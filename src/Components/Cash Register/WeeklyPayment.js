@@ -28,8 +28,10 @@ import {
     getExpenseSummaryType,
     buildWeeklyPaymentExpenseTypeSummary,
 } from '../../utils/weeklyPaymentStaffAdvancePdf';
+import { syncExpensesEntryFromWeeklyExpenseEdit } from '../../utils/expensesEntryWeeklyPaymentBill';
 import Change from '../Images/dropdownchange.png';
 import { useLiveDataSync } from '../../utils/useLiveDataSync';
+import { useWeeklyPaymentRegisterPermissions } from '../../utils/useWeeklyPaymentRegisterPermissions';
 import CustomDateField from '../ExpensesEntry/CustomDateField';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
 import AdvancePortalForm from '../Advance Portal/AdvancePortal';
@@ -190,7 +192,8 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
     };
     const enteredBy = resolveEnteredBy();
     const normalizedUsername = username?.trim();
-    const canRemoveBillCopyUrl = normalizedUsername === 'Admin' || normalizedUsername === 'Mahalingam M';
+    const { hasEditPermission, hasDeletePermission } = useWeeklyPaymentRegisterPermissions(userRoles);
+    const canRemoveBillCopyUrl = hasDeletePermission;
     const resolveActiveBranchId = () => {
         try {
             const selectedBranchId = localStorage.getItem("selectedBranchId");
@@ -501,6 +504,7 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
         staff_advance_portal_id: "",
         loan_portal_id: "",
         description: "",
+        expenses_entry_id: "",
     });
     const handleEditClick = async (row) => {
         setEditingRowId(row.id);
@@ -546,6 +550,7 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
             loan_portal_id: row.loan_portal_id || "",
             description: description,
             branch_id: row.branch_id ?? row.branchId ?? activeBranchId ?? null,
+            expenses_entry_id: row.expenses_entry_id ?? row.expensesEntryId ?? null,
         });
     };
     const formatDateOnly = (dateString) => {
@@ -871,8 +876,11 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                         ? Number(row.amount)
                         : null,
                 paymentMode: 'Cash',
+                expensesEntryId: row.expenses_entry_id ?? row.expensesEntryId ?? null,
                 fromWeeklyCashRegister: true,
                 weeklyExpenseId: row.id,
+                weeklyExpenseRow: row,
+                source: 'Cash Register',
             };
             localStorage.setItem('expenseEntryPrefill', JSON.stringify(prefill));
             setShowBillExpenseEntryModal(true);
@@ -2807,15 +2815,28 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                 editFormData.loan_portal_id = null;
             }
             if (!onlyDescriptionChanged) {
-                const finalEditData = { ...editFormData };
-                finalEditData.branch_id = row.branch_id ?? row.branchId ?? activeBranchId ?? null;
-                finalEditData.type_id = getWeeklyExpenseTypeId(editFormData.type);
+                const preservedExpensesEntryId =
+                    row.expenses_entry_id ??
+                    row.expensesEntryId ??
+                    editingOriginalRow?.expenses_entry_id ??
+                    editingOriginalRow?.expensesEntryId ??
+                    editFormData.expenses_entry_id ??
+                    null;
+                const finalEditData = {
+                    ...row,
+                    ...editFormData,
+                    branch_id: row.branch_id ?? row.branchId ?? activeBranchId ?? null,
+                    type_id: getWeeklyExpenseTypeId(editFormData.type),
+                };
                 if (editFormData.type === "Project Advance") {
                     finalEditData.employee_id = null;
                 }
                 if (editFormData.type === "Staff Advance") {
                     finalEditData.contractor_id = null;
                     finalEditData.vendor_id = null;
+                }
+                if (preservedExpensesEntryId != null && preservedExpensesEntryId !== '') {
+                    finalEditData.expenses_entry_id = preservedExpensesEntryId;
                 }
                 const response = await fetch(
                     `https://backendaab.in/demoAabuildersDash/api/weekly-expenses/edit/${row.id}?username=${encodeURIComponent(
@@ -2829,12 +2850,60 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                 );
                 if (!response.ok) throw new Error("Failed to update expense");
                 const updatedExpense = await response.json();
+                if (
+                    preservedExpensesEntryId != null &&
+                    preservedExpensesEntryId !== '' &&
+                    !updatedExpense.expenses_entry_id &&
+                    !updatedExpense.expensesEntryId
+                ) {
+                    updatedExpense.expenses_entry_id = preservedExpensesEntryId;
+                }
                 setExpenses((prevExpenses) => {
                     const newExpenses = prevExpenses.map((exp) => (exp.id === row.id ? updatedExpense : exp));
                     fetchPortalDescriptions(newExpenses);
                     fetchStaffAdvanceDescriptions(newExpenses);
                     return newExpenses;
                 });
+            }
+            const expensesEntryId =
+                row.expenses_entry_id ??
+                row.expensesEntryId ??
+                editingOriginalRow?.expenses_entry_id ??
+                editingOriginalRow?.expensesEntryId ??
+                editFormData.expenses_entry_id ??
+                null;
+            if (expensesEntryId) {
+                const weeklyRowForSync = {
+                    ...row,
+                    ...editFormData,
+                    expenses_entry_id: expensesEntryId,
+                };
+                const project = siteOptions.find(
+                    (opt) => Number(opt.id) === Number(weeklyRowForSync.project_id)
+                );
+                const vid = weeklyRowForSync.vendor_id ?? weeklyRowForSync.vendorId;
+                const cid = weeklyRowForSync.contractor_id ?? weeklyRowForSync.contractorId;
+                try {
+                    await syncExpensesEntryFromWeeklyExpenseEdit(weeklyRowForSync, {
+                        editedBy: username,
+                        siteLabel: project?.label ?? project?.value ?? '',
+                        vendorName:
+                            vid != null && String(vid).trim() !== '' && !Number.isNaN(Number(vid))
+                                ? (vendorOptions.find((v) => Number(v.id) === Number(vid))?.value ||
+                                      vendorOptions.find((v) => Number(v.id) === Number(vid))?.label ||
+                                      '')
+                                : '',
+                        contractorName:
+                            cid != null && String(cid).trim() !== '' && !Number.isNaN(Number(cid))
+                                ? (contractorOptions.find((c) => Number(c.id) === Number(cid))?.value ||
+                                      contractorOptions.find((c) => Number(c.id) === Number(cid))?.label ||
+                                      '')
+                                : '',
+                    });
+                } catch (syncError) {
+                    console.error('Failed to sync linked expense entry:', syncError);
+                    alert('Weekly expense saved, but the linked expense entry could not be updated.');
+                }
             }
             await refreshWeeklyPaymentData();
             setEditingRowId(null);
@@ -4042,10 +4111,11 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                             </div>
                         </div>
                     </div>
-                    <div className="w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden max-xl:overflow-y-auto no-scrollbar scrollbar-none">
-                        <div className="flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none">
-                            <div className="flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none max-xl:shrink-0 xl:min-w-[1240] xl:max-w-[1240] xl:shrink-0 xl:h-full xl:flex-none xl:w-auto">
-                                <div className="flex justify-between items-center mb-[8px] shrink-0">
+                    <div className="w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden max-xl:overflow-y-auto max-xl:overflow-x-hidden no-scrollbar scrollbar-none">
+                        <div className="flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto no-scrollbar scrollbar-none">
+                            <div className="flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto no-scrollbar scrollbar-none max-xl:shrink-0 xl:min-w-[1240] xl:max-w-[1240] xl:shrink-0 xl:h-full xl:flex-none xl:w-auto">
+                                <div className="w-full max-w-full xl:w-[1258px] xl:max-w-[1258px] flex flex-col shrink-0 self-start flex-1 min-h-0 overflow-hidden">
+                                <div className="flex justify-between items-center mb-[8px] shrink-0 w-full">
                                     <h1 className="font-bold text-base">
                                         Expenses (PS {operationalWeekNumber ?? "-"})
                                     </h1>
@@ -4053,8 +4123,9 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                                         ₹{Number(totalExpenses).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </h1>
                                 </div>
-                                <div className="flex flex-col w-full max-w-full overflow-hidden xl:w-fit xl:flex-1 xl:min-h-0 max-xl:flex-none max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none">
-                                    <div className="mb-[12px] w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-hidden">
+                                <div className="flex flex-col w-full max-w-full overflow-hidden xl:w-fit xl:flex-1 xl:min-h-0 max-xl:flex-none max-xl:overflow-x-auto no-scrollbar scrollbar-none">
+                                    <div className="mb-[12px] w-full max-w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center justify-between gap-[6px] overflow-hidden">
+                                        <div className="flex flex-row flex-nowrap items-center gap-[6px] min-w-0 flex-1 overflow-hidden">
                                         <div className="shrink-0 flex items-center z-[2] bg-white">
                                             <EdbcFilterToggleButton
                                                 onClick={() => {
@@ -4132,18 +4203,18 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                                                 </span>
                                             )}
                                         </div>
+                                        </div>
                                         <EdbcTableToolbarRightActions
                                             onClearFilters={clearFilters}
                                             overallSearch={overallSearch}
                                             onOverallSearchChange={setOverallSearch}
-                                            wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] max-xl:flex-1 xl:shrink-0"
-                                            searchWrapperClassName="h-[34px] min-w-0 flex-1 border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1 xl:w-[286px] xl:shrink-0"
+                                            wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] shrink-0"
                                         />
                                     </div>
-                                    <div className="w-full flex-1 min-h-0 rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden xl:w-fit xl:flex xl:flex-col max-xl:flex-none max-xl:min-h-[330px]">
+                                    <div className="w-full flex-1 min-h-0 rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden flex flex-col max-xl:min-h-[330px]">
                                         <div
                                             ref={scrollRef}
-                                            className="w-full flex-1 min-h-0 h-full overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none max-xl:flex-none max-xl:min-h-[330px] xl:w-fit xl:max-w-full xl:overflow-auto"
+                                            className="w-full flex-1 min-h-0 h-full overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none max-w-full max-xl:min-h-[330px]"
                                             onWheel={() => { filterNudgeUsedRef.current = false; }}
                                             onMouseDown={(e) => handleMouseDown(e, scrollRef)}
                                             onMouseMove={(e) => handleMouseMove(e, scrollRef)}
@@ -4660,7 +4731,7 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                                                                                     </span>
                                                                                 ) : (
                                                                                     <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
-                                                                                        {isWeeklyExpenseTypeMatched(row.type) ? (
+                                                                                        {isWeeklyExpenseTypeMatched(row.type) && hasEditPermission ? (
                                                                                             <button type="button" onClick={() => handleEditClick(row)}>
                                                                                                 <img src={Edit} alt="Edit" className="w-5 h-4" />
                                                                                             </button>
@@ -4670,7 +4741,7 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                                                                                     </span>
                                                                                 )}
                                                                                 <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
-                                                                                    {isWeeklyExpenseTypeMatched(row.type) ? (
+                                                                                    {isWeeklyExpenseTypeMatched(row.type) && hasDeletePermission ? (
                                                                                         <button type="button" onClick={() => handleWeeklyExpensesDelete(row.id)}>
                                                                                             <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                                         </button>
@@ -4702,16 +4773,19 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                                         </div>
                                     </div>
                                 </div>
+                                </div>
                             </div>
-                            <div className="w-fit shrink-0 flex flex-col min-h-0 xl:h-full max-xl:h-auto max-xl:w-full">
-                                <div className="flex justify-between items-center mb-[8px]">
+                            <div className="w-fit shrink-0 flex flex-col min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto no-scrollbar scrollbar-none xl:h-full max-xl:h-auto max-xl:w-full">
+                                <div className="flex flex-col flex-1 min-h-0 max-xl:w-full">
+                                <div className="w-[502px] max-w-full shrink-0 self-start flex flex-col">
+                                <div className="flex justify-between items-center mb-[8px] w-full">
                                     <h1 className="font-bold text-base">Income</h1>
                                     <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
                                         ₹{payments.reduce((total, row) => total + Number(row.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </h1>
                                 </div>
-                                <div className="flex flex-col w-fit max-w-full min-h-0 overflow-hidden max-xl:w-full max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none">
-                                    <div className="mb-[12px] w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-hidden">
+                                    <div className="mb-[12px] w-full max-w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center justify-between gap-[6px] overflow-hidden">
+                                        <div className="flex flex-row flex-nowrap items-center gap-[6px] min-w-0 flex-1 overflow-hidden">
                                         <div className="shrink-0 flex items-center z-[2] bg-white">
                                             <EdbcFilterToggleButton
                                                 onClick={() => {
@@ -4775,18 +4849,21 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                                                 </span>
                                             )}
                                         </div>
+                                        </div>
                                         <EdbcTableToolbarRightActions
                                             onClearFilters={clearPaymentsFilters}
                                             overallSearch={paymentsOverallSearch}
                                             onOverallSearchChange={setPaymentsOverallSearch}
-                                            wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] max-xl:flex-1 xl:shrink-0"
-                                            searchWrapperClassName="h-[34px] min-w-0 flex-1 border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1 xl:w-[286px] xl:shrink-0"
+                                            wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] shrink-0"
                                         />
                                     </div>
+                                </div>
+                                <div className="flex flex-col flex-1 min-h-0 max-xl:flex-row max-xl:flex-wrap max-xl:items-start max-xl:gap-x-[18px] max-xl:gap-y-[12px] w-full">
+                                <div className="w-[502px] max-w-full shrink-0 self-start flex flex-col">
                                     <div className="w-fit max-w-full flex flex-col shrink-0">
                                         <div
                                             ref={paymentsScrollRef}
-                                            className="rounded-lg border-l-8 border-l-[#BF9853] min-h-[330px] w-fit max-w-full shrink-0 overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none max-xl:w-full"
+                                            className="rounded-lg border-l-8 border-l-[#BF9853] min-h-[330px] w-full max-w-full shrink-0 overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none"
                                             style={{
                                                 height: `${40 + (showPaymentsFilters ? 40 : 0) + 40 + 180}px`,
                                                 maxHeight: `${40 + (showPaymentsFilters ? 40 : 0) + 40 + 180}px`,
@@ -5040,7 +5117,7 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                                                                         </span>
                                                                     ) : (
                                                                         <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
-                                                                            {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
+                                                                            {weeklyReceivedTypes.some(type => type.received_type === row.type) && hasEditPermission ? (
                                                                                 <button onClick={() => handleEditPaymentClick(row)}>
                                                                                     <img className="w-5 h-4" src={Edit} alt="Edit" />
                                                                                 </button>
@@ -5054,7 +5131,7 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                                                                         </span>
                                                                     )}
                                                                     <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
-                                                                        {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
+                                                                        {weeklyReceivedTypes.some(type => type.received_type === row.type) && hasDeletePermission ? (
                                                                             <button type="button" onClick={() => handleWeeklyReceivedDelete(row.id)}>
                                                                                 <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                             </button>
@@ -5089,12 +5166,12 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                                         </div>
                                     </div>
                                 </div>
-                                <div className="mt-[12px] flex-1 min-h-0 rounded-xl bg-white px-[18px] py-[12px] border border-[#E6DAC6] text-left overflow-hidden max-xl:flex-none max-xl:overflow-visible">
-                                    <div className="flex flex-col h-full min-h-0">
+                                <div className="xl:mt-[12px] max-xl:flex-1 max-xl:min-w-[280px] flex-1 min-h-0 rounded-xl bg-white px-[18px] py-[12px] border border-[#E6DAC6] text-left overflow-hidden overflow-x-hidden no-scrollbar scrollbar-none max-xl:overflow-visible">
+                                    <div className="flex flex-col h-full min-h-0 overflow-x-hidden">
                                         <div className="flex items-center justify-between rounded-lg mb-[4px]">
                                             <p className="text-[16px] font-semibold text-black">Summary Details</p>
                                         </div>
-                                        <div className="overflow-y-auto no-scrollbar scrollbar-none flex-1 min-h-0 max-xl:overflow-visible max-xl:flex-none">
+                                        <div className="overflow-y-auto overflow-x-hidden no-scrollbar scrollbar-none flex-1 min-h-0 max-xl:overflow-visible max-xl:flex-none">
                                             {Object.entries(
                                                 expenses
                                                     .filter(expense => Number(expense.amount) > 0)
@@ -5120,6 +5197,8 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                                             </p>
                                         </div>
                                     </div>
+                                </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
@@ -5185,15 +5264,15 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                             />
                         </label>
                         <div className="flex justify-end gap-[18px] mt-[18px]">
-                            {portalDescriptions[currentRow?.advance_portal_id] && !isDescriptionEditing && (
-                                <button onClick={() => setIsDescriptionEditing(true)} disabled={editingRowId !== currentRow?.id} className="px-4 py-2 bg-green-600 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
+                            {portalDescriptions[currentRow?.advance_portal_id] && !isDescriptionEditing && editingRowId === currentRow?.id && (
+                                <button onClick={() => setIsDescriptionEditing(true)} className="px-4 py-2 bg-green-600 text-white rounded-md">
                                     Edit
                                 </button>
                             )}
                             <button onClick={() => { setShowPopups(false); setIsDescriptionEditing(false); }} className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded">
                                 Close
                             </button>
-                            {(!portalDescriptions[currentRow?.advance_portal_id] || isDescriptionEditing) && (
+                            {(!portalDescriptions[currentRow?.advance_portal_id] || isDescriptionEditing) && (!portalDescriptions[currentRow?.advance_portal_id] || editingRowId === currentRow?.id) && (
                                 <button
                                     onClick={async () => {
                                         await updateDescription(currentRow.advance_portal_id, editFormData.description);
@@ -5743,10 +5822,10 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                 </div>
             ) : null}
             {showBillSettlementAdvanceModal ? (
-                <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg w-full max-w-[1824px] max-h-[92vh] overflow-y-auto shadow-lg relative">
-                        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-                            <p className="text-sm font-semibold text-[#202020]">Advance Portal</p>
+                <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center">
+                    <div className="bg-white rounded-lg overflow-y-auto shadow-lg relative p-[18px]">
+                        <div className="sticky top-0 z-10 bg-white flex items-center justify-between mb-[14px]">
+                            <p className="text-[18px] font-semibold text-black">Advance Portal</p>
                             <button
                                 type="button"
                                 onClick={() => {
@@ -5764,16 +5843,16 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                                         /* ignore */
                                     }
                                 }}
-                                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
+                                className="w-8 h-8 flex items-center justify-center transition-colors duration-200"
                             >
-                                ×
+                                <img src={FileRemover} className="w-3 h-3" alt="Close" />
                             </button>
                         </div>
-                        <div className="p-3">
-                            <AdvancePortalForm
+                        <AdvancePortalForm
                                 username={username}
                                 userRoles={userRoles}
                                 embedded
+                                modalEmbedded
                                 lockTypePrefill
                                 onSuccess={async () => {
                                     setShowBillSettlementAdvanceModal(false);
@@ -5796,7 +5875,6 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                                     }
                                 }}
                             />
-                        </div>
                     </div>
                 </div>
             ) : null}

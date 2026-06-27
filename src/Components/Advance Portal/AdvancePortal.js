@@ -45,7 +45,7 @@ const ADVANCE_PORTAL_TEXTAREA_CLASS =
   'border-2 border-[#BF9853] rounded-md px-[8px] lg:w-[616px] w-[300px] h-[60px] focus:outline-none border-opacity-[0.20] resize-none text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
 const ADVANCE_PORTAL_LABEL_CLASS = 'text-md font-semibold mb-[8px] block';
 const ADVANCE_PORTAL_FORM_FIELDS = {
-  selectType: 'Select Type',
+  selectType: 'Account Type',
   date: 'Date',
   contractorVendor: 'Contractor/Vendor',
   overallAdvance: 'Overall Advance',
@@ -92,6 +92,7 @@ const AdvancePortal = ({
   userRoles = [],
   paymentModeOptions = [],
   embedded = false,
+  modalEmbedded = false,
   onSuccess,
   lockTypePrefill = false,
   refreshSignal,
@@ -1948,8 +1949,9 @@ const AdvancePortal = ({
     }
   };
   return (
-    <div className='flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]'>
-      <div className='px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]'>
+    <div className={`flex flex-col overflow-hidden ${modalEmbedded ? 'bg-white h-auto' : 'h-[calc(100vh-104px)] bg-[#FAF6ED]'}`}>
+      <div className={`flex flex-col flex-1 min-h-0 overflow-hidden ${modalEmbedded ? 'bg-white p-0' : 'px-[18px] pt-[18px] pb-[18px] bg-[#FAF6ED]'}`}>
+          {!embedded && (
           <div className='w-full pt-[18px] px-[18px] pb-[18px] rounded-[6px] bg-white mb-[18px] text-left flex items-center gap-6'>
             <div className='flex flex-wrap gap-[10px] w-full'>
               <div>
@@ -1996,6 +1998,11 @@ const AdvancePortal = ({
                       ...customStyles.placeholder(provided),
                       color: '#A6A5A6',
                     }),
+                    dropdownIndicator: (provided, state) => ({
+                      ...customStyles.dropdownIndicator(provided, state),
+                      paddingLeft: 0,
+                      paddingRight: 4,
+                    }),
                   }}
                   className='lg:w-[150px] rounded-lg focus:outline-none '
                 />
@@ -2028,10 +2035,11 @@ const AdvancePortal = ({
               </div>
             </div>
           </div>
-        <div className='w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex-1 min-h-0 min-w-0 overflow-hidden flex flex-col'>
+          )}
+        <div className={`w-full flex-1 min-h-0 min-w-0 overflow-hidden flex flex-col ${modalEmbedded ? 'bg-white p-0 rounded-none' : 'pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px]'}`}>
             <div className='xl:flex flex-1 min-h-0 xl:min-w-0 px- gap-[18px]'>
-              <div className='shrink-0 xl:w-fit' ref={leftFormColRef}>
-                <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 text-left'>
+              <div className='shrink-0 w-fit' ref={leftFormColRef}>
+                <div className='grid grid-cols-2 gap-3 text-left'>
                   <div className='text-left max-w-[300px]'>
                     <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.selectType}<span className="text-[#E4572E]">*</span></label>
                     {lockTypePrefill ? (
@@ -2137,8 +2145,8 @@ const AdvancePortal = ({
                     </div>
                   )}
                   {selectedType === 'Bill Settlement' && (
-                    <div className="col-span-1 sm:col-span-2">
-                      <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="col-span-2">
+                      <div className="flex flex-row gap-3">
                         <div className="text-left flex-1">
                           <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.category}<span className="text-[#E4572E]">*</span></label>
                           <Select
@@ -2163,8 +2171,8 @@ const AdvancePortal = ({
                       </div>
                     </div>
                   )}
-                  <div className="col-span-1 sm:col-span-2">
-                    <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="col-span-2">
+                    <div className="flex flex-row gap-3">
                       <div className="text-left flex-1">
                         <label className={ADVANCE_PORTAL_LABEL_CLASS}>
                           {selectedType === 'Transfer'
@@ -2213,7 +2221,7 @@ const AdvancePortal = ({
                       </div>
                     </div>
                   </div>
-                  <div className='col-span-1 sm:col-span-2 text-left' ref={descriptionSectionRef}>
+                  <div className='col-span-2 text-left' ref={descriptionSectionRef}>
                     <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.description}</label>
                     <textarea
                       rows={2}
@@ -2223,7 +2231,7 @@ const AdvancePortal = ({
                       className={`${ADVANCE_PORTAL_TEXTAREA_CLASS} hover:!border-[rgba(191,152,83,0.2)] focus:!border-[rgba(191,152,83,1)]`}
                     />
                   </div>
-                  <div className='col-span-1 sm:col-span-2 min-w-0 overflow-hidden'>
+                  <div className='col-span-2 min-w-0 overflow-hidden'>
                     <div className="flex items-start justify-between lg:w-[616px] w-[300px] gap-2 flex-wrap mb-2 min-w-0">
                       <div className='flex shrink-0'>
                         <label htmlFor="fileInput" className="cursor-pointer flex items-center gap-[6px] text-orange-600">

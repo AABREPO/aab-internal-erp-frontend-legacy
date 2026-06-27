@@ -3313,7 +3313,12 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                             </>
                                         )}
                                         <div className="text-left">
-                                            <label className="block text-black font-semibold mb-[8px] text-left">Bill Copy URL</label>
+                                            <div className="flex justify-between mb-[8px] w-[616px]">
+                                                <label className="block text-black font-semibold text-left">Bill Copy URL</label>
+                                                {pendingBillCopyFile && (
+                                                    <span className="text-[14px] text-[#E4572E] font-semibold">{pendingBillCopyFile.name}</span>
+                                                )}
+                                            </div>
                                             <div className="flex w-[616px] items-center gap-[8px]">
                                                 <input
                                                     type="text"

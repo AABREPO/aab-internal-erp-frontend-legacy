@@ -375,3 +375,129 @@ export const syncWeeklyExpensesForExpensesEntryEdit = async (
     await updateWeeklyExpenseById(row.id, payload, { editedBy, apiBase });
   }
 };
+
+const EXPENSES_FORM_API_BASE = 'https://backendaab.in/demoAabuilderDash';
+
+export const resolveWeeklyExpenseExpensesEntryId = (row) => {
+  const id = row?.expenses_entry_id ?? row?.expensesEntryId;
+  if (id == null || id === '') return null;
+  const n = Number(id);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+export const getExpensesEntryAccountTypeFromWeeklyExpenseType = (weeklyType) => {
+  const t = String(weeklyType || '').trim();
+  if (t === 'Bill Payment' || t === 'Bill') return 'Bill Payments';
+  if (t === 'Claim' || t === 'Claim Payment') return 'Claim Payment';
+  return null;
+};
+
+export const fetchExpensesFormEntryById = async (
+  expensesEntryId,
+  apiBase = EXPENSES_FORM_API_BASE
+) => {
+  const res = await fetch(`${apiBase}/expenses_form/get_form`, {
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    throw new Error('Failed to fetch expenses for linked entry update');
+  }
+  const all = await res.json();
+  return (Array.isArray(all) ? all : []).find((e) => String(e.id) === String(expensesEntryId)) || null;
+};
+
+export const buildExpenseUpdatePayloadFromWeeklyExpenseEdit = (
+  weeklyData,
+  existingExpense,
+  { editedBy = '', siteLabel = '', vendorName = '', contractorName = '' } = {}
+) => {
+  const existing = existingExpense || {};
+  const weeklyType = weeklyData?.type ?? weeklyData?.accountType;
+  const mappedAccountType = getExpensesEntryAccountTypeFromWeeklyExpenseType(weeklyType);
+
+  const resolvedDate =
+    normalizeWeeklyBillApiDate(weeklyData?.date) ??
+    normalizeWeeklyBillApiDate(existing.date) ??
+    '';
+
+  const projectId =
+    normalizeWeeklyBillNullableId(weeklyData?.project_id ?? weeklyData?.projectId) ??
+    existing.projectId ??
+    existing.project_id ??
+    null;
+
+  const vendorId = normalizeWeeklyBillNullableId(weeklyData?.vendor_id ?? weeklyData?.vendorId);
+  const contractorId = normalizeWeeklyBillNullableId(
+    weeklyData?.contractor_id ?? weeklyData?.contractorId
+  );
+
+  const amountRaw = parseFloat(weeklyData?.amount);
+  const amount = Number.isFinite(amountRaw) ? amountRaw : parseFloat(existing.amount) || 0;
+
+  const weeklyDescription = String(weeklyData?.description ?? '').trim();
+
+  // Inline Cash Register edits must not touch bill copy on expenses_form — only the
+  // expense-entry popup / dedicated upload flow should change the file URL.
+  const existingBillCopy = String(existing.billCopyUrl ?? existing.billCopy ?? '').trim();
+
+  return {
+    ...existing,
+    accountType: mappedAccountType || existing.accountType || 'Bill Payments',
+    date: resolvedDate,
+    siteName: siteLabel || existing.siteName || existing.projectName || '',
+    projectId,
+    vendor: vendorName || existing.vendor || '',
+    vendorId: vendorId ?? existing.vendorId ?? existing.vendor_id ?? null,
+    contractor: contractorName || existing.contractor || '',
+    contractorId: contractorId ?? existing.contractorId ?? existing.contractor_id ?? null,
+    amount,
+    ...(existingBillCopy ? { billCopy: existingBillCopy, billCopyUrl: existingBillCopy } : {}),
+    comments: weeklyDescription || existing.comments || '',
+    source: existing.source || weeklyData?.source || 'Cash Register',
+    branchId:
+      normalizeWeeklyBillNullableId(weeklyData?.branch_id ?? weeklyData?.branchId) ??
+      existing.branchId ??
+      existing.branch_id ??
+      null,
+    editedBy: editedBy || existing.editedBy || null,
+  };
+};
+
+/** When a Cash Register weekly expense row is edited, mirror changes onto expenses_form. */
+export const syncExpensesEntryFromWeeklyExpenseEdit = async (
+  weeklyExpenseData,
+  {
+    editedBy = '',
+    siteLabel = '',
+    vendorName = '',
+    contractorName = '',
+    apiBase = EXPENSES_FORM_API_BASE,
+  } = {}
+) => {
+  const expensesEntryId = resolveWeeklyExpenseExpensesEntryId(weeklyExpenseData);
+  if (!expensesEntryId) return { ok: false, skipped: true };
+
+  const existingExpense = await fetchExpensesFormEntryById(expensesEntryId, apiBase);
+  if (!existingExpense) {
+    console.warn(`Linked expense entry ${expensesEntryId} not found; skipping expense sync`);
+    return { ok: false, skipped: true, notFound: true };
+  }
+
+  const updatePayload = buildExpenseUpdatePayloadFromWeeklyExpenseEdit(
+    weeklyExpenseData,
+    existingExpense,
+    { editedBy, siteLabel, vendorName, contractorName }
+  );
+
+  const response = await fetch(`${apiBase}/expenses_form/update/${expensesEntryId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(updatePayload),
+  });
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Failed to update linked expense entry: ${errText}`);
+  }
+  return { ok: true, expensesEntryId };
+};

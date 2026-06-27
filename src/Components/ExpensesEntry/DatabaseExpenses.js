@@ -10,6 +10,7 @@ import SingleDatePicker from './SingleDatePicker';
 import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
+import FileRemover from '../Images/FileRemover.svg';
 import Select, { components as selectComponents } from 'react-select';
 import UploadFile from '../Images/Upload file.svg'
 import CalendarIcon from "../Images/Calendoricon.png";
@@ -3497,7 +3498,12 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                             </>
                                         )}
                                         <div className="text-left">
-                                            <label className="block text-black font-semibold mb-[8px] text-left">Bill Copy URL</label>
+                                            <div className="flex justify-between mb-[8px] w-[616px]">
+                                                <label className="block text-black font-semibold text-left">Bill Copy URL</label>
+                                                {pendingBillCopyFile && (
+                                                    <span className="text-[14px] text-[#E4572E] font-semibold">{pendingBillCopyFile.name}</span>
+                                                )}
+                                            </div>
                                             <div className="flex w-[616px] items-center gap-[8px]">
                                                 <input
                                                     type="text"
@@ -3623,6 +3629,43 @@ const formatDate = (dateString) => {
     return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
 };
 const AuditModal = ({ show, onClose, audits, resolveMachineToolsDisplay, vendorOptions = [], contractorOptions = [], employeeOptions = [], labourOptions = [] }) => {
+    const auditScrollRef = useRef(null);
+    const auditIsDragging = useRef(false);
+    const [auditDragCursor, setAuditDragCursor] = useState(false);
+    const auditStart = useRef({ x: 0, y: 0 });
+    const auditScrollPos = useRef({ left: 0, top: 0 });
+    const handleAuditMouseDown = (e) => {
+        if (e.target.closest('a, button, input, textarea, select')) return;
+        if (!auditScrollRef.current) return;
+        auditIsDragging.current = true;
+        auditStart.current = { x: e.clientX, y: e.clientY };
+        auditScrollPos.current = {
+            left: auditScrollRef.current.scrollLeft,
+            top: auditScrollRef.current.scrollTop,
+        };
+        auditScrollRef.current.style.userSelect = 'none';
+    };
+    const handleAuditMouseMove = (e) => {
+        if (!auditIsDragging.current || !auditScrollRef.current) return;
+        setAuditDragCursor(true);
+        const dx = e.clientX - auditStart.current.x;
+        const dy = e.clientY - auditStart.current.y;
+        auditScrollRef.current.scrollLeft = auditScrollPos.current.left - dx;
+        auditScrollRef.current.scrollTop = auditScrollPos.current.top - dy;
+    };
+    const handleAuditMouseUp = () => {
+        auditIsDragging.current = false;
+        setAuditDragCursor(false);
+        if (auditScrollRef.current) {
+            auditScrollRef.current.style.userSelect = '';
+        }
+    };
+    useEffect(() => {
+        if (!auditDragCursor) return undefined;
+        const handleWindowMouseUp = () => handleAuditMouseUp();
+        window.addEventListener('mouseup', handleWindowMouseUp);
+        return () => window.removeEventListener('mouseup', handleWindowMouseUp);
+    }, [auditDragCursor]);
     if (!show) return null;
     const auditDataFields = [
         { key: 'Date', columnId: EDBC_IDS.EDBC2 },
@@ -3632,7 +3675,7 @@ const AuditModal = ({ show, onClose, audits, resolveMachineToolsDisplay, vendorO
         { key: 'Comments', columnId: EDBC_IDS.EDBC9 },
         { key: 'Category', columnId: EDBC_IDS.EDBC10 },
         { key: 'AccountType', columnId: EDBC_IDS.EDBC12 },
-        { key: 'BillCopy', columnId: null },
+        { key: 'BillCopy', columnId: EDBC_IDS.EDBC20 },
     ];
     const pickAudit = (audit, camel, snake) => audit[camel] ?? audit[snake];
     const normalizeAuditId = (id) => {
@@ -3703,13 +3746,45 @@ const AuditModal = ({ show, onClose, audits, resolveMachineToolsDisplay, vendorO
         const oldVal = audit[`old${key}`];
         const rawNewVal = audit[`new${key}`];
         const rawVal = isNew ? rawNewVal : oldVal;
-        const displayValue = formatFieldDisplay(key, rawVal);
         const tdClass = columnId ? getEdbcColumnConfig(columnId)?.tdClass : '';
-        const billCopyClass = key === 'BillCopy' ? 'border text-sm text-center' : '';
-        const className = ['border text-sm', tdClass, billCopyClass].filter(Boolean).join(' ');
+        const className = ['border text-sm', tdClass].filter(Boolean).join(' ');
+        if (key === 'BillCopy') {
+            const billCopyUrl = rawVal && String(rawVal).trim() ? String(rawVal).trim() : '';
+            const content = billCopyUrl ? (
+                <a
+                    href={billCopyUrl}
+                    className="text-red-500 underline"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onMouseDown={(e) => e.stopPropagation()}
+                >
+                    View
+                </a>
+            ) : (
+                <span></span>
+            );
+            if (!isNew) {
+                return (
+                    <td key={key} id={columnId || undefined} className={className}>
+                        {content}
+                    </td>
+                );
+            }
+            const changed = getFieldChanged(key, oldVal, rawNewVal);
+            return (
+                <td
+                    key={key}
+                    id={columnId || undefined}
+                    className={`${className} ${changed ? 'bg-[#BF9853] text-black font-bold' : ''}`}
+                >
+                    {content}
+                </td>
+            );
+        }
+        const displayValue = formatFieldDisplay(key, rawVal);
         if (!isNew) {
             return (
-                <td key={key} id={columnId || undefined} style={key === 'BillCopy' ? { width: '300px' } : undefined} className={className}>
+                <td key={key} id={columnId || undefined} className={className}>
                     {displayValue}
                 </td>
             );
@@ -3719,7 +3794,6 @@ const AuditModal = ({ show, onClose, audits, resolveMachineToolsDisplay, vendorO
             <td
                 key={key}
                 id={columnId || undefined}
-                style={key === 'BillCopy' ? { width: '300px' } : undefined}
                 className={`${className} ${changed ? 'bg-[#BF9853] text-black font-bold' : ''}`}
             >
                 {displayValue}
@@ -3731,15 +3805,22 @@ const AuditModal = ({ show, onClose, audits, resolveMachineToolsDisplay, vendorO
     const edbc12TdClass = getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass || '';
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white rounded-md shadow-lg p-4">
-                <div className="flex justify-between items-center mt-4 ml-7 mr-7">
-                    <h2 className="text-xl font-bold">History</h2>
+            <div className="bg-white rounded-md w-full max-w-[1800px] shadow-lg p-4">
+                <div className="flex justify-between items-center mt-4">
+                    <h2 className="text-xl font-bold ml-7">History</h2>
                     <button onClick={onClose}>
-                        <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
+                        <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
                     </button>
                 </div>
-                <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
-                    <table className="table-fixed min-w-full bg-white border-collapse">
+                <div
+                    ref={auditScrollRef}
+                    className={`overflow-x-auto overflow-y-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg no-scrollbar scrollbar-none ml-7 select-none${auditDragCursor ? ' cursor-grabbing' : ''}`}
+                    onMouseDown={handleAuditMouseDown}
+                    onMouseMove={handleAuditMouseMove}
+                    onMouseUp={handleAuditMouseUp}
+                    onMouseLeave={handleAuditMouseUp}
+                >
+                    <table className="table-fixed w-max bg-white border-collapse">
                         <thead className="bg-[#FAF6ED]">
                             <EdbcTableHeaderRow>
                                 <EdbcColumnHeader columnId={EDBC_IDS.EDBC1} label="Time Stamp" />
@@ -3752,7 +3833,7 @@ const AuditModal = ({ show, onClose, audits, resolveMachineToolsDisplay, vendorO
                                 <EdbcColumnHeader columnId={EDBC_IDS.EDBC9} label="Discription" />
                                 <EdbcColumnHeader columnId={EDBC_IDS.EDBC10} label="Category" />
                                 <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="A/C Type" />
-                                <th style={{ width: '300px' }} className="border-b py-2 px-4 text-center text-base font-bold whitespace-nowrap">Bill Copy</th>
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="File" />
                                 <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Edited By" />
                             </EdbcTableHeaderRow>
                         </thead>

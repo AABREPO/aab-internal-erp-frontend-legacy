@@ -13,6 +13,7 @@ import {
     isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import { resolveExpensesEntryIdAfterSave } from '../../utils/advancePortalWeeklyPaymentBill';
+import { updateWeeklyExpenseById } from '../../utils/expensesEntryWeeklyPaymentBill';
 import {
     EXPENSE_ENTRY_MODULE_NAME,
 } from '../../utils/paymentModeArrangement';
@@ -344,6 +345,13 @@ const Form = ({
     const [billPaymentsCashRegisterPrefill, setBillPaymentsCashRegisterPrefill] = useState(false);
     /** Weekly expense row id — sync uploaded bill PDF to `PUT .../weekly-expenses/:id/bill-copy-url` */
     const [weeklyExpenseIdForBillCopyUrl, setWeeklyExpenseIdForBillCopyUrl] = useState(null);
+    /** Full weekly expense row from Cash Register — required so edit PUT does not clear other fields */
+    const [weeklyExpenseRowForLink, setWeeklyExpenseRowForLink] = useState(null);
+    /** When weekly row already has expenses_entry_id — update instead of creating new */
+    const [linkedExpensesEntryId, setLinkedExpensesEntryId] = useState(null);
+    const [linkedExpenseEntryRecord, setLinkedExpenseEntryRecord] = useState(null);
+    const [existingExpenseBillCopyUrl, setExistingExpenseBillCopyUrl] = useState('');
+    const [expenseEntrySource, setExpenseEntrySource] = useState('Expenses Entry');
     const [duplicateMatchedExpenses, setDuplicateMatchedExpenses] = useState([]);
     const [checkingDuplicate, setCheckingDuplicate] = useState(false);
     useEffect(() => {
@@ -787,6 +795,22 @@ const Form = ({
                         setWeeklyExpenseIdForBillCopyUrl(wid);
                     }
                 }
+                if (prefillData.weeklyExpenseRow && typeof prefillData.weeklyExpenseRow === 'object') {
+                    setWeeklyExpenseRowForLink(prefillData.weeklyExpenseRow);
+                }
+                const rawLinkedExpensesId =
+                    prefillData.expensesEntryId ??
+                    prefillData.expenses_entry_id ??
+                    prefillData.weeklyExpenseRow?.expenses_entry_id ??
+                    prefillData.weeklyExpenseRow?.expensesEntryId;
+                const parsedLinkedExpensesId = Number(rawLinkedExpensesId);
+                if (Number.isFinite(parsedLinkedExpensesId) && parsedLinkedExpensesId > 0) {
+                    setLinkedExpensesEntryId(parsedLinkedExpensesId);
+                }
+                if (prefillData.fromWeeklyCashRegister) {
+                    const prefillSource = String(prefillData.source ?? 'Cash Register').trim();
+                    setExpenseEntrySource(prefillSource || 'Cash Register');
+                }
 
                 const prefillAccountTypeName = normalizeAccountTypeName(
                     prefillData.accountType ?? prefillData.account_type
@@ -1040,6 +1064,10 @@ const Form = ({
                     // If we expected a party but couldn't match yet, keep prefill for a later rerender.
                     if ((needVendor || needContractor || hasVendorName || hasContractorName) && !didApplyParty) {
                         return;
+                    }
+
+                    if (prefillData.fromWeeklyCashRegister) {
+                        setBillPaymentsCashRegisterPrefill(true);
                     }
 
                     localStorage.removeItem('expenseEntryPrefill');
@@ -1584,9 +1612,144 @@ const Form = ({
             setAmount(rawValue);
         }
     };
+    const toLocalDateStr = (val) => {
+        if (!val) return '';
+        const d = new Date(val);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
     useEffect(() => {
+        if (linkedExpensesEntryId) return;
         fetchLatestEno();
-    }, []);
+    }, [linkedExpensesEntryId]);
+
+    useEffect(() => {
+        if (!linkedExpensesEntryId) return;
+        if (!siteOptions.length || !categoryOptions.length) return;
+        if (!vendorOptionsLoaded || !contractorOptionsLoaded) return;
+
+        let cancelled = false;
+        const loadLinkedExpenseEntry = async () => {
+            try {
+                const response = await fetch(
+                    buildBranchUrl('https://backendaab.in/demoAabuilderDash/expenses_form/get_form')
+                );
+                if (!response.ok || cancelled) return;
+                const allExpenses = await response.json();
+                const expense = (Array.isArray(allExpenses) ? allExpenses : []).find(
+                    (e) => String(e.id) === String(linkedExpensesEntryId)
+                );
+                if (!expense || cancelled) return;
+
+                setLinkedExpenseEntryRecord(expense);
+
+                if (expense.eno != null) setEno(expense.eno);
+
+                const billCopy = String(expense.billCopyUrl || expense.billCopy || '').trim();
+                setExistingExpenseBillCopyUrl(billCopy);
+
+                const accountTypeName = normalizeAccountTypeName(expense.accountType);
+                if (accountTypeName) setSelectedAccountType(accountTypeName);
+
+                const expenseDate = expense.date || expense.timestamp;
+                if (expenseDate) {
+                    const d = String(expenseDate);
+                    setDate(d.includes('T') ? d.split('T')[0] : toLocalDateStr(d));
+                }
+
+                const siteName = expense.siteName || expense.projectName || '';
+                if (siteName) {
+                    const siteOption = siteOptions.find(
+                        (opt) => String(opt.label).trim() === String(siteName).trim()
+                    );
+                    if (siteOption) setSelectedSite(siteOption);
+                }
+
+                const vid = expense.vendorId ?? expense.vendor_id;
+                const cid = expense.contractorId ?? expense.contractor_id;
+                const normalized = (s) => String(s ?? '').trim().toLowerCase();
+                const vName = normalized(expense.vendor);
+                const cName = normalized(expense.contractor);
+                if (vid != null && String(vid).trim() !== '' && Number.isFinite(Number(vid)) && Number(vid) > 0) {
+                    const v = combinedOptions.find(
+                        (o) => o.type === 'Vendor' && Number(o.id) === Number(vid)
+                    );
+                    if (v) {
+                        setSelectedOption(v);
+                        setSelectedType('Vendor');
+                    }
+                } else if (cid != null && String(cid).trim() !== '' && Number.isFinite(Number(cid)) && Number(cid) > 0) {
+                    const c = combinedOptions.find(
+                        (o) => o.type === 'Contractor' && Number(o.id) === Number(cid)
+                    );
+                    if (c) {
+                        setSelectedOption(c);
+                        setSelectedType('Contractor');
+                    }
+                } else if (vName) {
+                    const v = combinedOptions.find(
+                        (o) => o.type === 'Vendor' && normalized(o.label) === vName
+                    );
+                    if (v) {
+                        setSelectedOption(v);
+                        setSelectedType('Vendor');
+                    }
+                } else if (cName) {
+                    const c = combinedOptions.find(
+                        (o) => o.type === 'Contractor' && normalized(c.label) === cName
+                    );
+                    if (c) {
+                        setSelectedOption(c);
+                        setSelectedType('Contractor');
+                    }
+                }
+
+                if (expense.amount != null && expense.amount !== '') {
+                    setAmount(String(Math.abs(Number(expense.amount))));
+                }
+
+                const catOpt = findCategoryOptionByVendorField(expense.category);
+                if (catOpt) applyResolvedCategoryOption(catOpt);
+
+                if (expense.comments != null) setComments(String(expense.comments));
+                if (expense.quantity != null && expense.quantity !== '') {
+                    setQuantity(String(expense.quantity));
+                }
+
+                if (expense.paymentMode && !lockClaimPaymentModeCash) {
+                    setPaymentMode(expense.paymentMode);
+                }
+
+                const rawBillArrival = expense.billArrivalDate ?? expense.bill_arrival_date ?? '';
+                if (rawBillArrival) {
+                    const s = String(rawBillArrival).trim().slice(0, 10);
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) setBillArrivalDate(s);
+                }
+
+                if (String(expense.source || '').trim()) {
+                    setExpenseEntrySource(String(expense.source).trim());
+                }
+            } catch (error) {
+                console.error('Failed to load linked expense entry:', error);
+            }
+        };
+
+        loadLinkedExpenseEntry();
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        linkedExpensesEntryId,
+        siteOptions,
+        categoryOptions,
+        combinedOptions,
+        vendorOptionsLoaded,
+        contractorOptionsLoaded,
+        lockClaimPaymentModeCash,
+    ]);
+
     const formatDateOnly = (dateString) => {
         const date = new Date(dateString);
         const day = String(date.getDate()).padStart(2, '0');
@@ -1613,14 +1776,6 @@ const Form = ({
         const hour12 = hours % 12 || 12;
         return `${day}/${month}/${year} ${hour12}:${minutes} ${ampm}`;
     };
-    const toLocalDateStr = (val) => {
-        if (!val) return '';
-        const d = new Date(val);
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${y}-${m}-${day}`;
-    };
     const normalizeStr = (s) => (s == null ? '' : String(s).trim());
     const checkForDuplicateEntry = async () => {
         const vendorLabel = normalizeStr(selectedType === 'Vendor' && selectedOption ? selectedOption.label : '');
@@ -1635,6 +1790,9 @@ const Form = ({
             const allExpenses = await response.json();
 
             const matching = allExpenses.filter((exp) => {
+                if (linkedExpensesEntryId != null && String(exp.id) === String(linkedExpensesEntryId)) {
+                    return false;
+                }
                 const expDateStr = toLocalDateStr(exp.date || exp.timestamp);
                 const dateMatch = expDateStr === dateStr;
                 if (!dateMatch) return false;
@@ -1708,12 +1866,14 @@ const Form = ({
             alert('Please select a payment mode for this account type.');
             return false;
         }
-        if (selectedAccountType === 'Bill Refund' && !selectedFile) {
+        if (selectedAccountType === 'Bill Refund' && !selectedFile && !String(existingExpenseBillCopyUrl || '').trim()) {
             alert('PDF file is required for Bill Refund.');
             return false;
         }
+        const hasBillCopy =
+            !!selectedFile || !!String(existingExpenseBillCopyUrl || '').trim();
         // Bill Arrival Date is optional for Bill Payments / Bill Refund
-        if ((selectedAccountType === 'Utility Bills' || selectedAccountType === 'Bill Payments') && !selectedFile) {
+        if ((selectedAccountType === 'Utility Bills' || selectedAccountType === 'Bill Payments') && !hasBillCopy) {
             alert('PDF file is required for this account type.');
             return false;
         }
@@ -1722,7 +1882,7 @@ const Form = ({
             selectedAccountType !== 'Utility Bills' &&
             selectedAccountType !== 'Bill Payments' &&
             selectedAccountType !== 'Bill Refund' &&
-            !selectedFile
+            !hasBillCopy
         ) {
             alert('PDF file is required for this type.');
             return false;
@@ -1770,6 +1930,107 @@ const Form = ({
         setShowDuplicateModal(false);
         setDuplicateMatchedExpenses([]);
     };
+    const resolveExpenseBillCopyUrl = (pdfUrl) =>
+        String(pdfUrl || '').trim() ||
+        String(existingExpenseBillCopyUrl || '').trim() ||
+        '';
+    const fetchLinkedExpenseEntryRecord = async (expensesEntryId) => {
+        if (expensesEntryId == null) return null;
+        if (
+            linkedExpenseEntryRecord &&
+            String(linkedExpenseEntryRecord.id) === String(expensesEntryId)
+        ) {
+            return linkedExpenseEntryRecord;
+        }
+        try {
+            const response = await fetch(
+                buildBranchUrl('https://backendaab.in/demoAabuilderDash/expenses_form/get_form')
+            );
+            if (!response.ok) return null;
+            const allExpenses = await response.json();
+            return (
+                (Array.isArray(allExpenses) ? allExpenses : []).find(
+                    (e) => String(e.id) === String(expensesEntryId)
+                ) || null
+            );
+        } catch {
+            return null;
+        }
+    };
+    const persistExpenseEntry = async (bodyData, pdfUrl = '') => {
+        const billCopyResolved = resolveExpenseBillCopyUrl(pdfUrl);
+        const payload = {
+            ...bodyData,
+            billCopy: billCopyResolved,
+            billCopyUrl: billCopyResolved,
+        };
+        if (linkedExpensesEntryId != null) {
+            const existingRecord = await fetchLinkedExpenseEntryRecord(linkedExpensesEntryId);
+            const updateUrl = buildBranchUrl(
+                `https://backendaab.in/demoAabuilderDash/expenses_form/update/${linkedExpensesEntryId}`
+            );
+            const updatePayload = {
+                ...(existingRecord || {}),
+                ...payload,
+                id: linkedExpensesEntryId,
+                billCopy: billCopyResolved,
+                billCopyUrl: billCopyResolved,
+                editedBy: username,
+            };
+            const formResponse = await fetch(updateUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatePayload),
+            });
+            const responseText = await formResponse.text();
+            if (!formResponse.ok) {
+                throw new Error(`Form update failed: ${responseText}`);
+            }
+            if (billCopyResolved) {
+                setExistingExpenseBillCopyUrl(billCopyResolved);
+                setLinkedExpenseEntryRecord((prev) =>
+                    prev && String(prev.id) === String(linkedExpensesEntryId)
+                        ? { ...prev, billCopy: billCopyResolved, billCopyUrl: billCopyResolved }
+                        : prev
+                );
+            }
+            let savedExpenseData = { id: linkedExpensesEntryId, ...updatePayload };
+            const trimmed = responseText.trim();
+            if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                try {
+                    savedExpenseData = JSON.parse(trimmed);
+                } catch {
+                    // keep default savedExpenseData
+                }
+            }
+            return { expensesId: linkedExpensesEntryId, savedExpenseData };
+        }
+        const formResponse = await fetch(buildBranchUrl('https://backendaab.in/demoAabuilderDash/expenses_form/save'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const responseText = await formResponse.text();
+        if (!formResponse.ok) {
+            throw new Error(`Form submission failed: ${responseText}`);
+        }
+        const expensesId = resolveExpensesEntryIdAfterSave(responseText);
+        if (!expensesId) {
+            throw new Error(
+                'Expenses save response did not include id. Backend must return { id } from expenses_form.'
+            );
+        }
+        let savedExpenseData = null;
+        const trimmedSaveResponse = responseText.trim();
+        if (trimmedSaveResponse.startsWith('{') || trimmedSaveResponse.startsWith('[')) {
+            try {
+                savedExpenseData = JSON.parse(trimmedSaveResponse);
+            } catch {
+                savedExpenseData = null;
+            }
+        }
+        return { expensesId, savedExpenseData };
+    };
     const putWeeklyExpenseBillCopyUrl = async (weeklyExpenseId, url) => {
         if (weeklyExpenseId == null || url == null || String(url).trim() === '') return false;
         const res = await fetch(
@@ -1781,6 +2042,45 @@ const Form = ({
             }
         );
         return res.ok;
+    };
+    const fetchWeeklyExpenseRowById = async (weeklyExpenseId) => {
+        try {
+            const res = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly-expenses/getAll', {
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (!res.ok) return null;
+            const data = await res.json();
+            const list = Array.isArray(data) ? data : [];
+            return list.find((r) => String(r.id) === String(weeklyExpenseId)) || null;
+        } catch {
+            return null;
+        }
+    };
+    const linkWeeklyExpenseExpensesEntryId = async (weeklyExpenseId, expensesEntryId, existingRow) => {
+        if (weeklyExpenseId == null || expensesEntryId == null) return false;
+        let row = existingRow && typeof existingRow === 'object' ? { ...existingRow } : {};
+        if (!row.id && Object.keys(row).length === 0) {
+            const fetched = await fetchWeeklyExpenseRowById(weeklyExpenseId);
+            if (fetched) row = { ...fetched };
+        }
+        const payload = {
+            ...row,
+            id: weeklyExpenseId,
+            expenses_entry_id: expensesEntryId,
+        };
+        delete payload.billCopyUrl;
+        const existingBillCopy = String(payload.bill_copy_url ?? '').trim();
+        if (!existingBillCopy) {
+            delete payload.bill_copy_url;
+        }
+        try {
+            await updateWeeklyExpenseById(weeklyExpenseId, payload, { editedBy: username });
+            return true;
+        } catch (error) {
+            console.error('Failed to link weekly expense to expenses entry:', error);
+            return false;
+        }
     };
     const submitExpenseData = async () => {
         if (
@@ -1867,13 +2167,12 @@ const Form = ({
                 vendorId: vendorId,
                 contractor: contractor,
                 contractorId: contractorId,
-                source: "Expenses Entry",
+                source: expenseEntrySource,
                 quantity: quantity,
                 amount: selectedAccountType === 'Bill Refund' ? -Math.abs(parseInt(amount)) : parseInt(amount),
                 category: selectedCategory ? selectedCategory.label : '',
                 comments: comments,
                 machineTools: selectedMachineTools?.id != null ? selectedMachineTools.id : null,
-                billCopyUrl: pdfUrl || '',
                 utilityType: utilityType || '',
                 utilityTypeNumber: selectedEbNumber ? selectedEbNumber.label : '',
                 utilityForTheMonth: selectedMonths || '',
@@ -1887,45 +2186,7 @@ const Form = ({
                 enteredBy: username,
                 ...(eno != null ? { eno } : {}),
             };
-            const formResponse = await fetch(buildBranchUrl("https://backendaab.in/demoAabuilderDash/expenses_form/save"), {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(bodyData),
-            });
-            let expensesId = null;
-            let savedExpenseData = null;
-            const responseText = await formResponse.text();
-            if (!formResponse.ok) {
-                throw new Error(`Form submission failed: ${responseText}`);
-            }
-            expensesId = resolveExpensesEntryIdAfterSave(responseText);
-            console.log("expensesId", expensesId);
-            if (!expensesId) {
-                throw new Error(
-                    'Expenses save response did not include id. Backend must return { id } from expenses_form.'
-                );
-            }
-            const trimmedSaveResponse = responseText.trim();
-            if (trimmedSaveResponse.startsWith('{') || trimmedSaveResponse.startsWith('[')) {
-                try {
-                    savedExpenseData = JSON.parse(trimmedSaveResponse);
-                } catch {
-                    savedExpenseData = null;
-                }
-            }
-            if (expensesId) {
-                try {
-                    const verifyResponse = await fetch("https://backendaab.in/demoAabuilderDash/expenses_form/get_form");
-                    if (verifyResponse.ok) {
-                        const allForms = await verifyResponse.json();
-                        const savedForm = allForms.find(f => f.id === expensesId);
-                    }
-                } catch (verifyError) {
-                    console.error('Could not verify saved data:', verifyError);
-                }
-            }
+            const { expensesId, savedExpenseData } = await persistExpenseEntry(bodyData, pdfUrl);
             // When opened from Cash Register file-upload flows, we must NOT create a weekly-expenses row here.
             if (!disableWeeklyExpensesSave && paymentMode === 'Cash' && expensesId && selectedAccountType !== 'Bill Payments') {
                 let vendorId = null;
@@ -1957,7 +2218,7 @@ const Form = ({
                     bill_copy_url: pdfUrl || '',
                     branch_id: activeBranchId,
                     entered_by: username,
-                    source: "Expenses Entry",
+                    source: expenseEntrySource,
                 };
                 try {
                     const weeklyExpenseResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-expenses/save", {
@@ -1974,6 +2235,16 @@ const Form = ({
                     }
                 } catch (error) {
                     console.error("❌ Error submitting weekly expense:", error);
+                }
+            }
+            if (disableWeeklyExpensesSave && weeklyExpenseIdForBillCopyUrl != null && expensesId && linkedExpensesEntryId == null) {
+                const linked = await linkWeeklyExpenseExpensesEntryId(
+                    weeklyExpenseIdForBillCopyUrl,
+                    expensesId,
+                    weeklyExpenseRowForLink
+                );
+                if (!linked) {
+                    toast.warn('Expense saved, but the weekly expense row could not be linked.');
                 }
             }
             if (weeklyExpenseIdForBillCopyUrl != null && pdfUrl) {
@@ -2106,7 +2377,9 @@ const Form = ({
             alert("Please enter cheque number and date.");
             return;
         }
-        if ((selectedAccountType === 'Utility Bills' || selectedAccountType === 'Bill Payments') && !selectedFile) {
+        const hasBillCopy =
+            !!selectedFile || !!String(existingExpenseBillCopyUrl || '').trim();
+        if ((selectedAccountType === 'Utility Bills' || selectedAccountType === 'Bill Payments') && !hasBillCopy) {
             alert('PDF file is required for this account type.');
             return;
         }
@@ -2193,11 +2466,10 @@ const Form = ({
                 contractor_id: contractorId,
                 quantity: quantity,
                 amount: parseInt(paymentModalData.amount),
-                source: "Expenses Entry",
+                source: expenseEntrySource,
                 category: selectedCategory ? selectedCategory.label : '',
                 comments: comments,
                 machineTools: selectedMachineTools?.id != null ? selectedMachineTools.id : null,
-                billCopyUrl: pdfUrl || '',
                 paymentMode: paymentModalData.paymentMode,
                 utilityType: utilityType || '',
                 utilityTypeNumber: selectedEbNumber ? selectedEbNumber.label : '',
@@ -2212,7 +2484,9 @@ const Form = ({
                 enteredBy: username,
                 ...(eno != null ? { eno } : {}),
             };
-            const expensesSaveUrl = buildBranchUrl("https://backendaab.in/demoAabuilderDash/expenses_form/save");
+            const expensesSaveUrl = linkedExpensesEntryId != null
+                ? buildBranchUrl(`https://backendaab.in/demoAabuilderDash/expenses_form/update/${linkedExpensesEntryId}`)
+                : buildBranchUrl('https://backendaab.in/demoAabuilderDash/expenses_form/save');
             if (
                 selectedAccountType !== 'Bill Payments' &&
                 isPaymentModeRequiringBankRegisterLog(paymentModalData.paymentMode)
@@ -2227,46 +2501,7 @@ const Form = ({
                     }
                 );
             }
-            const expensesResponse = await fetch(expensesSaveUrl, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(expensesPayload),
-            });
-            let expensesId = null;
-            let savedExpenseData = null;
-            const responseText = await expensesResponse.text();
-            if (!expensesResponse.ok) {
-                throw new Error(`Expenses form submission failed: ${responseText}`);
-            }
-            expensesId = resolveExpensesEntryIdAfterSave(responseText);
-            if (!expensesId) {
-                throw new Error(
-                    'Expenses save response did not include id. Backend must return { id } from expenses_form.'
-                );
-            }
-            const trimmedSaveResponse = responseText.trim();
-            if (trimmedSaveResponse.startsWith('{') || trimmedSaveResponse.startsWith('[')) {
-                try {
-                    savedExpenseData = JSON.parse(trimmedSaveResponse);
-                } catch {
-                    savedExpenseData = { id: expensesId };
-                }
-            } else {
-                savedExpenseData = { id: expensesId, message: responseText };
-            }
-            if (expensesId) {
-                try {
-                    const verifyResponse = await fetch("https://backendaab.in/demoAabuilderDash/expenses_form/get_form");
-                    if (verifyResponse.ok) {
-                        const allForms = await verifyResponse.json();
-                        const savedForm = allForms.find(f => f.id === expensesId);
-                    }
-                } catch (verifyError) {
-                    console.error('Could not verify saved data:', verifyError);
-                }
-            }
+            const { expensesId, savedExpenseData } = await persistExpenseEntry(expensesPayload, pdfUrl);
             if (selectedAccountType !== 'Bill Payments') {
                 const weeklyPaymentBillPayload = {
                     date: paymentModalData.date,
@@ -2290,7 +2525,7 @@ const Form = ({
                     account_number: paymentModalData.accountNumber || null,
                     branch_id: activeBranchId,
                     entered_by: username,
-                    source: "Expenses Entry",
+                    source: expenseEntrySource,
                 };
                 const weeklyResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save', {
                     method: 'POST',
@@ -2325,13 +2560,25 @@ const Form = ({
                     theme: "colored"
                 });
             }
+            if (disableWeeklyExpensesSave && weeklyExpenseIdForBillCopyUrl != null && expensesId && linkedExpensesEntryId == null) {
+                const linked = await linkWeeklyExpenseExpensesEntryId(
+                    weeklyExpenseIdForBillCopyUrl,
+                    expensesId,
+                    weeklyExpenseRowForLink
+                );
+                if (!linked) {
+                    toast.warn('Expense saved, but the weekly expense row could not be linked.');
+                }
+            }
             if (weeklyExpenseIdForBillCopyUrl != null && pdfUrl) {
                 const ok = await putWeeklyExpenseBillCopyUrl(weeklyExpenseIdForBillCopyUrl, pdfUrl);
                 if (!ok) {
                     toast.warn('Expense saved, but the weekly bill row could not be updated with the file link.');
                 }
             }
-            setEno(eno + 1);
+            if (!linkedExpensesEntryId) {
+                setEno(eno + 1);
+            }
             resetForm();
             setShowPaymentModal(false);
             if (typeof onSuccess === 'function') {

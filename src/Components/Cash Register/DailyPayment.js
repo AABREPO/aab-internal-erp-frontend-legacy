@@ -32,6 +32,8 @@ import {
     EdbcTableToolbarRightActions,
     EdbcTextInputFilter,
     EdbcTotalAmountFilter,
+    EdbcExpandableBodyCell,
+    useEdbcExpandedCells,
     EDBC_TABLE_EDGE_TABLE_CLASS,
     EDBC_CASH_REGISTER_CHANGE_COLUMN_CLASS,
     EDBC_CASH_REGISTER_DAILY_REFUND_TABLE_LOCK_TABLE_CLASS,
@@ -49,6 +51,7 @@ import {
     matchesWeeklyPaymentExpenseOverallSearch,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
 import { useLiveDataSync } from '../../utils/useLiveDataSync';
+import { useWeeklyPaymentRegisterPermissions } from '../../utils/useWeeklyPaymentRegisterPermissions';
 
 const CASH_REGISTER_SELECT_STYLES = {
     ...DATABASE_TABLE_FILTER_SELECT_STYLES,
@@ -69,8 +72,14 @@ const DAILY_PAYMENT_EXPENSES_TBODY_TABLE_LOCK_TABLE_CLASS =
         .replace(/\[&_td\.edbc/g, '[&_tbody_td.edbc');
 
 const DAILY_PAYMENT_EXPENSES_TABLE_FIXED_WIDTH_CLASS = 'w-[1240px] min-w-[1240px]';
-const DAILY_PAYMENT_REFUND_TABLE_FIXED_WIDTH_CLASS = 'w-[480px] min-w-[480px]';
-const DAILY_PAYMENT_REFUND_SECTION_FIXED_WIDTH_CLASS = 'w-[488px] min-w-[488px]';
+const DAILY_REFUND_TABLE_FIXED_WIDTH_CLASS = 'w-[490px] min-w-[490px]';
+const DAILY_REFUND_TABLE_INCOME_STYLE_CLASS =
+    '[&_th#EDBC-20]:!w-[70px] [&_td#EDBC-20]:!w-[70px] [&_th#EDBC-20]:!min-w-[70px] [&_td#EDBC-20]:!min-w-[70px] [&_th#EDBC-20]:!max-w-[70px] [&_td#EDBC-20]:!max-w-[70px]';
+const DAILY_REFUND_TBODY_TABLE_LOCK_TABLE_CLASS =
+    EDBC_CASH_REGISTER_DAILY_REFUND_TABLE_LOCK_TABLE_CLASS.replace(/\[&_td#/g, '[&_tbody_td#');
+
+const formatRefundAmountDisplay = (amount) =>
+    `₹${Number(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const DAILY_PAYMENT_EXPENSES_TBODY_EDBC8_LOCK_TABLE_CLASS =
     '[&_thead_tr.bg-\\[\\#eeeeee\\]>th#EDBC-8]:!pr-0 [&_th#EDBC-8]:!w-[120px] [&_th#EDBC-8]:!max-w-[120px] [&_th#EDBC-8]:!overflow-hidden [&_tbody_td#EDBC-8]:!w-[98px] [&_tbody_td#EDBC-8]:!max-w-[98px] [&_tbody_td#EDBC-8]:!overflow-visible';
@@ -98,8 +107,8 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
         }
     };
     const enteredBy = resolveEnteredBy();
-    const canEditDelete = username === 'Admin' || username === 'Mahalingam M';
-    const canRemoveFileUrl = canEditDelete;
+    const { hasEditPermission, hasDeletePermission } = useWeeklyPaymentRegisterPermissions(userRoles);
+    const canRemoveFileUrl = hasDeletePermission;
     const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
     const withBranchUrl = useCallback((baseUrl) => {
         const url = new URL(baseUrl);
@@ -179,10 +188,10 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
     const [combinedOptions, setCombinedOptions] = useState([]);
     const currentYear = new Date().getFullYear();
     const [weeklyReceivedTypes, setWeeklyReceivedTypes] = useState([]);
-    const [isChangeButtonActive, setIsChangeButtonActive] = useState(false);
+    const [isChangeButtonActive, setIsChangeButtonActive] = useState(true);
     /** Labour vs Vendor/Contractor/Employee toggle — only for the row currently being edited (independent from new entry). */
     const [isEditChangeButtonActive, setIsEditChangeButtonActive] = useState(false);
-    const [isRefundChangeButtonActive, setIsRefundChangeButtonActive] = useState(false);
+    const [isRefundChangeButtonActive, setIsRefundChangeButtonActive] = useState(true);
     const [currentFileRow, setCurrentFileRow] = useState(null);
     const [selectedFileForPopup, setSelectedFileForPopup] = useState(null);
     const [removedFileUrlRows, setRemovedFileUrlRows] = useState({});
@@ -342,7 +351,9 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
     const refundScrollRef = useRef(null);
     const refundFilterRowRef = useRef(null);
     const refundFilterNudgeUsedRef = useRef(false);
+    const { expandedCells, toggleExpandedCell } = useEdbcExpandedCells();
     const isDragging = useRef(false);
+    const dragHorizontalOnly = useRef(false);
     const start = useRef({ x: 0, y: 0 });
     const scroll = useRef({ left: 0, top: 0 });
     const velocity = useRef({ x: 0, y: 0 });
@@ -373,11 +384,12 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
     };
     // Move laboursList state declaration here, before it's used in sortedDailyExpenses
     const [laboursList, setLaboursList] = useState([]);
-    const handleMouseDown = (e, ref) => {
+    const handleMouseDown = (e, ref, horizontalOnly = false) => {
         if (!ref.current) return;
         if (isScrollDragExcludedTarget(e.target)) return;
         if (e.button !== 0) return;
         isDragging.current = true;
+        dragHorizontalOnly.current = horizontalOnly;
         start.current = { x: e.clientX, y: e.clientY };
         scroll.current = {
             left: ref.current.scrollLeft,
@@ -395,12 +407,12 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
     const handleMouseMove = (e, ref) => {
         if (!isDragging.current || !ref.current) return;
         const dx = e.clientX - start.current.x;
-        const dy = e.clientY - start.current.y;
+        const dy = dragHorizontalOnly.current ? 0 : (e.clientY - start.current.y);
         const now = Date.now();
         const dt = now - lastMove.current.time || 16;
         velocity.current = {
             x: (e.clientX - lastMove.current.x) / dt,
-            y: (e.clientY - lastMove.current.y) / dt,
+            y: dragHorizontalOnly.current ? 0 : (e.clientY - lastMove.current.y) / dt,
         };
         ref.current.scrollLeft = scroll.current.left - dx;
         ref.current.scrollTop = scroll.current.top - dy;
@@ -2817,12 +2829,13 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
     const refundDstCol20Label = 'Activity';
     return (
         <body className="bg-[#FAF6ED] overflow-hidden">
-            <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED] px-[18px] pt-[18px] pb-[18px]">
+            <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED] px-[10px] min-[400px]:px-[14px] md:px-[18px] pt-[10px] min-[400px]:pt-[14px] md:pt-[18px] pb-[10px] min-[400px]:pb-[14px] md:pb-[18px]">
                 <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
                     <div className="w-full rounded-[6px] bg-white mb-[18px] shrink-0">
                         <div className="flex flex-wrap items-center justify-between text-left max-md:flex-col max-md:items-stretch">
-                            <div className='flex gap-[12px] p-[18px]'>
-                                <div className="min-w-0">
+                            <div className="flex-1 min-w-0 overflow-visible p-[10px] min-[400px]:p-[14px] md:p-[18px]">
+                                <div className="flex flex-wrap gap-[8px] min-[400px]:gap-[10px] md:gap-[12px] items-end text-left">
+                                <div className="min-w-0 shrink-0">
                                     <label className="block font-semibold mb-[8px]">Weekly Balance</label>
                                     <input
                                         type="text"
@@ -2836,7 +2849,7 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                         (day) => formatLocalISODate(day) === selectedDate
                                     );
                                     return (
-                                        <div className="relative flex items-center rounded-lg bg-[#FFFDF9] border border-[#FFEBC9]">
+                                        <div className="relative flex items-center rounded-lg bg-[#FFFDF9] border border-[#FFEBC9] shrink-0 w-fit max-w-full overflow-x-auto no-scrollbar scrollbar-none">
                                             {selectedDayIndex >= 0 && (
                                                 <div
                                                     className="absolute top-0 bottom-0 rounded-md bg-[#BF9853] transition-all duration-700 ease-in-out"
@@ -2854,12 +2867,12 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                         key={idx}
                                                         type="button"
                                                         onClick={() => handleDateClick(dateStr)}
-                                                        className={`relative z-10 flex flex-1 flex-col items-center min-w-[73px] pt-[10px] pb-[8px] px-[14px] rounded-md transition-colors duration-300 ${isSelected ? 'text-white' : 'text-black'}`}
+                                                        className={`relative z-10 flex shrink-0 flex-col items-center w-[44px] min-[400px]:w-[52px] sm:w-[58px] md:w-[73px] pt-[6px] pb-[6px] min-[400px]:pt-[8px] min-[400px]:pb-[7px] md:pt-[10px] md:pb-[8px] px-[3px] min-[400px]:px-[5px] sm:px-[8px] md:px-[14px] rounded-md transition-colors duration-300 ${isSelected ? 'text-white' : 'text-black'}`}
                                                     >
-                                                        <span className="text-[14px] font-semibold leading-tight">
+                                                        <span className="text-[10px] min-[400px]:text-[11px] sm:text-[12px] md:text-[14px] font-semibold leading-tight">
                                                             {day.toLocaleDateString("en-US", { weekday: "short" })}
                                                         </span>
-                                                        <span className="text-[14px] font-semibold leading-tight mt-[2px]">
+                                                        <span className="text-[10px] min-[400px]:text-[11px] sm:text-[12px] md:text-[14px] font-semibold leading-tight mt-[2px] whitespace-nowrap">
                                                             {formatDate(day)}
                                                         </span>
                                                         {isSelected && (
@@ -2871,8 +2884,9 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                         </div>
                                     );
                                 })()}
+                                </div>
                             </div>
-                            <div className="flex items-center space-x-3 flex-wrap justify-end pr-[18px] max-md:justify-start max-md:px-[18px] max-md:pb-[18px] max-md:w-full">
+                            <div className="flex items-center flex-wrap justify-end pr-[18px] max-md:justify-start max-md:px-[18px] max-md:pb-[18px] max-md:w-full">
                                 <div
                                     className="rounded-md px-4 py-[8px] text-sm shrink-0"
                                     style={{
@@ -2919,16 +2933,18 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                             </div>
                         </div>
                     </div>
-            <div className="w-full p-[18px] border-collapse bg-[#FFFFFF] rounded-md flex flex-col flex-1 min-h-0 overflow-hidden max-xl:overflow-y-auto no-scrollbar scrollbar-none">
-                <div className="w-full flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none">
-                    <div className="shrink-0 w-fit max-w-full flex flex-col min-h-0 overflow-hidden max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none">
-                        <div className="flex justify-between items-center mb-[8px]">
+            <div className="w-full p-[18px] border-collapse bg-[#FFFFFF] rounded-md flex flex-col flex-1 min-h-0 overflow-hidden max-xl:overflow-y-auto max-xl:overflow-x-hidden no-scrollbar scrollbar-none">
+                <div className="w-full flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto no-scrollbar scrollbar-none">
+                    <div className="shrink-0 w-fit max-w-full flex flex-col min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto no-scrollbar scrollbar-none">
+                        <div className="w-full max-w-full xl:w-[1258px] xl:max-w-[1258px] flex flex-col shrink-0 self-start flex-1 min-h-0 overflow-hidden">
+                        <div className="flex justify-between items-center mb-[8px] w-full">
                             <h1 className="font-bold text-base">Expenses (PS {currentWeekNumber ?? "-"})</h1>
                             <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
                                 ₹{Number(expensesFilteredTotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </h1>
                         </div>
-                        <div className="mb-[12px] w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-hidden">
+                        <div className="mb-[12px] w-full max-w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center justify-between gap-[6px] overflow-hidden">
+                            <div className="flex flex-row flex-nowrap items-center gap-[6px] min-w-0 flex-1 overflow-hidden">
                             <div className="shrink-0 flex items-center z-[2] bg-white">
                                 <EdbcFilterToggleButton
                                     onClick={() => {
@@ -3006,12 +3022,12 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                     </span>
                                 )}
                             </div>
+                            </div>
                             <EdbcTableToolbarRightActions
                                 onClearFilters={clearFilters}
                                 overallSearch={overallSearch}
                                 onOverallSearchChange={setOverallSearch}
-                                wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] max-xl:flex-1 xl:shrink-0"
-                                searchWrapperClassName="h-[34px] min-w-0 flex-1 border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1 xl:w-[286px] xl:shrink-0"
+                                wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] shrink-0"
                             />
                         </div>
                         <div className="w-full flex-1 min-h-0 rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
@@ -3188,9 +3204,9 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                             className="text-xs focus:outline-none w-full"
                                                             value={newDailyExpense.type ? { value: newDailyExpense.type, label: newDailyExpense.type } : null}
                                                             onChange={(selectedOption) => handleInputChange({ target: { name: 'type', value: selectedOption ? selectedOption.value : '' } })}
-                                                            options={(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type) => ({
-                                                                value: isChangeButtonActive ? type.category : type.type,
-                                                                label: isChangeButtonActive ? type.category : type.type,
+                                                            options={(isChangeButtonActive ? weeklyTypes : expensesCategory).map((type) => ({
+                                                                value: isChangeButtonActive ? type.type : type.category,
+                                                                label: isChangeButtonActive ? type.type : type.category,
                                                             }))}
                                                             placeholder={expensesDstCol12Label}
                                                             isSearchable
@@ -3545,7 +3561,7 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                 </span>
                                                             ) : (
                                                                 <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
-                                                                    {row.type === "Carry Forward" ? (
+                                                                    {row.type === "Carry Forward" || !hasEditPermission ? (
                                                                         <img
                                                                             className="w-5 h-4 opacity-40 cursor-not-allowed"
                                                                             src={Edit}
@@ -3558,13 +3574,15 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                     )}
                                                                 </span>
                                                             )}
-                                                            {canEditDelete && (
-                                                                <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                            <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                {hasDeletePermission ? (
                                                                     <button type="button" onClick={() => handleDailyExpensesDelete(row.id)}>
                                                                         <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                     </button>
-                                                                </span>
-                                                            )}
+                                                                ) : (
+                                                                    <img className="w-5 h-4 opacity-40 cursor-not-allowed" src={Delete} alt="Delete Disabled" />
+                                                                )}
+                                                            </span>
                                                             <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
                                                                 <button type="button" onClick={() => fetchAuditDetailsForDailyExpense(row.id)}>
                                                                     <img className="w-5 h-4" src={history} alt="History" />
@@ -3579,16 +3597,19 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                 </table>
                             </div>
                         </div>
+                        </div>
                     </div>
-                    <div className="w-fit shrink-0 flex flex-col min-h-0 xl:h-full max-xl:h-auto max-xl:w-full">
-                        <div className="flex justify-between items-center mb-[8px]">
+                    <div className="w-fit shrink-0 flex flex-col min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto no-scrollbar scrollbar-none xl:h-full max-xl:h-auto max-xl:w-full">
+                        <div className="flex flex-col flex-1 min-h-0 max-xl:w-full">
+                        <div className="w-[502px] max-w-full shrink-0 self-start flex flex-col">
+                        <div className="flex justify-between items-center mb-[8px] w-full">
                             <h1 className="font-bold text-base">Refund Received</h1>
                             <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
                                 ₹{Number(totalRefund).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </h1>
                         </div>
-                        <div className={`flex flex-col ${DAILY_PAYMENT_REFUND_SECTION_FIXED_WIDTH_CLASS} max-w-full min-h-0 overflow-hidden max-xl:w-full max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none`}>
-                            <div className="mb-[12px] w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-hidden">
+                            <div className="mb-[12px] w-full max-w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center justify-between gap-[6px] overflow-hidden">
+                                <div className="flex flex-row flex-nowrap items-center gap-[6px] min-w-0 flex-1 overflow-hidden">
                                 <div className="shrink-0 flex items-center z-[2] bg-white">
                                 <EdbcFilterToggleButton
                                     onClick={() => {
@@ -3625,37 +3646,45 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                 <div
                                     ref={refundFilterChipsRef}
                                     className="w-0 flex-1 min-w-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-x-auto overflow-y-hidden no-scrollbar scrollbar-none cursor-grab max-xl:w-auto max-xl:flex-none max-xl:shrink"
-                                    onMouseDown={(e) => handleMouseDown(e, refundFilterChipsRef)}
+                                    onMouseDown={(e) => handleMouseDown(e, refundFilterChipsRef, true)}
                                     onMouseMove={(e) => handleMouseMove(e, refundFilterChipsRef)}
                                     onMouseUp={() => handleMouseUp(refundFilterChipsRef)}
                                     onMouseLeave={() => handleMouseUp(refundFilterChipsRef)}
                                 >
                                     {selectRefundName && (
-                                        <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                        <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
                                             <span className="font-medium text-[#BF9853]">{refundDstCol4Label}: </span>
                                             <span className="font-semibold text-[14px]">{selectRefundName}</span>
-                                            <button type="button" onClick={() => setSelectRefundName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            <button type="button" onClick={() => setSelectRefundName('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
                                     {selectRefundAmount.trim() && (
-                                        <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                        <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
                                             <span className="font-medium text-[#BF9853]">{refundDstCol8Label}: </span>
                                             <span className="font-semibold text-[14px]">{selectRefundAmount}</span>
                                             <button type="button" onClick={() => setSelectRefundAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                         </span>
                                     )}
                                 </div>
+                                </div>
                                 <EdbcTableToolbarRightActions
                                     onClearFilters={clearRefundFilters}
                                     overallSearch={refundOverallSearch}
                                     onOverallSearchChange={setRefundOverallSearch}
-                                    wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] max-xl:flex-1 xl:shrink-0"
-                                    searchWrapperClassName="h-[34px] min-w-0 flex-1 border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1 xl:w-[286px] xl:shrink-0"
+                                    wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] shrink-0"
                                 />
                             </div>
-                            <div className="shrink-0">
-                                <div ref={refundScrollRef} className="rounded-lg border-l-8 border-l-[#BF9853] min-h-[330px] w-fit max-w-full shrink-0 overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none"
-                                    onWheel={() => { refundFilterNudgeUsedRef.current = false; }}
+                        </div>
+                        <div className="flex flex-col flex-1 min-h-0 max-xl:flex-row max-xl:flex-wrap max-xl:items-start max-xl:gap-x-[18px] max-xl:gap-y-[12px] w-full">
+                        <div className="w-[502px] max-w-full shrink-0 self-start flex flex-col">
+                            <div className="w-fit max-w-full flex flex-col shrink-0">
+                                <div
+                                    ref={refundScrollRef}
+                                    className="rounded-lg border-l-8 border-l-[#BF9853] min-h-[330px] w-full max-w-full shrink-0 overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none"
+                                    onWheel={(e) => {
+                                        refundFilterNudgeUsedRef.current = false;
+                                        e.stopPropagation();
+                                    }}
                                     style={{
                                         height: `${40 + (showRefundFilters ? 40 : 0) + 40 + 180}px`,
                                         maxHeight: `${40 + (showRefundFilters ? 40 : 0) + 40 + 180}px`,
@@ -3664,8 +3693,12 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                         transform: 'translateZ(0)',
                                         backfaceVisibility: 'hidden'
                                     }}
+                                    onMouseDown={(e) => handleMouseDown(e, refundScrollRef)}
+                                    onMouseMove={(e) => handleMouseMove(e, refundScrollRef)}
+                                    onMouseUp={() => handleMouseUp(refundScrollRef)}
+                                    onMouseLeave={() => handleMouseUp(refundScrollRef)}
                                 >
-                                    <table className={`border-collapse text-left ${DAILY_PAYMENT_REFUND_TABLE_FIXED_WIDTH_CLASS} table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} ${EDBC_CASH_REGISTER_DAILY_REFUND_TABLE_LOCK_TABLE_CLASS} [&_tbody_tr]:!h-[40px] [&_tbody_tr]:!max-h-[40px] [&_tbody_tr>td]:box-border [&_tbody_tr>td]:!h-[40px] [&_tbody_tr>td]:!max-h-[40px] [&_tbody_tr>td]:!py-0 [&_tbody_tr>td]:!leading-none [&_th#EDBC-20]:!w-[70px] [&_td#EDBC-20]:!w-[70px] [&_th#EDBC-20]:!min-w-[70px] [&_td#EDBC-20]:!min-w-[70px] [&_th#EDBC-20]:!max-w-[70px] [&_td#EDBC-20]:!max-w-[70px] [&_thead_tr>th:nth-last-child(3)]:!w-[80px] [&_thead_tr>th:nth-last-child(3)]:!min-w-[80px] [&_thead_tr>th:nth-last-child(3)]:!max-w-[80px] [&_tbody_tr>td:nth-last-child(3)]:!w-[80px] [&_tbody_tr>td:nth-last-child(3)]:!min-w-[80px] [&_tbody_tr>td:nth-last-child(3)]:!max-w-[80px]`}>
+                                    <table className={`border-collapse text-left ${DAILY_REFUND_TABLE_FIXED_WIDTH_CLASS} table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} ${DAILY_REFUND_TABLE_INCOME_STYLE_CLASS} ${DAILY_REFUND_TBODY_TABLE_LOCK_TABLE_CLASS}`}>
                                         <colgroup>
                                             <col style={{ width: '218px' }} />
                                             <col style={{ width: '100px' }} />
@@ -3673,7 +3706,7 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                             <col style={{ width: '70px' }} />
                                             <col style={{ width: '12px' }} />
                                         </colgroup>
-                                        <thead className="sticky top-0 z-10 bg-white">
+                                        <thead className="sticky top-0 z-[99999] bg-white">
                                             <EdbcTableHeaderRow>
                                                 <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label={refundDstCol4Label} sortProps={refundEdbcSortProps} />
                                                 <th className="px-[2px] w-[100px] overflow-visible" aria-hidden="true"></th>
@@ -3711,7 +3744,7 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                     <th className="w-[12px] min-w-[12px] max-w-[12px] p-0" aria-hidden="true"></th>
                                                 </EdbcTableFilterRow>
                                             )}
-                                            <tr className="bg-white !h-[40px] !max-h-[40px] [&>td]:box-border [&>td]:!h-[40px] [&>td]:!max-h-[40px] [&>td]:!py-0 [&>td]:!leading-none overflow-hidden">
+                                            <EdbcTableBodyRow className="!bg-white border-b-2 border-gray-200 !h-[40px] !max-h-[40px] [&>td]:!py-0 overflow-hidden">
                                                 <td id={EDBC_IDS.EDBC4} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass} overflow-hidden !pl-[12px]`}>
                                                     <div className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass} min-w-0 max-w-full`}>
                                                         <Select
@@ -3768,13 +3801,13 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                 <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
                                                 </td>
                                                 <td className="w-[12px] min-w-[12px] max-w-[12px] p-0"></td>
-                                            </tr>
+                                            </EdbcTableBodyRow>
                                         </thead>
                                         <tbody>
                                             {sortedRefundPayments.map((row, index) => (
-                                                <EdbcTableBodyRow key={row.id || index} className="!h-[40px] !max-h-[40px] [&>td]:box-border [&>td]:!h-[40px] [&>td]:!max-h-[40px] [&>td]:!py-0 [&>td]:!leading-none overflow-hidden">
-                                                    <td id={EDBC_IDS.EDBC4} className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass}>
-                                                        {editingPaymentId === row.id ? (
+                                                <EdbcTableBodyRow key={row.id || index}>
+                                                    {editingPaymentId === row.id ? (
+                                                        <td id={EDBC_IDS.EDBC4} className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass}>
                                                             <Select
                                                                 name="refund_party"
                                                                 className="text-xs focus:outline-none w-full"
@@ -3794,14 +3827,17 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                 menuPortalTarget={document.body}
                                                                 styles={CASH_REGISTER_SELECT_STYLES}
                                                             />
-                                                        ) : (
-                                                            <div className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass} h-[40px] flex items-center overflow-hidden`}>
-                                                                <div className="truncate">
-                                                                    {getRefundRowName(row)}
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </td>
+                                                        </td>
+                                                    ) : (
+                                                        <EdbcExpandableBodyCell
+                                                            columnId={EDBC_IDS.EDBC4}
+                                                            expense={row}
+                                                            rowIndex={index}
+                                                            expandedCells={expandedCells}
+                                                            onToggleExpanded={toggleExpandedCell}
+                                                            getDisplayValue={getRefundRowName}
+                                                        />
+                                                    )}
                                                     <td className="px-[2px] overflow-visible">
                                                         {editingPaymentId !== row.id && (() => {
                                                             const hasLabourId = row.labour_id && Number(row.labour_id) > 0;
@@ -3815,8 +3851,8 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                             );
                                                         })()}
                                                     </td>
-                                                    <td id={EDBC_IDS.EDBC22} className={getEdbcColumnConfig(EDBC_IDS.EDBC22)?.tdClass}>
-                                                        {editingPaymentId === row.id ? (
+                                                    {editingPaymentId === row.id ? (
+                                                        <td id={EDBC_IDS.EDBC22} className={getEdbcColumnConfig(EDBC_IDS.EDBC22)?.tdClass}>
                                                             <div className={getEdbcColumnConfig(EDBC_IDS.EDBC22)?.filterWidthClass}>
                                                                 <input
                                                                     type="number"
@@ -3831,10 +3867,18 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                     onWheel={(e) => e.preventDefault()}
                                                                 />
                                                             </div>
-                                                        ) : (
-                                                            formatEdbcTotalAmountPlaceholder(row.amount)
-                                                        )}
-                                                    </td>
+                                                        </td>
+                                                    ) : (
+                                                        <EdbcExpandableBodyCell
+                                                            columnId={EDBC_IDS.EDBC22}
+                                                            expense={row}
+                                                            rowIndex={index}
+                                                            expandedCells={expandedCells}
+                                                            onToggleExpanded={toggleExpandedCell}
+                                                            textAlignClass="text-right"
+                                                            getDisplayValue={(entry) => formatRefundAmountDisplay(entry.amount)}
+                                                        />
+                                                    )}
                                                     <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
                                                         <div className="flex gap-1 justify-center">
                                                             {editingPaymentId === row.id ? (
@@ -3845,18 +3889,24 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                 </span>
                                                             ) : (
                                                                 <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
-                                                                    <button onClick={() => handleEditRefundClick(row)}>
-                                                                        <img className="w-5 h-4" src={Edit} alt="Edit" />
-                                                                    </button>
+                                                                    {hasEditPermission ? (
+                                                                        <button onClick={() => handleEditRefundClick(row)}>
+                                                                            <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                        </button>
+                                                                    ) : (
+                                                                        <img className="w-5 h-4 opacity-40 cursor-not-allowed" src={Edit} alt="Edit Disabled" />
+                                                                    )}
                                                                 </span>
                                                             )}
-                                                            {canEditDelete && (
-                                                                <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                            <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                {hasDeletePermission ? (
                                                                     <button type="button" onClick={() => handleRefundPaymentsDelete(row.id)}>
                                                                         <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                     </button>
-                                                                </span>
-                                                            )}
+                                                                ) : (
+                                                                    <img className="w-5 h-4 opacity-40 cursor-not-allowed" src={Delete} alt="Delete Disabled" />
+                                                                )}
+                                                            </span>
                                                             <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
                                                                 <button type="button" onClick={() => fetchAuditDetailsForRefundPaymentReceived(row.id)}>
                                                                     <img className="w-5 h-4" src={history} alt="History" />
@@ -3872,12 +3922,12 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                 </div>
                             </div>
                         </div>
-                        <div className="mt-[12px] flex-1 min-h-0 rounded-xl bg-white px-[18px] py-[12px] border border-[#E6DAC6] text-left overflow-hidden max-xl:flex-none max-xl:overflow-visible">
-                            <div className="flex flex-col h-full min-h-0">
+                        <div className="xl:mt-[12px] max-xl:flex-1 max-xl:min-w-[280px] flex-1 min-h-0 rounded-xl bg-white px-[18px] py-[12px] border border-[#E6DAC6] text-left overflow-hidden overflow-x-hidden no-scrollbar scrollbar-none max-xl:overflow-visible">
+                            <div className="flex flex-col h-full min-h-0 overflow-x-hidden">
                                 <div className="flex items-center justify-between rounded-lg mb-[4px]">
                                     <p className="text-[16px] font-semibold text-black">Summary Details</p>
                                 </div>
-                                <div className="overflow-y-auto no-scrollbar scrollbar-none flex-1 min-h-0 max-xl:overflow-visible max-xl:flex-none">
+                                <div className="overflow-y-auto overflow-x-hidden no-scrollbar scrollbar-none flex-1 min-h-0 max-xl:overflow-visible max-xl:flex-none">
                                     {Object.entries(
                                         sortedDailyExpenses
                                             .filter((expense) => expense.date === selectedDate && Number(expense.amount) > 0)
@@ -3906,6 +3956,8 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                     </p>
                                 </div>
                             </div>
+                        </div>
+                        </div>
                         </div>
                     </div>
                 </div>
@@ -3950,9 +4002,9 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                 )}
                             </label>
                             <div className="flex justify-end gap-[18px] mt-[18px]">
-                                {!entryId && (
-                                    <button onClick={() => setEntryId(descriptionRowId)} disabled={editingDailyExpenseRowId !== descriptionRowId}
-                                        className="px-4 py-2 bg-green-600 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                {!entryId && description && editingDailyExpenseRowId === descriptionRowId && (
+                                    <button onClick={() => setEntryId(descriptionRowId)}
+                                        className="px-4 py-2 bg-green-600 text-white rounded-md"
                                     >
                                         Edit
                                     </button>
@@ -3968,7 +4020,7 @@ const DailyPayment = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                 >
                                     Close
                                 </button>
-                                {entryId && (
+                                {entryId && (!(expenses.find((e) => String(e.id) === String(descriptionRowId))?.description || '').trim() || editingDailyExpenseRowId === descriptionRowId) && (
                                     <button onClick={handleUpdate} disabled={loading}
                                         className="px-4 py-2 bg-[#BF9853] text-white rounded-md hover:bg-[#BF9853] disabled:opacity-50 disabled:cursor-not-allowed"
                                     >

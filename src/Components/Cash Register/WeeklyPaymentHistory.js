@@ -25,6 +25,7 @@ import {
     getPortalAdvancePartyName,
     getPortalAdvanceProjectName,
 } from '../../utils/weeklyPaymentStaffAdvancePdf';
+import { syncExpensesEntryFromWeeklyExpenseEdit } from '../../utils/expensesEntryWeeklyPaymentBill';
 import { i } from 'mathjs';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
 import CustomDateField from '../ExpensesEntry/CustomDateField';
@@ -61,6 +62,7 @@ import {
     useEdbcTableSort,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
 import { useLiveDataSync } from '../../utils/useLiveDataSync';
+import { useWeeklyPaymentRegisterPermissions } from '../../utils/useWeeklyPaymentRegisterPermissions';
 import { HandoverPaymentsModal } from './WeeklyPaymentHandover';
 
 const ENTRY_ROW_SELECT_CLASS_NAMES = {
@@ -133,8 +135,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
         }
     };
     const enteredBy = resolveEnteredBy();
-    const normalizedUsername = username?.trim();
-    const canEditDelete = normalizedUsername === 'Admin' || normalizedUsername === 'Mahalingam M';
+    const { hasEditPermission, hasDeletePermission } = useWeeklyPaymentRegisterPermissions(userRoles);
     const isExpensesEntryUploadOnly = viewMode === 'expenses-entry-upload';
     const resolveActiveBranchId = () => {
         try {
@@ -844,8 +845,11 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                         ? Number(row.amount)
                         : null,
                 paymentMode: 'Cash',
+                expensesEntryId: row.expenses_entry_id ?? row.expensesEntryId ?? null,
                 fromWeeklyCashRegister: true,
                 weeklyExpenseId: row.id,
+                weeklyExpenseRow: row,
+                source: 'Cash Register',
             };
             localStorage.setItem('expenseEntryPrefill', JSON.stringify(prefill));
             setShowBillExpenseEntryModal(true);
@@ -3600,6 +3604,17 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                 branch_id: row.branch_id ?? row.branchId ?? activeBranchId ?? null,
                 type_id: getWeeklyExpenseTypeId(row.type),
             };
+            const preservedExpensesEntryId =
+                row.expenses_entry_id ??
+                row.expensesEntryId ??
+                originalExpense?.expenses_entry_id ??
+                originalExpense?.expensesEntryId ??
+                editingOriginalRow?.expenses_entry_id ??
+                editingOriginalRow?.expensesEntryId ??
+                null;
+            if (preservedExpensesEntryId != null && preservedExpensesEntryId !== '') {
+                expensePayload.expenses_entry_id = preservedExpensesEntryId;
+            }
             const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/edit/${row.id}?username=${encodeURIComponent(
                 enteredBy
             )}`,
@@ -3612,6 +3627,53 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                 });
             if (!response.ok) {
                 throw new Error("Failed to update expense");
+            }
+            let updatedWeeklyRow = row;
+            try {
+                const parsed = await response.json();
+                if (parsed && typeof parsed === 'object') updatedWeeklyRow = parsed;
+            } catch {
+                // keep row fallback
+            }
+            const expensesEntryId =
+                preservedExpensesEntryId ??
+                row.expenses_entry_id ??
+                row.expensesEntryId ??
+                originalExpense?.expenses_entry_id ??
+                originalExpense?.expensesEntryId ??
+                null;
+            if (expensesEntryId) {
+                const weeklyRowForSync = {
+                    ...row,
+                    ...updatedWeeklyRow,
+                    expenses_entry_id: expensesEntryId,
+                };
+                const project = siteOptions.find(
+                    (opt) => Number(opt.id) === Number(weeklyRowForSync.project_id)
+                );
+                const vid = weeklyRowForSync.vendor_id ?? weeklyRowForSync.vendorId;
+                const cid = weeklyRowForSync.contractor_id ?? weeklyRowForSync.contractorId;
+                try {
+                    await syncExpensesEntryFromWeeklyExpenseEdit(weeklyRowForSync, {
+                        editedBy: enteredBy,
+                        siteLabel: project?.label ?? project?.value ?? '',
+                        vendorName:
+                            vid != null && String(vid).trim() !== '' && !Number.isNaN(Number(vid))
+                                ? (vendorOptions.find((v) => Number(v.id) === Number(vid))?.value ||
+                                      vendorOptions.find((v) => Number(v.id) === Number(vid))?.label ||
+                                      '')
+                                : '',
+                        contractorName:
+                            cid != null && String(cid).trim() !== '' && !Number.isNaN(Number(cid))
+                                ? (contractorOptions.find((c) => Number(c.id) === Number(cid))?.value ||
+                                      contractorOptions.find((c) => Number(c.id) === Number(cid))?.label ||
+                                      '')
+                                : '',
+                    });
+                } catch (syncError) {
+                    console.error('Failed to sync linked expense entry:', syncError);
+                    alert('Weekly expense saved, but the linked expense entry could not be updated.');
+                }
             }
             window.location.reload();
             if (row.type === "Carry Forward") return;
@@ -4034,8 +4096,8 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                         </div>
                     </div>
                     <div className={isExpensesEntryUploadOnly
-                        ? 'w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden max-xl:overflow-y-auto no-scrollbar scrollbar-none'
-                        : 'w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden max-xl:overflow-y-auto no-scrollbar scrollbar-none'}>
+                        ? 'w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden max-xl:overflow-y-auto max-xl:overflow-x-hidden no-scrollbar scrollbar-none'
+                        : 'w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden max-xl:overflow-y-auto max-xl:overflow-x-hidden no-scrollbar scrollbar-none'}>
                         {nextWeekDiscountInfo && (
                             <div className="flex justify-end mb-4 -mr-6 -mt-7">
                                 <h2 className="font-semibold text-base">
@@ -4049,16 +4111,18 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                 </h2>
                             </div>
                         )}
-                        <div className="flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none">
-                            <div className="flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none max-xl:shrink-0 xl:min-w-[1240] xl:max-w-[1240] xl:shrink-0 xl:h-full xl:flex-none xl:w-auto">
-                                <div className="flex justify-between items-center mb-[8px] shrink-0">
+                        <div className="flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto no-scrollbar scrollbar-none">
+                            <div className="flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto no-scrollbar scrollbar-none max-xl:shrink-0 xl:min-w-[1240] xl:max-w-[1240] xl:shrink-0 xl:h-full xl:flex-none xl:w-auto">
+                                <div className="w-full max-w-full xl:w-[1258px] xl:max-w-[1258px] flex flex-col shrink-0 self-start flex-1 min-h-0 overflow-hidden">
+                                <div className="flex justify-between items-center mb-[8px] shrink-0 w-full">
                                     <h1 className="font-bold text-base">Expenses (PS {selectedWeek ?? "-"})</h1>
                                     <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
                                         ₹{filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </h1>
                                 </div>
-                                <div className="flex flex-col w-full max-w-full overflow-hidden xl:w-fit xl:flex-1 xl:min-h-0 max-xl:flex-none max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none">
-                                    <div className="mb-[12px] w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-hidden">
+                                <div className="flex flex-col w-full max-w-full overflow-hidden xl:w-fit xl:flex-1 xl:min-h-0 max-xl:flex-none max-xl:overflow-x-auto no-scrollbar scrollbar-none">
+                                    <div className="mb-[12px] w-full max-w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center justify-between gap-[6px] overflow-hidden">
+                                        <div className="flex flex-row flex-nowrap items-center gap-[6px] min-w-0 flex-1 overflow-hidden">
                                         <div className="shrink-0 flex items-center z-[2] bg-white">
                                             <EdbcFilterToggleButton
                                                 onClick={() => {
@@ -4136,18 +4200,18 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                 </span>
                                             )}
                                         </div>
+                                        </div>
                                         <EdbcTableToolbarRightActions
                                             onClearFilters={clearFilters}
                                             overallSearch={overallSearch}
                                             onOverallSearchChange={setOverallSearch}
-                                            wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] max-xl:flex-1 xl:shrink-0"
-                                            searchWrapperClassName="h-[34px] min-w-0 flex-1 border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1 xl:w-[286px] xl:shrink-0"
+                                            wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] shrink-0"
                                         />
                                     </div>
-                                    <div className="w-full flex-1 min-h-0 rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden xl:w-fit xl:flex xl:flex-col max-xl:flex-none max-xl:min-h-[330px]">
+                                    <div className="w-full flex-1 min-h-0 rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden flex flex-col max-xl:min-h-[330px]">
                                         <div
                                             ref={scrollRef}
-                                            className="w-full flex-1 min-h-0 h-full overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none xl:w-fit xl:max-w-full xl:overflow-auto max-xl:min-h-[330px] max-xl:flex-none"
+                                            className="w-full flex-1 min-h-0 h-full overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none max-w-full max-xl:min-h-[330px]"
                                             onWheel={() => { filterNudgeUsedRef.current = false; }}
                                             onMouseDown={(e) => handleMouseDown(e, scrollRef)}
                                             onMouseMove={(e) => handleMouseMove(e, scrollRef)}
@@ -4862,7 +4926,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                 >
                                                                                     <img src={file} className="" alt="Open File" />
                                                                                 </a>
-                                                                                {canEditDelete && isWeeklyExpenseTypeMatched(row.type) ? (
+                                                                                {hasDeletePermission && isWeeklyExpenseTypeMatched(row.type) ? (
                                                                                     <button
                                                                                         type="button"
                                                                                         onClick={() => handleRemoveBillCopyUrl(row)}
@@ -4894,7 +4958,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                         <img src={fileUpload} className="w-4 h-4 opacity-70" alt="Upload File" />
                                                                                     </button>
                                                                                 )}
-                                                                                {canEditDelete && isWeeklyExpenseTypeMatched(row.type) && removedBillCopyRows[row.id] ? (
+                                                                                {hasDeletePermission && isWeeklyExpenseTypeMatched(row.type) && removedBillCopyRows[row.id] ? (
                                                                                     <button
                                                                                         type="button"
                                                                                         onClick={() => handleRestoreBillCopyUrl(row)}
@@ -4921,7 +4985,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                 </span>
                                                                             ) : (
                                                                                 <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
-                                                                                    {row.type === "Daily" || !isWeeklyExpenseTypeMatched(row.type) ? (
+                                                                                    {row.type === "Daily" || !isWeeklyExpenseTypeMatched(row.type) || !hasEditPermission ? (
                                                                                         <img className="w-5 h-4 opacity-40 cursor-not-allowed" src={Edit} alt="Edit Disabled" />
                                                                                     ) : (
                                                                                         <button type="button" onClick={() => {
@@ -4934,14 +4998,12 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                 </span>
                                                                             )}
                                                                             <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
-                                                                                {row.type === "Daily" || !isWeeklyExpenseTypeMatched(row.type) ? (
+                                                                                {row.type === "Daily" || !isWeeklyExpenseTypeMatched(row.type) || !hasDeletePermission ? (
                                                                                     <img className="w-5 h-4 opacity-40 cursor-not-allowed" src={Delete} alt="Delete Disabled" />
-                                                                                ) : canEditDelete ? (
+                                                                                ) : (
                                                                                     <button type="button" onClick={() => handleWeeklyExpensesDelete(row.id)}>
                                                                                         <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                                     </button>
-                                                                                ) : (
-                                                                                    <img className="w-5 h-4 opacity-40 cursor-not-allowed" src={Delete} alt="Delete Disabled" />
                                                                                 )}
                                                                             </span>
                                                                             <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
@@ -4965,18 +5027,20 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                         </div>
                                     </div>
                                 </div>
+                                </div>
                             </div>
-                            <div className={`w-fit shrink-0 flex flex-col min-h-0 xl:h-full max-xl:h-auto max-xl:w-full${isExpensesEntryUploadOnly ? ' min-w-[486px]' : ''}`}>
+                            <div className={`w-fit shrink-0 flex flex-col min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto no-scrollbar scrollbar-none xl:h-full max-xl:h-auto max-xl:w-full${isExpensesEntryUploadOnly ? ' min-w-[486px]' : ''}`}>
+                                <div className="flex flex-col flex-1 min-h-0 max-xl:w-full">
                                 {!isExpensesEntryUploadOnly && (
-                                    <>
-                                        <div className="flex justify-between items-center mb-[8px]">
+                                        <div className="w-[502px] max-w-full shrink-0 self-start flex flex-col">
+                                        <div className="flex justify-between items-center mb-[8px] w-full">
                                             <h1 className="font-bold text-base">Income</h1>
                                             <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
                                                 ₹{payments.reduce((total, row) => total + Number(row.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </h1>
                                         </div>
-                                        <div className="flex flex-col w-fit max-w-full min-h-0 overflow-hidden max-xl:w-full max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none">
-                                            <div className="mb-[12px] w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-hidden">
+                                            <div className="mb-[12px] w-full max-w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center justify-between gap-[6px] overflow-hidden">
+                                                <div className="flex flex-row flex-nowrap items-center gap-[6px] min-w-0 flex-1 overflow-hidden">
                                                 <div className="shrink-0 flex items-center z-[2] bg-white">
                                                     <EdbcFilterToggleButton
                                                         onClick={() => {
@@ -5040,16 +5104,21 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                         </span>
                                                     )}
                                                 </div>
+                                                </div>
                                                 <EdbcTableToolbarRightActions
                                                     onClearFilters={clearPaymentsFilters}
                                                     overallSearch={paymentsOverallSearch}
                                                     onOverallSearchChange={setPaymentsOverallSearch}
-                                                    wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] max-xl:flex-1 xl:shrink-0"
-                                                    searchWrapperClassName="h-[34px] min-w-0 flex-1 border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1 xl:w-[286px] xl:shrink-0"
+                                                    wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] shrink-0"
                                                 />
                                             </div>
+                                        </div>
+                                )}
+                                <div className="flex flex-col flex-1 min-h-0 max-xl:flex-row max-xl:flex-wrap max-xl:items-start max-xl:gap-x-[18px] max-xl:gap-y-[12px] w-full">
+                                {!isExpensesEntryUploadOnly && (
+                                        <div className="w-[502px] max-w-full shrink-0 self-start flex flex-col">
                                             <div className="shrink-0">
-                                                <div ref={paymentsScrollRef} className="rounded-lg border-l-8 border-l-[#BF9853] min-h-[330px] w-fit max-w-full shrink-0 overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none max-xl:w-full"
+                                                <div ref={paymentsScrollRef} className="rounded-lg border-l-8 border-l-[#BF9853] min-h-[330px] w-full max-w-full shrink-0 overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none"
                                                     style={{
                                                         height: `${40 + (showPaymentsFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
                                                         maxHeight: `${40 + (showPaymentsFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
@@ -5321,13 +5390,19 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                     ) : (
                                                                                         <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
                                                                                             {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
-                                                                                                canEditSelectedWeek && (
+                                                                                                hasEditPermission ? (
                                                                                                     <button onClick={() => {
                                                                                                         setEditingPaymentId(row.id);
                                                                                                         setEditingOriginalPayment({ ...row });
                                                                                                     }}>
                                                                                                         <img className="w-5 h-4" src={Edit} alt="Edit" />
                                                                                                     </button>
+                                                                                                ) : (
+                                                                                                    <img
+                                                                                                        className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                                                        src={Edit}
+                                                                                                        alt="Edit Disabled"
+                                                                                                    />
                                                                                                 )
                                                                                             ) : (
                                                                                                 <img
@@ -5340,8 +5415,11 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                     )}
                                                                                     {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
                                                                                         <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
-                                                                                            {canEditDelete ? (
-                                                                                                <button type="button" onClick={() => handleWeeklyReceivedDelete(row.id)}>
+                                                                                            {hasDeletePermission ? (
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    onClick={() => handleWeeklyReceivedDelete(row.id)}
+                                                                                                >
                                                                                                     <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                                                 </button>
                                                                                             ) : (
@@ -5386,14 +5464,13 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                 </div>
                                             </div>
                                         </div>
-                                    </>
                                 )}
-                                <div className={`${isExpensesEntryUploadOnly ? 'mt-[80px]' : 'mt-[12px]'} flex-1 min-h-0 rounded-xl bg-white px-[18px] py-[12px] border border-[#E6DAC6] text-left overflow-hidden max-xl:flex-none max-xl:overflow-visible`}>
-                                    <div className="flex flex-col h-full min-h-0">
+                                <div className={`${isExpensesEntryUploadOnly ? 'mt-[80px]' : 'xl:mt-[12px]'} max-xl:flex-1 max-xl:min-w-[280px] flex-1 min-h-0 rounded-xl bg-white px-[18px] py-[12px] border border-[#E6DAC6] text-left overflow-hidden overflow-x-hidden no-scrollbar scrollbar-none max-xl:overflow-visible`}>
+                                    <div className="flex flex-col h-full min-h-0 overflow-x-hidden">
                                         <div className="flex items-center justify-between rounded-lg mb-[4px]">
                                             <p className="text-[16px] font-semibold text-black">Summary Details</p>
                                             <div className="flex items-center gap-2">
-                                                {canEditDelete &&
+                                                {hasDeletePermission &&
                                                     lastDeletedWeeklySummary &&
                                                     String(lastDeletedWeeklySummary.weekNumber) === String(selectedWeek) &&
                                                     String(lastDeletedWeeklySummary.year) === String(year) && (
@@ -5453,7 +5530,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="overflow-y-auto no-scrollbar scrollbar-none flex-1 min-h-0 max-xl:overflow-visible max-xl:flex-none">
+                                        <div className="overflow-y-auto overflow-x-hidden no-scrollbar scrollbar-none flex-1 min-h-0 max-xl:overflow-visible max-xl:flex-none">
                                             {Object.entries(
                                                 filteredExpenses
                                                     .filter(expense => Number(expense.amount) > 0)
@@ -5479,6 +5556,8 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                             </p>
                                         </div>
                                     </div>
+                                </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
@@ -5992,15 +6071,15 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                     />
                                 </label>
                                 <div className="flex justify-end gap-[18px] mt-[18px]">
-                                    {portalDescriptions[currentRow?.advance_portal_id] && !isDescriptionEditing && (
-                                        <button onClick={() => setIsDescriptionEditing(true)} disabled={editingRowId !== currentRow?.id} className="px-4 py-2 bg-green-600 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
+                                    {portalDescriptions[currentRow?.advance_portal_id] && !isDescriptionEditing && editingRowId === currentRow?.id && (
+                                        <button onClick={() => setIsDescriptionEditing(true)} className="px-4 py-2 bg-green-600 text-white rounded-md">
                                             Edit
                                         </button>
                                     )}
                                     <button onClick={() => { setShowPopups(false); setIsDescriptionEditing(false); }} className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-md">
                                         Close
                                     </button>
-                                    {(!portalDescriptions[currentRow?.advance_portal_id] || isDescriptionEditing) && (
+                                    {(!portalDescriptions[currentRow?.advance_portal_id] || isDescriptionEditing) && (!portalDescriptions[currentRow?.advance_portal_id] || editingRowId === currentRow?.id) && (
                                         <button
                                             onClick={async () => {
                                                 await updateDescription(currentRow.advance_portal_id, editFormData.description);
@@ -6072,8 +6151,8 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                     ) : null}
                     {showBillSettlementAdvanceModal ? (
                         <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
-                            <div className="bg-white rounded-lg w-full max-w-[1824px] max-h-[92vh] overflow-y-auto shadow-lg relative">
-                                <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                            <div className="bg-white rounded-lg w-full max-w-[1824px] overflow-y-auto shadow-lg relative p-[18px]">
+                                <div className="sticky top-0 z-10 bg-white flex items-center justify-between">
                                     <p className="text-sm font-semibold text-[#202020]">Advance Portal</p>
                                     <button
                                         type="button"
@@ -6092,16 +6171,16 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                 /* ignore */
                                             }
                                         }}
-                                        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
+                                        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200"
                                     >
-                                        ×
+                                        <img src={FileRemover} className="w-3 h-3" alt="Close" />
                                     </button>
                                 </div>
-                                <div className="p-3">
-                                    <AdvancePortalForm
+                                <AdvancePortalForm
                                         username={username}
                                         userRoles={userRoles}
                                         embedded
+                                        modalEmbedded
                                         lockTypePrefill
                                         onSuccess={() => {
                                             setShowBillSettlementAdvanceModal(false);
@@ -6120,7 +6199,6 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                             setExpenseEntryRefreshNonce((n) => n + 1);
                                         }}
                                     />
-                                </div>
                             </div>
                         </div>
                     ) : null}

@@ -19,6 +19,14 @@ const resolveSelectedAccountOption = (accountOptions, rawAccountNumber) => {
   return match || { value: String(raw), label: String(raw) };
 };
 
+const formatAmountDisplay = (value) => {
+  if (value === '' || value === null || value === undefined) return '';
+  const normalized = String(value).replace(/,/g, '');
+  const num = Number(normalized);
+  if (Number.isNaN(num)) return String(value);
+  return num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
 const AdvancePortalEditPaymentModal = ({
   isOpen,
   onClose,
@@ -74,12 +82,16 @@ const AdvancePortalEditPaymentModal = ({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
-                  <input
-                    type="text"
-                    value={amount ?? ''}
-                    readOnly
-                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
-                  />
+                  <div className="relative w-full h-[45px]">
+                    <span className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-600 pointer-events-none">₹</span>
+                    <input
+                      type="text"
+                      readOnly
+                      tabIndex={-1}
+                      value={formatAmountDisplay(amount)}
+                      className="pl-7 pr-3 border-2 border-[#BF9853] border-opacity-25 rounded-lg w-full h-full text-gray-600 bg-gray-100 text-sm cursor-default focus:outline-none"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>

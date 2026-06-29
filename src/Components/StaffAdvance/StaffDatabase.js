@@ -16,11 +16,20 @@ import AdvancePortalEditPaymentModal from '../Advance Portal/AdvancePortalEditPa
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
-import Filter from '../Images/filter (3).png'
-import Reload from '../Images/rotate-right.png'
+import Filter from '../Images/TableFilter.svg'
+import Search from '../Images/Searchnew.svg'
+import Reload from '../Images/Clear.svg'
+import Pdf from '../Images/pdf.png';
+import XL from '../Images/sheets.png';
+import { DATABASE_TABLE_FILTER_SELECT_STYLES, formatEdbcFilterDateDMY } from '../ExpensesEntry/databaseExpensesSharedColumns';
 import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
+
+const STAFF_FILTER_DATE_INPUT_CLASS =
+  'p-1 rounded-lg bg-transparent w-full border-2 border-[rgba(191,152,83,0.2)] focus:outline-none text-[14px] h-[34px]';
+const STAFF_FILTER_NATIVE_SELECT_CLASS =
+  'p-1 rounded-lg bg-transparent w-full h-[34px] font-normal border-2 border-[rgba(191,152,83,0.2)] focus:outline-none text-[14px]';
 
 const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const [records, setRecords] = useState([]);
@@ -59,6 +68,9 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const scrollRef = useRef(null);
+  const filterRowRef = useRef(null);
+  const filterNudgeUsedRef = useRef(false);
+  const [overallSearch, setOverallSearch] = useState('');
   const isDragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
   const scroll = useRef({ left: 0, top: 0 });
@@ -279,6 +291,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
     setSelectTransferTo('');
     setSelectType('');
     setSelectMode('');
+    setOverallSearch('');
   };
 
   const formatDateOnly = (dateString) => {
@@ -923,124 +936,165 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
     return () => cancelMomentum();
   }, []);
 
-  if (isInitialLoading) {
-    return (
-      <div className="p-6 bg-[#faf6ed] min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#BF9853] mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading data...</p>
-        </div>
-      </div>
-    );
-  }
-
+  // Keep rendering the page while loading; data will populate once fetched.
   return (
-    <div>
-      <div className='w-full max-w-[1850px] h-auto bg-white text-left flex  sm:flex-row gap-3 p-3 sm:p-5 mx-2 ml-10 mr-10'>
-        <div className=''>
-          <label className='block mb-2 font-semibold text-sm sm:text-base'>Advance Amount</label>
-          <input
-            className='w-full max-w-[183px] h-[40px] sm:h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2 text-sm sm:text-base'
-            value={`₹${advanceTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
-            readOnly
-          />
-        </div>
-        <div className=''>
-          <label className='block mb-2 font-semibold text-sm sm:text-base'>Transfer Amount</label>
-          <input
-            className='w-full max-w-[220px] h-[40px] sm:h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2 text-sm sm:text-base'
-            value={`₹${transferTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
-            readOnly
-          />
-        </div>
-        <div className=''>
-          <label className='block mb-2 font-semibold text-sm sm:text-base'>Refund Amount</label>
-          <input
-            className='w-full max-w-[220px] h-[40px] sm:h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2 text-sm sm:text-base'
-            value={`₹${refundTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
-            readOnly
-          />
+    <div className='flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]'>
+      <div className='px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]'>
+      <div className='w-full pt-[18px] px-[18px] pb-[18px] rounded-[6px] bg-white mb-[18px] text-left flex items-center gap-6'>
+        <div className='w-full xl:w-auto xl:justify-between'>
+          <div className='flex flex-wrap gap-[12px]'>
+            <div>
+              <label className='block mb-[8px] font-semibold'>Advance Amount</label>
+              <input
+                className='lg:w-[150px] h-[40px] rounded-lg border border-[#00000029] font-semibold bg-[#ededed] focus:outline-none p-2'
+                value={`₹${advanceTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                readOnly
+              />
+            </div>
+            <div>
+              <label className='block mb-[8px] font-semibold'>Transfer Amount</label>
+              <input
+                className='lg:w-[150px] h-[40px] rounded-lg border border-[#00000029] font-semibold bg-[#ededed] focus:outline-none p-2'
+                value={`₹${transferTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                readOnly
+              />
+            </div>
+            <div>
+              <label className='block mb-[8px] font-semibold'>Refund Amount</label>
+              <input
+                className='lg:w-[150px] h-[40px] rounded-lg border border-[#00000029] font-semibold bg-[#ededed] focus:outline-none p-2'
+                value={`₹${refundTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                readOnly
+              />
+            </div>
+          </div>
         </div>
       </div>
-      {/* Error message */}
       {error && (
-        <div className="mb-4 p-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded-lg w-full">
+        <div className="mb-[18px] p-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded-lg w-full">
           <p className="font-semibold">Warning:</p>
           <p>{error}</p>
         </div>
       )}
-      <div className='w-full max-w-[1850px] bg-white mt-3 sm:mt-5 pt-3 sm:pt-5 mx-2 ml-10 mr-5'>
+      <div className="w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
         <div
           className={`text-left flex ${selectDate || selectEmployeeName || selectPurpose || selectTransferTo || selectType || selectMode
-            ? 'flex-col lg:flex-row lg:justify-between'
-            : 'flex-col sm:flex-row sm:justify-between sm:items-center'
-            } mb-3 gap-3 sm:gap-2`}>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
-            <button className='pl-0 sm:pl-2' onClick={() => setShowFilters(!showFilters)}>
+            ? 'flex-col sm:flex-row sm:justify-between'
+            : 'flex-row justify-between items-center'
+            } mb-[12px] gap-[6px]`}>
+          <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
+            <button
+              className=''
+              onClick={() => {
+                const willOpen = !showFilters;
+                const scroller = scrollRef.current;
+                if (willOpen) {
+                  setShowFilters(true);
+                  if (!scroller) return;
+                  if (scroller.scrollTop <= 0) return;
+                  if (filterNudgeUsedRef.current) return;
+                  filterNudgeUsedRef.current = true;
+                  requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                      const h = filterRowRef.current?.offsetHeight || 0;
+                      if (h > 0) {
+                        scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+                      }
+                    });
+                  });
+                  return;
+                }
+                const h = filterRowRef.current?.offsetHeight || 0;
+                setShowFilters(false);
+                if (!scroller || h <= 0 || !filterNudgeUsedRef.current) return;
+                filterNudgeUsedRef.current = false;
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(() => {
+                    scroller.scrollTop = scroller.scrollTop + h;
+                  });
+                });
+              }}
+            >
               <img
                 src={Filter}
                 alt="Toggle Filter"
-                className="w-6 h-6 sm:w-7 sm:h-7 border border-[#BF9853] rounded-md ml-0 sm:ml-3"
+                className=" border rounded-md h-[34px]"
               />
             </button>
             {(selectDate || selectEmployeeName || selectPurpose || selectTransferTo || selectType || selectMode) && (
-              <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
+              <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
                 {selectDate && (
-                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 py-1 text-xs sm:text-sm font-medium w-fit">
-                    <span className="font-normal">Date: </span>
-                    <span className="font-bold">{selectDate}</span>
-                    <button onClick={() => setSelectDate('')} className="text-[#BF9853] ml-1 text-lg sm:text-2xl">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(selectDate)}</span>
+                    <button onClick={() => setSelectDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                   </span>
                 )}
                 {selectEmployeeName && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-xs sm:text-sm font-medium w-fit">
-                    <span className="font-normal">Employee: </span>
-                    <span className="font-bold">{selectEmployeeName}</span>
-                    <button onClick={() => setSelectEmployeeName('')} className="text-[#BF9853] text-lg sm:text-2xl ml-1">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Employee: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectEmployeeName}</span>
+                    <button onClick={() => setSelectEmployeeName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectPurpose && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-xs sm:text-sm font-medium w-fit">
-                    <span className="font-normal">Purpose:</span>
-                    <span className="font-bold">{selectPurpose}</span>
-                    <button onClick={() => setSelectPurpose('')} className="text-[#BF9853] text-lg sm:text-2xl ml-1">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Purpose: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectPurpose}</span>
+                    <button onClick={() => setSelectPurpose('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectTransferTo && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-xs sm:text-sm font-medium w-fit">
-                    <span className="font-normal">Transfer To: </span>
-                    <span className="font-bold">{selectTransferTo}</span>
-                    <button onClick={() => setSelectTransferTo('')} className="text-[#BF9853] text-lg sm:text-2xl ml-1">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Transfer To: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectTransferTo}</span>
+                    <button onClick={() => setSelectTransferTo('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectType && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-xs sm:text-sm font-medium w-fit">
-                    <span className="font-normal">Type: </span>
-                    <span className="font-bold">{selectType}</span>
-                    <button onClick={() => setSelectType('')} className="text-[#BF9853] text-lg sm:text-2xl ml-1">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Type: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectType}</span>
+                    <button onClick={() => setSelectType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectMode && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-xs sm:text-sm font-medium w-fit">
-                    <span className="font-normal">Mode: </span>
-                    <span className="font-bold">{selectMode}</span>
-                    <button onClick={() => setSelectMode('')} className="text-[#BF9853] text-lg sm:text-2xl ml-1">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Mode: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectMode}</span>
+                    <button onClick={() => setSelectMode('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
               </div>
             )}
           </div>
-          <div className='flex flex-col sm:flex-row gap-2 sm:gap-4 sm:justify-end sm:mr-4'>
-            <button onClick={exportPDF} className='text-xs sm:text-sm text-[#E4572E] hover:underline font-bold text-left sm:text-right'>Export PDF</button>
-            <button onClick={exportCSV} className='text-xs sm:text-sm text-[#007233] hover:underline font-bold text-left sm:text-right'>Export XL</button>
-            <button className='text-xs sm:text-sm text-[#BF9853] hover:underline font-bold text-left sm:text-right'>Print</button>
+          <div className='flex items-end gap-[6px]'>
+            <button onClick={clearFilters} className='flex h-[34px] w-[32px] shrink-0 items-center justify-center'>
+              <img className='w-full h-full' src={Reload} alt="Reload" />
+            </button>
+            <div className="w-[286px] min-w-[286px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
+              <input
+                type="text"
+                value={overallSearch}
+                onChange={(e) => setOverallSearch(e.target.value)}
+                placeholder="Search Transactions..."
+                className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
+              />
+              <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
+            </div>
+            <div className=' text-left md:text-right md:items-end items-end cursor-default flex justify-end max-w-screen-2xl table-auto overflow-auto w-full scrollbar-none no-scrollbar'>
+              <div className='flex items-end text-center '>
+                <span className='text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportPDF}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
+                <span className='text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportCSV}>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
+              </div>
+            </div>
           </div>
         </div>
-        <div className='border-l-8 border-l-[#BF9853] rounded-lg ml-2 sm:ml-5 mr-2 sm:mr-5'>
-          {/* Single Table with Scrollable Container */}
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <div
             ref={scrollRef}
-            className='overflow-auto max-h-[400px] sm:max-h-[500px]'
+            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none no-scrollbar scrollbar-none"
+            onWheel={() => { filterNudgeUsedRef.current = false; }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -1113,11 +1167,11 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
                   <th className="px-1 sm:px-2 min-w-[60px] sm:min-w-[80px] font-bold text-left text-xs sm:text-sm">Activity</th>
                 </tr>
                 {showFilters && (
-                  <tr className="bg-white border-b border-gray-200">
+                  <tr ref={filterRowRef} className="bg-white border-b border-gray-200">
                     <th className="pt-2 pb-2 min-w-[120px] sm:w-44">
                       <input
                         type="date"
-                        className="p-1 rounded-md bg-transparent w-full max-w-[120px] sm:w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs sm:text-sm"
+                        className={STAFF_FILTER_DATE_INPUT_CLASS}
                       />
                     </th>
                     <th className="pt-2 pb-2 min-w-[120px] sm:w-44">
@@ -1125,7 +1179,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
                         type="date"
                         value={selectDate}
                         onChange={(e) => setSelectDate(e.target.value)}
-                        className="p-1 rounded-md bg-transparent w-full max-w-[120px] sm:w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs sm:text-sm"
+                        className={STAFF_FILTER_DATE_INPUT_CLASS}
                         placeholder="Search Date..."
                       />
                     </th>
@@ -1138,48 +1192,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
                         placeholder="Employee..."
                         isSearchable
                         isClearable
-                        styles={{
-                          control: (provided, state) => ({
-                            ...provided,
-                            backgroundColor: 'transparent',
-                            borderWidth: '3px',
-                            borderColor: state.isFocused
-                              ? 'rgba(191, 152, 83, 0.2)'
-                              : 'rgba(191, 152, 83, 0.2)',
-                            borderRadius: '6px',
-                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                            '&:hover': {
-                              borderColor: 'rgba(191, 152, 83, 0.2)',
-                            },
-                            minHeight: '32px',
-                            fontSize: '12px',
-                          }),
-                          placeholder: (provided) => ({
-                            ...provided,
-                            color: '#999',
-                            textAlign: 'left',
-                            fontSize: '12px',
-                          }),
-                          menu: (provided) => ({
-                            ...provided,
-                            zIndex: 9,
-                          }),
-                          option: (provided, state) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            fontSize: '12px',
-                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                            color: 'black',
-                          }),
-                          singleValue: (provided) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            color: 'black',
-                            fontSize: '12px',
-                          }),
-                        }}
+                        styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                       />
                     </th>
                     <th className="pt-2 pb-2 min-w-[180px] sm:w-[300px]">
@@ -1191,48 +1204,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
                         placeholder="Purpose..."
                         isSearchable
                         isClearable
-                        styles={{
-                          control: (provided, state) => ({
-                            ...provided,
-                            backgroundColor: 'transparent',
-                            borderWidth: '3px',
-                            borderColor: state.isFocused
-                              ? 'rgba(191, 152, 83, 0.2)'
-                              : 'rgba(191, 152, 83, 0.2)',
-                            borderRadius: '6px',
-                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                            '&:hover': {
-                              borderColor: 'rgba(191, 152, 83, 0.2)',
-                            },
-                            minHeight: '32px',
-                            fontSize: '12px',
-                          }),
-                          placeholder: (provided) => ({
-                            ...provided,
-                            color: '#999',
-                            textAlign: 'left',
-                            fontSize: '12px',
-                          }),
-                          menu: (provided) => ({
-                            ...provided,
-                            zIndex: 9,
-                          }),
-                          option: (provided, state) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            fontSize: '12px',
-                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                            color: 'black',
-                          }),
-                          singleValue: (provided) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            color: 'black',
-                            fontSize: '12px',
-                          }),
-                        }}
+                        styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                       />
                     </th>
                     <th className="pt-2 pb-2 min-w-[200px] sm:w-[350px]">
@@ -1244,48 +1216,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
                         placeholder="Transfer To..."
                         isSearchable
                         isClearable
-                        styles={{
-                          control: (provided, state) => ({
-                            ...provided,
-                            backgroundColor: 'transparent',
-                            borderWidth: '3px',
-                            borderColor: state.isFocused
-                              ? 'rgba(191, 152, 83, 0.2)'
-                              : 'rgba(191, 152, 83, 0.2)',
-                            borderRadius: '6px',
-                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                            '&:hover': {
-                              borderColor: 'rgba(191, 152, 83, 0.2)',
-                            },
-                            minHeight: '32px',
-                            fontSize: '12px',
-                          }),
-                          placeholder: (provided) => ({
-                            ...provided,
-                            color: '#999',
-                            textAlign: 'left',
-                            fontSize: '12px',
-                          }),
-                          menu: (provided) => ({
-                            ...provided,
-                            zIndex: 9,
-                          }),
-                          option: (provided, state) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            fontSize: '12px',
-                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                            color: 'black',
-                          }),
-                          singleValue: (provided) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            color: 'black',
-                            fontSize: '12px',
-                          }),
-                        }}
+                        styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                       />
                     </th>
                     <th className=' pt-2 pb-2'></th>
@@ -1294,7 +1225,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
                       <select
                         value={selectType}
                         onChange={(e) => setSelectType(e.target.value)}
-                        className="p-1 rounded-md bg-transparent w-full max-w-[100px] sm:w-[120px] h-[32px] sm:h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                        className={STAFF_FILTER_NATIVE_SELECT_CLASS}
                         placeholder="Type..."
                       >
                         <option value=''>Select Type...</option>
@@ -1309,7 +1240,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
                       <select
                         value={selectMode}
                         onChange={(e) => setSelectMode(e.target.value)}
-                        className="p-1 rounded-md bg-transparent w-full max-w-[100px] sm:w-[120px] h-[32px] sm:h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                        className={STAFF_FILTER_NATIVE_SELECT_CLASS}
                         placeholder="Mode..."
                       >
                         <option value=''>Select</option>
@@ -1328,7 +1259,14 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
                 )}
               </thead>
               <tbody>
-                {currentData.length > 0 ? (
+                {isInitialLoading ? (
+                  <tr>
+                    <td className="p-8 text-center" colSpan={13}>
+                      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#BF9853] mx-auto mb-3"></div>
+                      <p className="text-gray-600 text-sm">Loading data...</p>
+                    </td>
+                  </tr>
+                ) : currentData.length > 0 ? (
                   currentData.map((entry) => (
                     <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
                       <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[80px] sm:min-w-[100px] font-semibold">
@@ -1415,7 +1353,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
                   ))
                 ) : (
                   <tr>
-                    <td className="p-2 text-center text-sm text-gray-400" colSpan={12}>
+                    <td className="p-2 text-center text-sm text-gray-400" colSpan={13}>
                       No data available
                     </td>
                   </tr>
@@ -1426,14 +1364,13 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
         </div>
         {/* Pagination Controls */}
         {sortedData.length > 0 && (
-          <div className="flex flex-col sm:flex-row justify-between items-center px-3 sm:px-5 py-3 sm:py-4 bg-white mx-2 sm:mx-0">
-            {/* Items per page selector */}
-            <div className="flex items-center space-x-2 mb-3 sm:mb-0">
-              <label className="text-xs sm:text-sm font-medium text-gray-700">Show:</label>
+          <div className="flex shrink-0 items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-700">Items per page:</span>
               <select
                 value={itemsPerPage}
                 onChange={handleItemsPerPageChange}
-                className="border border-gray-300 rounded-md px-1 sm:px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent"
+                className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
               >
                 <option value={50}>50</option>
                 <option value={100}>100</option>
@@ -1447,65 +1384,52 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
                 <option value={900}>900</option>
                 <option value={1000}>1000</option>
               </select>
-              <span className="text-xs sm:text-sm text-gray-700">entries</span>
             </div>
-
-            {/* Page info */}
-            <div className="text-xs sm:text-sm text-gray-700 mb-3 sm:mb-0 text-center">
-              <span className="hidden sm:inline">Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries</span>
-              <span className="sm:hidden">{startIndex + 1}-{Math.min(endIndex, sortedData.length)} of {sortedData.length}</span>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-700">
+                Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
+              </span>
             </div>
-
-            {/* Pagination buttons */}
-            <div className="flex items-center space-x-1 sm:space-x-2">
+            <div className="flex items-center space-x-1">
               <button
+                type="button"
                 onClick={goToPreviousPage}
                 disabled={currentPage === 1}
-                className={`px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium rounded-md ${currentPage === 1
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
-                  }`}
+                className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
               >
-                <span className="hidden sm:inline">Previous</span>
-                <span className="sm:hidden">Prev</span>
+                Previous
               </button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
 
-              {/* Page numbers */}
-              <div className="flex items-center space-x-1">
-                {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 2) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 1) {
-                    pageNum = totalPages - 2 + i;
-                  } else {
-                    pageNum = currentPage - 1 + i;
-                  }
-
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => goToPage(pageNum)}
-                      className={`px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium rounded-md ${currentPage === pageNum
-                        ? 'bg-[#BF9853] text-white'
-                        : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
-                        }`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
-              </div>
-
+                return (
+                  <button
+                    type="button"
+                    key={pageNum}
+                    onClick={() => goToPage(pageNum)}
+                    className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${currentPage === pageNum
+                      ? 'bg-[#BF9853] text-white border-[#BF9853]'
+                      : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
+                      }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
               <button
+                type="button"
                 onClick={goToNextPage}
                 disabled={currentPage === totalPages}
-                className={`px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium rounded-md ${currentPage === totalPages
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
-                  }`}
+                className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
               >
                 Next
               </button>
@@ -1793,6 +1717,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
           setPaymentModalData={setEditPaymentModalData}
           accountDetails={accountDetails}
         />
+      </div>
       </div>
     </div>
   );

@@ -1,7 +1,337 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Select from 'react-select';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import PdfIcon from '../Images/pdf.png';
+import XlIcon from '../Images/sheets.png';
+import {
+  EDBC_IDS,
+  getEdbcColumnConfig,
+  EdbcTableHeaderRow,
+  EdbcTableBodyRow,
+  EdbcColumnHeader,
+  EDBC_TABLE_EDGE_TABLE_CLASS,
+  EDBC8_COLUMN_LOCK_TABLE_CLASS,
+  useEdbcExpandedCells,
+  EdbcExpandableBodyCell,
+  EdbcFilterToggleButton,
+} from '../ExpensesEntry/databaseExpensesSharedColumns';
+
+const SUMMARY_EDBC13_COLUMN_LOCK =
+  '[&_th#EDBC-13]:!w-[130px] [&_td#EDBC-13]:!w-[130px] [&_th#EDBC-13]:!min-w-[130px] [&_td#EDBC-13]:!min-w-[130px] [&_th#EDBC-13]:!max-w-[130px] [&_td#EDBC-13]:!max-w-[130px] [&_th#EDBC-13]:!overflow-hidden [&_td#EDBC-13]:!overflow-hidden';
+const SUMMARY_TABLE_CLASS = `table-fixed border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS} ${EDBC8_COLUMN_LOCK_TABLE_CLASS} ${SUMMARY_EDBC13_COLUMN_LOCK} [&_#EDBC-12]:!pl-0 [&_th#EDBC-13]:!pr-0 [&_td#EDBC-13]:!pr-0`;
+const SUMMARY_PURPOSE_TABLE_CLASS = `${SUMMARY_TABLE_CLASS} w-[668px] max-w-full [&_th#EDBC-3]:!w-[298px] [&_td#EDBC-3]:!w-[298px] [&_th#EDBC-3]:!min-w-[298px] [&_td#EDBC-3]:!min-w-[298px] [&_th#EDBC-3]:!max-w-[298px] [&_td#EDBC-3]:!max-w-[298px] [&_th#EDBC-3]:!overflow-hidden [&_td#EDBC-3]:!overflow-hidden [&_thead_tr:nth-child(2)>th:first-child>div]:!w-[286px] [&_thead_tr:nth-child(2)>th:first-child>div]:!min-w-[286px] [&_thead_tr:nth-child(2)>th:first-child>div]:!max-w-[286px]`;
+const SUMMARY_EMPLOYEE_TABLE_CLASS = `${SUMMARY_TABLE_CLASS} w-[600px] max-w-full [&_th#EDBC-4]:!w-[230px] [&_td#EDBC-4]:!w-[230px] [&_th#EDBC-4]:!min-w-[230px] [&_td#EDBC-4]:!min-w-[230px] [&_th#EDBC-4]:!max-w-[230px] [&_td#EDBC-4]:!max-w-[230px] [&_td#EDBC-4]:!overflow-hidden`;
+const SUMMARY_OUTSIDE_SELECT_CLASS = 'custom-select w-[300px] h-[40px] rounded-lg focus:outline-none';
+const SUMMARY_PANEL_SHADOW =
+  'shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1),0_-8px_15px_-3px_rgba(0,0,0,0.1)]';
+
+const SUMMARY_BOX_STYLE = {
+  backgroundColor: '#FFFDF9',
+  backgroundImage: [
+    'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+    'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+    'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+    'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+  ].join(', '),
+  backgroundSize: '100% 1px, 100% 1px, 1px 100%, 1px 100%',
+  backgroundPosition: '0 0, 0 100%, 0 0, 100% 0',
+  backgroundRepeat: 'repeat-x, repeat-x, repeat-y, repeat-y',
+};
+
+const formatSummaryAmount = (value) =>
+  `₹${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const getStaffStatusLabel = (pendingAdvance) => (pendingAdvance > 0 ? 'Pending' : 'Settled');
+const BILL_STATUS_PENDING_COLOR = '#E4572E';
+const BILL_STATUS_SETTLED_COLOR = '#007233';
+const edbc13Config = getEdbcColumnConfig(EDBC_IDS.EDBC13);
+const getStaffStatusColor = (pendingAdvance) =>
+  pendingAdvance > 0 ? BILL_STATUS_PENDING_COLOR : BILL_STATUS_SETTLED_COLOR;
+
+const renderStaffStatusBodyCell = ({
+  pendingAdvance,
+  rowId,
+  rowIndex,
+  expandedCells,
+  onToggleExpanded,
+}) => {
+  const label = getStaffStatusLabel(pendingAdvance);
+  const cellKey = `${rowId ?? rowIndex}-paymentMode`;
+  const expanded = expandedCells[cellKey];
+  const tdClass = edbc13Config?.tdClass;
+  return (
+    <td id={EDBC_IDS.EDBC13} className={`${tdClass} !pr-0`}>
+      <span
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          onToggleExpanded(cellKey);
+        }}
+        className={`block w-full font-semibold ${expanded ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+        style={{ color: getStaffStatusColor(pendingAdvance) }}
+        title={label}
+      >
+        {label}
+      </span>
+    </td>
+  );
+};
+
+const SummaryTableExportActions = ({ onExportPdf, onExportCsv }) => (
+  <div className="flex shrink-0 items-end gap-2">
+    <span
+      className="text-[#E4572E] flex items-center gap-1 font-semibold hover:underline cursor-pointer"
+      onClick={onExportPdf}
+    >
+      PDF
+      <img src={PdfIcon} alt="Pdf" className="w-4 h-4" />
+    </span>
+    <span
+      className="text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer"
+      onClick={onExportCsv}
+    >
+      XL
+      <img src={XlIcon} alt="XL" className="w-4 h-4" />
+    </span>
+  </div>
+);
+
+const useTableDragScroll = () => {
+  const scrollRef = useRef(null);
+  const isPointerDown = useRef(false);
+  const isDragging = useRef(false);
+  const start = useRef({ x: 0, y: 0 });
+  const scroll = useRef({ left: 0, top: 0 });
+  const velocity = useRef({ x: 0, y: 0 });
+  const animationFrame = useRef(null);
+  const lastMove = useRef({ time: 0, x: 0, y: 0 });
+  const resetDragState = useCallback(() => {
+    isPointerDown.current = false;
+    isDragging.current = false;
+    if (scrollRef.current) {
+      scrollRef.current.style.cursor = '';
+      scrollRef.current.style.userSelect = '';
+    }
+  }, []);
+  const cancelMomentum = useCallback(() => {
+    if (animationFrame.current) {
+      cancelAnimationFrame(animationFrame.current);
+      animationFrame.current = null;
+    }
+  }, []);
+  const applyMomentum = useCallback(() => {
+    if (!scrollRef.current) return;
+    const friction = 0.95;
+    const minVelocity = 0.1;
+    const step = () => {
+      const { x, y } = velocity.current;
+      if (!scrollRef.current) return;
+      if (Math.abs(x) > minVelocity || Math.abs(y) > minVelocity) {
+        scrollRef.current.scrollLeft -= x * 20;
+        scrollRef.current.scrollTop -= y * 20;
+        velocity.current.x *= friction;
+        velocity.current.y *= friction;
+        animationFrame.current = requestAnimationFrame(step);
+      } else {
+        cancelMomentum();
+      }
+    };
+    animationFrame.current = requestAnimationFrame(step);
+  }, [cancelMomentum]);
+  const handleDocumentMouseMove = useCallback((e) => {
+    if (!isPointerDown.current || !scrollRef.current) return;
+    const dx = e.clientX - start.current.x;
+    const dy = e.clientY - start.current.y;
+    if (!isDragging.current) {
+      if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+      isDragging.current = true;
+      scrollRef.current.style.cursor = 'grabbing';
+      scrollRef.current.style.userSelect = 'none';
+    }
+    const now = Date.now();
+    const dt = now - lastMove.current.time || 16;
+    velocity.current = {
+      x: (e.clientX - lastMove.current.x) / dt,
+      y: (e.clientY - lastMove.current.y) / dt,
+    };
+    scrollRef.current.scrollLeft = scroll.current.left - dx;
+    scrollRef.current.scrollTop = scroll.current.top - dy;
+    lastMove.current = {
+      time: now,
+      x: e.clientX,
+      y: e.clientY,
+    };
+  }, []);
+  const handleDocumentMouseUp = useCallback(() => {
+    document.removeEventListener('mousemove', handleDocumentMouseMove);
+    document.removeEventListener('mouseup', handleDocumentMouseUp);
+    if (!scrollRef.current) {
+      resetDragState();
+      return;
+    }
+    const wasDragging = isDragging.current;
+    resetDragState();
+    if (wasDragging) {
+      applyMomentum();
+    }
+  }, [applyMomentum, handleDocumentMouseMove, resetDragState]);
+  const handleMouseDown = useCallback((e) => {
+    if (!scrollRef.current || e.button !== 0) return;
+    isPointerDown.current = true;
+    isDragging.current = false;
+    start.current = { x: e.clientX, y: e.clientY };
+    scroll.current = {
+      left: scrollRef.current.scrollLeft,
+      top: scrollRef.current.scrollTop,
+    };
+    lastMove.current = {
+      time: Date.now(),
+      x: e.clientX,
+      y: e.clientY,
+    };
+    cancelMomentum();
+    document.addEventListener('mousemove', handleDocumentMouseMove);
+    document.addEventListener('mouseup', handleDocumentMouseUp);
+  }, [cancelMomentum, handleDocumentMouseMove, handleDocumentMouseUp]);
+  return { scrollRef, handleMouseDown };
+};
+
+const summaryOutsideSelectStyles = {
+  control: (provided, state) => ({
+    ...provided,
+    fontFamily: 'Manrope',
+    borderWidth: '2px',
+    borderRadius: '8px',
+    minHeight: '40px',
+    height: '40px',
+    flexWrap: 'nowrap',
+    borderColor: state.isFocused
+      ? 'rgba(191, 152, 83, 1)'
+      : 'rgba(191, 152, 83, 0.2)',
+    boxShadow: state.isFocused
+      ? '0 0 0 1px rgba(101, 102, 53, 0.2)'
+      : 'none',
+    '&:hover': {
+      borderColor: 'rgba(191, 152, 83, 0.2)',
+    },
+  }),
+  valueContainer: (provided, state) => ({
+    ...provided,
+    flex: '1 1 0%',
+    minWidth: 0,
+    flexWrap: 'nowrap',
+    overflow: 'hidden',
+    paddingLeft: '12px',
+    paddingRight: state.hasValue ? '2px' : provided.paddingRight,
+    paddingTop: 0,
+    paddingBottom: 0,
+    height: '41px',
+    alignItems: 'center',
+  }),
+  singleValue: (provided) => ({
+    ...provided,
+    maxWidth: '100%',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    margin: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    color: 'black',
+    fontWeight: '500',
+  }),
+  input: (provided) => ({
+    ...provided,
+    margin: 0,
+    padding: 0,
+    fontWeight: '500',
+    color: 'black',
+  }),
+  menu: (provided) => ({
+    ...provided,
+    zIndex: 9999,
+    maxHeight: '300px',
+  }),
+  menuPortal: (provided) => ({
+    ...provided,
+    zIndex: 9999,
+  }),
+  menuList: (provided) => ({
+    ...provided,
+    paddingTop: 0,
+    paddingBottom: 0,
+    maxHeight: '250px',
+    overflowY: 'auto',
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
+    '&::-webkit-scrollbar': {
+      display: 'none',
+    },
+  }),
+  indicatorSeparator: () => ({ display: 'none' }),
+  indicatorsContainer: (provided) => ({
+    ...provided,
+    flex: '0 0 auto',
+    paddingLeft: '0',
+  }),
+  dropdownIndicator: (provided, state) => ({
+    ...provided,
+    display: state.hasValue ? 'none' : 'flex',
+    color: '#000000',
+    flexShrink: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+  }),
+  clearIndicator: (provided) => ({
+    ...provided,
+    cursor: 'pointer',
+    color: '#000000',
+    flexShrink: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    paddingLeft: '4px',
+    paddingRight: '4px',
+  }),
+  placeholder: (provided) => ({
+    ...provided,
+    fontWeight: 'normal',
+    fontSize: '14px',
+    color: '#A6A5A6',
+    margin: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    textAlign: 'left',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: '100%',
+    position: 'absolute',
+  }),
+  option: (provided, state) => ({
+    ...provided,
+    minHeight: 36,
+    height: 'auto',
+    paddingTop: 6,
+    paddingBottom: 6,
+    whiteSpace: 'normal',
+    display: 'flex',
+    alignItems: 'center',
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
+    WebkitTapHighlightColor: '#FAF6ED',
+    backgroundColor: state.isSelected
+      ? '#BF9853'
+      : state.isFocused
+        ? '#FAF6ED'
+        : provided.backgroundColor,
+    color: state.isSelected ? '#FFFFFF' : provided.color,
+    fontWeight: '500',
+    textAlign: 'left',
+    '&:active': {
+      backgroundColor: state.isSelected ? '#BF9853' : '#FAF6ED',
+    },
+  }),
+};
 
 const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const [empOptions, setEmpOptions] = useState([]);
@@ -142,65 +472,41 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     };
     fetchData();
   }, []);
-  const customStyles = {
-    control: (provided, state) => ({
-      ...provided,
-      borderWidth: '2px',
-      lineHeight: '20px',
-      fontSize: '14px',
-      height: '45px',
-      borderRadius: '8px',
-      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.3)' : 'rgba(191, 152, 83, 0.3)',
-      boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.3)' : 'none',
-    }),
-    clearIndicator: (provided) => ({
-      ...provided,
-      cursor: 'pointer',
-    }),
-    menu: (provided) => ({
-      ...provided,
-      zIndex: 9999,
-      maxHeight: '300px',
-    }),
-    menuPortal: (provided) => ({
-      ...provided,
-      zIndex: 9999,
-    }),
-    menuList: (provided) => ({
-      ...provided,
-      maxHeight: '250px',
-      overflowY: 'auto',
-    }),
-    singleValue: (provided) => ({
-      ...provided,
-      fontWeight: '500',
-      color: 'black',
-      textAlign: 'left',
-    }),
-    option: (provided, state) => ({
-      ...provided,
-      fontWeight: '500',
-      backgroundColor: state.isSelected
-        ? 'rgba(191, 152, 83, 0.3)'
-        : state.isFocused
-          ? 'rgba(191, 152, 83, 0.1)'
-          : 'white',
-      color: 'black',
-      textAlign: 'left',
-    }),
-    input: (provided) => ({
-      ...provided,
-      fontWeight: '500',
-      color: 'black',
-      textAlign: 'left',
-    }),
-    placeholder: (provided) => ({
-      ...provided,
-      fontWeight: '500',
-      color: '#999',
-      textAlign: 'left',
-    }),
+  const purposeTableScroll = useTableDragScroll();
+  const empTableScroll = useTableDragScroll();
+  const { expandedCells: purposeExpandedCells, toggleExpandedCell: togglePurposeExpandedCell } = useEdbcExpandedCells();
+  const { expandedCells: empExpandedCells, toggleExpandedCell: toggleEmpExpandedCell } = useEdbcExpandedCells();
+  const [showPurposeFilters, setShowPurposeFilters] = useState(false);
+  const [showEmpFilters, setShowEmpFilters] = useState(false);
+  const edbc8Config = getEdbcColumnConfig(EDBC_IDS.EDBC8);
+  const handlePurposeEdbcSort = (field) => {
+    if (field === 'siteName') handleSort('purposeName');
+    else if (field === 'amount') handleSort('pendingAdvance');
+    else if (field === 'paymentMode') handleSort('billStatus');
   };
+  const handleEmpEdbcSort = (field) => {
+    if (field === 'vendor') handlePurposeSort('name');
+    else if (field === 'amount') handlePurposeSort('pendingAdvance');
+    else if (field === 'paymentMode') handlePurposeSort('billStatus');
+  };
+  const purposeHeaderSortField = sortConfig.key === 'purposeName'
+    ? 'siteName'
+    : sortConfig.key === 'pendingAdvance'
+      ? 'amount'
+      : sortConfig.key === 'billAmount'
+        ? 'amount'
+        : sortConfig.key === 'billStatus'
+          ? 'paymentMode'
+          : null;
+  const empHeaderSortField = purposeSortConfig.key === 'name'
+    ? 'vendor'
+    : purposeSortConfig.key === 'pendingAdvance'
+      ? 'amount'
+      : purposeSortConfig.key === 'billAmount'
+        ? 'amount'
+        : purposeSortConfig.key === 'billStatus'
+          ? 'paymentMode'
+          : null;
   // State for filtered purpose data
   const [purposeData, setPurposeData] = useState([]);
   useEffect(() => {
@@ -656,243 +962,303 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   };
 
   return (
-    <div className=" bg-[#FAF6ED]">
-      <div className="max-w-[1850px] ml-10 mr-10">
-        <div className="bg-white rounded-lg shadow-sm p-4 lg:p-6">
-          {/* Responsive layout that adapts to screen size */}
-          <div className="flex flex-col xl:flex-row gap-4 lg:gap-6 text-left">
-            {/* Employee Section */}
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-4 gap-4">
-                <div className="flex-1 min-w-0">
-                  <label className="block font-semibold mb-2 text-gray-700 text-sm sm:text-base">Employee Name</label>
+    <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]">
+      <div className="p-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
+        <div className="flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 max-h-full overflow-visible px-[24px] py-[24px] items-stretch bg-white">
+          {/* Employee Section */}
+          <div className={`flex flex-col flex-1 min-w-0 min-h-0 max-h-full overflow-hidden bg-white rounded-[6px] max-w-[770px] ${SUMMARY_PANEL_SHADOW} px-[24px] py-[24px]`}>
+            <div className="w-full min-w-0 flex flex-col flex-1 min-h-0 max-h-full">
+              <div className="flex flex-wrap justify-between items-start gap-[12px] mb-[18px] shrink-0 w-full">
+                <div className="text-left max-w-[220px]">
+                  <label className="block font-semibold mb-[8px]">Employee Name</label>
                   <Select
                     options={staffAdvanceCombinedOptions}
                     value={selectedEmpOption}
                     onChange={(selectedOption) => {
                       setSelectedEmpOption(selectedOption);
                     }}
-                    className="w-full max-w-xs sm:max-w-sm h-[40px] sm:h-[45px] rounded-lg focus:outline-none"
+                    placeholder="Employee Name"
+                    className={SUMMARY_OUTSIDE_SELECT_CLASS}
                     isClearable
-                    styles={customStyles}
+                    menuPortalTarget={document.body}
+                    styles={summaryOutsideSelectStyles}
                   />
                 </div>
-                <div className="flex flex-col text-right border-2 border-[#E4572E] border-opacity-25 p-2 sm:p-3 rounded-lg bg-orange-50 min-w-0">
-                  <span className="text-xs sm:text-sm font-medium">
-                    Pending Advance:{" "}
-                    <b className="text-red-500">
-                      {totalPendingAdvance !== 0 ? totalPendingAdvance.toLocaleString("en-IN") : "0"}
-                    </b>
-                  </span>
-                  <span className="text-xs sm:text-sm">
-                    Total Refund:{" "}
-                    {totalBillAmount !== 0 ? totalBillAmount.toLocaleString("en-IN") : "0"}
-                  </span>
+                <div className="rounded-md px-4 py-[8px] mt-[8px] text-sm shrink-0" style={SUMMARY_BOX_STYLE}>
+                  <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                    <span className="flex shrink-0 w-[130px] text-black font-semibold">
+                      <span className="whitespace-nowrap">Pending Advance</span>
+                      <span className="ml-auto">:</span>
+                    </span>
+                    <span className="font-semibold" style={{ color: '#E4572E' }}>
+                      {formatSummaryAmount(totalPendingAdvance)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                    <span className="flex shrink-0 w-[130px] text-black font-semibold">
+                      <span className="whitespace-nowrap">Total Refund</span>
+                      <span className="ml-auto">:</span>
+                    </span>
+                    <span className="font-semibold" style={{ color: '#E4572E' }}>
+                      {formatSummaryAmount(totalBillAmount)}
+                    </span>
+                  </div>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-1 sm:gap-2 text-xs sm:text-sm justify-end mb-4">
-                <button onClick={exportPDF} className="flex items-center font-bold hover:underline gap-1 text-[#E4572E] px-2 sm:px-3 py-1 rounded hover:bg-orange-50 text-xs sm:text-sm">Export PDF</button>
-                <button onClick={exportCSV} className="flex items-center font-bold hover:underline gap-1 text-[#007233] px-2 sm:px-3 py-1 rounded hover:bg-green-50 text-xs sm:text-sm">Export XL</button>
-                <button className="flex items-center font-bold hover:underline gap-1 text-[#BF9853] px-2 sm:px-3 py-1 rounded hover:bg-yellow-50 text-xs sm:text-sm">Print</button>
-              </div>
-              <div className="border-l-8 border-l-[#BF9853] rounded-lg overflow-hidden shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse min-w-[500px] sm:min-w-[600px] lg:min-w-[700px] max-h-[500px]">
-                    <thead>
-                      <tr className="bg-[#f8f1e5] text-left">
-                        <th
-                          className="p-2 sm:p-3 cursor-pointer hover:bg-gray-200 font-semibold text-gray-700 text-xs sm:text-sm"
-                          onClick={() => handleSort('purposeName')}
-                        >
-                          Purpose
-                          {sortConfig.key === 'purposeName' && (
-                            <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                          )}
-                        </th>
-                        <th
-                          className="p-2 sm:p-3 cursor-pointer hover:bg-gray-200 font-semibold text-gray-700 text-xs sm:text-sm"
-                          onClick={() => handleSort('pendingAdvance')}
-                        >
-                          Advance
-                          {sortConfig.key === 'pendingAdvance' && (
-                            <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                          )}
-                        </th>
-                        <th
-                          className="p-2 sm:p-3 cursor-pointer hover:bg-gray-200 font-semibold text-gray-700 text-xs sm:text-sm"
-                          onClick={() => handleSort('billAmount')}
-                        >
-                          Refund Amount
-                          {sortConfig.key === 'billAmount' && (
-                            <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                          )}
-                        </th>
-                        <th
-                          className="p-2 sm:p-3 cursor-pointer hover:bg-gray-200 font-semibold text-gray-700 text-xs sm:text-sm"
-                          onClick={() => handleSort('billStatus')}
-                        >
-                          Status
-                          {sortConfig.key === 'billStatus' && (
-                            <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                          )}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortData(purposeData, sortConfig, 'pendingAdvance', 'purposeName').length > 0 ? (
-                        sortData(purposeData, sortConfig, 'pendingAdvance', 'purposeName').map((purpose, idx) => (
-                          <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-[#FAF6ED] hover:bg-gray-50"}>
-                            <td className="py-2 px-2 sm:py-3 sm:px-3 text-left font-medium text-xs sm:text-sm">{purpose.purposeName}</td>
-                            <td
-                              className="py-2 px-2 sm:py-3 sm:px-3 cursor-help relative font-mono text-xs sm:text-sm"
-                              onMouseEnter={(e) => handleMouseEnterAdvance(e, purpose.purposeId, selectedEmpOption?.id, selectedEmpOption?.type)}
-                              onMouseLeave={handleMouseLeave}
-                            >
-                              {purpose.pendingAdvance.toLocaleString("en-IN")}
-                            </td>
-                            <td
-                              className="py-2 px-2 sm:py-3 sm:px-3 cursor-help relative font-mono text-xs sm:text-sm"
-                              onMouseEnter={(e) => handleMouseEnter(e, purpose.purposeId, selectedEmpOption?.id, selectedEmpOption?.type)}
-                              onMouseLeave={handleMouseLeave}
-                            >
-                              {purpose.billAmount.toLocaleString("en-IN")}
-                            </td>
-                            <td className="py-2 px-2 sm:py-3 sm:px-3">
-                              <span
-                                className={`px-2 py-1 rounded-full text-xs font-medium ${purpose.pendingAdvance > 0
-                                    ? "text-[#E4572E]"
-                                    : "text-green-800"
-                                  }`}
+              <div className="border border-gray-200 px-[18px] pt-[18px] flex flex-col flex-1 min-h-0 overflow-hidden">
+                <div className="flex min-w-0 w-[676px] max-w-full flex-nowrap items-end justify-between gap-[6px] mb-[9px] shrink-0 overflow-hidden">
+                  <div className="flex min-w-0 items-center overflow-hidden gap-[6px] shrink-0">
+                    <EdbcFilterToggleButton onClick={() => setShowPurposeFilters((v) => !v)} />
+                  </div>
+                  <div className="flex flex-nowrap shrink-0 items-end justify-end gap-[6px]">
+                    <SummaryTableExportActions onExportPdf={exportPDF} onExportCsv={exportCSV} />
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden pb-[18px] flex flex-col">
+                  <div
+                    ref={purposeTableScroll.scrollRef}
+                    className="rounded-lg border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none w-full"
+                    onMouseDown={purposeTableScroll.handleMouseDown}
+                  >
+                    <table className={`${SUMMARY_PURPOSE_TABLE_CLASS} ${showPurposeFilters ? '[&_thead_tr:first-child_th]:!border-b-0' : ''}`}>
+                      <thead className="sticky top-0 z-20 bg-white">
+                        <EdbcTableHeaderRow>
+                          <EdbcColumnHeader
+                            columnId={EDBC_IDS.EDBC3}
+                            label="Purpose"
+                            sortField={purposeHeaderSortField}
+                            sortDirection={sortConfig.direction}
+                            onSort={handlePurposeEdbcSort}
+                          />
+                          <EdbcColumnHeader
+                            columnId={EDBC_IDS.EDBC8}
+                            label="Advance"
+                            sortField={purposeHeaderSortField}
+                            sortDirection={sortConfig.direction}
+                            onSort={handlePurposeEdbcSort}
+                          />
+                          <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Refund Amount" />
+                          <EdbcColumnHeader
+                            columnId={EDBC_IDS.EDBC13}
+                            label="Status"
+                            sortField={purposeHeaderSortField}
+                            sortDirection={sortConfig.direction}
+                            onSort={handlePurposeEdbcSort}
+                          />
+                        </EdbcTableHeaderRow>
+                      </thead>
+                      <tbody>
+                        {sortData(purposeData, sortConfig, 'pendingAdvance', 'purposeName').length > 0 ? (
+                          sortData(purposeData, sortConfig, 'pendingAdvance', 'purposeName').map((purpose, idx) => (
+                            <EdbcTableBodyRow key={purpose.purposeId ?? idx}>
+                              <EdbcExpandableBodyCell
+                                columnId={EDBC_IDS.EDBC3}
+                                expense={{ id: purpose.purposeId, ...purpose }}
+                                rowIndex={idx}
+                                expandedCells={purposeExpandedCells}
+                                onToggleExpanded={togglePurposeExpandedCell}
+                                getDisplayValue={(row) => row.purposeName}
+                              />
+                              <td
+                                id={EDBC_IDS.EDBC8}
+                                className={edbc8Config?.tdClass}
+                                onMouseEnter={(e) => handleMouseEnterAdvance(e, purpose.purposeId, selectedEmpOption?.id, selectedEmpOption?.type)}
+                                onMouseLeave={handleMouseLeave}
                               >
-                                {purpose.pendingAdvance > 0 ? "Pending" : "Settled"}
-                              </span>
-                            </td>
+                                <span
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    togglePurposeExpandedCell(`${purpose.purposeId ?? idx}-amount`);
+                                  }}
+                                  className={`block w-full cursor-help ${purposeExpandedCells[`${purpose.purposeId ?? idx}-amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                  title={formatSummaryAmount(purpose.pendingAdvance)}
+                                >
+                                  {formatSummaryAmount(purpose.pendingAdvance)}
+                                </span>
+                              </td>
+                              <td
+                                className={edbc8Config?.tdClass}
+                                onMouseEnter={(e) => handleMouseEnter(e, purpose.purposeId, selectedEmpOption?.id, selectedEmpOption?.type)}
+                                onMouseLeave={handleMouseLeave}
+                              >
+                                <span
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    togglePurposeExpandedCell(`${purpose.purposeId ?? idx}-bill_amount`);
+                                  }}
+                                  className={`block w-full cursor-help ${purposeExpandedCells[`${purpose.purposeId ?? idx}-bill_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                  title={formatSummaryAmount(purpose.billAmount)}
+                                >
+                                  {formatSummaryAmount(purpose.billAmount)}
+                                </span>
+                              </td>
+                              {renderStaffStatusBodyCell({
+                                pendingAdvance: purpose.pendingAdvance,
+                                rowId: purpose.purposeId,
+                                rowIndex: idx,
+                                expandedCells: purposeExpandedCells,
+                                onToggleExpanded: togglePurposeExpandedCell,
+                              })}
+                            </EdbcTableBodyRow>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="4" className="text-center py-4 text-gray-500 font-semibold">No Entry is available</td>
                           </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan="4" className="text-center p-8 text-gray-500">No data available</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Purpose Section */}
-            <div className="flex-1 min-w-0 xl:ml-6">
-              <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-4 gap-4">
-                <div className="flex-1 min-w-0">
-                  <label className="block font-semibold mb-2 text-gray-700 text-sm sm:text-base">Purpose</label>
+          {/* Purpose Section */}
+          <div className={`flex flex-col flex-1 min-w-0 min-h-0 max-h-full overflow-hidden bg-white rounded-[6px] max-w-[696px] ${SUMMARY_PANEL_SHADOW} px-[24px] py-[24px]`}>
+            <div className="w-full min-w-0 flex flex-col flex-1 min-h-0 max-h-full">
+              <div className="flex flex-wrap justify-between items-start gap-[12px] mb-[18px] shrink-0 w-full">
+                <div className="text-left">
+                  <label className="block font-semibold mb-[8px]">Purpose</label>
                   <Select
                     options={purposeOptions || []}
-                    placeholder="Select a purpose..."
+                    placeholder="Purpose"
                     isSearchable={true}
                     value={selectedPurposeOption}
                     onChange={setSelectedPurposeOption}
-                    styles={customStyles}
+                    className={SUMMARY_OUTSIDE_SELECT_CLASS}
                     isClearable
-                    className="w-full max-w-xs sm:max-w-sm h-[40px] sm:h-[45px] focus:outline-none"
+                    menuPortalTarget={document.body}
+                    styles={summaryOutsideSelectStyles}
                   />
                 </div>
-                <div className="flex flex-col text-right border-2 border-[#E4572E] border-opacity-25 p-2 sm:p-3 rounded-lg bg-orange-50 min-w-0">
-                  <span className="text-xs sm:text-sm font-medium">
-                    Pending Advance: <b className="text-[#E4572E]">{purposePendingAdvance.toLocaleString("en-IN")}</b>
-                  </span>
-                  <span className="text-xs sm:text-sm">Total Refund: {purposeBillAmount.toLocaleString("en-IN")}</span>
+                <div className="rounded-md px-4 py-[8px] mt-[8px] text-sm shrink-0" style={SUMMARY_BOX_STYLE}>
+                  <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                    <span className="flex shrink-0 w-[130px] text-black font-semibold">
+                      <span className="whitespace-nowrap">Pending Advance</span>
+                      <span className="ml-auto">:</span>
+                    </span>
+                    <span className="font-semibold" style={{ color: '#E4572E' }}>
+                      {formatSummaryAmount(purposePendingAdvance)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                    <span className="flex shrink-0 w-[130px] text-black font-semibold">
+                      <span className="whitespace-nowrap">Total Refund</span>
+                      <span className="ml-auto">:</span>
+                    </span>
+                    <span className="font-semibold" style={{ color: '#E4572E' }}>
+                      {formatSummaryAmount(purposeBillAmount)}
+                    </span>
+                  </div>
                 </div>
               </div>
-
-              <div className="flex flex-wrap gap-1 sm:gap-2 text-xs sm:text-sm justify-end mb-4">
-                <button onClick={exportPurposePDF} className="flex items-center gap-1 font-bold hover:underline text-[#E4572E] px-2 sm:px-3 py-1 rounded hover:bg-orange-50 text-xs sm:text-sm">Export PDF</button>
-                <button onClick={exportPurposeCSV} className="flex items-center gap-1 font-bold hover:underline text-[#007233] px-2 sm:px-3 py-1 rounded hover:bg-green-50 text-xs sm:text-sm">Export XL</button>
-                <button className="flex items-center gap-1 font-bold hover:underline text-[#BF9853] px-2 sm:px-3 py-1 rounded hover:bg-yellow-50 text-xs sm:text-sm">Print</button>
-              </div>
-
-              <div className="border-l-8 border-l-[#BF9853] rounded-lg overflow-hidden shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse min-w-[500px] sm:min-w-[600px] lg:min-w-[700px] max-h-[500px]">
-                    <thead>
-                      <tr className="bg-[#f8f1e5] text-left">
-                        <th
-                          className="p-2 sm:p-3 cursor-pointer hover:bg-gray-200 font-semibold text-gray-700 text-xs sm:text-sm"
-                          onClick={() => handlePurposeSort('name')}
-                        >
-                          Employee Name
-                          {purposeSortConfig.key === 'name' && (
-                            <span className="ml-1">{purposeSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                          )}
-                        </th>
-                        <th
-                          className="p-2 sm:p-3 cursor-pointer hover:bg-gray-200 font-semibold text-gray-700 text-xs sm:text-sm"
-                          onClick={() => handlePurposeSort('pendingAdvance')}
-                        >
-                          Advance
-                          {purposeSortConfig.key === 'pendingAdvance' && (
-                            <span className="ml-1">{purposeSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                          )}
-                        </th>
-                        <th
-                          className="p-2 sm:p-3 cursor-pointer hover:bg-gray-200 font-semibold text-gray-700 text-xs sm:text-sm"
-                          onClick={() => handlePurposeSort('billAmount')}
-                        >
-                          Refund Amount
-                          {purposeSortConfig.key === 'billAmount' && (
-                            <span className="ml-1">{purposeSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                          )}
-                        </th>
-                        <th
-                          className="p-2 sm:p-3 cursor-pointer hover:bg-gray-200 font-semibold text-gray-700 text-xs sm:text-sm"
-                          onClick={() => handlePurposeSort('billStatus')}
-                        >
-                          Status
-                          {purposeSortConfig.key === 'billStatus' && (
-                            <span className="ml-1">{purposeSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                          )}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortData(purposeDetails, purposeSortConfig).length > 0 ? (
-                        sortData(purposeDetails, purposeSortConfig).map((d, idx) => (
-                          <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-[#FAF6ED] hover:bg-gray-50"}>
-                            <td className="py-2 px-2 sm:py-3 sm:px-3 font-medium text-xs sm:text-sm">{d.name}</td>
-                            <td
-                              className="py-2 px-2 sm:py-3 sm:px-3 cursor-help relative font-mono text-xs sm:text-sm"
-                              onMouseEnter={(e) => handleMouseEnterAdvance(e, selectedPurposeOption?.id, d.empId, d.empType)}
-                              onMouseLeave={handleMouseLeave}
-                            >
-                              {d.pendingAdvance.toLocaleString("en-IN")}
-                            </td>
-                            <td
-                              className="py-2 px-2 sm:py-3 sm:px-3 cursor-help relative font-mono text-xs sm:text-sm"
-                              onMouseEnter={(e) => handleMouseEnter(e, selectedPurposeOption?.id, d.empId, d.empType)}
-                              onMouseLeave={handleMouseLeave}
-                            >
-                              {d.billAmount.toLocaleString("en-IN")}
-                            </td>
-                            <td className="py-2 px-2 sm:py-3 sm:px-3">
-                              <span
-                                className={`px-2 py-1 rounded-full text-xs font-medium ${d.pendingAdvance > 0
-                                    ? "text-[#E4572E]"
-                                    : "text-green-800"
-                                  }`}
+              <div className="border border-gray-200 px-[18px] pt-[18px] flex flex-col flex-1 min-h-0 overflow-hidden">
+                <div className="flex min-w-0 w-full flex-nowrap items-end justify-between gap-[6px] mb-[9px] shrink-0 overflow-hidden">
+                  <div className="flex min-w-0 items-center overflow-hidden gap-[6px] shrink-0">
+                    <EdbcFilterToggleButton onClick={() => setShowEmpFilters((v) => !v)} />
+                  </div>
+                  <div className="flex flex-nowrap shrink-0 items-end justify-end gap-[6px]">
+                    <SummaryTableExportActions onExportPdf={exportPurposePDF} onExportCsv={exportPurposeCSV} />
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden pb-[18px] flex flex-col">
+                  <div
+                    ref={empTableScroll.scrollRef}
+                    className="rounded-lg border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none w-full"
+                    onMouseDown={empTableScroll.handleMouseDown}
+                  >
+                    <table className={`${SUMMARY_EMPLOYEE_TABLE_CLASS} ${showEmpFilters ? '[&_thead_tr:first-child_th]:!border-b-0' : ''}`}>
+                      <thead className="sticky top-0 z-20 bg-white">
+                        <EdbcTableHeaderRow>
+                          <EdbcColumnHeader
+                            columnId={EDBC_IDS.EDBC4}
+                            label="Employee Name"
+                            sortField={empHeaderSortField}
+                            sortDirection={purposeSortConfig.direction}
+                            onSort={handleEmpEdbcSort}
+                          />
+                          <EdbcColumnHeader
+                            columnId={EDBC_IDS.EDBC8}
+                            label="Advance"
+                            sortField={empHeaderSortField}
+                            sortDirection={purposeSortConfig.direction}
+                            onSort={handleEmpEdbcSort}
+                          />
+                          <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Refund Amount" />
+                          <EdbcColumnHeader
+                            columnId={EDBC_IDS.EDBC13}
+                            label="Status"
+                            sortField={empHeaderSortField}
+                            sortDirection={purposeSortConfig.direction}
+                            onSort={handleEmpEdbcSort}
+                          />
+                        </EdbcTableHeaderRow>
+                      </thead>
+                      <tbody>
+                        {sortData(purposeDetails, purposeSortConfig).length > 0 ? (
+                          sortData(purposeDetails, purposeSortConfig).map((d, idx) => (
+                            <EdbcTableBodyRow key={d.empId ?? idx}>
+                              <EdbcExpandableBodyCell
+                                columnId={EDBC_IDS.EDBC4}
+                                expense={{ id: d.empId, ...d }}
+                                rowIndex={idx}
+                                expandedCells={empExpandedCells}
+                                onToggleExpanded={toggleEmpExpandedCell}
+                                getDisplayValue={(row) => row.name}
+                              />
+                              <td
+                                id={EDBC_IDS.EDBC8}
+                                className={edbc8Config?.tdClass}
+                                onMouseEnter={(e) => handleMouseEnterAdvance(e, selectedPurposeOption?.id, d.empId, d.empType)}
+                                onMouseLeave={handleMouseLeave}
                               >
-                                {d.pendingAdvance > 0 ? "Pending" : "Settled"}
-                              </span>
+                                <span
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleEmpExpandedCell(`${d.empId ?? idx}-amount`);
+                                  }}
+                                  className={`block w-full cursor-help ${empExpandedCells[`${d.empId ?? idx}-amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                  title={formatSummaryAmount(d.pendingAdvance)}
+                                >
+                                  {formatSummaryAmount(d.pendingAdvance)}
+                                </span>
+                              </td>
+                              <td
+                                className={edbc8Config?.tdClass}
+                                onMouseEnter={(e) => handleMouseEnter(e, selectedPurposeOption?.id, d.empId, d.empType)}
+                                onMouseLeave={handleMouseLeave}
+                              >
+                                <span
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleEmpExpandedCell(`${d.empId ?? idx}-bill_amount`);
+                                  }}
+                                  className={`block w-full cursor-help ${empExpandedCells[`${d.empId ?? idx}-bill_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                  title={formatSummaryAmount(d.billAmount)}
+                                >
+                                  {formatSummaryAmount(d.billAmount)}
+                                </span>
+                              </td>
+                              {renderStaffStatusBodyCell({
+                                pendingAdvance: d.pendingAdvance,
+                                rowId: d.empId,
+                                rowIndex: idx,
+                                expandedCells: empExpandedCells,
+                                onToggleExpanded: toggleEmpExpandedCell,
+                              })}
+                            </EdbcTableBodyRow>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="4" className="text-center py-4 text-gray-500 font-semibold">
+                              No Entry is available
                             </td>
                           </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan="4" className="text-center p-8 text-gray-500">
-                            No data available
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>

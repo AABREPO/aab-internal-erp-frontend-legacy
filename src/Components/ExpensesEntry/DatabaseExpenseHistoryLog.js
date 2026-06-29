@@ -651,9 +651,7 @@ const DatabaseExpenseHistoryLog = ({ username: _username, userRoles: _userRoles 
                             </div>
                             <div className="flex items-center space-x-1">
                                 <button
-                                    type="button"
-                                    disabled={page <= 1}
-                                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                    type="button" disabled={page <= 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                                     className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
                                 >
                                     Previous
@@ -671,9 +669,7 @@ const DatabaseExpenseHistoryLog = ({ username: _username, userRoles: _userRoles 
                                     }
                                     return (
                                         <button
-                                            key={pageNum}
-                                            type="button"
-                                            onClick={() => setCurrentPage(pageNum)}
+                                            key={pageNum} type="button" onClick={() => setCurrentPage(pageNum)}
                                             className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${
                                                 page === pageNum
                                                     ? 'bg-[#BF9853] text-white border-[#BF9853]'
@@ -685,9 +681,7 @@ const DatabaseExpenseHistoryLog = ({ username: _username, userRoles: _userRoles 
                                     );
                                 })}
                                 <button
-                                    type="button"
-                                    disabled={page >= totalPages}
-                                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                    type="button" disabled={page >= totalPages} onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                                     className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
                                 >
                                     Next

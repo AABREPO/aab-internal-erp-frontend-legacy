@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, useLayoutEffect } from 'react';
 import Select from 'react-select';
 import Attach from '../Images/Attachfile.svg';
 import edit from '../Images/Edit.svg';
@@ -14,6 +14,203 @@ import {
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
 import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
+import CustomDateField from '../ExpensesEntry/CustomDateField';
+import {
+  EDBC_IDS,
+  DATABASE_TABLE_FILTER_SELECT_STYLES,
+  getEdbcColumnConfig,
+  getEdbcColumnHeaderSortProps,
+  useEdbcExpandedCells,
+  useEdbcTableSort,
+  EdbcTableHeaderRow,
+  EdbcTableFilterRow,
+  EdbcTableBodyRow,
+  EdbcColumnHeader,
+  EdbcTimestampFilter,
+  EdbcSelectFilter,
+  EdbcTotalAmountFilter,
+  EdbcEmptyFilterCell,
+  EdbcDateBodyCell,
+  EdbcExpandableBodyCell,
+  EDBC_TABLE_EDGE_TABLE_CLASS,
+  EDBC2_FIRST_COLUMN_WIDTH_CLASS,
+  EdbcFilterToggleButton,
+  EdbcTableToolbarRightActions,
+  matchesEdbcAmountFilter,
+  formatEdbcFilterDateDMY,
+} from '../ExpensesEntry/databaseExpensesSharedColumns';
+
+const STAFF_SIDE_TABLE_BLANK_VALUE = 'BLANK';
+const STAFF_SIDE_TABLE_BLANK_LABEL = 'Blank';
+const staffSideTableBlankOption = { value: STAFF_SIDE_TABLE_BLANK_VALUE, label: STAFF_SIDE_TABLE_BLANK_LABEL };
+
+const formatStaffSideEdbc8Amount = (value) =>
+  `₹${(parseFloat(value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const formatStaffSideEdbc8AmountNegative = (value) =>
+  `-₹${(Math.abs(parseFloat(value) || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const normalizeStaffSideSearchText = (value) =>
+  String(value ?? '').toLowerCase().replace(/,/g, '');
+
+const staffEntryMatchesSideTableDateFilter = (entryDate, startDate, endDate) => {
+  if (!startDate && !endDate) return true;
+  const expenseDate = new Date(entryDate);
+  if (startDate && endDate) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    return expenseDate >= start && expenseDate <= end;
+  }
+  if (startDate) {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    return expenseDate >= start;
+  }
+  const end = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+  return expenseDate <= end;
+};
+
+const getStaffSideEntryRowDisplay = (entry, purposeOptions) => {
+  const advanceAmount =
+    entry.type === 'Refund'
+      ? formatStaffSideEdbc8AmountNegative(entry.staff_refund_amount)
+      : formatStaffSideEdbc8Amount(entry.amount);
+  let transferOrRefund = '';
+  if (entry.type === 'Refund') {
+    transferOrRefund = 'Refund';
+  } else if (entry.type === 'Transfer') {
+    const amount = parseFloat(entry.amount) || 0;
+    const toPurpose = purposeOptions.find((p) => p.id === entry.to_purpose_id);
+    transferOrRefund =
+      amount < 0
+        ? `Transfer To ${toPurpose?.label || 'Unknown Purpose'}`
+        : `Transfer From ${toPurpose?.label || 'Unknown Purpose'}`;
+  } else if (entry.staff_refund_amount) {
+    transferOrRefund = formatStaffSideEdbc8Amount(entry.staff_refund_amount);
+  }
+  return {
+    advanceAmount,
+    transferOrRefund,
+    payment_mode: entry.staff_payment_mode || '',
+  };
+};
+
+const toStaffSideExpenseRow = (entry) => ({ ...entry, id: entry.id, eno: entry.entry_no });
+
+const getFirstVisibleStaffSideTableBodyRow = (scroller) => {
+  if (!scroller) return null;
+  const thead = scroller.querySelector('thead');
+  if (!thead) return null;
+  const headerBottom = thead.getBoundingClientRect().bottom;
+  const rows = scroller.querySelectorAll('tbody tr');
+  let fallback = null;
+  for (const row of rows) {
+    if (row.querySelector('td[colspan]')) continue;
+    const rect = row.getBoundingClientRect();
+    if (rect.height <= 0) continue;
+    if (!fallback) fallback = row;
+    if (rect.top >= headerBottom - 0.5) return row;
+  }
+  return fallback;
+};
+
+const alignStaffSideTableRowBelowHeader = (scroller, row) => {
+  if (!scroller || !row) return;
+  const thead = scroller.querySelector('thead');
+  if (!thead) return;
+  const headerBottom = thead.getBoundingClientRect().bottom;
+  const rowTop = row.getBoundingClientRect().top;
+  const delta = rowTop - headerBottom;
+  if (Math.abs(delta) > 0.5) {
+    scroller.scrollTop += delta;
+  }
+};
+
+const ADVANCE_PORTAL_SELECT_CLASS =
+  'custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const ADVANCE_PORTAL_AMOUNT_INPUT_CLASS =
+  'pl-[20px] pr-4 border-2 border-[#BF9853] rounded-lg w-full h-full focus:outline-none border-opacity-[0.20] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const ADVANCE_PORTAL_READONLY_AMOUNT_INPUT_CLASS =
+  'pl-[20px] pr-4 border-2 border-[#BF9853] rounded-lg w-full h-full focus:outline-none border-opacity-[0.20] bg-[#ededed] text-[14px] font-semibold cursor-default';
+const ADVANCE_PORTAL_FILTER_AMOUNT_INPUT_CLASS =
+  'pl-[20px] pr-2 border border-[#00000029] rounded-lg w-full h-full focus:outline-none bg-[#ededed] text-sm font-semibold cursor-default';
+const ADVANCE_PORTAL_TEXTAREA_CLASS =
+  'border-2 border-[#BF9853] rounded-md px-[8px] w-[616px] h-[60px] focus:outline-none border-opacity-[0.20] resize-none text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const ADVANCE_PORTAL_LABEL_CLASS = 'text-md font-semibold mb-[8px] block';
+
+const formatNumber = (num) => {
+  if (!num) return '';
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+};
+const formatAmountDisplay = (value) => {
+  if (value === '' || value === null || value === undefined) return '';
+  const normalized = String(value).replace(/,/g, '');
+  const num = Number(normalized);
+  if (Number.isNaN(num)) return String(value);
+  return num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+const AdvancePortalAmountOutput = ({
+  value,
+  variant = 'form',
+  className = '',
+  fullWidth = false,
+}) => {
+  const isFilter = variant === 'filter';
+  const wrapperClass = isFilter
+    ? `relative lg:w-[150px] w-full h-[40px] ${className}`.trim()
+    : fullWidth
+      ? `relative w-full h-[40px] ${className}`.trim()
+      : `relative w-[300px] h-[40px] ${className}`.trim();
+  const rupeeClass = isFilter
+    ? 'absolute top-1/2 left-2 transform -translate-y-1/2 text-gray-600 text-sm pointer-events-none'
+    : 'absolute top-1/2 left-[8px] transform -translate-y-1/2 text-gray-600 text-lg pointer-events-none';
+  const inputClass = isFilter
+    ? ADVANCE_PORTAL_FILTER_AMOUNT_INPUT_CLASS
+    : ADVANCE_PORTAL_READONLY_AMOUNT_INPUT_CLASS;
+
+  return (
+    <div className={wrapperClass}>
+      <span className={rupeeClass}>₹</span>
+      <input
+        type="text"
+        readOnly
+        tabIndex={-1}
+        value={formatAmountDisplay(value)}
+        className={inputClass}
+      />
+    </div>
+  );
+};
+
+const AdvancePortalAmountInput = ({
+  value,
+  onChange,
+  placeholder = '',
+  className = '',
+  fullWidth = false,
+}) => {
+  const wrapperClass = fullWidth
+    ? `relative w-full h-[40px] ${className}`.trim()
+    : `relative w-[300px] h-[40px] ${className}`.trim();
+
+  return (
+    <div className={wrapperClass}>
+      <span className="absolute top-1/2 left-[8px] transform -translate-y-1/2 text-gray-600 text-lg">₹</span>
+      <input
+        type="text"
+        value={formatNumber(value)}
+        onChange={onChange}
+        placeholder={placeholder}
+        onWheel={(e) => e.target.blur()}
+        className={ADVANCE_PORTAL_AMOUNT_INPUT_CLASS}
+      />
+    </div>
+  );
+};
+
 const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const resolveActiveBranchId = () => {
     try {
@@ -86,6 +283,26 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
   const [filePreviewUrl, setFilePreviewUrl] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const fileInputRef = useRef(null);
+  const leftFormColRef = useRef(null);
+  const descriptionSectionRef = useRef(null);
+  const [sideTableAreaHeight, setSideTableAreaHeight] = useState(null);
+  const [sideTableContentHeight, setSideTableContentHeight] = useState(null);
+  const [sideTableOverallSearch, setSideTableOverallSearch] = useState('');
+  const [sideTableShowFilters, setSideTableShowFilters] = useState(false);
+  const [sideTableFilterDateStart, setSideTableFilterDateStart] = useState('');
+  const [sideTableFilterDateEnd, setSideTableFilterDateEnd] = useState('');
+  const [sideTableShowDateRangePicker, setSideTableShowDateRangePicker] = useState(false);
+  const [sideTableFilterAdvanceAmount, setSideTableFilterAdvanceAmount] = useState('');
+  const [sideTableFilterTransferRefund, setSideTableFilterTransferRefund] = useState('');
+  const [sideTableFilterMode, setSideTableFilterMode] = useState('');
+  const sideTableScrollRef = useRef(null);
+  const sideTableFilterRowRef = useRef(null);
+  const sideTableFilterNudgeUsedRef = useRef(false);
+  const sideTableFilterAnchorRowRef = useRef(null);
+  const sideTableFilterScrollTopBeforeToggleRef = useRef(null);
+  const sideTableFilterRowHeightBeforeCloseRef = useRef(0);
+  const sideTablePendingFilterOpenNudgeRef = useRef(false);
+  const sideTablePendingFilterCloseNudgeRef = useRef(false);
   // Employee options state
   const [employeeOptions, setEmployeeOptions] = useState([]);
   const [laboursList, setLaboursList] = useState([]);
@@ -206,21 +423,53 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
     };
     fetchPurposeOptions();
   }, []);
-  // Memoized custom styles to prevent recreation on every render
   const customStyles = useMemo(() => ({
     control: (provided, state) => ({
       ...provided,
+      fontFamily: 'Manrope',
       borderWidth: '2px',
-      lineHeight: '20px',
-      fontSize: '14px',
-      height: '45px',
       borderRadius: '8px',
-      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.3)' : 'rgba(191, 152, 83, 0.3)',
-      boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.3)' : 'none',
+      minHeight: '40px',
+      height: '40px',
+      flexWrap: 'nowrap',
+      borderColor: state.isFocused
+        ? 'rgba(191, 152, 83, 1)'
+        : 'rgba(191, 152, 83, 0.2)',
+      boxShadow: state.isFocused
+        ? '0 0 0 1px rgba(101, 102, 53, 0.2)'
+        : 'none',
+      '&:hover': {
+        borderColor: 'rgba(191, 152, 83, 0.2)',
+      },
     }),
-    clearIndicator: (provided) => ({
+    valueContainer: (provided, state) => ({
       ...provided,
-      cursor: 'pointer',
+      flex: '1 1 0%',
+      minWidth: 0,
+      flexWrap: 'nowrap',
+      overflow: 'hidden',
+      paddingLeft: '12px',
+      paddingRight: state.hasValue ? '2px' : provided.paddingRight,
+      paddingTop: 0,
+      paddingBottom: 0,
+      height: '36px',
+      alignItems: 'center',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      maxWidth: '100%',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+      margin: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      color: 'black',
+    }),
+    input: (provided) => ({
+      ...provided,
+      margin: 0,
+      padding: 0,
     }),
     menu: (provided) => ({
       ...provided,
@@ -233,37 +482,76 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
     }),
     menuList: (provided) => ({
       ...provided,
+      paddingTop: 0,
+      paddingBottom: 0,
       maxHeight: '250px',
       overflowY: 'auto',
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none',
+      '&::-webkit-scrollbar': {
+        display: 'none',
+      },
     }),
-    singleValue: (provided) => ({
+    indicatorSeparator: () => ({ display: 'none' }),
+    indicatorsContainer: (provided) => ({
       ...provided,
-      fontWeight: '500',
-      color: 'black',
-      textAlign: 'left',
+      flex: '0 0 auto',
+      paddingLeft: '0',
     }),
-    option: (provided, state) => ({
+    dropdownIndicator: (provided, state) => ({
       ...provided,
-      fontWeight: '500',
-      backgroundColor: state.isSelected
-        ? 'rgba(191, 152, 83, 0.3)'
-        : state.isFocused
-          ? 'rgba(191, 152, 83, 0.1)'
-          : 'white',
-      color: 'black',
-      textAlign: 'left',
+      display: state.hasValue ? 'none' : 'flex',
+      color: '#000000',
+      flexShrink: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
     }),
-    input: (provided) => ({
+    clearIndicator: (provided) => ({
       ...provided,
-      fontWeight: '500',
-      color: 'black',
-      textAlign: 'left',
+      cursor: 'pointer',
+      color: '#000000',
+      flexShrink: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      paddingLeft: '4px',
+      paddingRight: '4px',
     }),
     placeholder: (provided) => ({
       ...provided,
-      fontWeight: '500',
-      color: '#999',
+      fontWeight: 'normal',
+      fontSize: '14px',
+      color: '#A6A5A6',
+      margin: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
       textAlign: 'left',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      maxWidth: '100%',
+      position: 'absolute',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      minHeight: 36,
+      height: 'auto',
+      paddingTop: 6,
+      paddingBottom: 6,
+      whiteSpace: 'normal',
+      display: 'flex',
+      alignItems: 'center',
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+      WebkitTapHighlightColor: '#FAF6ED',
+      backgroundColor: state.isSelected
+        ? '#BF9853'
+        : state.isFocused
+          ? '#FAF6ED'
+          : provided.backgroundColor,
+      color: state.isSelected ? '#FFFFFF' : provided.color,
+      ':active': {
+        backgroundColor: state.isSelected ? '#BF9853' : '#FAF6ED',
+      },
     }),
   }), []);
   // Memoized field configuration to prevent recalculation on every render
@@ -1149,6 +1437,225 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
     // Add print logic
   }, []);
 
+  const { sortField: sideTableSortField, sortDirection: sideTableSortDirection, handleSort: handleSideTableSort, clearSort: clearSideTableSort } = useEdbcTableSort();
+  const { expandedCells: sideTableExpandedCells, toggleExpandedCell: toggleSideTableExpandedCell } = useEdbcExpandedCells();
+  const edbc8Config = getEdbcColumnConfig(EDBC_IDS.EDBC8);
+  const edbc3Config = getEdbcColumnConfig(EDBC_IDS.EDBC3);
+  const edbc13Config = getEdbcColumnConfig(EDBC_IDS.EDBC13);
+  const edbc19Config = getEdbcColumnConfig(EDBC_IDS.EDBC19);
+  const edbc19TdClass = edbc19Config?.tdClass || '';
+  const edbc2ColumnWidthClass = EDBC2_FIRST_COLUMN_WIDTH_CLASS;
+  const sideTableEdbcSortProps = useMemo(
+    () => getEdbcColumnHeaderSortProps(sideTableSortField, sideTableSortDirection, handleSideTableSort),
+    [sideTableSortField, sideTableSortDirection, handleSideTableSort],
+  );
+  const sideTableColumnWidthClasses = useMemo(
+    () => [
+      EDBC2_FIRST_COLUMN_WIDTH_CLASS,
+      edbc8Config?.columnWidthClass,
+      edbc3Config?.columnWidthClass,
+      edbc13Config?.columnWidthClass,
+      edbc19Config?.columnWidthClass,
+    ].filter(Boolean),
+    [edbc8Config, edbc3Config, edbc13Config, edbc19Config],
+  );
+  const sideTableModeFilterOptions = useMemo(() => {
+    const modes = new Set();
+    filteredTableData.forEach((entry) => {
+      const mode = (entry.staff_payment_mode || '').trim();
+      if (mode) modes.add(mode);
+    });
+    return Array.from(modes)
+      .sort((a, b) => a.localeCompare(b))
+      .map((mode) => ({ value: mode, label: mode }));
+  }, [filteredTableData]);
+  const sideTableTransferRefundFilterOptions = useMemo(() => {
+    const seen = new Set();
+    let hasBlank = false;
+    const options = [];
+    filteredTableData.forEach((entry) => {
+      const { transferOrRefund } = getStaffSideEntryRowDisplay(entry, purposeOptions);
+      const value = (transferOrRefund || '').trim();
+      if (!value) {
+        hasBlank = true;
+        return;
+      }
+      if (!seen.has(value)) {
+        seen.add(value);
+        options.push({ value, label: value });
+      }
+    });
+    options.sort((a, b) => a.label.localeCompare(b.label));
+    if (hasBlank) options.unshift(staffSideTableBlankOption);
+    return options;
+  }, [filteredTableData, purposeOptions]);
+  const sideTableEntriesForFilter = useMemo(() => {
+    let entries = filteredTableData;
+    if (sideTableFilterDateStart || sideTableFilterDateEnd) {
+      entries = entries.filter((entry) =>
+        staffEntryMatchesSideTableDateFilter(entry.date, sideTableFilterDateStart, sideTableFilterDateEnd),
+      );
+    }
+    if (sideTableFilterTransferRefund) {
+      if (sideTableFilterTransferRefund === STAFF_SIDE_TABLE_BLANK_VALUE) {
+        entries = entries.filter(
+          (entry) => !getStaffSideEntryRowDisplay(entry, purposeOptions).transferOrRefund.trim(),
+        );
+      } else {
+        entries = entries.filter(
+          (entry) =>
+            getStaffSideEntryRowDisplay(entry, purposeOptions).transferOrRefund === sideTableFilterTransferRefund,
+        );
+      }
+    }
+    if (sideTableFilterMode) {
+      entries = entries.filter(
+        (entry) => (entry.staff_payment_mode || '').toLowerCase() === sideTableFilterMode.toLowerCase(),
+      );
+    }
+    if (sideTableFilterAdvanceAmount.trim()) {
+      entries = entries.filter((entry) => {
+        const amountVal = entry.type === 'Refund' ? entry.staff_refund_amount : entry.amount;
+        return matchesEdbcAmountFilter(amountVal, sideTableFilterAdvanceAmount);
+      });
+    }
+    if (!sideTableOverallSearch.trim()) return entries;
+    const q = normalizeStaffSideSearchText(sideTableOverallSearch.trim());
+    return entries.filter((entry) => {
+      const { advanceAmount, transferOrRefund, payment_mode } = getStaffSideEntryRowDisplay(entry, purposeOptions);
+      const searchable = normalizeStaffSideSearchText(
+        [
+          new Date(entry.date).toLocaleDateString('en-GB'),
+          advanceAmount,
+          transferOrRefund,
+          payment_mode,
+          entry.entry_no,
+          entry.type,
+          entry.description,
+          entry.amount,
+          entry.staff_refund_amount,
+        ].join(' '),
+      );
+      return searchable.includes(q);
+    });
+  }, [
+    filteredTableData,
+    purposeOptions,
+    sideTableFilterDateStart,
+    sideTableFilterDateEnd,
+    sideTableFilterTransferRefund,
+    sideTableFilterMode,
+    sideTableFilterAdvanceAmount,
+    sideTableOverallSearch,
+  ]);
+  const sideTableAdvanceTotal = useMemo(
+    () =>
+      sideTableEntriesForFilter.reduce((total, entry) => {
+        if (entry.type === 'Refund') {
+          return total - (Number(entry.staff_refund_amount) || 0);
+        }
+        return total + (Number(entry.amount) || 0);
+      }, 0),
+    [sideTableEntriesForFilter],
+  );
+  const sideTableSortedEntries = useMemo(() => {
+    const entries = [...sideTableEntriesForFilter];
+    if (!sideTableSortField) {
+      return entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+    return entries.sort((a, b) => {
+      let aValue;
+      let bValue;
+      if (sideTableSortField === 'amount') {
+        const amountVal = (entry) =>
+          entry.type === 'Refund' ? -(Number(entry.staff_refund_amount) || 0) : Number(entry.amount) || 0;
+        aValue = amountVal(a);
+        bValue = amountVal(b);
+      } else if (sideTableSortField === 'paymentMode') {
+        aValue = (a.staff_payment_mode || '').toLowerCase();
+        bValue = (b.staff_payment_mode || '').toLowerCase();
+      } else if (sideTableSortField === 'date') {
+        aValue = new Date(a.date).getTime();
+        bValue = new Date(b.date).getTime();
+      } else {
+        aValue = String(a[sideTableSortField] ?? '').toLowerCase();
+        bValue = String(b[sideTableSortField] ?? '').toLowerCase();
+      }
+      if (aValue < bValue) return sideTableSortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sideTableSortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [sideTableEntriesForFilter, sideTableSortField, sideTableSortDirection]);
+  const sideTableHasActiveColumnFilters =
+    sideTableFilterDateStart ||
+    sideTableFilterDateEnd ||
+    sideTableFilterTransferRefund ||
+    sideTableFilterMode ||
+    sideTableFilterAdvanceAmount.trim();
+  const clearSideTableFilters = useCallback(() => {
+    setSideTableFilterDateStart('');
+    setSideTableFilterDateEnd('');
+    setSideTableShowDateRangePicker(false);
+    setSideTableFilterTransferRefund('');
+    setSideTableFilterMode('');
+    setSideTableFilterAdvanceAmount('');
+    setSideTableOverallSearch('');
+    clearSideTableSort();
+  }, [clearSideTableSort]);
+
+  const toggleSideTableFilters = useCallback(() => {
+    const willOpen = !sideTableShowFilters;
+    const scroller = sideTableScrollRef.current;
+    if (willOpen) {
+      if (scroller) {
+        sideTableFilterAnchorRowRef.current = getFirstVisibleStaffSideTableBodyRow(scroller);
+        sideTableFilterScrollTopBeforeToggleRef.current = scroller.scrollTop;
+      }
+      sideTablePendingFilterOpenNudgeRef.current = true;
+      setSideTableShowFilters(true);
+      return;
+    }
+    if (scroller) {
+      sideTableFilterAnchorRowRef.current = getFirstVisibleStaffSideTableBodyRow(scroller);
+      sideTableFilterScrollTopBeforeToggleRef.current = scroller.scrollTop;
+      sideTableFilterRowHeightBeforeCloseRef.current = sideTableFilterRowRef.current?.offsetHeight || 0;
+    }
+    sideTablePendingFilterCloseNudgeRef.current = true;
+    setSideTableShowFilters(false);
+  }, [sideTableShowFilters]);
+
+  useLayoutEffect(() => {
+    const scroller = sideTableScrollRef.current;
+    const row = sideTableFilterAnchorRowRef.current;
+    if (!scroller || !row || !scroller.contains(row)) return;
+
+    if (sideTableShowFilters && sideTablePendingFilterOpenNudgeRef.current) {
+      sideTablePendingFilterOpenNudgeRef.current = false;
+      const savedTop = sideTableFilterScrollTopBeforeToggleRef.current;
+      const filterH = sideTableFilterRowRef.current?.offsetHeight || 0;
+      if (savedTop != null && filterH > 0) {
+        scroller.scrollTop = savedTop + filterH;
+      }
+      sideTableFilterScrollTopBeforeToggleRef.current = null;
+      alignStaffSideTableRowBelowHeader(scroller, row);
+      sideTableFilterNudgeUsedRef.current = true;
+      return;
+    }
+
+    if (!sideTableShowFilters && sideTablePendingFilterCloseNudgeRef.current) {
+      sideTablePendingFilterCloseNudgeRef.current = false;
+      const savedTop = sideTableFilterScrollTopBeforeToggleRef.current;
+      const filterH = sideTableFilterRowHeightBeforeCloseRef.current || 0;
+      if (savedTop != null && filterH > 0) {
+        scroller.scrollTop = Math.max(0, savedTop - filterH);
+      }
+      sideTableFilterScrollTopBeforeToggleRef.current = null;
+      sideTableFilterRowHeightBeforeCloseRef.current = 0;
+      alignStaffSideTableRowBelowHeader(scroller, row);
+      sideTableFilterNudgeUsedRef.current = false;
+    }
+  }, [sideTableShowFilters]);
+
   // Review modal handlers
   const handleReviewConfirm = useCallback(() => {
     if (isReviewEditMode) {
@@ -1314,406 +1821,569 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
       alert('Error updating record');
     }
   }, [editingId, editFormData, fetchRecords, activeBranchId, withBranchUrl]);
+
+  useEffect(() => {
+    const syncSideTableHeights = () => {
+      if (window.innerWidth < 1280) {
+        setSideTableAreaHeight(null);
+        setSideTableContentHeight(null);
+        return;
+      }
+      const leftEl = leftFormColRef.current;
+      const descriptionEl = descriptionSectionRef.current;
+      if (!leftEl || !descriptionEl) return;
+      const leftTop = leftEl.getBoundingClientRect().top;
+      const descriptionBottom = descriptionEl.getBoundingClientRect().bottom;
+      const alignHeight = Math.round(descriptionBottom - leftTop);
+      if (alignHeight > 0) {
+        setSideTableAreaHeight(alignHeight);
+        setSideTableContentHeight(alignHeight);
+      }
+    };
+    const scheduleSync = () => {
+      requestAnimationFrame(() => requestAnimationFrame(syncSideTableHeights));
+    };
+    scheduleSync();
+    const leftEl = leftFormColRef.current;
+    if (!leftEl) return undefined;
+    const ro = new ResizeObserver(scheduleSync);
+    ro.observe(leftEl);
+    const descriptionEl = descriptionSectionRef.current;
+    if (descriptionEl) ro.observe(descriptionEl);
+    window.addEventListener('resize', scheduleSync);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', scheduleSync);
+    };
+  }, [formData.selectedType]);
+
   return (
-    <div className=" bg-[#FAF6ED]">
-      <div className='overflow-hidden bg-[#FAF6ED] w-full'>
-        <div className='px-4 sm:px-6 lg:px-10 overflow-hidden'>
-          <div className='flex flex-col xl:flex-row gap-4 xl:gap-10 text-left '>
-            <div className='bg-white w-full p-4 px-5 rounded-md text-left xl:flex  items-center pb-6 gap-[16px]'>
-              <div className='flex-1 space-y-2'>
-                <label className='font-semibold text-sm sm:text-base mb-1'>From Date</label>
-                <input
-                  type='date'
+    <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]">
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden px-[18px] pt-[18px] pb-[18px] bg-[#FAF6ED]">
+        <div className="w-full pt-[18px] px-[18px] pb-[18px] rounded-[6px] bg-white mb-[18px] text-left flex items-center gap-6">
+          <div className="flex flex-wrap gap-[10px] w-full">
+            <div>
+              <label className="block mb-[8px] font-semibold text-sm sm:text-base">From Date</label>
+              <div className="w-[150px]">
+                <CustomDateField
                   value={staffFromDate}
-                  onChange={(e) => setStaffFromDate(e.target.value)}
-                  className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-full h-[45px] focus:outline-none focus:border-[#BF9853] transition-colors'
-                />
-              </div>
-              <div className='flex-1 space-y-2'>
-                <label className='font-semibold text-sm sm:text-base mb-1'>To Date</label>
-                <input
-                  type='date'
-                  value={staffToDate}
-                  onChange={(e) => setStaffToDate(e.target.value)}
-                  className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-full h-[45px] focus:outline-none focus:border-[#BF9853] transition-colors'
-                />
-              </div>
-              <div className='flex-1 space-y-2'>
-                <label className='font-semibold text-sm sm:text-base mb-1'>Amount Given</label>
-                <input
-                  value={staffAmountGiven}
-                  readOnly
-                  className='bg-[#F2F2F2] rounded-lg px-2 py-1 w-full h-[45px] focus:outline-none focus:bg-white focus:border-2 focus:border-[#BF9853] transition-all'
-                  placeholder="0.00"
-                />
-              </div>
-              <div className='flex-1 space-y-2'>
-                <label className='font-semibold text-sm sm:text-base mb-1'>Payment Mode</label>
-                <Select
-                  value={paymentModeOptions.find(option => option.value === staffPaymentMode) || null}
-                  onChange={(selected) => setStaffPaymentMode(selected ? selected.value : '')}
-                  options={paymentModeOptions}
-                  placeholder="Select"
-                  isClearable
-                  isSearchable
-                  menuPortalTarget={document.body}
-                  styles={customStyles}
-                  className='w-full'
+                  onChange={setStaffFromDate}
+                  placeholder="From Date"
+                  className="w-[150px] [&>div]:!w-[150px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                  controlHeightPx={40}
+                  alwaysOpenBelow
+                  anchor="right"
                 />
               </div>
             </div>
-            <div className='flex flex-col sm:flex-row bg-white w-full h-auto xl:h-[128px] rounded-md p-4 gap-[16px] px-10 '>
-              <div className='space-y-2'>
-                <label className='font-semibold text-sm sm:text-base mb-1'>Today Amount</label>
-                <input
-                  readOnly
-                  type='text'
-                  value={staffTodayAmount}
-                  className='bg-[#F2F2F2] rounded-lg px-2 py-1 w-full h-[45px] focus:outline-none'
-                  placeholder="0.00"
+            <div>
+              <label className="block mb-[8px] font-semibold text-sm sm:text-base">To Date</label>
+              <div className="w-[150px]">
+                <CustomDateField
+                  value={staffToDate}
+                  onChange={setStaffToDate}
+                  placeholder="To Date"
+                  className="w-[150px] [&>div]:!w-[150px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                  controlHeightPx={40}
+                  alwaysOpenBelow
+                  anchor="right"
                 />
               </div>
-              <div className='space-y-2'>
-                <label className='font-semibold text-sm sm:text-base mb-1'>Total Outstanding</label>
-                <input
-                  readOnly
-                  type='text'
-                  value={staffTotalOutstanding}
-                  className='bg-[#F2F2F2] px-2 py-1 rounded-lg w-full h-[45px] focus:outline-none'
-                  placeholder="0.00"
-                />
-              </div>
+            </div>
+            <div>
+              <label className="block mb-[8px] font-semibold text-sm sm:text-base">Payment Mode</label>
+              <Select
+                value={paymentModeOptions.find(option => option.value === staffPaymentMode) || null}
+                onChange={(selected) => setStaffPaymentMode(selected ? selected.value : '')}
+                options={paymentModeOptions}
+                placeholder="Payment Mode"
+                isClearable
+                isSearchable
+                menuPortalTarget={document.body}
+                styles={{
+                  ...customStyles,
+                  placeholder: (provided) => ({
+                    ...customStyles.placeholder(provided),
+                    color: '#A6A5A6',
+                  }),
+                  dropdownIndicator: (provided, state) => ({
+                    ...customStyles.dropdownIndicator(provided, state),
+                    paddingLeft: 0,
+                    paddingRight: 4,
+                  }),
+                }}
+                className="lg:w-[150px] rounded-lg focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block mb-[8px] font-semibold text-sm sm:text-base">Amount Given</label>
+              <AdvancePortalAmountOutput variant="filter" value={staffAmountGiven} />
+            </div>
+            <div>
+              <label className="block mb-[8px] font-semibold text-sm sm:text-base">Today Amount</label>
+              <AdvancePortalAmountOutput variant="filter" value={staffTodayAmount} />
+            </div>
+            <div>
+              <label className="block mb-[8px] font-semibold text-sm sm:text-base">Total Outstanding</label>
+              <AdvancePortalAmountOutput variant="filter" value={staffTotalOutstanding} />
             </div>
           </div>
         </div>
-        <div className='p-4 max-w-[1900px] ml-6 mr-6'>
-          {/* Form */}
-          <form onSubmit={handleSubmit} onKeyPress={handleKeyPress} className='bg-white w-full p-6 h-auto rounded shadow-sm'>
-            <div className='flex flex-col xl:flex-row '>
-              <div className='xl:flex w-full xl:w-[1000px]'>
-                <div className='grid grid-cols-1 md:grid-cols-2 gap-6 text-left '>
-                  {/* Select Type */}
-                  <div className='flex items-center gap-3'>
-                    <label className='font-semibold text-[#E4572E] xl:w-40 w-44'>
-                      Select Type {isRequired('selectedType') && <span className="text-red-500">*</span>}
-                    </label>
-                    <Select
-                      value={selectTypeOptions.find(option => option.value === formData.selectedType) || null}
-                      onChange={(selected) => handleInputChange('selectedType', selected ? selected.value : '')}
-                      options={selectTypeOptions}
-                      placeholder="Select Type..."
-                      isClearable
-                      isSearchable
-                      menuPortalTarget={document.body}
-                      styles={customStyles}
-                      className='w-full'
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleSubmit(e);
-                        }
-                      }}
-                    />
-                  </div>
-                  {/* Date */}
-                  <div className='flex items-center gap-3'>
-                    <label className='font-semibold text-[#E4572E] w-20'>
-                      Date {isRequired('date') && <span className="text-red-500">*</span>}
-                    </label>
-                    <input
-                      type='date'
+
+        <div className="w-full flex-1 min-h-0 min-w-0 max-xl:overflow-y-auto xl:overflow-hidden no-scrollbar scrollbar-none flex flex-col pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px]">
+          <form onSubmit={handleSubmit} onKeyPress={handleKeyPress} className="max-xl:flex-none xl:flex xl:items-start flex-1 min-h-0 xl:min-w-0 gap-[18px]">
+            <div className="shrink-0 w-fit" ref={leftFormColRef}>
+              <div className="grid grid-cols-2 gap-3 text-left">
+                <div className="text-left max-w-[300px]">
+                  <label className={ADVANCE_PORTAL_LABEL_CLASS}>
+                    Select Type{isRequired('selectedType') && <span className="text-[#E4572E]">*</span>}
+                  </label>
+                  <Select
+                    value={selectTypeOptions.find(option => option.value === formData.selectedType) || null}
+                    onChange={(selected) => handleInputChange('selectedType', selected ? selected.value : '')}
+                    options={selectTypeOptions}
+                    placeholder="Select Type..."
+                    isClearable
+                    isSearchable
+                    menuPortalTarget={document.body}
+                    styles={customStyles}
+                    className={ADVANCE_PORTAL_SELECT_CLASS}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSubmit(e);
+                      }
+                    }}
+                  />
+                </div>
+                <div className="text-left">
+                  <label className={ADVANCE_PORTAL_LABEL_CLASS}>
+                    Date{isRequired('date') && <span className="text-[#E4572E]">*</span>}
+                  </label>
+                  <div className="expense-entry-form-date w-[300px]">
+                    <CustomDateField
                       value={formData.date}
-                      onChange={(e) => handleInputChange('date', e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      placeholder='dd-mm-yyyy'
-                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
+                      onChange={(value) => handleInputChange('date', value)}
+                      placeholder="Date"
+                      className="w-full text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                      controlHeightPx={40}
+                      alwaysOpenBelow
+                      anchor="right"
                     />
                   </div>
-                  {/* EMP Name */}
-                  <div className=''>
-                    <label className='font-semibold block'>
-                      EMP Name {isRequired('empName') && <span className="text-red-500">*</span>}
+                </div>
+                <div className="text-left">
+                  <div className="flex justify-between mb-[8px]">
+                    <label className="text-md font-semibold block">
+                      EMP Name{isRequired('empName') && <span className="text-[#E4572E]">*</span>}
                     </label>
-                    <Select
-                      value={formData.empName}
-                      onChange={(value) => handleInputChange('empName', value)}
-                      options={staffAdvanceCombinedOptions}
-                      className='w-full h-[45px] rounded-lg focus:outline-none'
-                      isClearable
-                      styles={customStyles}
-                      placeholder="Select employee..."
-                      isSearchable={true}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleSubmit(e);
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className=''>
-                    <label className='font-semibold block'>Overall Advance</label>
-                    <input
-                      value={formData.overallAdvance}
-                      readOnly
-                      className='w-full h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none cursor-not-allowed'
-                      placeholder="0.00"
-                    />
-                  </div>
-                  {/* Purpose */}
-                  <div className=''>
-                    <label className='font-semibold block'>{fieldConfig.purposeLabel}</label>
-                    <Select
-                      value={formData.purpose}
-                      onChange={(value) => handleInputChange('purpose', value)}
-                      options={purposeOptions}
-                      placeholder="Select a purpose..."
-                      isSearchable={true}
-                      styles={customStyles}
-                      isClearable
-                      className='w-full h-[45px] focus:outline-none'
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleSubmit(e);
-                        }
-                      }}
-                    />
-                  </div>
-                  {/* Advance Amount */}
-                  <div className=''>
-                    <label className='font-semibold block'>
-                      Advance Amount {isRequired('advanceAmount') && <span className="text-red-500">*</span>}
-                    </label>
-                    <input
-                      value={formData.advanceAmount}
-                      readOnly
-                      className='w-full h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none cursor-not-allowed'
-                      placeholder="0.00"
-                    />
-                  </div>
-                  {/* Amount Given / Purpose To */}
-                  <div className=''>
-                    <label className='font-semibold block'>{fieldConfig.amountGivenLabel}</label>
-                    {formData.selectedType === 'Transfer' ? (
-                      <Select
-                        value={formData.transferPurpose}
-                        onChange={(value) => handleInputChange('transferPurpose', value)}
-                        options={purposeOptions}
-                        placeholder="Select purpose to..."
-                        styles={customStyles}
-                        className='w-full h-[45px] rounded-lg focus:outline-none'
-                        isClearable
-                      />
-                    ) : (
-                      <input
-                        value={formData.amountGivenInput}
-                        onChange={(e) => handleInputChange('amountGivenInput', e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        className='w-full h-[45px] px-2 py-1 rounded-lg border-2 border-[#BF9853] border-opacity-30 focus:outline-none focus:border-[#BF9853] transition-colors'
-                        placeholder={`Enter ${fieldConfig.amountGivenLabel.toLowerCase()}`}
-                      />
+                    {formData.empName?.type && (
+                      <span className="text-[14px] text-[#E4572E] font-semibold block mt-0.5">{formData.empName.type}</span>
                     )}
                   </div>
-                  {/* Conditional Payment Mode/Transfer Amount */}
-                  <div className=''>
-                    <label className='font-semibold block'>{fieldConfig.paymentModeLabel}</label>
-                    {formData.selectedType === 'Transfer' ? (
-                      <input
-                        value={formData.transferAmount}
-                        onChange={(e) => handleInputChange('transferAmount', e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
-                        placeholder="Enter transfer amount"
-                      />
-                    ) : (
-                      <Select
-                        value={paymentModeOptions.find(option => option.value === formData.paymentMode) || null}
-                        onChange={(selected) => handleInputChange('paymentMode', selected ? selected.value : '')}
-                        options={paymentModeOptions}
-                        placeholder="Select"
-                        isClearable
-                        isSearchable
-                        menuPortalTarget={document.body}
-                        styles={customStyles}
-                        className='w-full'
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleSubmit(e);
-                          }
-                        }}
-                      />
-                    )}
-                  </div>
-                  {/* Description */}
-                  <div className='col-span-1 md:col-span-2 '>
-                    <label className='font-semibold block'>Description</label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => handleInputChange('description', e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors resize-none'
-                      placeholder="Enter description..."
-                      rows={3}
-                    />
-                  </div>
-                  {/* File Attachment and Submit */}
-                  <div className=''>
-                    <div className="flex items-center mb-4">
-                      <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600 hover:text-orange-700 transition-colors">
-                        <img className='w-5 h-4 mr-2' alt='' src={Attach} />
-                        Attach file
-                      </label>
-                      <input
-                        type="file"
-                        id="fileInput"
-                        ref={fileInputRef}
-                        className="hidden"
-                        onChange={handleFileChange}
-                      />
-                      {selectedFile && <span className="text-gray-600 text-sm ml-2">{selectedFile.name}</span>}
+                  <Select
+                    value={formData.empName}
+                    onChange={(value) => handleInputChange('empName', value)}
+                    options={staffAdvanceCombinedOptions}
+                    className={ADVANCE_PORTAL_SELECT_CLASS}
+                    isClearable
+                    styles={customStyles}
+                    placeholder="Select employee..."
+                    isSearchable={true}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSubmit(e);
+                      }
+                    }}
+                  />
+                </div>
+                <div className="text-left">
+                  <label className={ADVANCE_PORTAL_LABEL_CLASS}>Overall Advance</label>
+                  <AdvancePortalAmountOutput value={formData.overallAdvance} />
+                </div>
+                <div className="text-left">
+                  <label className={ADVANCE_PORTAL_LABEL_CLASS}>{fieldConfig.purposeLabel}</label>
+                  <Select
+                    value={formData.purpose}
+                    onChange={(value) => handleInputChange('purpose', value)}
+                    options={purposeOptions}
+                    placeholder="Select a purpose..."
+                    isSearchable={true}
+                    styles={customStyles}
+                    isClearable
+                    className={ADVANCE_PORTAL_SELECT_CLASS}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSubmit(e);
+                      }
+                    }}
+                  />
+                </div>
+                <div className="text-left">
+                  <label className={ADVANCE_PORTAL_LABEL_CLASS}>
+                    Advance Amount{isRequired('advanceAmount') && <span className="text-[#E4572E]">*</span>}
+                  </label>
+                  <AdvancePortalAmountOutput value={formData.advanceAmount} />
+                </div>
+                <div className="col-span-2">
+                  <div className="flex flex-row gap-3">
+                    <div className="text-left flex-1">
+                      <label className={ADVANCE_PORTAL_LABEL_CLASS}>{fieldConfig.amountGivenLabel}</label>
+                      {formData.selectedType === 'Transfer' ? (
+                        <Select
+                          value={formData.transferPurpose}
+                          onChange={(value) => handleInputChange('transferPurpose', value)}
+                          options={purposeOptions}
+                          placeholder="Select purpose to..."
+                          styles={customStyles}
+                          className={ADVANCE_PORTAL_SELECT_CLASS}
+                          isClearable
+                        />
+                      ) : (
+                        <AdvancePortalAmountInput
+                          value={formData.amountGivenInput}
+                          onChange={(e) => {
+                            const rawValue = e.target.value.replace(/,/g, '');
+                            if (!isNaN(rawValue)) {
+                              handleInputChange('amountGivenInput', rawValue);
+                            }
+                          }}
+                          placeholder={fieldConfig.amountGivenLabel}
+                          fullWidth
+                        />
+                      )}
                     </div>
-                    <div className='flex gap-3'>
-                      <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className={`px-6 py-2 rounded-lg flex items-center justify-center transition-all duration-200 ${isSubmitting
-                          ? 'bg-gray-400 cursor-not-allowed'
-                          : 'bg-[#c7934c] text-white hover:bg-[#b08542] hover:shadow-md'
-                          }`}
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                            Processing...
-                          </>
-                        ) : (
-                          'Pay Advance'
-                        )}
-                      </button>
+                    <div className="text-left">
+                      <label className={ADVANCE_PORTAL_LABEL_CLASS}>{fieldConfig.paymentModeLabel}</label>
+                      {formData.selectedType === 'Transfer' ? (
+                        <AdvancePortalAmountInput
+                          value={formData.transferAmount}
+                          onChange={(e) => {
+                            const rawValue = e.target.value.replace(/,/g, '');
+                            if (!isNaN(rawValue)) {
+                              handleInputChange('transferAmount', rawValue);
+                            }
+                          }}
+                          placeholder="Transfer Amount"
+                        />
+                      ) : (
+                        <Select
+                          value={paymentModeOptions.find(option => option.value === formData.paymentMode) || null}
+                          onChange={(selected) => handleInputChange('paymentMode', selected ? selected.value : '')}
+                          options={paymentModeOptions}
+                          placeholder="Payment Mode"
+                          isClearable
+                          isSearchable
+                          menuPortalTarget={document.body}
+                          styles={customStyles}
+                          className={ADVANCE_PORTAL_SELECT_CLASS}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSubmit(e);
+                            }
+                          }}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
-              </div>
-              <div className='w-full'>
-                <div className='flex flex-col xl:ml-8 min-w-0 flex-1'>
-                  <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4  p-2  rounded-lg'>
-                    <div className="flex items-center gap- text-sm text-gray-600">
+                <div className="col-span-2 text-left" ref={descriptionSectionRef}>
+                  <label className={ADVANCE_PORTAL_LABEL_CLASS}>Description</label>
+                  <textarea
+                    rows={2}
+                    value={formData.description}
+                    onChange={(e) => handleInputChange('description', e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Description"
+                    className={`${ADVANCE_PORTAL_TEXTAREA_CLASS} hover:!border-[rgba(191,152,83,0.2)] focus:!border-[rgba(191,152,83,1)]`}
+                  />
+                </div>
+                <div className="col-span-2 min-w-0 overflow-hidden">
+                  <div className="flex items-start justify-between lg:w-[616px] w-[300px] gap-2 flex-wrap mb-2 min-w-0">
+                    <div className="flex shrink-0">
+                      <label htmlFor="fileInput" className="cursor-pointer flex items-center gap-[6px] text-orange-600">
+                        <img className="w-[15px] h-[16px]" alt="" src={Attach} />
+                        <span className="text-[14px] font-semibold">Attach file</span>
+                      </label>
+                      <input type="file" id="fileInput" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
                     </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <input
-                        className='border-2 w-[112px] p-2 border-[#E4572E] text-[#E4572E] font-bold border-opacity-10 rounded h-[33px] bg-transparent focus:outline-none focus:border-[#E4572E] transition-colors'
-                        placeholder=""
-                        readOnly
-                        value={formData.advanceAmount}
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={exportToPDF}
-                          className='text-[#E4572E] font-semibold hover:underline cursor-pointer transition-colors'
-                        >
-                          Export PDF
-                        </button>
-                        <button
-                          type="button"
-                          onClick={exportToExcel}
-                          className='text-[#007233] font-semibold hover:underline cursor-pointer transition-colors'
-                        >
-                          Export XL
-                        </button>
-                        <button
-                          type="button"
-                          onClick={printData}
-                          className='text-[#BF9853] font-semibold hover:underline cursor-pointer transition-colors'
-                        >
-                          Print
-                        </button>
+                    {selectedFile && (
+                      <span
+                        className="text-gray-600 text-[12px] break-words min-w-0 text-right"
+                        title={selectedFile.name}
+                      >
+                        {selectedFile.name}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className={`bg-[#c7934c] text-white w-full sm:w-[120px] h-[33px] rounded flex items-center justify-center text-sm xl:mb-0 mb-2 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  >
+                    {isSubmitting ? 'Processing...' : 'Pay Advance'}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div
+              className={`min-w-0 shrink-0 flex flex-col ${sideTableAreaHeight != null ? 'overflow-hidden' : 'overflow-x-auto'}`}
+              style={sideTableAreaHeight != null ? { height: `${sideTableAreaHeight}px` } : undefined}
+            >
+              <div
+                className={`expense-form-side-table-host min-h-0 overflow-hidden flex flex-col ${sideTableContentHeight != null ? 'flex-1 min-h-0' : 'h-full'}`}
+                style={
+                  sideTableContentHeight != null
+                    ? { height: `${sideTableContentHeight}px` }
+                    : undefined
+                }
+              >
+                <div className="side-table-form-path w-full min-w-0 max-w-full flex flex-col h-full min-h-0">
+                  <div className="form-side-table-toolbar-row w-full min-w-0 shrink-0 text-left mb-[8px]">
+                    <div className="flex w-full justify-between items-start gap-[8px] mt-[4px] mb-[12px]">
+                      <h2 className="form-side-table-advance-header text-base font-semibold leading-none">
+                        Advance
+                      </h2>
+                      <span className="form-side-table-advance-amount text-base font-bold text-[#E4572E] leading-none">
+                        ₹{(!formData.empName || !formData.purpose || sideTableSortedEntries.length === 0)
+                          ? '0.00'
+                          : formatAmountDisplay(formData.advanceAmount)}
+                      </span>
+                    </div>
+                    <div className="flex min-w-0 w-full flex-nowrap items-center justify-between gap-[6px]">
+                      <div className={`flex min-w-0 items-center overflow-hidden${sideTableHasActiveColumnFilters ? ' flex-1 min-w-0' : ' shrink-0'}`}>
+                        <EdbcFilterToggleButton onClick={toggleSideTableFilters} />
+                        {sideTableHasActiveColumnFilters && (
+                          <div className="flex min-w-0 flex-1 overflow-x-auto flex-nowrap gap-2 no-scrollbar scrollbar-none">
+                            {(sideTableFilterDateStart || sideTableFilterDateEnd) && (
+                              <span className="inline-flex shrink-0 items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                <span className="font-medium text-[#BF9853]">Date: </span>
+                                <span className="font-semibold text-[14px]">
+                                  {sideTableFilterDateStart && sideTableFilterDateEnd
+                                    ? sideTableFilterDateStart === sideTableFilterDateEnd
+                                      ? formatEdbcFilterDateDMY(sideTableFilterDateStart)
+                                      : `${formatEdbcFilterDateDMY(sideTableFilterDateStart)} – ${formatEdbcFilterDateDMY(sideTableFilterDateEnd)}`
+                                    : sideTableFilterDateStart
+                                      ? `From ${formatEdbcFilterDateDMY(sideTableFilterDateStart)}`
+                                      : formatEdbcFilterDateDMY(sideTableFilterDateEnd)}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSideTableFilterDateStart('');
+                                    setSideTableFilterDateEnd('');
+                                  }}
+                                  className="text-[#E4572E] ml-1 text-2xl"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            )}
+                            {sideTableFilterAdvanceAmount.trim() && (
+                              <span className="inline-flex shrink-0 items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                <span className="font-medium text-[#BF9853]">Advance: </span>
+                                <span className="font-semibold text-[14px]">{sideTableFilterAdvanceAmount}</span>
+                                <button type="button" onClick={() => setSideTableFilterAdvanceAmount('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                              </span>
+                            )}
+                            {sideTableFilterTransferRefund && (
+                              <span className="inline-flex shrink-0 items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                <span className="font-medium text-[#BF9853]">Transfer/Refund: </span>
+                                <span className="font-semibold text-[14px]">
+                                  {sideTableFilterTransferRefund === STAFF_SIDE_TABLE_BLANK_VALUE
+                                    ? STAFF_SIDE_TABLE_BLANK_LABEL
+                                    : sideTableFilterTransferRefund}
+                                </span>
+                                <button type="button" onClick={() => setSideTableFilterTransferRefund('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                              </span>
+                            )}
+                            {sideTableFilterMode && (
+                              <span className="inline-flex shrink-0 items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                <span className="font-medium text-[#BF9853]">Mode: </span>
+                                <span className="font-semibold text-[14px]">{sideTableFilterMode}</span>
+                                <button type="button" onClick={() => setSideTableFilterMode('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex min-w-0 items-center justify-end gap-[6px]">
+                        <EdbcTableToolbarRightActions
+                          onClearFilters={clearSideTableFilters}
+                          overallSearch={sideTableOverallSearch}
+                          onOverallSearchChange={setSideTableOverallSearch}
+                          searchPlaceholder="Search Transactions..."
+                          showExportIcons={true}
+                          onExportPdf={exportToPDF}
+                          onExportCsv={exportToExcel}
+                          clearButtonType="button"
+                          wrapperClassName={null}
+                          searchWrapperClassName="h-[34px] min-w-0 flex-1 border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 sm:w-[286px] sm:min-w-[286px] sm:flex-none sm:shrink-0"
+                        />
                       </div>
                     </div>
                   </div>
-                  <div className='border-l-8 border-l-[#BF9853] rounded-lg max-h-[450px] overflow-auto shadow-sm bg-white'>
-                    <table className="w-full min-w-[800px]">
-                      <thead className="bg-[#FAF6ED] text-left sticky top-0 z-10">
-                        <tr>
-                          <th className="px-4 py-3 font-semibold text-gray-700">Date</th>
-                          <th className="px-4 py-3 font-semibold text-gray-700">Advance</th>
-                          <th className="px-4 py-3 font-semibold text-gray-700">Transfer/Refund</th>
-                          <th className="px-4 py-3 font-semibold text-gray-700">Mode</th>
-                          <th className="px-4 py-3 font-semibold text-gray-700">Activity</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredTableData.length === 0 ? (
-                          <tr>
-                            <td colSpan="6" className=" py-8 text-center text-gray-500">
-                              <div className="flex flex-col items-center gap-2">
-                                <span>No data available</span>
-                                <span className="text-sm">
-                                  {!formData.empName || !formData.purpose
-                                    ? "Select both EMP Name and Purpose to view related data"
-                                    : "No records found for the selected employee and purpose"
-                                  }
-                                </span>
-                              </div>
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredTableData.map((record) => (
-                            <tr key={record.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
-                              <td className=" py-3">{record.date}</td>
-                              <td
-                                className=" py-3 font-medium"
-                                style={{ color: record.type === "Refund" ? '#dc2626' : '#059669' }}
-                              >
-                                {record.type === "Refund"
-                                  ? -Math.abs(record.staff_refund_amount || 0)
-                                  : record.amount}
-                              </td>
-                              <td className=" py-3">
-                                {record.type === "Refund"
-                                  ? "Refund"
-                                  : record.type === "Transfer"
-                                    ? (() => {
-                                      // For transfer records, determine direction based on amount sign
-                                      const amount = parseFloat(record.amount) || 0;
-                                      if (amount < 0) {
-                                        // Negative amount means money going out from this purpose
-                                        // Find the "to" purpose name from the transfer record
-                                        const toPurposeId = record.to_purpose_id;
-                                        const toPurpose = purposeOptions.find(p => p.id === toPurposeId);
-                                        return `Transfer To ${toPurpose?.label || 'Unknown Purpose'}`;
-                                      } else {
-                                        // Positive amount means money coming in to this purpose
-                                        // Find the "from" purpose name from the transfer record
-                                        const fromPurposeId = record.to_purpose_id;
-                                        const fromPurpose = purposeOptions.find(p => p.id === fromPurposeId);
-                                        return `Transfer From ${fromPurpose?.label || 'Unknown Purpose'}`;
-                                      }
-                                    })()
-                                    : record.staff_refund_amount
-                                }
-                              </td>
-                              <td className=" py-3">{record.staff_payment_mode}</td>
-                              <td className=" py-3">
-                                <button
-                                  type="button"
-                                  className="rounded-full transition duration-200 ml-2 mr-3"
-                                  onClick={() => handleEditClick(record)}
-                                >
-                                  <img
-                                    src={edit}
-                                    alt="Edit"
-                                    className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 cursor-pointer"
-                                  />
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
+                  <div className="form-side-table-h-scroll min-w-0 w-full flex-1 min-h-0 flex flex-col overflow-hidden">
+                    <div className="w-full min-w-0 flex-1 min-h-0 flex flex-col">
+                      <div className="border-l-8 border-l-[#BF9853] w-fit flex-1 min-h-0 overflow-hidden rounded-lg box-border flex flex-col">
+                        <div
+                          ref={sideTableScrollRef}
+                          className="w-full flex-1 min-h-0 overflow-auto no-scrollbar scrollbar-none select-none"
+                          onWheel={() => { sideTableFilterNudgeUsedRef.current = false; }}
+                        >
+                        <table className={`table-fixed border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS}`.trim()}>
+                          <colgroup>
+                            {sideTableColumnWidthClasses.map((colClass, index) => (
+                              <col key={index} className={colClass} />
+                            ))}
+                          </colgroup>
+                          <thead className="sticky top-0 z-10 bg-white">
+                            <EdbcTableHeaderRow>
+                              <EdbcColumnHeader
+                                columnId={EDBC_IDS.EDBC2}
+                                label="Date"
+                                columnWidthClass={edbc2ColumnWidthClass}
+                                {...sideTableEdbcSortProps}
+                              />
+                              <EdbcColumnHeader
+                                columnId={EDBC_IDS.EDBC8}
+                                label="Advance"
+                                {...sideTableEdbcSortProps}
+                              />
+                              <EdbcColumnHeader
+                                columnId={EDBC_IDS.EDBC3}
+                                label="Transfer/Refund"
+                              />
+                              <EdbcColumnHeader
+                                columnId={EDBC_IDS.EDBC13}
+                                label="Mode"
+                                {...sideTableEdbcSortProps}
+                              />
+                              <EdbcColumnHeader
+                                columnId={EDBC_IDS.EDBC19}
+                                label="Activity"
+                              />
+                            </EdbcTableHeaderRow>
+                            {sideTableShowFilters && (
+                              <EdbcTableFilterRow ref={sideTableFilterRowRef}>
+                                <EdbcTimestampFilter
+                                  columnId={EDBC_IDS.EDBC2}
+                                  placeholder="Date"
+                                  timestampStartDate={sideTableFilterDateStart}
+                                  timestampEndDate={sideTableFilterDateEnd}
+                                  isOpen={sideTableShowDateRangePicker}
+                                  onOpen={() => setSideTableShowDateRangePicker(true)}
+                                  onClose={() => setSideTableShowDateRangePicker(false)}
+                                  onApply={(from, to) => {
+                                    setSideTableFilterDateStart(from || '');
+                                    setSideTableFilterDateEnd(to || '');
+                                  }}
+                                />
+                                <EdbcTotalAmountFilter
+                                  columnId={EDBC_IDS.EDBC8}
+                                  totalAmount={sideTableAdvanceTotal}
+                                  value={sideTableFilterAdvanceAmount}
+                                  onChange={(e) => setSideTableFilterAdvanceAmount(e.target.value)}
+                                />
+                                <EdbcSelectFilter
+                                  columnId={EDBC_IDS.EDBC3}
+                                  placeholder="Transfer/Refund"
+                                  options={sideTableTransferRefundFilterOptions}
+                                  value={sideTableFilterTransferRefund}
+                                  onChange={setSideTableFilterTransferRefund}
+                                  blankOption={staffSideTableBlankOption}
+                                  blankValue={STAFF_SIDE_TABLE_BLANK_VALUE}
+                                  selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                />
+                                <EdbcSelectFilter
+                                  columnId={EDBC_IDS.EDBC13}
+                                  placeholder="Mode"
+                                  options={sideTableModeFilterOptions}
+                                  value={sideTableFilterMode}
+                                  onChange={setSideTableFilterMode}
+                                  selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                />
+                                <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC19} />
+                              </EdbcTableFilterRow>
+                            )}
+                          </thead>
+                          <tbody>
+                            {!formData.empName || !formData.purpose ? (
+                              <tr>
+                                <td colSpan={5} className="text-center py-4 text-sm text-gray-500">
+                                  Select both EMP Name and Purpose to view related data
+                                </td>
+                              </tr>
+                            ) : sideTableSortedEntries.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="text-center py-4 text-sm text-gray-500">
+                                  No records found for the selected employee and purpose
+                                </td>
+                              </tr>
+                            ) : (
+                              sideTableSortedEntries.map((entry, index) => {
+                                const row = toStaffSideExpenseRow(entry);
+                                const { advanceAmount, transferOrRefund, payment_mode } =
+                                  getStaffSideEntryRowDisplay(entry, purposeOptions);
+                                return (
+                                  <EdbcTableBodyRow key={entry.id ?? index}>
+                                    <EdbcDateBodyCell
+                                      expense={row}
+                                      rowIndex={index}
+                                      expandedCells={sideTableExpandedCells}
+                                      onToggleExpanded={toggleSideTableExpandedCell}
+                                      formatValue={(date) => new Date(date).toLocaleDateString('en-GB')}
+                                      columnWidthClass={edbc2ColumnWidthClass}
+                                    />
+                                    <EdbcExpandableBodyCell
+                                      columnId={EDBC_IDS.EDBC8}
+                                      expense={row}
+                                      rowIndex={index}
+                                      expandedCells={sideTableExpandedCells}
+                                      onToggleExpanded={toggleSideTableExpandedCell}
+                                      textAlignClass="text-right"
+                                      getDisplayValue={() => advanceAmount}
+                                    />
+                                    <EdbcExpandableBodyCell
+                                      columnId={EDBC_IDS.EDBC3}
+                                      expense={row}
+                                      rowIndex={index}
+                                      expandedCells={sideTableExpandedCells}
+                                      onToggleExpanded={toggleSideTableExpandedCell}
+                                      getDisplayValue={() => transferOrRefund}
+                                    />
+                                    <EdbcExpandableBodyCell
+                                      columnId={EDBC_IDS.EDBC13}
+                                      expense={row}
+                                      rowIndex={index}
+                                      expandedCells={sideTableExpandedCells}
+                                      onToggleExpanded={toggleSideTableExpandedCell}
+                                      getDisplayValue={() => payment_mode}
+                                    />
+                                    <td id={EDBC_IDS.EDBC19} className={edbc19TdClass}>
+                                      <div className="flex items-center gap-1 sm:gap-2">
+                                        <button type="button" className="rounded-full transition duration-200">
+                                          <img
+                                            src={edit}
+                                            onClick={() => handleEditClick(entry)}
+                                            alt="Edit"
+                                            className="w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 cursor-pointer"
+                                          />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </EdbcTableBodyRow>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2270,7 +2940,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
 
         <ToastContainer />
       </div>
-    </div >
+    </div>
   );
 };
 export default StaffAdvance;

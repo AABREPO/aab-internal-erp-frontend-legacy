@@ -1,10 +1,394 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 import Select from 'react-select';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import AdvanceForm from './AdvancePortal';
+import PdfIcon from '../Images/pdf.png';
+import XlIcon from '../Images/sheets.png';
+import FileRemover from '../Images/FileRemover.svg';
+import {
+  EDBC_IDS,
+  DATABASE_TABLE_FILTER_SELECT_STYLES,
+  getEdbcColumnConfig,
+  EdbcTableHeaderRow,
+  EdbcTableFilterRow,
+  EdbcTableBodyRow,
+  EdbcColumnHeader,
+  EdbcProjectNameFilter,
+  EdbcTotalAmountFilter,
+  matchesEdbcAmountFilter,
+  normalizeEdbcAmountFilterText,
+  EDBC_TABLE_EDGE_TABLE_CLASS,
+  EDBC8_COLUMN_LOCK_TABLE_CLASS,
+  EDBC2_FIRST_COLUMN_WIDTH_CLASS,
+  useEdbcExpandedCells,
+  EdbcExpandableBodyCell,
+  EdbcFilterToggleButton,
+  EdbcTableToolbarRightActions,
+} from '../ExpensesEntry/databaseExpensesSharedColumns';
 import { use } from 'react';
+
+const SUMMARY_FIRST_COLUMN_FILTER_SELECT_STYLES = {
+  ...DATABASE_TABLE_FILTER_SELECT_STYLES,
+  dropdownIndicator: (provided, state) => ({
+    ...DATABASE_TABLE_FILTER_SELECT_STYLES.dropdownIndicator(provided, state),
+    display: state.hasValue ? 'none' : 'flex',
+  }),
+};
+
+const useTableDragScroll = () => {
+  const scrollRef = useRef(null);
+  const isPointerDown = useRef(false);
+  const isDragging = useRef(false);
+  const start = useRef({ x: 0, y: 0 });
+  const scroll = useRef({ left: 0, top: 0 });
+  const velocity = useRef({ x: 0, y: 0 });
+  const animationFrame = useRef(null);
+  const lastMove = useRef({ time: 0, x: 0, y: 0 });
+  const resetDragState = useCallback(() => {
+    isPointerDown.current = false;
+    isDragging.current = false;
+    if (scrollRef.current) {
+      scrollRef.current.style.cursor = '';
+      scrollRef.current.style.userSelect = '';
+    }
+  }, []);
+  const cancelMomentum = useCallback(() => {
+    if (animationFrame.current) {
+      cancelAnimationFrame(animationFrame.current);
+      animationFrame.current = null;
+    }
+  }, []);
+  const applyMomentum = useCallback(() => {
+    if (!scrollRef.current) return;
+    const friction = 0.95;
+    const minVelocity = 0.1;
+    const step = () => {
+      const { x, y } = velocity.current;
+      if (!scrollRef.current) return;
+      if (Math.abs(x) > minVelocity || Math.abs(y) > minVelocity) {
+        scrollRef.current.scrollLeft -= x * 20;
+        scrollRef.current.scrollTop -= y * 20;
+        velocity.current.x *= friction;
+        velocity.current.y *= friction;
+        animationFrame.current = requestAnimationFrame(step);
+      } else {
+        cancelMomentum();
+      }
+    };
+    animationFrame.current = requestAnimationFrame(step);
+  }, [cancelMomentum]);
+  const handleDocumentMouseMove = useCallback((e) => {
+    if (!isPointerDown.current || !scrollRef.current) return;
+    const dx = e.clientX - start.current.x;
+    const dy = e.clientY - start.current.y;
+    if (!isDragging.current) {
+      if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+      isDragging.current = true;
+      scrollRef.current.style.cursor = 'grabbing';
+      scrollRef.current.style.userSelect = 'none';
+    }
+    const now = Date.now();
+    const dt = now - lastMove.current.time || 16;
+    velocity.current = {
+      x: (e.clientX - lastMove.current.x) / dt,
+      y: (e.clientY - lastMove.current.y) / dt,
+    };
+    scrollRef.current.scrollLeft = scroll.current.left - dx;
+    scrollRef.current.scrollTop = scroll.current.top - dy;
+    lastMove.current = {
+      time: now,
+      x: e.clientX,
+      y: e.clientY,
+    };
+  }, []);
+  const handleDocumentMouseUp = useCallback(() => {
+    document.removeEventListener('mousemove', handleDocumentMouseMove);
+    document.removeEventListener('mouseup', handleDocumentMouseUp);
+    if (!scrollRef.current) {
+      resetDragState();
+      return;
+    }
+    const wasDragging = isDragging.current;
+    resetDragState();
+    if (wasDragging) {
+      applyMomentum();
+    }
+  }, [applyMomentum, handleDocumentMouseMove, resetDragState]);
+  const handleMouseDown = useCallback((e) => {
+    if (!scrollRef.current || e.button !== 0) return;
+    isPointerDown.current = true;
+    isDragging.current = false;
+    start.current = { x: e.clientX, y: e.clientY };
+    scroll.current = {
+      left: scrollRef.current.scrollLeft,
+      top: scrollRef.current.scrollTop,
+    };
+    lastMove.current = {
+      time: Date.now(),
+      x: e.clientX,
+      y: e.clientY,
+    };
+    cancelMomentum();
+    document.addEventListener('mousemove', handleDocumentMouseMove);
+    document.addEventListener('mouseup', handleDocumentMouseUp);
+  }, [cancelMomentum, handleDocumentMouseMove, handleDocumentMouseUp]);
+  return { scrollRef, handleMouseDown };
+};
+
+const SUMMARY_EDBC13_COLUMN_LOCK =
+  '[&_th#EDBC-13]:!w-[130px] [&_td#EDBC-13]:!w-[130px] [&_th#EDBC-13]:!min-w-[130px] [&_td#EDBC-13]:!min-w-[130px] [&_th#EDBC-13]:!max-w-[130px] [&_td#EDBC-13]:!max-w-[130px] [&_th#EDBC-13]:!overflow-hidden [&_td#EDBC-13]:!overflow-hidden';
+const SUMMARY_FIRST_COLUMN_PAD = '';
+const SUMMARY_TABLE_CLASS = `table-fixed border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS} ${EDBC8_COLUMN_LOCK_TABLE_CLASS} ${SUMMARY_EDBC13_COLUMN_LOCK} ${SUMMARY_FIRST_COLUMN_PAD} [&_#EDBC-12]:!pl-0 [&_th#EDBC-13]:!pr-0 [&_td#EDBC-13]:!pr-0`;
+const SUMMARY_PROJECT_TABLE_CLASS = `${SUMMARY_TABLE_CLASS} w-[668px] max-w-full [&_th#EDBC-3]:!w-[298px] [&_td#EDBC-3]:!w-[298px] [&_th#EDBC-3]:!min-w-[298px] [&_td#EDBC-3]:!min-w-[298px] [&_th#EDBC-3]:!max-w-[298px] [&_td#EDBC-3]:!max-w-[298px] [&_th#EDBC-3]:!overflow-hidden [&_td#EDBC-3]:!overflow-hidden [&_thead_tr:nth-child(2)>th:first-child>div]:!w-[286px] [&_thead_tr:nth-child(2)>th:first-child>div]:!min-w-[286px] [&_thead_tr:nth-child(2)>th:first-child>div]:!max-w-[286px]`;
+const SUMMARY_SITE_TABLE_CLASS = `${SUMMARY_TABLE_CLASS} w-[600px] max-w-full [&_th#EDBC-4]:!w-[230px] [&_td#EDBC-4]:!w-[230px] [&_th#EDBC-4]:!min-w-[230px] [&_td#EDBC-4]:!min-w-[230px] [&_th#EDBC-4]:!max-w-[230px] [&_td#EDBC-4]:!max-w-[230px] [&_td#EDBC-4]:!overflow-hidden`;
+const SUMMARY_POPUP_TABLE_CLASS = `table-fixed w-[468px] max-w-full border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS} ${EDBC8_COLUMN_LOCK_TABLE_CLASS} [&_th#EDBC-2]:!w-[130px] [&_td#EDBC-2]:!w-[130px] [&_th#EDBC-2]:!min-w-[130px] [&_td#EDBC-2]:!min-w-[130px] [&_th#EDBC-2]:!max-w-[130px] [&_td#EDBC-2]:!max-w-[130px]`;
+const SUMMARY_BILL_STATUS_POPUP_TABLE_BASE = `table-fixed border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS} ${EDBC8_COLUMN_LOCK_TABLE_CLASS} [&_th#EDBC-2]:!w-[130px] [&_td#EDBC-2]:!w-[130px] [&_th#EDBC-2]:!min-w-[130px] [&_td#EDBC-2]:!min-w-[130px] [&_th#EDBC-2]:!max-w-[130px] [&_td#EDBC-2]:!max-w-[130px]`;
+const SUMMARY_BILL_STATUS_LEFT_POPUP_TABLE_CLASS = `${SUMMARY_BILL_STATUS_POPUP_TABLE_BASE} w-[588px] max-w-full [&_th#EDBC-4]:!w-[218px] [&_td#EDBC-4]:!w-[218px] [&_th#EDBC-4]:!min-w-[218px] [&_td#EDBC-4]:!min-w-[218px] [&_th#EDBC-4]:!max-w-[218px] [&_td#EDBC-4]:!max-w-[218px]`;
+const SUMMARY_BILL_STATUS_RIGHT_POPUP_TABLE_CLASS = `${SUMMARY_BILL_STATUS_POPUP_TABLE_BASE} w-[668px] max-w-full [&_th#EDBC-3]:!w-[298px] [&_td#EDBC-3]:!w-[298px] [&_th#EDBC-3]:!min-w-[298px] [&_td#EDBC-3]:!min-w-[298px] [&_th#EDBC-3]:!max-w-[298px] [&_td#EDBC-3]:!max-w-[298px]`;
+const SUMMARY_OUTSIDE_SELECT_CLASS = 'custom-select w-[300px] h-[40px] rounded-lg focus:outline-none';
+const SUMMARY_PROJECT_NAME_SELECT_CLASS = 'custom-select w-[300px] h-[40px] rounded-lg focus:outline-none';
+const SUMMARY_PANEL_SHADOW =
+  'shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1),0_-8px_15px_-3px_rgba(0,0,0,0.1)]';
+
+const SummaryFilterChip = ({ label, value, onClear }) => (
+  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium">
+    <span className="font-medium text-[#BF9853] whitespace-nowrap">{label}:</span>
+    <span className="font-semibold text-[14px] whitespace-nowrap">{value}</span>
+    <button type="button" onClick={onClear} className="text-[#E4572E] ml-1 text-2xl leading-none shrink-0">×</button>
+  </span>
+);
+
+const SummaryTableExportActions = ({ onExportPdf, onExportCsv }) => (
+  <div className="flex shrink-0 items-end gap-2">
+    <span className="text-[#E4572E] flex items-center gap-1 font-semibold hover:underline cursor-pointer" onClick={onExportPdf}>
+      PDF<img src={PdfIcon} alt="Pdf" className="w-4 h-4" />
+    </span>
+    <span className="text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer" onClick={onExportCsv}>
+      XL<img src={XlIcon} alt="XL" className="w-4 h-4" />
+    </span>
+  </div>
+);
+
+const EMPTY_SUMMARY_POPUP_CONTEXT = { line1: '', line2: '' };
+
+const formatSummaryPopupContextText = ({ line1, line2 }) => {
+  if (!line1 && !line2) return '';
+  if (!line1) return line2;
+  if (!line2) return line1;
+  return `${line1} - ${line2}`;
+};
+
+const resolveSummaryContractorVendorLabel = ({
+  contractorVendorId,
+  contractorVendorType,
+  contractorOptions,
+  vendorOptions,
+  selectedOption,
+}) => {
+  if (selectedOption?.label) return selectedOption.label;
+  if (contractorVendorId) {
+    if (contractorVendorType === 'Contractor') {
+      return contractorOptions.find((c) => c.id === contractorVendorId)?.label || '-';
+    }
+    return vendorOptions.find((v) => v.id === contractorVendorId)?.label || '-';
+  }
+  return 'All Contractors/Vendors';
+};
+
+const resolveSummaryProjectLabel = ({
+  projectId,
+  siteOptions,
+  selectedSite,
+  projectName,
+}) => {
+  if (projectName) return projectName;
+  if (selectedSite?.label) return selectedSite.label;
+  if (projectId) {
+    return siteOptions.find((s) => String(s.id) === String(projectId))?.label || 'All Projects';
+  }
+  return 'All Projects';
+};
+
+const buildFirstTablePopupContext = ({
+  contractorVendorId,
+  contractorVendorType,
+  contractorOptions,
+  vendorOptions,
+  selectedOption,
+  projectId,
+  siteOptions,
+  projectName,
+}) => ({
+  line1: resolveSummaryContractorVendorLabel({
+    contractorVendorId,
+    contractorVendorType,
+    contractorOptions,
+    vendorOptions,
+    selectedOption,
+  }),
+  line2: resolveSummaryProjectLabel({
+    projectId,
+    siteOptions,
+    selectedSite: null,
+    projectName,
+  }),
+});
+
+const buildSecondTablePopupContext = ({
+  projectId,
+  siteOptions,
+  selectedSite,
+  contractorVendorName,
+}) => ({
+  line1: resolveSummaryProjectLabel({
+    projectId,
+    siteOptions,
+    selectedSite,
+    projectName: null,
+  }),
+  line2: contractorVendorName || '-',
+});
+
+const SummaryPopupContextHeader = ({ context }) => (
+  <h3 className="text-[18px] font-semibold text-[#000000]">
+    {context.line1 && <span className="block">{context.line1}</span>}
+    {context.line2 && <span className="block">{context.line2}</span>}
+  </h3>
+);
+
+const getContractorVendorOptionValue = (option) => `${option.type}-${option.id}`;
+
+const SummaryContractorVendorFilter = ({ value, onChange, options }) => {
+  const config = getEdbcColumnConfig(EDBC_IDS.EDBC4);
+  if (!config) return null;
+  return (
+    <th id={EDBC_IDS.EDBC4} className={config.filterThClass}>
+      <Select
+        className={config.filterWidthClass}
+        options={options}
+        value={value}
+        onChange={onChange}
+        getOptionValue={getContractorVendorOptionValue}
+        getOptionLabel={(option) => option.label}
+        placeholder="Contractor/Vendor"
+        menuPlacement="bottom"
+        menuPortalTarget={document.body}
+        isSearchable
+        noOptionsMessage={() => 'No options'}
+        filterOption={(option, input) => {
+          const q = input.trim().toLowerCase();
+          if (!q) return true;
+          return option.label.toLowerCase().includes(q);
+        }}
+        styles={SUMMARY_FIRST_COLUMN_FILTER_SELECT_STYLES}
+      />
+    </th>
+  );
+};
+
+const SummaryEdbcSelectFilter = ({
+  columnId,
+  placeholder,
+  options,
+  value,
+  onChange,
+  isClearable = false,
+}) => {
+  const config = getEdbcColumnConfig(columnId);
+  if (!config) return null;
+  const resolvedValue = value ? { value, label: value } : null;
+  return (
+    <th id={columnId} className={config.filterThClass}>
+      <Select
+        className={config.filterWidthClass}
+        options={options}
+        value={resolvedValue}
+        onChange={(selectedOption) => onChange(selectedOption ? selectedOption.value : '')}
+        placeholder={placeholder}
+        menuPlacement="bottom"
+        menuPortalTarget={document.body}
+        isClearable={isClearable}
+        isSearchable
+        noOptionsMessage={() => 'No options'}
+        styles={SUMMARY_FIRST_COLUMN_FILTER_SELECT_STYLES}
+      />
+    </th>
+  );
+};
+const SUMMARY_BOX_STYLE = {
+  backgroundColor: '#FFFDF9',
+  backgroundImage: [
+    'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+    'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+    'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+    'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+  ].join(', '),
+  backgroundSize: '100% 1px, 100% 1px, 1px 100%, 1px 100%',
+  backgroundPosition: '0 0, 0 100%, 0 0, 100% 0',
+  backgroundRepeat: 'repeat-x, repeat-x, repeat-y, repeat-y',
+};
+
+const formatSummaryAmount = (value) =>
+  `₹${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const getBillStatusLabel = (pendingAdvance) => (pendingAdvance > 0 ? 'Pending' : 'Bill Settled');
+const buildSummaryRowSearchText = ({ name, pendingAdvance, billAmount }) => {
+  const billStatus = getBillStatusLabel(pendingAdvance);
+  return [
+    name,
+    pendingAdvance,
+    billAmount,
+    billStatus,
+    formatSummaryAmount(pendingAdvance),
+    formatSummaryAmount(billAmount),
+    normalizeEdbcAmountFilterText(pendingAdvance),
+    normalizeEdbcAmountFilterText(billAmount),
+  ]
+    .map((v) => String(v ?? '').toLowerCase())
+    .join(' ');
+};
+const matchesSummaryUniversalSearch = (query, rowFields) => {
+  const q = String(query ?? '').trim().toLowerCase();
+  if (!q) return true;
+  const searchable = buildSummaryRowSearchText(rowFields);
+  const qAmount = normalizeEdbcAmountFilterText(query).toLowerCase();
+  return searchable.includes(q) || (qAmount && searchable.includes(qAmount));
+};
+const BILL_STATUS_PENDING_COLOR = '#E4572E';
+const BILL_STATUS_SETTLED_COLOR = '#007233';
+const edbc13Config = getEdbcColumnConfig(EDBC_IDS.EDBC13);
+const getBillStatusColor = (pendingAdvance) =>
+  pendingAdvance > 0 ? BILL_STATUS_PENDING_COLOR : BILL_STATUS_SETTLED_COLOR;
+const renderBillStatusBodyCell = ({
+  pendingAdvance,
+  rowId,
+  rowIndex,
+  expandedCells,
+  onToggleExpanded,
+  onClick,
+}) => {
+  const label = getBillStatusLabel(pendingAdvance);
+  const cellKey = `${rowId ?? rowIndex}-paymentMode`;
+  const expanded = expandedCells[cellKey];
+  const tdClass = edbc13Config?.tdClass;
+  return (
+    <td id={EDBC_IDS.EDBC13} className={`${tdClass} !pr-0`}>
+      <span
+        onClick={onClick}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          onToggleExpanded(cellKey);
+        }}
+        className={`block w-full cursor-pointer font-semibold ${expanded ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+        style={{ color: getBillStatusColor(pendingAdvance) }}
+        title={label}
+      >
+        {label}
+      </span>
+    </td>
+  );
+};
 const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
   const resolveActiveBranchId = useCallback(() => {
     try {
@@ -37,7 +421,28 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
   const [sitePendingAdvance, setSitePendingAdvance] = useState(0);
   const [siteBillAmount, setSiteBillAmount] = useState(0);
   const [totalBillAmount, setTotalBillAmount] = useState(0);
-  const [selectedProject, setSelectedProject] = useState(null);
+  const [projectSearch, setProjectSearch] = useState('');
+  const [siteSearch, setSiteSearch] = useState('');
+  const [showProjectFilters, setShowProjectFilters] = useState(false);
+  const [showSiteFilters, setShowSiteFilters] = useState(false);
+  const [selectProjectNameFilter, setSelectProjectNameFilter] = useState('');
+  const [selectProjectAdvanceFilter, setSelectProjectAdvanceFilter] = useState('');
+  const [selectProjectBillAmountFilter, setSelectProjectBillAmountFilter] = useState('');
+  const [selectProjectBillStatusFilter, setSelectProjectBillStatusFilter] = useState('');
+  const [selectSiteContractorFilter, setSelectSiteContractorFilter] = useState(null);
+  const [selectSiteAdvanceFilter, setSelectSiteAdvanceFilter] = useState('');
+  const [selectSiteBillAmountFilter, setSelectSiteBillAmountFilter] = useState('');
+  const [selectSiteBillStatusFilter, setSelectSiteBillStatusFilter] = useState('');
+  const { expandedCells: projectExpandedCells, toggleExpandedCell: toggleProjectExpandedCell } = useEdbcExpandedCells();
+  const { expandedCells: siteExpandedCells, toggleExpandedCell: toggleSiteExpandedCell } = useEdbcExpandedCells();
+  const projectTableScroll = useTableDragScroll();
+  const siteTableScroll = useTableDragScroll();
+  const projectScrollRef = projectTableScroll.scrollRef;
+  const siteScrollRef = siteTableScroll.scrollRef;
+  const projectFilterRowRef = useRef(null);
+  const siteFilterRowRef = useRef(null);
+  const projectFilterNudgeUsedRef = useRef(false);
+  const siteFilterNudgeUsedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState(0);
@@ -55,19 +460,19 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
   // Popup/Modal state for first table
   const [projectPopupData, setProjectPopupData] = useState(null);
   const [projectPopupTitle, setProjectPopupTitle] = useState("");
-  const [projectPopupContext, setProjectPopupContext] = useState("");
+  const [projectPopupContext, setProjectPopupContext] = useState(EMPTY_SUMMARY_POPUP_CONTEXT);
   const [showProjectPopup, setShowProjectPopup] = useState(false);
   const [projectPopupSortConfig, setProjectPopupSortConfig] = useState({ key: null, direction: 'asc' });
   // Popup/Modal state for second table
   const [sitePopupData, setSitePopupData] = useState(null);
   const [sitePopupTitle, setSitePopupTitle] = useState("");
-  const [sitePopupContext, setSitePopupContext] = useState("");
+  const [sitePopupContext, setSitePopupContext] = useState(EMPTY_SUMMARY_POPUP_CONTEXT);
   const [showSitePopup, setShowSitePopup] = useState(false);
   const [sitePopupSortConfig, setSitePopupSortConfig] = useState({ key: null, direction: 'asc' });
   // Popup/Modal state for Bill Status popup (combined advance + bill)
   const [showBillStatusPopup, setShowBillStatusPopup] = useState(false);
   const [billStatusPopupData, setBillStatusPopupData] = useState({ advances: [], bills: [] });
-  const [billStatusPopupContext, setBillStatusPopupContext] = useState("");
+  const [billStatusPopupContext, setBillStatusPopupContext] = useState(EMPTY_SUMMARY_POPUP_CONTEXT);
   const [billStatusPopupSortConfig, setBillStatusPopupSortConfig] = useState({ key: null, direction: 'asc' });
   const [isBillStatusFromFirstTable, setIsBillStatusFromFirstTable] = useState(true);
   // Function to convert Google Drive URL to viewable format for opening in new tab
@@ -325,24 +730,56 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
 
   useTabRefreshSignal(refreshSignal, isActive, () => fetchAdvanceFormData({ showLoader: false }));
 
-  const customStyles = {
+  const summaryOutsideSelectStyles = {
     control: (provided, state) => ({
       ...provided,
+      fontFamily: 'Manrope',
       borderWidth: '2px',
-      lineHeight: '20px',
-      fontSize: '14px',
-      minHeight: '45px',
-      height: '45px',
       borderRadius: '8px',
-      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.5)' : 'rgba(191, 152, 83, 0.25)',
-      boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+      minHeight: '40px',
+      height: '40px',
+      flexWrap: 'nowrap',
+      borderColor: state.isFocused
+        ? 'rgba(191, 152, 83, 1)'
+        : 'rgba(191, 152, 83, 0.2)',
+      boxShadow: state.isFocused
+        ? '0 0 0 1px rgba(101, 102, 53, 0.2)'
+        : 'none',
       '&:hover': {
-        borderColor: 'rgba(191, 152, 83, 0.5)',
+        borderColor: 'rgba(191, 152, 83, 0.2)',
       },
     }),
-    clearIndicator: (provided) => ({
+    valueContainer: (provided, state) => ({
       ...provided,
-      cursor: 'pointer',
+      flex: '1 1 0%',
+      minWidth: 0,
+      flexWrap: 'nowrap',
+      overflow: 'hidden',
+      paddingLeft: '12px',
+      paddingRight: state.hasValue ? '2px' : provided.paddingRight,
+      paddingTop: 0,
+      paddingBottom: 0,
+      height: '41px',
+      alignItems: 'center',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      maxWidth: '100%',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+      margin: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      color: 'black',
+      fontWeight: '500',
+    }),
+    input: (provided) => ({
+      ...provided,
+      margin: 0,
+      padding: 0,
+      fontWeight: '500',
+      color: 'black',
     }),
     menu: (provided) => ({
       ...provided,
@@ -355,37 +792,78 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
     }),
     menuList: (provided) => ({
       ...provided,
+      paddingTop: 0,
+      paddingBottom: 0,
       maxHeight: '250px',
       overflowY: 'auto',
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none',
+      '&::-webkit-scrollbar': {
+        display: 'none',
+      },
     }),
-    singleValue: (provided) => ({
+    indicatorSeparator: () => ({ display: 'none' }),
+    indicatorsContainer: (provided) => ({
       ...provided,
-      fontWeight: '500',
-      color: 'black',
-      textAlign: 'left',
+      flex: '0 0 auto',
+      paddingLeft: '0',
     }),
-    option: (provided, state) => ({
+    dropdownIndicator: (provided, state) => ({
       ...provided,
-      fontWeight: '500',
-      backgroundColor: state.isSelected 
-        ? 'rgba(191, 152, 83, 0.3)' 
-        : state.isFocused 
-          ? 'rgba(191, 152, 83, 0.1)' 
-          : 'white',
-      color: 'black',
-      textAlign: 'left',
+      display: state.hasValue ? 'none' : 'flex',
+      color: '#000000',
+      flexShrink: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
     }),
-    input: (provided) => ({
+    clearIndicator: (provided) => ({
       ...provided,
-      fontWeight: '500',
-      color: 'black',
-      textAlign: 'left',
+      cursor: 'pointer',
+      color: '#000000',
+      flexShrink: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      paddingLeft: '4px',
+      paddingRight: '4px',
     }),
     placeholder: (provided) => ({
       ...provided,
-      fontWeight: '500',
-      color: '#999',
+      fontWeight: 'normal',
+      fontSize: '14px',
+      color: '#6b7280',
+      margin: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
       textAlign: 'left',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      maxWidth: '100%',
+      position: 'absolute',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      minHeight: 36,
+      height: 'auto',
+      paddingTop: 6,
+      paddingBottom: 6,
+      whiteSpace: 'normal',
+      display: 'flex',
+      alignItems: 'center',
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+      WebkitTapHighlightColor: '#FAF6ED',
+      backgroundColor: state.isSelected
+        ? '#BF9853'
+        : state.isFocused
+          ? '#FAF6ED'
+          : provided.backgroundColor,
+      color: state.isSelected ? '#FFFFFF' : provided.color,
+      fontWeight: '500',
+      textAlign: 'left',
+      '&:active': {
+        backgroundColor: state.isSelected ? '#BF9853' : '#FAF6ED',
+      },
     }),
   };
   const [selectedAdvanceSite, setSelectedAdvanceSite] = useState(null);
@@ -705,11 +1183,16 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
     if (advanceDetails.length > 0) {
       setProjectPopupTitle('Advance Details');
       setProjectPopupData(advanceDetails);
-      // Set context: "Contractor/Vendor Name - Project Name"
-      const contractorVendorName = selectedContractorOrVendorOption
-        ? selectedContractorOrVendorOption.label
-        : "All Contractors/Vendors";
-      setProjectPopupContext(`${contractorVendorName} - ${projectName}`);
+      setProjectPopupContext(buildFirstTablePopupContext({
+        contractorVendorId,
+        contractorVendorType,
+        contractorOptions,
+        vendorOptions,
+        selectedOption: selectedContractorOrVendorOption,
+        projectId,
+        siteOptions,
+        projectName,
+      }));
       setShowProjectPopup(true);
     }
   };
@@ -718,11 +1201,16 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
     if (billDetails.length > 0) {
       setProjectPopupTitle('Bill Details');
       setProjectPopupData(billDetails);
-      // Set context: "Contractor/Vendor Name - Project Name"
-      const contractorVendorName = selectedContractorOrVendorOption
-        ? selectedContractorOrVendorOption.label
-        : "All Contractors/Vendors";
-      setProjectPopupContext(`${contractorVendorName} - ${projectName}`);
+      setProjectPopupContext(buildFirstTablePopupContext({
+        contractorVendorId,
+        contractorVendorType,
+        contractorOptions,
+        vendorOptions,
+        selectedOption: selectedContractorOrVendorOption,
+        projectId,
+        siteOptions,
+        projectName,
+      }));
       setShowProjectPopup(true);
     }
   };
@@ -733,11 +1221,12 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
     if (advanceDetails.length > 0) {
       setSitePopupTitle('Advance Details');
       setSitePopupData(advanceDetails);
-      // Set context: "Project Name - Contractor/Vendor Name"
-      const projectName = selectedAdvanceSite
-        ? selectedAdvanceSite.label
-        : "All Projects";
-      setSitePopupContext(`${projectName} - ${contractorVendorName}`);
+      setSitePopupContext(buildSecondTablePopupContext({
+        projectId,
+        siteOptions,
+        selectedSite: selectedAdvanceSite,
+        contractorVendorName,
+      }));
       setShowSitePopup(true);
     }
   };
@@ -746,11 +1235,12 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
     if (billDetails.length > 0) {
       setSitePopupTitle('Bill Details');
       setSitePopupData(billDetails);
-      // Set context: "Project Name - Contractor/Vendor Name"
-      const projectName = selectedAdvanceSite
-        ? selectedAdvanceSite.label
-        : "All Projects";
-      setSitePopupContext(`${projectName} - ${contractorVendorName}`);
+      setSitePopupContext(buildSecondTablePopupContext({
+        projectId,
+        siteOptions,
+        selectedSite: selectedAdvanceSite,
+        contractorVendorName,
+      }));
       setShowSitePopup(true);
     }
   };
@@ -761,10 +1251,16 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
     const billDetails = getBillDetails(projectId, contractorVendorId, contractorVendorType);
 
     setBillStatusPopupData({ advances: advanceDetails, bills: billDetails });
-    const contractorVendorName = selectedContractorOrVendorOption
-      ? selectedContractorOrVendorOption.label
-      : "All Contractors/Vendors";
-    setBillStatusPopupContext(`${contractorVendorName} - ${projectName}`);
+    setBillStatusPopupContext(buildFirstTablePopupContext({
+      contractorVendorId,
+      contractorVendorType,
+      contractorOptions,
+      vendorOptions,
+      selectedOption: selectedContractorOrVendorOption,
+      projectId,
+      siteOptions,
+      projectName,
+    }));
     setIsBillStatusFromFirstTable(true);
     setShowBillStatusPopup(true);
   };
@@ -774,10 +1270,12 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
     const billDetails = getBillDetails(projectId, contractorVendorId, contractorVendorType);
 
     setBillStatusPopupData({ advances: advanceDetails, bills: billDetails });
-    const projectName = selectedAdvanceSite
-      ? selectedAdvanceSite.label
-      : "All Projects";
-    setBillStatusPopupContext(`${projectName} - ${contractorVendorName}`);
+    setBillStatusPopupContext(buildSecondTablePopupContext({
+      projectId,
+      siteOptions,
+      selectedSite: selectedAdvanceSite,
+      contractorVendorName,
+    }));
     setIsBillStatusFromFirstTable(false);
     setShowBillStatusPopup(true);
   };
@@ -900,10 +1398,231 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
       setSiteBillAmount(totalBill);
     }
   }, [selectedAdvanceSite, advanceData, contractorOptions, vendorOptions]);
-  const filteredProjects = selectedProject
-    ? projectData.filter(proj => proj.projectName === selectedProject.value)
-    : projectData;
-  const sortedFilteredData = sortData(filteredProjects, sortConfig, 'pendingAdvance', 'projectName');
+  const sortedFilteredData = useMemo(() => {
+    const sorted = sortData(projectData, sortConfig, 'pendingAdvance', 'projectName');
+    const q = projectSearch.trim();
+    return sorted.filter((proj) => {
+      if (selectProjectNameFilter && proj.projectName !== selectProjectNameFilter) return false;
+      if (!matchesEdbcAmountFilter(proj.pendingAdvance, selectProjectAdvanceFilter)) return false;
+      if (!matchesEdbcAmountFilter(proj.billAmount, selectProjectBillAmountFilter)) return false;
+      const billStatus = proj.pendingAdvance > 0 ? 'Pending' : 'Bill Settled';
+      if (selectProjectBillStatusFilter && billStatus !== selectProjectBillStatusFilter) return false;
+      if (!matchesSummaryUniversalSearch(q, {
+        name: proj.projectName,
+        pendingAdvance: proj.pendingAdvance,
+        billAmount: proj.billAmount,
+      })) return false;
+      return true;
+    });
+  }, [projectData, sortConfig, projectSearch, selectProjectNameFilter, selectProjectAdvanceFilter, selectProjectBillAmountFilter, selectProjectBillStatusFilter]);
+  const sortedSiteDisplayData = useMemo(() => {
+    const sorted = sortData(siteDetails, siteSortConfig);
+    const q = siteSearch.trim();
+    return sorted.filter((d) => {
+      if (selectSiteContractorFilter) {
+        if (
+          d.entityId !== selectSiteContractorFilter.id ||
+          d.entityType !== selectSiteContractorFilter.type
+        ) return false;
+      }
+      if (!matchesEdbcAmountFilter(d.pendingAdvance, selectSiteAdvanceFilter)) return false;
+      if (!matchesEdbcAmountFilter(d.billAmount, selectSiteBillAmountFilter)) return false;
+      const billStatus = d.pendingAdvance > 0 ? 'Pending' : 'Bill Settled';
+      if (selectSiteBillStatusFilter && billStatus !== selectSiteBillStatusFilter) return false;
+      if (!matchesSummaryUniversalSearch(q, {
+        name: d.name,
+        pendingAdvance: d.pendingAdvance,
+        billAmount: d.billAmount,
+      })) return false;
+      return true;
+    });
+  }, [siteDetails, siteSortConfig, siteSearch, selectSiteContractorFilter, selectSiteAdvanceFilter, selectSiteBillAmountFilter, selectSiteBillStatusFilter]);
+  const projectNameFilterOptions = useMemo(
+    () => [...new Set(projectData.map((p) => p.projectName))].sort().map((name) => ({ value: name, label: name })),
+    [projectData],
+  );
+  const billStatusFilterOptions = useMemo(
+    () => [{ value: 'Pending', label: 'Pending' }, { value: 'Bill Settled', label: 'Bill Settled' }],
+    [],
+  );
+  const clearProjectContractorSelection = useCallback(() => {
+    setSelectedContractorOrVendorOption(null);
+    sessionStorage.removeItem('selectedContractorOrVendorOption');
+    localStorage.removeItem('advanceContractorVendor');
+  }, []);
+  const clearProjectTableFilters = useCallback(() => {
+    clearProjectContractorSelection();
+    setProjectSearch('');
+    setSelectProjectNameFilter('');
+    setSelectProjectAdvanceFilter('');
+    setSelectProjectBillAmountFilter('');
+    setSelectProjectBillStatusFilter('');
+    setSortConfig({ key: null, direction: 'asc' });
+  }, [clearProjectContractorSelection]);
+  const clearSiteTableFilters = useCallback(() => {
+    setSelectedAdvanceSite(null);
+    setSiteSearch('');
+    setSelectSiteContractorFilter(null);
+    setSelectSiteAdvanceFilter('');
+    setSelectSiteBillAmountFilter('');
+    setSelectSiteBillStatusFilter('');
+    setSiteSortConfig({ key: null, direction: 'asc' });
+  }, []);
+  const hasProjectColumnFilters = Boolean(
+    selectProjectNameFilter ||
+    selectProjectAdvanceFilter.trim() ||
+    selectProjectBillAmountFilter.trim() ||
+    selectProjectBillStatusFilter
+  );
+  const hasSiteColumnFilters = Boolean(
+    selectSiteContractorFilter ||
+    selectSiteAdvanceFilter.trim() ||
+    selectSiteBillAmountFilter.trim() ||
+    selectSiteBillStatusFilter
+  );
+  const toggleProjectFilters = useCallback(() => {
+    const willOpen = !showProjectFilters;
+    const scroller = projectScrollRef.current;
+    if (willOpen) {
+      setShowProjectFilters(true);
+      if (!scroller) return;
+      if (scroller.scrollTop <= 0) return;
+      if (projectFilterNudgeUsedRef.current) return;
+      projectFilterNudgeUsedRef.current = true;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const h = projectFilterRowRef.current?.offsetHeight || 0;
+          if (h > 0) {
+            scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+          }
+        });
+      });
+      return;
+    }
+    const h = projectFilterRowRef.current?.offsetHeight || 0;
+    setShowProjectFilters(false);
+    if (!scroller || h <= 0 || !projectFilterNudgeUsedRef.current) return;
+    projectFilterNudgeUsedRef.current = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scroller.scrollTop = scroller.scrollTop + h;
+      });
+    });
+  }, [showProjectFilters, projectScrollRef]);
+  const toggleSiteFilters = useCallback(() => {
+    const willOpen = !showSiteFilters;
+    const scroller = siteScrollRef.current;
+    if (willOpen) {
+      setShowSiteFilters(true);
+      if (!scroller) return;
+      if (scroller.scrollTop <= 0) return;
+      if (siteFilterNudgeUsedRef.current) return;
+      siteFilterNudgeUsedRef.current = true;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const h = siteFilterRowRef.current?.offsetHeight || 0;
+          if (h > 0) {
+            scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+          }
+        });
+      });
+      return;
+    }
+    const h = siteFilterRowRef.current?.offsetHeight || 0;
+    setShowSiteFilters(false);
+    if (!scroller || h <= 0 || !siteFilterNudgeUsedRef.current) return;
+    siteFilterNudgeUsedRef.current = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scroller.scrollTop = scroller.scrollTop + h;
+      });
+    });
+  }, [showSiteFilters, siteScrollRef]);
+  useEffect(() => {
+    if (!showProjectFilters) return;
+    const scroller = projectScrollRef.current;
+    if (!scroller) return;
+    projectFilterNudgeUsedRef.current = false;
+    requestAnimationFrame(() => {
+      scroller.scrollTop = 0;
+    });
+  }, [
+    selectProjectNameFilter,
+    selectProjectAdvanceFilter,
+    selectProjectBillAmountFilter,
+    selectProjectBillStatusFilter,
+  ]);
+  useEffect(() => {
+    if (!showSiteFilters) return;
+    const scroller = siteScrollRef.current;
+    if (!scroller) return;
+    siteFilterNudgeUsedRef.current = false;
+    requestAnimationFrame(() => {
+      scroller.scrollTop = 0;
+    });
+  }, [
+    selectSiteContractorFilter,
+    selectSiteAdvanceFilter,
+    selectSiteBillAmountFilter,
+    selectSiteBillStatusFilter,
+  ]);
+  const projectTableTotals = useMemo(() => ({
+    advance: projectData.reduce((sum, row) => sum + (parseFloat(row.pendingAdvance) || 0), 0),
+    billAmount: projectData.reduce((sum, row) => sum + (parseFloat(row.billAmount) || 0), 0),
+  }), [projectData]);
+  const siteTableTotals = useMemo(() => ({
+    advance: siteDetails.reduce((sum, row) => sum + (parseFloat(row.pendingAdvance) || 0), 0),
+    billAmount: siteDetails.reduce((sum, row) => sum + (parseFloat(row.billAmount) || 0), 0),
+  }), [siteDetails]);
+  const handleProjectEdbcSort = (field) => {
+    if (field === 'siteName') handleSort('projectName');
+    else if (field === 'amount') handleSort('pendingAdvance');
+    else if (field === 'paymentMode') handleSort('billStatus');
+  };
+  const handleSiteEdbcSort = (field) => {
+    if (field === 'vendor') handleSiteSort('name');
+    else if (field === 'amount') handleSiteSort('pendingAdvance');
+    else if (field === 'paymentMode') handleSiteSort('billStatus');
+  };
+  const projectHeaderSortField = sortConfig.key === 'projectName'
+    ? 'siteName'
+    : sortConfig.key === 'pendingAdvance'
+      ? 'amount'
+      : sortConfig.key === 'billAmount'
+        ? 'amount'
+        : sortConfig.key === 'billStatus'
+          ? 'paymentMode'
+          : null;
+  const siteHeaderSortField = siteSortConfig.key === 'name'
+    ? 'vendor'
+    : siteSortConfig.key === 'pendingAdvance'
+      ? 'amount'
+      : siteSortConfig.key === 'billAmount'
+        ? 'amount'
+        : siteSortConfig.key === 'billStatus'
+          ? 'paymentMode'
+          : null;
+  const edbc2Config = getEdbcColumnConfig(EDBC_IDS.EDBC2);
+  const edbc3Config = getEdbcColumnConfig(EDBC_IDS.EDBC3);
+  const edbc4Config = getEdbcColumnConfig(EDBC_IDS.EDBC4);
+  const edbc8Config = getEdbcColumnConfig(EDBC_IDS.EDBC8);
+  const billStatusPopupEdbcSortField =
+    billStatusPopupSortConfig.key === 'contractorVendorName' || billStatusPopupSortConfig.key === 'transferSiteName'
+      ? 'vendor'
+      : billStatusPopupSortConfig.key === 'projectName'
+        ? 'siteName'
+        : billStatusPopupSortConfig.key;
+  const billStatusPopupTableClass = isBillStatusFromFirstTable
+    ? SUMMARY_BILL_STATUS_LEFT_POPUP_TABLE_CLASS
+    : SUMMARY_BILL_STATUS_RIGHT_POPUP_TABLE_CLASS;
+  const projectPopupEdbcSortField =
+    projectPopupSortConfig.key === 'contractorVendorName' || projectPopupSortConfig.key === 'transferSiteName'
+      ? 'vendor'
+      : projectPopupSortConfig.key;
+  const sitePopupEdbcSortField =
+    sitePopupSortConfig.key === 'projectName' || sitePopupSortConfig.key === 'transferSiteName'
+      ? 'vendor'
+      : sitePopupSortConfig.key;
   const exportPDF = () => {
     const doc = new jsPDF();
     if (selectedContractorOrVendorOption) {
@@ -1051,27 +1770,40 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
 
   // Popup sorting handlers
   const handleProjectPopupSort = (key) => {
+    const resolvedKey = key === 'vendor'
+      ? (selectedContractorOrVendorOption ? 'transferSiteName' : 'contractorVendorName')
+      : key;
     let direction = 'asc';
-    if (projectPopupSortConfig.key === key && projectPopupSortConfig.direction === 'asc') {
+    if (projectPopupSortConfig.key === resolvedKey && projectPopupSortConfig.direction === 'asc') {
       direction = 'desc';
     }
-    setProjectPopupSortConfig({ key, direction });
+    setProjectPopupSortConfig({ key: resolvedKey, direction });
   };
 
   const handleSitePopupSort = (key) => {
+    const resolvedKey = key === 'vendor'
+      ? (selectedAdvanceSite ? 'transferSiteName' : 'projectName')
+      : key;
     let direction = 'asc';
-    if (sitePopupSortConfig.key === key && sitePopupSortConfig.direction === 'asc') {
+    if (sitePopupSortConfig.key === resolvedKey && sitePopupSortConfig.direction === 'asc') {
       direction = 'desc';
     }
-    setSitePopupSortConfig({ key, direction });
+    setSitePopupSortConfig({ key: resolvedKey, direction });
   };
 
   const handleBillStatusPopupSort = (key) => {
+    const resolvedKey = key === 'vendor'
+      ? (isBillStatusFromFirstTable
+        ? (selectedContractorOrVendorOption ? 'transferSiteName' : 'contractorVendorName')
+        : (selectedAdvanceSite ? 'transferSiteName' : 'projectName'))
+      : key === 'siteName'
+        ? (selectedAdvanceSite ? 'transferSiteName' : 'projectName')
+        : key;
     let direction = 'asc';
-    if (billStatusPopupSortConfig.key === key && billStatusPopupSortConfig.direction === 'asc') {
+    if (billStatusPopupSortConfig.key === resolvedKey && billStatusPopupSortConfig.direction === 'asc') {
       direction = 'desc';
     }
-    setBillStatusPopupSortConfig({ key, direction });
+    setBillStatusPopupSortConfig({ key: resolvedKey, direction });
   };
 
   // Sort popup data
@@ -1120,14 +1852,21 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
     });
   };
 
+  const writeSummaryPopupContextToPdf = (doc, context, subtitle, subtitleY = 29, tableStartY = 35) => {
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(context.line1 || '', 14, 15);
+    doc.text(context.line2 || '', 14, 22);
+    doc.setFontSize(10);
+    doc.text(subtitle, 14, subtitleY);
+    return tableStartY;
+  };
+
   // Export Popup PDF
   const exportPopupPDF = (data, title, context, isProjectPopup) => {
     const doc = new jsPDF();
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text(context, 14, 15);
-    doc.setFontSize(10);
-    doc.text(title, 14, 22);
+    const contextText = formatSummaryPopupContextText(context);
+    const tableStartY = writeSummaryPopupContextToPdf(doc, context, title);
 
     const tableColumn = isProjectPopup && selectedContractorOrVendorOption
       ? ["Date", "Transfer", "Amount"]
@@ -1186,7 +1925,7 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
       head: [tableColumn],
       body: tableRows,
       theme: "grid",
-      startY: 28,
+      startY: tableStartY,
       headStyles: {
         fillColor: [255, 255, 255],
         lineWidth: 0.2,
@@ -1210,13 +1949,14 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
       }
     });
 
-    const fileName = `${context.replace(/[^a-z0-9]/gi, '_')}_${title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+    const fileName = `${contextText.replace(/[^a-z0-9]/gi, '_')}_${title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
     doc.save(fileName);
   };
 
   // Export Popup CSV
   const exportPopupCSV = (data, title, context, isProjectPopup) => {
-    const extraRow = [[context], [title], []];
+    const contextText = formatSummaryPopupContextText(context);
+    const extraRow = [[contextText], [title], []];
 
     const headers = isProjectPopup && selectedContractorOrVendorOption
       ? ["Date", "Transfer", "Amount"]
@@ -1266,7 +2006,7 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
         .join("\n");
     const link = document.createElement("a");
     link.setAttribute("href", encodeURI(csvContent));
-    const fileName = `${context.replace(/[^a-z0-9]/gi, '_')}_${title.replace(/[^a-z0-9]/gi, '_')}.csv`;
+    const fileName = `${contextText.replace(/[^a-z0-9]/gi, '_')}_${title.replace(/[^a-z0-9]/gi, '_')}.csv`;
     link.setAttribute("download", fileName);
     document.body.appendChild(link);
     link.click();
@@ -1276,11 +2016,8 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
   // Export Bill Status Popup PDF
   const exportBillStatusPDF = () => {
     const doc = new jsPDF();
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text(billStatusPopupContext, 14, 15);
-    doc.setFontSize(10);
-    doc.text("Bill Status Details", 14, 22);
+    const contextText = formatSummaryPopupContextText(billStatusPopupContext);
+    const tableStartY = writeSummaryPopupContextToPdf(doc, billStatusPopupContext, 'Bill Status Details');
 
     // Determine columns based on context
     let tableColumn = ["Date"];
@@ -1429,7 +2166,7 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
       head: [tableColumn],
       body: tableRows,
       theme: "grid",
-      startY: 28,
+      startY: tableStartY,
       headStyles: {
         fillColor: [255, 255, 255],
         lineWidth: 0.2,
@@ -1459,13 +2196,14 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
       }
     });
 
-    const fileName = `${billStatusPopupContext.replace(/[^a-z0-9]/gi, '_')}_Bill_Status.pdf`;
+    const fileName = `${contextText.replace(/[^a-z0-9]/gi, '_')}_Bill_Status.pdf`;
     doc.save(fileName);
   };
 
   // Export Bill Status Popup CSV
   const exportBillStatusCSV = () => {
-    const extraRow = [[billStatusPopupContext], ["Bill Status Details"], []];
+    const contextText = formatSummaryPopupContextText(billStatusPopupContext);
+    const extraRow = [[contextText], ["Bill Status Details"], []];
 
     // Determine columns based on context
     let headers = ["Date"];
@@ -1612,7 +2350,7 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
 
     const link = document.createElement("a");
     link.setAttribute("href", encodeURI(csvContent));
-    const fileName = `${billStatusPopupContext.replace(/[^a-z0-9]/gi, '_')}_Bill_Status.csv`;
+    const fileName = `${contextText.replace(/[^a-z0-9]/gi, '_')}_Bill_Status.csv`;
     link.setAttribute("download", fileName);
     document.body.appendChild(link);
     link.click();
@@ -1633,249 +2371,458 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
 
   return (
     <div className='flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]'>
-      <div className='px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]'>
-      <div className="flex flex-col flex-1 min-h-0 overflow-hidden w-full">
-          <div className="flex flex-col xl:flex-row items-stretch justify-between bg-white rounded-md px-[18px] py-[18px] mb-[18px] shrink-0 gap-[18px]">
-            <div className="flex flex-wrap flex-col xl:flex-row justify-between flex-1 items-center gap-[12px]">
-              <div className="flex flex-wrap gap-[12px] text-left">
-                <div className="text-left">
-                  <label className="block font-semibold mb-1">Contractor/Vendor</label>
+      <div className='p-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]'>
+        <div className="flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 max-h-full overflow-visible px-[24px] py-[24px] items-stretch bg-white">
+          <div className={`flex flex-col flex-1 min-w-0 min-h-0 max-h-full overflow-hidden bg-white rounded-[6px] max-w-[770px] ${SUMMARY_PANEL_SHADOW} px-[24px] py-[24px]`}>
+            <div className="w-full min-w-0 flex flex-col flex-1 min-h-0 max-h-full">
+              <div className="flex flex-wrap justify-between items-start gap-[12px] mb-[18px] shrink-0 w-full">
+                <div className="text-left max-w-[220px]">
+                  <label className="block font-semibold mb-[8px]">Vendor/Contractor</label>
                   <Select
                     options={combinedOptions}
                     value={selectedContractorOrVendorOption}
                     onChange={(selectedOption) => {
                       setSelectedContractorOrVendorOption(selectedOption);
                     }}
-                    placeholder="Select..."
-                    className="w-[253px] h-[45px] rounded-lg focus:outline-none"
+                    placeholder="Vendor/Contractor"
+                    className={SUMMARY_OUTSIDE_SELECT_CLASS}
                     isClearable
                     menuPortalTarget={document.body}
-                    styles={customStyles}
+                    styles={summaryOutsideSelectStyles}
                   />
                 </div>
+                <div className="rounded-md px-4 py-[8px] mt-[8px] text-sm shrink-0 " style={SUMMARY_BOX_STYLE}>
+                  <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                    <span className="flex shrink-0 w-[130px] text-black font-semibold">
+                      <span className="whitespace-nowrap">Project Advance</span>
+                      <span className="ml-auto">:</span>
+                    </span>
+                    <span className="font-semibold" style={{ color: '#E4572E' }}>
+                      {formatSummaryAmount(totalPendingAdvance)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                    <span className="flex shrink-0 w-[130px] text-black font-semibold">
+                      <span className="whitespace-nowrap">Bill Amount</span>
+                      <span className="ml-auto">:</span>
+                    </span>
+                    <span className="font-semibold" style={{ color: '#E4572E' }}>
+                      {formatSummaryAmount(totalBillAmount)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className='border border-gray-200 px-[18px] pt-[18px] flex flex-col flex-1 min-h-0 overflow-hidden'>
+                <div className="flex min-w-0 w-full flex-nowrap items-center justify-between gap-[6px] mb-[9px] shrink-0 overflow-hidden">
+                  <div className={`flex min-w-0 items-center overflow-hidden gap-[6px]${hasProjectColumnFilters ? ' flex-1 min-w-0' : ' shrink-0'}`}>
+                    <EdbcFilterToggleButton onClick={toggleProjectFilters} />
+                    {hasProjectColumnFilters && (
+                      <div className="flex min-w-0 flex-1 overflow-x-auto flex-nowrap gap-2 no-scrollbar scrollbar-none">
+                        {selectProjectNameFilter && (
+                          <SummaryFilterChip
+                            label="Project Name"
+                            value={selectProjectNameFilter}
+                            onClear={() => setSelectProjectNameFilter('')}
+                          />
+                        )}
+                        {selectProjectAdvanceFilter.trim() && (
+                          <SummaryFilterChip
+                            label="Advance"
+                            value={selectProjectAdvanceFilter}
+                            onClear={() => setSelectProjectAdvanceFilter('')}
+                          />
+                        )}
+                        {selectProjectBillAmountFilter.trim() && (
+                          <SummaryFilterChip
+                            label="Bill Amount"
+                            value={selectProjectBillAmountFilter}
+                            onClear={() => setSelectProjectBillAmountFilter('')}
+                          />
+                        )}
+                        {selectProjectBillStatusFilter && (
+                          <SummaryFilterChip
+                            label="Bill Status"
+                            value={selectProjectBillStatusFilter}
+                            onClear={() => setSelectProjectBillStatusFilter('')}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex min-w-0 items-center justify-end gap-[6px] shrink-0">
+                    <EdbcTableToolbarRightActions
+                      onClearFilters={clearProjectTableFilters}
+                      overallSearch={projectSearch}
+                      onOverallSearchChange={setProjectSearch}
+                      showExportIcons={false}
+                      clearButtonType="button"
+                      wrapperClassName={null}
+                      searchWrapperClassName="h-[34px] min-w-0 flex-1 max-w-[286px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 sm:w-[286px] sm:min-w-[286px] sm:flex-none sm:shrink-0"
+                    />
+                    <SummaryTableExportActions onExportPdf={exportPDF} onExportCsv={exportCSV} />
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden pb-[18px] flex flex-col">
+                  <div
+                    ref={projectTableScroll.scrollRef}
+                    className="rounded-lg border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none w-full"
+                    onMouseDown={projectTableScroll.handleMouseDown}
+                  >
+                    <table className={`${SUMMARY_PROJECT_TABLE_CLASS} ${showProjectFilters ? '[&_thead_tr:first-child_th]:!border-b-0' : ''}`}>
+                      <thead className="sticky top-0 z-20 bg-white">
+                        <EdbcTableHeaderRow>
+                          <EdbcColumnHeader
+                            columnId={EDBC_IDS.EDBC3}
+                            label="Project Name"
+                            sortField={projectHeaderSortField}
+                            sortDirection={sortConfig.direction}
+                            onSort={handleProjectEdbcSort}
+                          />
+                          <EdbcColumnHeader
+                            columnId={EDBC_IDS.EDBC8}
+                            label="Advance"
+                            sortField={projectHeaderSortField}
+                            sortDirection={sortConfig.direction}
+                            onSort={handleProjectEdbcSort}
+                          />
+                          <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Bill Amount" />
+                          <EdbcColumnHeader
+                            columnId={EDBC_IDS.EDBC13}
+                            label="Bill Status"
+                            sortField={projectHeaderSortField}
+                            sortDirection={sortConfig.direction}
+                            onSort={handleProjectEdbcSort}
+                          />
+                        </EdbcTableHeaderRow>
+                        {showProjectFilters && (
+                          <EdbcTableFilterRow ref={projectFilterRowRef}>
+                            <EdbcProjectNameFilter
+                              placeholder="Project Name"
+                              options={projectNameFilterOptions}
+                              value={selectProjectNameFilter}
+                              onChange={setSelectProjectNameFilter}
+                              selectStyles={SUMMARY_FIRST_COLUMN_FILTER_SELECT_STYLES}
+                            />
+                            <EdbcTotalAmountFilter
+                              columnId={EDBC_IDS.EDBC8}
+                              totalAmount={projectTableTotals.advance}
+                              value={selectProjectAdvanceFilter}
+                              onChange={(e) => setSelectProjectAdvanceFilter(e.target.value)}
+                            />
+                            <EdbcTotalAmountFilter
+                              columnId={EDBC_IDS.EDBC8}
+                              totalAmount={projectTableTotals.billAmount}
+                              value={selectProjectBillAmountFilter}
+                              onChange={(e) => setSelectProjectBillAmountFilter(e.target.value)}
+                            />
+                            <SummaryEdbcSelectFilter
+                              columnId={EDBC_IDS.EDBC13}
+                              placeholder="Bill Status"
+                              options={billStatusFilterOptions}
+                              value={selectProjectBillStatusFilter}
+                              onChange={setSelectProjectBillStatusFilter}
+                            />
+                          </EdbcTableFilterRow>
+                        )}
+                      </thead>
+                      <tbody>
+                        {sortedFilteredData.length > 0 ? (
+                          sortedFilteredData.map((proj, idx) => (
+                            <EdbcTableBodyRow key={proj.projectId ?? idx}>
+                              <EdbcExpandableBodyCell
+                                columnId={EDBC_IDS.EDBC3}
+                                expense={{ id: proj.projectId, ...proj }}
+                                rowIndex={idx}
+                                expandedCells={projectExpandedCells}
+                                onToggleExpanded={toggleProjectExpandedCell}
+                                getDisplayValue={(row) => row.projectName}
+                              />
+                              <td
+                                id={EDBC_IDS.EDBC8}
+                                className={edbc8Config?.tdClass}
+                                onMouseEnter={(e) => handleProjectAdvanceMouseEnter(e, proj.projectId, selectedContractorOrVendorOption?.id, selectedContractorOrVendorOption?.type)}
+                                onMouseLeave={handleProjectMouseLeave}
+                              >
+                                <span
+                                  onClick={() => handleProjectAdvanceClick(proj.projectId, selectedContractorOrVendorOption?.id, selectedContractorOrVendorOption?.type, proj.projectName)}
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleProjectExpandedCell(`${proj.projectId ?? idx}-amount`);
+                                  }}
+                                  className={`block w-full cursor-pointer ${projectExpandedCells[`${proj.projectId ?? idx}-amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                  title={formatSummaryAmount(proj.pendingAdvance)}
+                                >
+                                  {formatSummaryAmount(proj.pendingAdvance)}
+                                </span>
+                              </td>
+                              <td
+                                className={edbc8Config?.tdClass}
+                                onMouseEnter={(e) => handleProjectBillMouseEnter(e, proj.projectId, selectedContractorOrVendorOption?.id, selectedContractorOrVendorOption?.type)}
+                                onMouseLeave={handleProjectMouseLeave}
+                              >
+                                <span
+                                  onClick={() => handleProjectBillClick(proj.projectId, selectedContractorOrVendorOption?.id, selectedContractorOrVendorOption?.type, proj.projectName)}
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleProjectExpandedCell(`${proj.projectId ?? idx}-bill_amount`);
+                                  }}
+                                  className={`block w-full cursor-pointer ${projectExpandedCells[`${proj.projectId ?? idx}-bill_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                  title={formatSummaryAmount(proj.billAmount)}
+                                >
+                                  {formatSummaryAmount(proj.billAmount)}
+                                </span>
+                              </td>
+                              {renderBillStatusBodyCell({
+                                pendingAdvance: proj.pendingAdvance,
+                                rowId: proj.projectId,
+                                rowIndex: idx,
+                                expandedCells: projectExpandedCells,
+                                onToggleExpanded: toggleProjectExpandedCell,
+                                onClick: () => handleProjectBillStatusClick(
+                                  proj.projectId,
+                                  selectedContractorOrVendorOption?.id,
+                                  selectedContractorOrVendorOption?.type,
+                                  proj.projectName
+                                ),
+                              })}
+                            </EdbcTableBodyRow>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="4" className="text-center py-4 text-gray-500 font-semibold">No Entry is available</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className={`flex flex-col flex-1 min-w-0 min-h-0 max-h-full overflow-hidden bg-white rounded-[6px] max-w-[696px] ${SUMMARY_PANEL_SHADOW} px-[24px] py-[24px]`}>
+            <div className="w-full min-w-0 flex flex-col flex-1 min-h-0 max-h-full">
+              <div className="flex flex-wrap justify-between items-start gap-[12px] mb-[18px] shrink-0 w-full">
                 <div className="text-left">
-                  <label className="block font-semibold mb-1">Project Name</label>
+                  <label className="block font-semibold mb-[8px]">Project Name</label>
                   <Select
-                    options={projectData.map(proj => ({
-                      value: proj.projectName,
-                      label: proj.projectName
-                    }))}
-                    value={selectedProject}
-                    onChange={(selectedOption) => setSelectedProject(selectedOption)}
-                    className="w-[273px] h-[45px] rounded-lg focus:outline-none"
+                    options={sortedSiteOptions || []}
+                    value={selectedAdvanceSite}
+                    onChange={setSelectedAdvanceSite}
+                    placeholder="Project Name"
+                    className={SUMMARY_PROJECT_NAME_SELECT_CLASS}
+                    isSearchable={true}
                     isClearable
-                    isSearchable
                     menuPortalTarget={document.body}
-                    styles={customStyles}
+                    styles={summaryOutsideSelectStyles}
                   />
                 </div>
+                <div className="rounded-md px-4 py-[8px] mt-[8px] text-sm shrink-0" style={SUMMARY_BOX_STYLE}>
+                  <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                    <span className="flex shrink-0 w-[130px] text-black font-semibold">
+                      <span className="whitespace-nowrap">Project Advance</span>
+                      <span className="ml-auto">:</span>
+                    </span>
+                    <span className="font-semibold" style={{ color: '#E4572E' }}>
+                      {formatSummaryAmount(sitePendingAdvance)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                    <span className="flex shrink-0 w-[130px] text-black font-semibold">
+                      <span className="whitespace-nowrap">Bill Amount</span>
+                      <span className="ml-auto">:</span>
+                    </span>
+                    <span className="font-semibold" style={{ color: '#E4572E' }}>
+                      {formatSummaryAmount(siteBillAmount)}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div>
-                <div className="flex flex-col text-right border-2 border-[#E4572E] border-opacity-15 p-1 ml-auto">
-                  <span>
-                    Pending Advance:{" "}
-                    <b className="text-red-500">
-                      {totalPendingAdvance !== 0 ? totalPendingAdvance.toLocaleString("en-IN") : "0"}
-                    </b>
-                  </span>
-                  <span>
-                    Bill Amount:{" "}
-                    {totalBillAmount !== 0 ? totalBillAmount.toLocaleString("en-IN") : "0"}
-                  </span>
+              <div className='border border-gray-200 px-[18px] pt-[18px] flex flex-col flex-1 min-h-0 overflow-hidden'>
+                <div className="flex min-w-0 w-full flex-nowrap items-center justify-between gap-[6px] mb-[9px] shrink-0 overflow-hidden">
+                  <div className={`flex min-w-0 items-center overflow-hidden gap-[6px]${hasSiteColumnFilters ? ' flex-1 min-w-0' : ' shrink-0'}`}>
+                    <EdbcFilterToggleButton onClick={toggleSiteFilters} />
+                    {hasSiteColumnFilters && (
+                      <div className="flex min-w-0 flex-1 overflow-x-auto flex-nowrap gap-2 no-scrollbar scrollbar-none">
+                        {selectSiteContractorFilter && (
+                          <SummaryFilterChip
+                            label="Contractor/Vendor"
+                            value={selectSiteContractorFilter.label}
+                            onClear={() => setSelectSiteContractorFilter(null)}
+                          />
+                        )}
+                        {selectSiteAdvanceFilter.trim() && (
+                          <SummaryFilterChip
+                            label="Advance"
+                            value={selectSiteAdvanceFilter}
+                            onClear={() => setSelectSiteAdvanceFilter('')}
+                          />
+                        )}
+                        {selectSiteBillAmountFilter.trim() && (
+                          <SummaryFilterChip
+                            label="Bill Amount"
+                            value={selectSiteBillAmountFilter}
+                            onClear={() => setSelectSiteBillAmountFilter('')}
+                          />
+                        )}
+                        {selectSiteBillStatusFilter && (
+                          <SummaryFilterChip
+                            label="Bill Status"
+                            value={selectSiteBillStatusFilter}
+                            onClear={() => setSelectSiteBillStatusFilter('')}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex min-w-0 items-center justify-end gap-[6px] shrink-0">
+                    <EdbcTableToolbarRightActions
+                      onClearFilters={clearSiteTableFilters}
+                      overallSearch={siteSearch}
+                      onOverallSearchChange={setSiteSearch}
+                      showExportIcons={false}
+                      clearButtonType="button"
+                      wrapperClassName={null}
+                      searchWrapperClassName="h-[34px] min-w-0 flex-1 max-w-[286px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 sm:w-[286px] sm:min-w-[286px] sm:flex-none sm:shrink-0"
+                    />
+                    <SummaryTableExportActions onExportPdf={exportsiteNamePDF} onExportCsv={exportSiteNameCSV} />
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden pb-[18px] flex flex-col">
+                  <div
+                    ref={siteTableScroll.scrollRef}
+                    className="rounded-lg border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none w-full"
+                    onMouseDown={siteTableScroll.handleMouseDown}
+                  >
+                    <table className={`${SUMMARY_SITE_TABLE_CLASS} ${showSiteFilters ? '[&_thead_tr:first-child_th]:!border-b-0' : ''}`}>
+                      <thead className="sticky top-0 z-20 bg-white">
+                        <EdbcTableHeaderRow>
+                          <EdbcColumnHeader
+                            columnId={EDBC_IDS.EDBC4}
+                            label="Contractor/Vendor"
+                            sortField={siteHeaderSortField}
+                            sortDirection={siteSortConfig.direction}
+                            onSort={handleSiteEdbcSort}
+                          />
+                          <EdbcColumnHeader
+                            columnId={EDBC_IDS.EDBC8}
+                            label="Advance"
+                            sortField={siteHeaderSortField}
+                            sortDirection={siteSortConfig.direction}
+                            onSort={handleSiteEdbcSort}
+                          />
+                          <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Bill Amount" />
+                          <EdbcColumnHeader
+                            columnId={EDBC_IDS.EDBC13}
+                            label="Bill Status"
+                            sortField={siteHeaderSortField}
+                            sortDirection={siteSortConfig.direction}
+                            onSort={handleSiteEdbcSort}
+                          />
+                        </EdbcTableHeaderRow>
+                        {showSiteFilters && (
+                          <EdbcTableFilterRow ref={siteFilterRowRef}>
+                            <SummaryContractorVendorFilter
+                              value={selectSiteContractorFilter}
+                              onChange={setSelectSiteContractorFilter}
+                              options={combinedOptions}
+                            />
+                            <EdbcTotalAmountFilter
+                              columnId={EDBC_IDS.EDBC8}
+                              totalAmount={siteTableTotals.advance}
+                              value={selectSiteAdvanceFilter}
+                              onChange={(e) => setSelectSiteAdvanceFilter(e.target.value)}
+                            />
+                            <EdbcTotalAmountFilter
+                              columnId={EDBC_IDS.EDBC8}
+                              totalAmount={siteTableTotals.billAmount}
+                              value={selectSiteBillAmountFilter}
+                              onChange={(e) => setSelectSiteBillAmountFilter(e.target.value)}
+                            />
+                            <SummaryEdbcSelectFilter
+                              columnId={EDBC_IDS.EDBC13}
+                              placeholder="Bill Status"
+                              options={billStatusFilterOptions}
+                              value={selectSiteBillStatusFilter}
+                              onChange={setSelectSiteBillStatusFilter}
+                            />
+                          </EdbcTableFilterRow>
+                        )}
+                      </thead>
+                      <tbody>
+                        {sortedSiteDisplayData.length > 0 ? (
+                          sortedSiteDisplayData.map((d, idx) => (
+                            <EdbcTableBodyRow key={d.entityId ?? idx}>
+                              <EdbcExpandableBodyCell
+                                columnId={EDBC_IDS.EDBC4}
+                                expense={{ id: d.entityId, ...d }}
+                                rowIndex={idx}
+                                expandedCells={siteExpandedCells}
+                                onToggleExpanded={toggleSiteExpandedCell}
+                                getDisplayValue={(row) => row.name}
+                              />
+                              <td
+                                id={EDBC_IDS.EDBC8}
+                                className={edbc8Config?.tdClass}
+                                onMouseEnter={(e) => handleSiteAdvanceMouseEnter(e, selectedAdvanceSite?.id || null, d.entityId, d.entityType)}
+                                onMouseLeave={handleSiteMouseLeave}
+                              >
+                                <span
+                                  onClick={() => handleSiteAdvanceClick(selectedAdvanceSite?.id || null, d.entityId, d.entityType, d.name)}
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleSiteExpandedCell(`${d.entityId ?? idx}-amount`);
+                                  }}
+                                  className={`block w-full cursor-pointer ${siteExpandedCells[`${d.entityId ?? idx}-amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                  title={formatSummaryAmount(d.pendingAdvance)}
+                                >
+                                  {formatSummaryAmount(d.pendingAdvance)}
+                                </span>
+                              </td>
+                              <td
+                                className={edbc8Config?.tdClass}
+                                onMouseEnter={(e) => handleSiteBillMouseEnter(e, selectedAdvanceSite?.id || null, d.entityId, d.entityType)}
+                                onMouseLeave={handleSiteMouseLeave}
+                              >
+                                <span
+                                  onClick={() => handleSiteBillClick(selectedAdvanceSite?.id || null, d.entityId, d.entityType, d.name)}
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleSiteExpandedCell(`${d.entityId ?? idx}-bill_amount`);
+                                  }}
+                                  className={`block w-full cursor-pointer ${siteExpandedCells[`${d.entityId ?? idx}-bill_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                  title={formatSummaryAmount(d.billAmount)}
+                                >
+                                  {formatSummaryAmount(d.billAmount)}
+                                </span>
+                              </td>
+                              {renderBillStatusBodyCell({
+                                pendingAdvance: d.pendingAdvance,
+                                rowId: d.entityId,
+                                rowIndex: idx,
+                                expandedCells: siteExpandedCells,
+                                onToggleExpanded: toggleSiteExpandedCell,
+                                onClick: () => handleSiteBillStatusClick(
+                                  selectedAdvanceSite?.id || null,
+                                  d.entityId,
+                                  d.entityType,
+                                  d.name
+                                ),
+                              })}
+                            </EdbcTableBodyRow>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="4" className="text-center py-4 text-gray-500 font-semibold">No Entry is available</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="flex flex-wrap flex-col xl:flex-row justify-between flex-1 items-center gap-[12px]">
-              <div className="text-left">
-                <label className="block font-semibold mb-1">Project Name</label>
-                <Select
-                  options={sortedSiteOptions || []}
-                  placeholder="Select a project..."
-                  isSearchable={true}
-                  value={selectedAdvanceSite}
-                  onChange={setSelectedAdvanceSite}
-                  styles={customStyles}
-                  isClearable
-                  menuPortalTarget={document.body}
-                  className="w-[270px] h-[45px] focus:outline-none"
-                />
-              </div>
-              <div>
-                <div className="flex flex-col text-right border-2 border-[#E4572E] border-opacity-15 p-1 ml-auto">
-                  <span>
-                    Pending Advance: <b className="text-red-500">{sitePendingAdvance.toLocaleString("en-IN")}</b>
-                  </span>
-                  <span>Bill Amount: {siteBillAmount.toLocaleString("en-IN")}</span>
-                </div>
-              </div>
-            </div>
           </div>
-          <div className="w-full flex-1 min-h-0 bg-white rounded-[6px] pt-[18px] px-[18px] pb-[18px] flex flex-col overflow-hidden">
-          <div className="flex flex-col xl:flex-row gap-[18px] w-full flex-1 min-h-0 overflow-hidden">
-            <div className="w-full xl:flex-1 flex flex-col flex-1 min-h-0 overflow-hidden">
-              <div className="flex shrink-0 gap-3 text-sm justify-end mb-[12px]">
-                <button onClick={exportPDF} className="flex items-center font-bold hover:underline gap-1 text-[#E4572E]">Export PDF</button>
-                <button onClick={exportCSV} className="flex items-center font-bold hover:underline gap-1 text-[#007233]">Export XL</button>
-                <button className="flex items-center font-bold hover:underline gap-1 text-[#BF9853]">Print</button>
-              </div>
-              <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-              <div className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto">
-                <table className="w-full border-collapse ">
-                  <thead>
-                    <tr className="bg-[#f8f1e5] text-left sticky top-0 z-10">
-                      <th className="p-2 py-2 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('projectName')}>
-                        Project Name
-                        {sortConfig.key === 'projectName' && (
-                          <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
-                      <th className="p-2 cursor-pointer hover:bg-gray-200 text-right" onClick={() => handleSort('pendingAdvance')}>
-                        Advance
-                        {sortConfig.key === 'pendingAdvance' && (
-                          <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
-                      <th className="p-2 cursor-pointer hover:bg-gray-200 text-right" onClick={() => handleSort('billAmount')} >
-                        Bill Amount
-                        {sortConfig.key === 'billAmount' && (
-                          <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
-                      <th className="p-2 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('billStatus')} >
-                        Bill Status
-                        {sortConfig.key === 'billStatus' && (
-                          <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedFilteredData.length > 0 ? (
-                      sortedFilteredData.map((proj, idx) => (
-                        <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-[#FAF6ED]"}>
-                          <td
-                            className={`py-2 px-6 text-left ${selectedContractorOrVendorOption ? 'cursor-pointer hover:underline' : ''}`}
-                            onClick={() => handleProjectNameClick(proj)}
-                            title={selectedContractorOrVendorOption ? "Open Advance Portal" : "Select Vendor/Contractor first"}
-                          >
-                            {proj.projectName}
-                          </td>
-                          <td className="py-2 cursor-pointer relative text-right"
-                            onMouseEnter={(e) => handleProjectAdvanceMouseEnter(e, proj.projectId, selectedContractorOrVendorOption?.id, selectedContractorOrVendorOption?.type)}
-                            onMouseLeave={handleProjectMouseLeave}
-                            onClick={() => handleProjectAdvanceClick(proj.projectId, selectedContractorOrVendorOption?.id, selectedContractorOrVendorOption?.type, proj.projectName)}
-                          >
-                            {proj.pendingAdvance.toLocaleString("en-IN")}
-                          </td>
-                          <td className="p-2 cursor-pointer relative text-right"
-                            onMouseEnter={(e) => handleProjectBillMouseEnter(e, proj.projectId, selectedContractorOrVendorOption?.id, selectedContractorOrVendorOption?.type)}
-                            onMouseLeave={handleProjectMouseLeave}
-                            onClick={() => handleProjectBillClick(proj.projectId, selectedContractorOrVendorOption?.id, selectedContractorOrVendorOption?.type, proj.projectName)}
-                          >
-                            {proj.billAmount.toLocaleString("en-IN")}
-                          </td>
-                          <td className="p-2 cursor-pointer"
-                            style={{ color: proj.pendingAdvance > 0 ? "red" : "green" }}
-                            onClick={() => handleProjectBillStatusClick(proj.projectId, selectedContractorOrVendorOption?.id, selectedContractorOrVendorOption?.type, proj.projectName)}
-                          >
-                            {proj.pendingAdvance > 0 ? "Pending" : "Bill Settled"}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="4" className="text-center p-4">No data available</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              </div>
-            </div>
-            <div className="w-full xl:flex-1 flex flex-col flex-1 min-h-0 overflow-hidden">
-              <div className="flex shrink-0 gap-3 text-sm justify-end mb-[12px]">
-                <button onClick={exportsiteNamePDF} className="flex items-center gap-1 font-bold hover:underline text-[#E4572E]">Export PDF</button>
-                <button onClick={exportSiteNameCSV} className="flex items-center gap-1 font-bold hover:underline text-[#007233]"> Export XL</button>
-                <button className="flex items-center gap-1 font-bold hover:underline text-[#BF9853]"> Print</button>
-              </div>
-              <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-              <div className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-[#f8f1e5] text-left sticky top-0 z-10">
-                      <th className="p-2 py-2 cursor-pointer hover:bg-gray-200" onClick={() => handleSiteSort('name')} >
-                        Contractor/Vendor
-                        {siteSortConfig.key === 'name' && (
-                          <span className="ml-1">{siteSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
-                      <th className="p-2 cursor-pointer hover:bg-gray-200 text-right" onClick={() => handleSiteSort('pendingAdvance')} >
-                        Advance
-                        {siteSortConfig.key === 'pendingAdvance' && (
-                          <span className="ml-1">{siteSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
-                      <th className="p-2 cursor-pointer hover:bg-gray-200 text-right" onClick={() => handleSiteSort('billAmount')} >
-                        Bill Amount
-                        {siteSortConfig.key === 'billAmount' && (
-                          <span className="ml-1">{siteSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
-                      <th className="p-2 cursor-pointer hover:bg-gray-200" onClick={() => handleSiteSort('billStatus')} >
-                        Bill Status
-                        {siteSortConfig.key === 'billStatus' && (
-                          <span className="ml-1">{siteSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortData(siteDetails, siteSortConfig).length > 0 ? (
-                      sortData(siteDetails, siteSortConfig).map((d, idx) => (
-                        <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-[#FAF6ED]"}>
-                          <td
-                            className={`p-2 text-left ${selectedAdvanceSite ? 'cursor-pointer hover:underline' : ''}`}
-                            onClick={() => handleSiteNameClick(d)}
-                            title={selectedAdvanceSite ? "Open Advance Portal" : "Select Project first"}
-                          >
-                            {d.name}
-                          </td>
-                          <td className="p-2 cursor-pointer relative text-right"
-                            onMouseEnter={(e) => handleSiteAdvanceMouseEnter(e, selectedAdvanceSite?.id || null, d.entityId, d.entityType)}
-                            onMouseLeave={handleSiteMouseLeave}
-                            onClick={() => handleSiteAdvanceClick(selectedAdvanceSite?.id || null, d.entityId, d.entityType, d.name)}
-                          >
-                            {d.pendingAdvance.toLocaleString("en-IN")}
-                          </td>
-                          <td className="p-2 cursor-pointer relative text-right"
-                            onMouseEnter={(e) => handleSiteBillMouseEnter(e, selectedAdvanceSite?.id || null, d.entityId, d.entityType)}
-                            onMouseLeave={handleSiteMouseLeave}
-                            onClick={() => handleSiteBillClick(selectedAdvanceSite?.id || null, d.entityId, d.entityType, d.name)}
-                          >
-                            {d.billAmount.toLocaleString("en-IN")}
-                          </td>
-                          <td className="p-2 cursor-pointer text-left"
-                            style={{ color: d.pendingAdvance > 0 ? "red" : "green" }}
-                            onClick={() => handleSiteBillStatusClick(selectedAdvanceSite?.id || null, d.entityId, d.entityType, d.name)}
-                          >
-                            {d.pendingAdvance > 0 ? "Pending" : "Bill Settled"}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="4" className="text-center p-4">
-                          No data available
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              </div>
-            </div>
-          </div>
-          </div>
+        </div>
       </div>
       {projectTooltipData && (
         <div className="fixed z-50 bg-white text-black p-3 rounded shadow-lg text-sm max-w-xs"
@@ -1955,102 +2902,83 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
           onClick={() => setShowProjectPopup(false)}
         >
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto"
+          <div className="relative bg-white rounded-lg shadow-xl p-[18px] w-fit text-left max-h-[80vh] overflow-hidden no-scrollbar scrollbar-none"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-2">
-              <div>
-                <h3 className="text-xl font-bold text-[#BF9853]">{projectPopupContext}</h3>
-                <p className="text-sm text-gray-600 mt-1">{projectPopupTitle}</p>
-              </div>
-              <button onClick={() => setShowProjectPopup(false)}
-                className="text-gray-500 hover:text-gray-700 text-3xl font-bold leading-none"
-              >
-                ×
-              </button>
+            <button
+              type="button"
+              onClick={() => setShowProjectPopup(false)}
+              className="absolute top-[18px] right-[18px] z-10 flex h-[20px] w-[20px] items-center justify-center"
+            >
+              <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
+            </button>
+            <div className="mb-2 pr-6">
+              <SummaryPopupContextHeader context={projectPopupContext} />
+              <p className="text-sm text-gray-600 mt-1">{projectPopupTitle}</p>
             </div>
-            <div className="flex gap-3 text-sm justify-end mb-3">
-              <button
-                onClick={() => exportPopupPDF(sortPopupData(projectPopupData, projectPopupSortConfig), projectPopupTitle, projectPopupContext, true)}
-                className="flex items-center font-bold hover:underline gap-1 text-[#E4572E]"
-              >
-                Export PDF
-              </button>
-              <button
-                onClick={() => exportPopupCSV(sortPopupData(projectPopupData, projectPopupSortConfig), projectPopupTitle, projectPopupContext, true)}
-                className="flex items-center font-bold hover:underline gap-1 text-[#007233]"
-              >
-                Export XL
-              </button>
+            <div className="flex w-[468px] max-w-full justify-end mb-3">
+              <SummaryTableExportActions
+                onExportPdf={() => exportPopupPDF(sortPopupData(projectPopupData, projectPopupSortConfig), projectPopupTitle, projectPopupContext, true)}
+                onExportCsv={() => exportPopupCSV(sortPopupData(projectPopupData, projectPopupSortConfig), projectPopupTitle, projectPopupContext, true)}
+              />
             </div>
-            <div className="mt-4 border-l-8 border-l-[#BF9853] rounded-lg overflow-hidden">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-[#f8f1e5]">
-                    <th className="p-3 text-left font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleProjectPopupSort('date')}>
-                      Date
-                      {projectPopupSortConfig.key === 'date' && (
-                        <span className="ml-1">{projectPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                      )}
-                    </th>
-                    {!selectedContractorOrVendorOption && (
-                      <th className="p-3 text-left font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleProjectPopupSort('contractorVendorName')}>
-                        Contractor/Vendor
-                        {projectPopupSortConfig.key === 'contractorVendorName' && (
-                          <span className="ml-1">{projectPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
-                    )}
-                    {selectedContractorOrVendorOption && (
-                      <th className="p-3 text-left font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleProjectPopupSort('transferSiteName')}>
-                        Transfer
-                        {projectPopupSortConfig.key === 'transferSiteName' && (
-                          <span className="ml-1">{projectPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
-                    )}
-                    <th className="p-3 text-right font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleProjectPopupSort('amount')}>
-                      Amount
-                      {projectPopupSortConfig.key === 'amount' && (
-                        <span className="ml-1">{projectPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                      )}
-                    </th>
-
-                  </tr>
+            <div className="mt-4 border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
+              <table className={` ${SUMMARY_POPUP_TABLE_CLASS}`}>
+                <thead className="sticky top-0 z-20 bg-[#FAF6ED]">
+                  <EdbcTableHeaderRow>
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC2}
+                      label="Date"
+                      columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS}
+                      sortField={projectPopupEdbcSortField}
+                      sortDirection={projectPopupSortConfig.direction}
+                      onSort={handleProjectPopupSort}
+                    />
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC4}
+                      label={!selectedContractorOrVendorOption ? 'Contractor/Vendor' : 'Transfer'}
+                      sortField={projectPopupEdbcSortField}
+                      sortDirection={projectPopupSortConfig.direction}
+                      onSort={handleProjectPopupSort}
+                    />
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC8}
+                      label="Amount"
+                      sortField={projectPopupEdbcSortField}
+                      sortDirection={projectPopupSortConfig.direction}
+                      onSort={handleProjectPopupSort}
+                    />
+                  </EdbcTableHeaderRow>
                 </thead>
                 <tbody>
                   {projectPopupData &&
                     sortPopupData(projectPopupData, projectPopupSortConfig)
                       .map((entry, index) => (
-                        <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-[#FAF6ED]"}>
-                          <td className="p-3 text-left">{entry.date}</td>
-                          {!selectedContractorOrVendorOption && (
-                            <td className="p-3 text-left text-gray-600">{entry.contractorVendorName || "-"}</td>
-                          )}
-                          {selectedContractorOrVendorOption && (
-                            <td className="p-3 text-left text-gray-600">
-                              {entry.isRefund ? (
-                                <div className="text-xs mt-1 text-gray-500">Refund</div>
-                              ) : entry.type === 'Transfer' && selectedContractorOrVendorOption && (
-                                <div className="text-xs mt-1 text-gray-500">
-                                  {entry.amount < 0 ? 'Transfer To: ' : 'Transfer From: '}
-                                  {entry.transferSiteName || '-'}
-                                </div>
-                              )}
-                            </td>
-                          )}
-                          <td className={`p-3 text-right font-semibold ${entry.amount < 0 ? 'text-red-600' : ''}`}>
+                        <EdbcTableBodyRow key={index}>
+                          <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass}>{entry.date}</td>
+                          <td id={EDBC_IDS.EDBC4} className={edbc4Config?.tdClass}>
+                            {!selectedContractorOrVendorOption ? (
+                              entry.contractorVendorName || '-'
+                            ) : entry.isRefund ? (
+                              <div className="text-xs text-gray-500">Refund</div>
+                            ) : entry.type === 'Transfer' && selectedContractorOrVendorOption ? (
+                              <div className="text-xs text-gray-500">
+                                {entry.amount < 0 ? 'Transfer To: ' : 'Transfer From: '}
+                                {entry.transferSiteName || '-'}
+                              </div>
+                            ) : null}
+                          </td>
+                          <td id={EDBC_IDS.EDBC8} className={`${edbc8Config?.tdClass} font-semibold ${entry.amount < 0 ? 'text-red-600' : ''}`.trim()}>
                             ₹{entry.amount.toLocaleString('en-IN')}
                           </td>
-                        </tr>
+                        </EdbcTableBodyRow>
                       ))}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-[#BF9853] text-white font-bold">
-                    <td className="p-3 text-left">Total</td>
-                    {!selectedContractorOrVendorOption && <td></td>}
-                    {selectedContractorOrVendorOption && <td></td>}
-                    <td className="p-3 text-right">
+                  <tr className="bg-[#BF9853] text-white h-[40px] font-bold">
+                    <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass}>Total</td>
+                    <td id={EDBC_IDS.EDBC4} className={edbc4Config?.tdClass}></td>
+                    <td id={EDBC_IDS.EDBC8} className={`${edbc8Config?.tdClass} text-white`}>
                       ₹{projectPopupData &&
                         projectPopupData
                           .reduce((sum, item) => sum + item.amount, 0)
@@ -2067,107 +2995,83 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
           onClick={() => setShowSitePopup(false)}
         >
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto"
+          <div className="relative bg-white rounded-lg shadow-xl p-[18px] w-fit text-left max-h-[80vh] overflow-hidden no-scrollbar scrollbar-none"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-2">
-              <div>
-                <h3 className="text-xl font-bold text-[#BF9853]">{sitePopupContext}</h3>
-                <p className="text-sm text-gray-600 mt-1">{sitePopupTitle}</p>
-              </div>
-              <button onClick={() => setShowSitePopup(false)} className="text-gray-500 hover:text-gray-700 text-3xl font-bold leading-none" >
-                ×
-              </button>
+            <button
+              type="button"
+              onClick={() => setShowSitePopup(false)}
+              className="absolute top-[18px] right-[18px] z-10 flex h-[20px] w-[20px] items-center justify-center"
+            >
+              <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
+            </button>
+            <div className="mb-2 pr-6">
+              <SummaryPopupContextHeader context={sitePopupContext} />
+              <p className="text-sm text-gray-600 mt-1">{sitePopupTitle}</p>
             </div>
-            <div className="flex gap-3 text-sm justify-end mb-3">
-              <button
-                onClick={() => exportPopupPDF(sortPopupData(sitePopupData, sitePopupSortConfig), sitePopupTitle, sitePopupContext, false)}
-                className="flex items-center font-bold hover:underline gap-1 text-[#E4572E]"
-              >
-                Export PDF
-              </button>
-              <button
-                onClick={() => exportPopupCSV(sortPopupData(sitePopupData, sitePopupSortConfig), sitePopupTitle, sitePopupContext, false)}
-                className="flex items-center font-bold hover:underline gap-1 text-[#007233]"
-              >
-                Export XL
-              </button>
+            <div className="flex w-[468px] max-w-full justify-end mb-3">
+              <SummaryTableExportActions
+                onExportPdf={() => exportPopupPDF(sortPopupData(sitePopupData, sitePopupSortConfig), sitePopupTitle, sitePopupContext, false)}
+                onExportCsv={() => exportPopupCSV(sortPopupData(sitePopupData, sitePopupSortConfig), sitePopupTitle, sitePopupContext, false)}
+              />
             </div>
-            <div className="mt-4 border-l-8 border-l-[#BF9853] rounded-lg overflow-hidden">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-[#f8f1e5]">
-                    <th className="p-3 text-left font-semibold cursor-pointer hover:bg-gray-200"
-                      onClick={() => handleSitePopupSort('date')}
-                    >
-                      Date
-                      {sitePopupSortConfig.key === 'date' && (
-                        <span className="ml-1">{sitePopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                      )}
-                    </th>
-                    {!selectedAdvanceSite && (
-                      <th className="p-3 text-left font-semibold cursor-pointer hover:bg-gray-200"
-                        onClick={() => handleSitePopupSort('projectName')}
-                      >
-                        Project Name
-                        {sitePopupSortConfig.key === 'projectName' && (
-                          <span className="ml-1">{sitePopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
-                    )}
-                    {selectedAdvanceSite && (
-                      <th className="p-3 text-left font-semibold cursor-pointer hover:bg-gray-200"
-                        onClick={() => handleSitePopupSort('transferSiteName')}
-                      >
-                        Transfer
-                        {sitePopupSortConfig.key === 'transferSiteName' && (
-                          <span className="ml-1">{sitePopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
-                    )}
-                    <th className="p-3 text-right font-semibold cursor-pointer hover:bg-gray-200"
-                      onClick={() => handleSitePopupSort('amount')}
-                    >
-                      Amount
-                      {sitePopupSortConfig.key === 'amount' && (
-                        <span className="ml-1">{sitePopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                      )}
-                    </th>
-                  </tr>
+            <div className="mt-4 border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
+              <table className={` ${SUMMARY_POPUP_TABLE_CLASS}`}>
+                <thead className="sticky top-0 z-20 bg-[#FAF6ED]">
+                  <EdbcTableHeaderRow>
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC2}
+                      label="Date"
+                      columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS}
+                      sortField={sitePopupEdbcSortField}
+                      sortDirection={sitePopupSortConfig.direction}
+                      onSort={handleSitePopupSort}
+                    />
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC4}
+                      label={!selectedAdvanceSite ? 'Project Name' : 'Transfer'}
+                      sortField={sitePopupEdbcSortField}
+                      sortDirection={sitePopupSortConfig.direction}
+                      onSort={handleSitePopupSort}
+                    />
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC8}
+                      label="Amount"
+                      sortField={sitePopupEdbcSortField}
+                      sortDirection={sitePopupSortConfig.direction}
+                      onSort={handleSitePopupSort}
+                    />
+                  </EdbcTableHeaderRow>
                 </thead>
                 <tbody>
                   {sitePopupData &&
                     sortPopupData(sitePopupData, sitePopupSortConfig)
                       .map((entry, index) => (
-                        <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-[#FAF6ED]"}>
-                          <td className="p-3 text-left">{entry.date}</td>
-                          {!selectedAdvanceSite && (
-                            <td className="p-3 text-left text-gray-600">{entry.projectName || "-"}</td>
-                          )}
-                          {selectedAdvanceSite && (
-                            <td className="p-3 text-left text-gray-600">
-                              {entry.isRefund ? (
-                                <div className="text-xs mt-1 text-gray-500">Refund</div>
-                              ) : entry.type === 'Transfer' && selectedAdvanceSite && (
-                                <div className="text-xs mt-1 text-gray-500">
-                                  {entry.amount < 0 ? 'Transfer To: ' : 'Transfer From: '}
-                                  {entry.transferSiteName || '-'}
-                                </div>
-                              )}
-                            </td>
-                          )}
-                          <td className={`p-3 text-right font-semibold ${entry.amount < 0 ? 'text-red-600' : ''}`}>
+                        <EdbcTableBodyRow key={index}>
+                          <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass}>{entry.date}</td>
+                          <td id={EDBC_IDS.EDBC4} className={edbc4Config?.tdClass}>
+                            {!selectedAdvanceSite ? (
+                              entry.projectName || '-'
+                            ) : entry.isRefund ? (
+                              <div className="text-xs text-gray-500">Refund</div>
+                            ) : entry.type === 'Transfer' && selectedAdvanceSite ? (
+                              <div className="text-xs text-gray-500">
+                                {entry.amount < 0 ? 'Transfer To: ' : 'Transfer From: '}
+                                {entry.transferSiteName || '-'}
+                              </div>
+                            ) : null}
+                          </td>
+                          <td id={EDBC_IDS.EDBC8} className={`${edbc8Config?.tdClass} font-semibold ${entry.amount < 0 ? 'text-red-600' : ''}`.trim()}>
                             ₹{entry.amount.toLocaleString('en-IN')}
                           </td>
-                        </tr>
+                        </EdbcTableBodyRow>
                       ))}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-[#BF9853] text-white font-bold">
-                    <td className="p-3 text-left">Total</td>
-                    {!selectedAdvanceSite && <td></td>}
-                    {selectedAdvanceSite && <td></td>}
-                    <td className="p-3 text-right">
+                  <tr className="bg-[#BF9853] text-white h-[40px] font-bold">
+                    <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass}>Total</td>
+                    <td id={EDBC_IDS.EDBC4} className={edbc4Config?.tdClass}></td>
+                    <td id={EDBC_IDS.EDBC8} className={`${edbc8Config?.tdClass} text-white`}>
                       ₹{sitePopupData &&
                         sitePopupData
                           .reduce((sum, item) => sum + item.amount, 0)
@@ -2184,81 +3088,76 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
           onClick={() => setShowBillStatusPopup(false)}
         >
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full max-h-[80vh] overflow-y-auto"
+          <div className="relative bg-white rounded-lg shadow-xl p-[18px] w-fit text-left max-h-[80vh] overflow-hidden no-scrollbar scrollbar-none"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-2">
-              <div>
-                <h3 className="text-xl font-bold text-[#BF9853]">{billStatusPopupContext}</h3>
-                <p className="text-sm text-gray-600 mt-1">Bill Status Details</p>
-              </div>
-              <button onClick={() => setShowBillStatusPopup(false)}
-                className="text-gray-500 hover:text-gray-700 text-3xl font-bold leading-none"
-              >
-                ×
-              </button>
+            <button
+              type="button"
+              onClick={() => setShowBillStatusPopup(false)}
+              className="absolute top-[18px] right-[18px] z-10 flex h-[20px] w-[20px] items-center justify-center"
+            >
+              <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
+            </button>
+            <div className="mb-2 pr-6">
+              <SummaryPopupContextHeader context={billStatusPopupContext} />
+              <p className="text-sm text-gray-600 mt-1">Bill Status Details</p>
             </div>
-            <div className="flex gap-3 text-sm justify-end mb-3">
-              <button
-                onClick={exportBillStatusPDF}
-                className="flex items-center font-bold hover:underline gap-1 text-[#E4572E]"
-              >
-                Export PDF
-              </button>
-              <button
-                onClick={exportBillStatusCSV}
-                className="flex items-center font-bold hover:underline gap-1 text-[#007233]"
-              >
-                Export XL
-              </button>
+            <div className={`flex max-w-full justify-end mb-3 ${isBillStatusFromFirstTable ? 'w-[588px]' : 'w-[668px]'}`}>
+              <SummaryTableExportActions
+                onExportPdf={exportBillStatusPDF}
+                onExportCsv={exportBillStatusCSV}
+              />
             </div>
-            <div className="mt-4 border-l-8 border-l-[#BF9853] rounded-lg overflow-hidden">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-[#f8f1e5]">
-                    <th className="p-3 text-left font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleBillStatusPopupSort('date')}>
-                      Date
-                      {billStatusPopupSortConfig.key === 'date' && (
-                        <span className="ml-1">{billStatusPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                      )}
-                    </th>
-                    {!isBillStatusFromFirstTable && !selectedAdvanceSite && (
-                      <th className="p-3 text-left font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleBillStatusPopupSort('projectName')}>
-                        Project Name
-                        {billStatusPopupSortConfig.key === 'projectName' && (
-                          <span className="ml-1">{billStatusPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
+            <div className="mt-4 border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
+              <table className={billStatusPopupTableClass}>
+                <thead className="sticky top-0 z-20 bg-[#FAF6ED]">
+                  <EdbcTableHeaderRow>
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC2}
+                      label="Date"
+                      columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS}
+                      sortField={billStatusPopupEdbcSortField}
+                      sortDirection={billStatusPopupSortConfig.direction}
+                      onSort={handleBillStatusPopupSort}
+                    />
+                    {isBillStatusFromFirstTable ? (
+                      <EdbcColumnHeader
+                        columnId={EDBC_IDS.EDBC4}
+                        label={selectedContractorOrVendorOption ? 'Transfer' : 'Contractor/Vendor'}
+                        sortField={billStatusPopupEdbcSortField}
+                        sortDirection={billStatusPopupSortConfig.direction}
+                        onSort={handleBillStatusPopupSort}
+                      />
+                    ) : (
+                      <EdbcColumnHeader
+                        columnId={EDBC_IDS.EDBC3}
+                        label={selectedAdvanceSite ? 'Transfer' : 'Project Name'}
+                        sortField={billStatusPopupEdbcSortField}
+                        sortDirection={billStatusPopupSortConfig.direction}
+                        onSort={handleBillStatusPopupSort}
+                      />
                     )}
-                    {isBillStatusFromFirstTable && !selectedContractorOrVendorOption && (
-                      <th className="p-3 text-left font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleBillStatusPopupSort('contractorVendorName')}>
-                        Contractor/Vendor
-                        {billStatusPopupSortConfig.key === 'contractorVendorName' && (
-                          <span className="ml-1">{billStatusPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
-                    )}
-                    {((isBillStatusFromFirstTable && selectedContractorOrVendorOption) || (!isBillStatusFromFirstTable && selectedAdvanceSite)) && (
-                      <th className="p-3 text-left font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleBillStatusPopupSort('transferSiteName')}>
-                        Transfer
-                        {billStatusPopupSortConfig.key === 'transferSiteName' && (
-                          <span className="ml-1">{billStatusPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
-                    )}
-                    <th className="p-3 text-right font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleBillStatusPopupSort('advanceAmount')}>
-                      Advance Amount
+                    <th
+                      id={EDBC_IDS.EDBC8}
+                      className={edbc8Config?.headerClass}
+                      onClick={() => handleBillStatusPopupSort('advanceAmount')}
+                    >
+                      Advance
                       {billStatusPopupSortConfig.key === 'advanceAmount' && (
                         <span className="ml-1">{billStatusPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
                       )}
                     </th>
-                    <th className="p-3 text-right font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleBillStatusPopupSort('billAmount')}>
+                    <th
+                      id={EDBC_IDS.EDBC8}
+                      className={edbc8Config?.headerClass}
+                      onClick={() => handleBillStatusPopupSort('billAmount')}
+                    >
                       Bill Amount
                       {billStatusPopupSortConfig.key === 'billAmount' && (
                         <span className="ml-1">{billStatusPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
                       )}
                     </th>
-                  </tr>
+                  </EdbcTableHeaderRow>
                 </thead>
                 <tbody>
                   {(() => {
@@ -2336,17 +3235,26 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
                     }
 
                     return combinedData.map((entry, index) => (
-                      <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-[#FAF6ED]"}>
-                        <td className="p-3 text-left">{entry.date}</td>
-                        {!isBillStatusFromFirstTable && !selectedAdvanceSite && (
-                          <td className="p-3 text-left text-gray-600">{entry.projectName || "-"}</td>
-                        )}
-                        {isBillStatusFromFirstTable && !selectedContractorOrVendorOption && (
-                          <td className="p-3 text-left text-gray-600">{entry.contractorVendorName || "-"}</td>
-                        )}
-                        {((isBillStatusFromFirstTable && selectedContractorOrVendorOption) || (!isBillStatusFromFirstTable && selectedAdvanceSite)) && (
-                          <td className="p-3 text-left text-gray-600">
-                            {entry.isRefund ? (
+                      <EdbcTableBodyRow key={index}>
+                        <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass}>{entry.date}</td>
+                        {isBillStatusFromFirstTable ? (
+                          <td id={EDBC_IDS.EDBC4} className={edbc4Config?.tdClass}>
+                            {!selectedContractorOrVendorOption ? (
+                              entry.contractorVendorName || '-'
+                            ) : entry.isRefund ? (
+                              <div className="text-xs text-gray-500">Refund</div>
+                            ) : entry.type === 'Transfer' && entry.transferSiteName ? (
+                              <div className="text-xs text-gray-500">
+                                {entry.advanceAmount < 0 ? 'To: ' : 'From: '}
+                                {entry.transferSiteName}
+                              </div>
+                            ) : '-'}
+                          </td>
+                        ) : (
+                          <td id={EDBC_IDS.EDBC3} className={edbc3Config?.tdClass}>
+                            {!selectedAdvanceSite ? (
+                              entry.projectName || '-'
+                            ) : entry.isRefund ? (
                               <div className="text-xs text-gray-500">Refund</div>
                             ) : entry.type === 'Transfer' && entry.transferSiteName ? (
                               <div className="text-xs text-gray-500">
@@ -2356,11 +3264,12 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
                             ) : '-'}
                           </td>
                         )}
-                        <td className={`p-3 text-right font-semibold ${entry.advanceAmount < 0 ? 'text-red-600' : ''}`}>
+                        <td id={EDBC_IDS.EDBC8} className={`${edbc8Config?.tdClass} font-semibold ${entry.advanceAmount < 0 ? 'text-red-600' : ''}`.trim()}>
                           {entry.advanceAmount !== 0 ? `₹${entry.advanceAmount.toLocaleString('en-IN')}` : '-'}
                         </td>
                         <td
-                          className={`p-3 text-right font-semibold ${entry.billAmount !== 0 && entry.file_url ? 'cursor-pointer hover:underline' : ''}`}
+                          id={EDBC_IDS.EDBC8}
+                          className={`${edbc8Config?.tdClass} font-semibold ${entry.billAmount !== 0 && entry.file_url ? 'cursor-pointer hover:underline' : ''}`.trim()}
                           onClick={(e) => {
                             e.stopPropagation();
                             if (entry.billAmount !== 0 && entry.file_url) {
@@ -2375,39 +3284,24 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
                         >
                           {entry.billAmount !== 0 ? `₹${entry.billAmount.toLocaleString('en-IN')}` : '-'}
                         </td>
-                      </tr>
+                      </EdbcTableBodyRow>
                     ));
                   })()}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-[#f8f1e5] font-bold">
-                    <td className="p-3 text-left" colSpan={
-                      (!isBillStatusFromFirstTable && !selectedAdvanceSite) ||
-                        (isBillStatusFromFirstTable && !selectedContractorOrVendorOption) ||
-                        ((isBillStatusFromFirstTable && selectedContractorOrVendorOption) ||
-                          (!isBillStatusFromFirstTable && selectedAdvanceSite))
-                        ? 2 : 1
-                    }>
-                      Total
-                    </td>
-                    <td className="p-3 text-right">
+                  <tr className="bg-[#f8f1e5] font-bold h-[40px]">
+                    <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass}>Total</td>
+                    <td id={isBillStatusFromFirstTable ? EDBC_IDS.EDBC4 : EDBC_IDS.EDBC3} className={isBillStatusFromFirstTable ? edbc4Config?.tdClass : edbc3Config?.tdClass}></td>
+                    <td id={EDBC_IDS.EDBC8} className={edbc8Config?.tdClass}>
                       ₹{billStatusPopupData.advances.reduce((sum, item) => sum + item.amount, 0).toLocaleString('en-IN')}
                     </td>
-                    <td className="p-3 text-right">
+                    <td id={EDBC_IDS.EDBC8} className={edbc8Config?.tdClass}>
                       ₹{billStatusPopupData.bills.reduce((sum, item) => sum + item.amount, 0).toLocaleString('en-IN')}
                     </td>
                   </tr>
-                  <tr className="bg-[#BF9853] text-white font-bold">
-                    <td className="p-3 text-left" colSpan={
-                      (!isBillStatusFromFirstTable && !selectedAdvanceSite) ||
-                        (isBillStatusFromFirstTable && !selectedContractorOrVendorOption) ||
-                        ((isBillStatusFromFirstTable && selectedContractorOrVendorOption) ||
-                          (!isBillStatusFromFirstTable && selectedAdvanceSite))
-                        ? 3 : 2
-                    }>
-                      Balance Advance
-                    </td>
-                    <td className="p-3 text-right" colSpan="2">
+                  <tr className="bg-[#BF9853] text-white font-bold h-[40px]">
+                    <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass} colSpan={2}>Balance Advance</td>
+                    <td id={EDBC_IDS.EDBC8} className={`${edbc8Config?.tdClass} text-white`} colSpan={2}>
                       ₹{(
                         billStatusPopupData.advances.reduce((sum, item) => sum + item.amount, 0) -
                         billStatusPopupData.bills.reduce((sum, item) => sum + item.amount, 0)
@@ -2446,7 +3340,6 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
         </div>
       ) : null}
 
-      </div>
     </div>
   );
 }

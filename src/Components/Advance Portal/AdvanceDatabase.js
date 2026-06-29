@@ -3,9 +3,6 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
 import CustomDateField from '../ExpensesEntry/CustomDateField';
-import Filter from '../Images/TableFilter.svg'
-import Search from '../Images/Searchnew.svg'
-import Reload from '../Images/Clear.svg'
 import Pdf from '../Images/pdf.png';
 import XL from '../Images/sheets.png';
 import { sum } from 'mathjs';
@@ -13,7 +10,7 @@ import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
 import Attach from '../Images/Attachfile.svg';
-import cross from '../Images/cross.png';
+import UploadFile from '../Images/Upload file.svg';
 import {
   EDBC_IDS,
   DATABASE_TABLE_FILTER_SELECT_STYLES,
@@ -28,6 +25,7 @@ import {
   EdbcSelectFilter,
   EdbcTextInputFilter,
   EdbcTotalAmountFilter,
+  matchesEdbcAmountFilter,
   EdbcEmptyFilterCell,
   EdbcTimestampBodyCell,
   EdbcDateBodyCell,
@@ -35,6 +33,8 @@ import {
   EdbcFileBodyCell,
   EDBC_TABLE_EDGE_TABLE_CLASS,
   formatEdbcFilterDateDMY,
+  EdbcFilterToggleButton,
+  EdbcTableToolbarRightActions,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
 import { syncWeeklyPaymentBillsForAdvancePortal, isAdvanceOnlinePaymentModeForModal, fetchAdvanceEditPaymentModalData, getAdvancePortalDisplayAmount, syncExpensesEntryFromAdvancePortalEdit, resolveAdvancePortalExpensesEntryId, clearAdvancePortalRecordsOnDelete, deleteLinkedExpenseEntryOnAdvancePortalDelete, formatWeeklyBillDeleteMessage, formatVendorCarryForwardDeleteMessage, resolveFilesUploadResponseUrl, syncVendorCarryForwardFromAdvancePortalEdit } from '../../utils/advancePortalWeeklyPaymentBill';
 import { isChequePaymentMode } from '../../utils/bankRegisterLogBeforeWeeklyBill';
@@ -46,6 +46,171 @@ import {
 import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
 import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 import AdvancePortalEditPaymentModal from './AdvancePortalEditPaymentModal';
+
+const ADVANCE_PORTAL_SELECT_CLASS =
+  'custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const ADVANCE_PORTAL_INPUT_CLASS =
+  'border-2 border-[#BF9853] rounded-lg px-[8px] w-[300px] h-[40px] focus:outline-none border-opacity-[0.20] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const ADVANCE_PORTAL_READONLY_INPUT_CLASS =
+  'border-2 border-[#BF9853] rounded-lg px-[8px] w-[300px] h-[40px] focus:outline-none border-opacity-[0.20] bg-[#ededed] text-[14px] font-semibold';
+const ADVANCE_PORTAL_TEXTAREA_CLASS =
+  'border-2 border-[#BF9853] rounded-md px-[8px] w-[616px]  h-[60px] focus:outline-none border-opacity-[0.20] resize-none text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const ADVANCE_PORTAL_LABEL_CLASS = 'text-md font-semibold mb-[8px] block';
+const formatAmountDisplay = (value) => {
+  if (value === '' || value === null || value === undefined) return '';
+  const normalized = String(value).replace(/,/g, '');
+  const num = Number(normalized);
+  if (Number.isNaN(num)) return String(value);
+  return num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+const ADVANCE_PORTAL_FILTER_AMOUNT_INPUT_CLASS =
+  'pl-[12px] pr-2 border border-[#00000029] rounded-lg w-full h-full focus:outline-none bg-[#ededed] text-[14px] font-medium cursor-default';
+const AdvancePortalFilterAmountOutput = ({ value, className = '' }) => {
+  const formatted = formatAmountDisplay(value);
+  const displayValue = formatted ? `₹${formatted}` : '';
+  return (
+    <div className={`relative lg:w-[150px] w-full h-[40px] ${className}`.trim()}>
+      <input
+        type="text"
+        readOnly
+        tabIndex={-1}
+        value={displayValue}
+        className={ADVANCE_PORTAL_FILTER_AMOUNT_INPUT_CLASS}
+      />
+    </div>
+  );
+};
+const ADVANCE_PORTAL_EDIT_MODAL_SELECT_STYLES = {
+  control: (provided, state) => ({
+    ...provided,
+    fontFamily: 'Manrope',
+    borderWidth: '2px',
+    borderRadius: '8px',
+    minHeight: '40px',
+    height: '40px',
+    flexWrap: 'nowrap',
+    borderColor: state.isFocused
+      ? 'rgba(191, 152, 83, 1)'
+      : 'rgba(191, 152, 83, 0.2)',
+    boxShadow: state.isFocused
+      ? '0 0 0 1px rgba(101, 102, 53, 0.2)'
+      : 'none',
+    '&:hover': {
+      borderColor: 'rgba(191, 152, 83, 0.2)',
+    },
+  }),
+  valueContainer: (provided, state) => ({
+    ...provided,
+    flex: '1 1 0%',
+    minWidth: 0,
+    flexWrap: 'nowrap',
+    overflow: 'hidden',
+    paddingLeft: '12px',
+    paddingRight: state.hasValue ? '2px' : provided.paddingRight,
+    paddingTop: 0,
+    paddingBottom: 0,
+    height: '36px',
+    alignItems: 'center',
+  }),
+  singleValue: (provided) => ({
+    ...provided,
+    maxWidth: '100%',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    margin: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    color: 'black',
+  }),
+  input: (provided) => ({
+    ...provided,
+    margin: 0,
+    padding: 0,
+  }),
+  menu: (provided) => ({
+    ...provided,
+    zIndex: 9999,
+    maxHeight: '300px',
+  }),
+  menuPortal: (provided) => ({
+    ...provided,
+    zIndex: 9999,
+  }),
+  menuList: (provided) => ({
+    ...provided,
+    paddingTop: 0,
+    paddingBottom: 0,
+    maxHeight: '250px',
+    overflowY: 'auto',
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
+    '&::-webkit-scrollbar': {
+      display: 'none',
+    },
+  }),
+  indicatorSeparator: () => ({ display: 'none' }),
+  indicatorsContainer: (provided) => ({
+    ...provided,
+    flex: '0 0 auto',
+    paddingLeft: '0',
+  }),
+  dropdownIndicator: (provided, state) => ({
+    ...provided,
+    display: state.hasValue ? 'none' : 'flex',
+    color: '#000000',
+    flexShrink: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+  }),
+  clearIndicator: (provided) => ({
+    ...provided,
+    cursor: 'pointer',
+    color: '#000000',
+    flexShrink: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    paddingLeft: '4px',
+    paddingRight: '4px',
+  }),
+  placeholder: (provided) => ({
+    ...provided,
+    fontWeight: 'normal',
+    fontSize: '14px',
+    color: '#6b7280',
+    margin: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    textAlign: 'left',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: '100%',
+    position: 'absolute',
+  }),
+  option: (provided, state) => ({
+    ...provided,
+    minHeight: 36,
+    height: 'auto',
+    paddingTop: 6,
+    paddingBottom: 6,
+    whiteSpace: 'normal',
+    display: 'flex',
+    alignItems: 'center',
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
+    WebkitTapHighlightColor: '#FAF6ED',
+    backgroundColor: state.isSelected
+      ? '#BF9853'
+      : state.isFocused
+        ? '#FAF6ED'
+        : provided.backgroundColor,
+    color: state.isSelected ? '#FFFFFF' : provided.color,
+    ':active': {
+      backgroundColor: state.isSelected ? '#BF9853' : '#FAF6ED',
+    },
+  }),
+};
 
 const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const BLANK_VALUE = 'BLANK';
@@ -97,6 +262,9 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   const [selectDatabaseSourceFrom, setSelectDatabaseSourceFrom] = useState('');
   const [selectDatabaseBranch, setSelectDatabaseBranch] = useState('');
   const [selectDatabaseEnteredBy, setSelectDatabaseEnteredBy] = useState('');
+  const [selectDatabaseAmount, setSelectDatabaseAmount] = useState('');
+  const [selectDatabaseBillAmount, setSelectDatabaseBillAmount] = useState('');
+  const [selectDatabaseRefundAmount, setSelectDatabaseRefundAmount] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [showAdvancePortalModal, setShowAdvancePortalModal] = useState(false);
@@ -231,6 +399,9 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           if (filters.selectDatabaseSourceFrom) setSelectDatabaseSourceFrom(filters.selectDatabaseSourceFrom);
           if (filters.selectDatabaseBranch) setSelectDatabaseBranch(filters.selectDatabaseBranch);
           if (filters.selectDatabaseEnteredBy) setSelectDatabaseEnteredBy(filters.selectDatabaseEnteredBy);
+          if (filters.selectDatabaseAmount) setSelectDatabaseAmount(filters.selectDatabaseAmount);
+          if (filters.selectDatabaseBillAmount) setSelectDatabaseBillAmount(filters.selectDatabaseBillAmount);
+          if (filters.selectDatabaseRefundAmount) setSelectDatabaseRefundAmount(filters.selectDatabaseRefundAmount);
           if (filters.startDate) setStartDate(filters.startDate);
           if (filters.endDate) setEndDate(filters.endDate);
           if (filters.overallSearch) setOverallSearch(filters.overallSearch);
@@ -276,13 +447,16 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       selectDatabaseSourceFrom,
       selectDatabaseBranch,
       selectDatabaseEnteredBy,
+      selectDatabaseAmount,
+      selectDatabaseBillAmount,
+      selectDatabaseRefundAmount,
       startDate,
       endDate,
       overallSearch,
       showFilters
     };
     sessionStorage.setItem('advanceDatabaseFilters', JSON.stringify(filters));
-  }, [timestampStartDate, timestampEndDate, selectDatabaseDateStart, selectDatabaseDateEnd, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, startDate, endDate, overallSearch, showFilters]);
+  }, [timestampStartDate, timestampEndDate, selectDatabaseDateStart, selectDatabaseDateEnd, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, selectDatabaseAmount, selectDatabaseBillAmount, selectDatabaseRefundAmount, startDate, endDate, overallSearch, showFilters]);
   const scrollRef = useRef(null);
   const filterRowRef = useRef(null);
   const filterNudgeUsedRef = useRef(false);
@@ -384,8 +558,21 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     if (Number.isNaN(numericValue)) {
       return value.toString();
     }
-    return numericValue.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+    return numericValue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
+  const editProjectAdvanceDisplay = useMemo(() => {
+    if (!selectedOption || !editFormData?.project_id || editFormData?.type === 'Bill Settlement') return '';
+    const idField = selectedOption.type === 'Vendor' ? 'vendor_id' : 'contractor_id';
+    const total = advanceData
+      .filter((item) => item[idField] === selectedOption.id && item.project_id === editFormData.project_id)
+      .reduce((sum, curr) => {
+        const amount = parseFloat(curr.amount) || 0;
+        const billAmount = parseFloat(curr.bill_amount) || 0;
+        const refundAmount = parseFloat(curr.refund_amount) || 0;
+        return sum + amount - billAmount - refundAmount;
+      }, 0);
+    return total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }, [advanceData, selectedOption, editFormData?.project_id, editFormData?.type]);
   const sanitizeNumberField = (value) => {
     if (value === '' || value === null || value === undefined) return 0;
     const numericValue = Number(value);
@@ -511,13 +698,13 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       getSiteName(entry.project_id),
       getSiteName(entry.transfer_site_id),
       entry.amount != null && entry.amount !== ""
-        ? Number(entry.amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
+        ? Number(entry.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : "",
       entry.bill_amount != null && entry.bill_amount !== ""
-        ? Number(entry.bill_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
+        ? Number(entry.bill_amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : "",
       entry.refund_amount != null && entry.refund_amount !== ""
-        ? Number(entry.refund_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
+        ? Number(entry.refund_amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : "",
       entry.type,
       entry.description,
@@ -584,13 +771,13 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       getSiteName(entry.project_id),
       getSiteName(entry.transfer_site_id),
       entry.amount != null && entry.amount !== ""
-        ? Number(entry.amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
+        ? Number(entry.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : "",
       entry.bill_amount != null && entry.bill_amount !== ""
-        ? Number(entry.bill_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
+        ? Number(entry.bill_amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : "",
       entry.refund_amount != null && entry.refund_amount !== ""
-        ? Number(entry.refund_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
+        ? Number(entry.refund_amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : "",
       entry.type || "",
       entry.description || "",
@@ -967,6 +1154,9 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
         if (String(enteredVal).toLowerCase() !== String(selectDatabaseEnteredBy).toLowerCase()) return false;
       }
     }
+    if (selectDatabaseAmount.trim() && !matchesEdbcAmountFilter(entry.amount, selectDatabaseAmount)) return false;
+    if (selectDatabaseBillAmount.trim() && !matchesEdbcAmountFilter(entry.bill_amount, selectDatabaseBillAmount)) return false;
+    if (selectDatabaseRefundAmount.trim() && !matchesEdbcAmountFilter(entry.refund_amount, selectDatabaseRefundAmount)) return false;
     if (overallSearch.trim()) {
       const q = overallSearch.toLowerCase().trim();
       const searchable = [
@@ -1244,7 +1434,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     value != null && value !== ''
       ? `₹${Number(value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       : '';
-  const advCol1Label = 'Time Stamp';
+  const advCol1Label = 'Timestamp';
   const advCol2Label = 'Date';
   const advCol3Label = 'Contractor/Vendor';
   const advCol4Label = 'Project Name';
@@ -1263,7 +1453,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   const advCol17Label = 'Activity';
   useEffect(() => {
     setCurrentPage(1);
-  }, [timestampStartDate, timestampEndDate, selectDatabaseDateStart, selectDatabaseDateEnd, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, startDate, endDate, overallSearch]);
+  }, [timestampStartDate, timestampEndDate, selectDatabaseDateStart, selectDatabaseDateEnd, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, selectDatabaseAmount, selectDatabaseBillAmount, selectDatabaseRefundAmount, startDate, endDate, overallSearch]);
   useEffect(() => {
     if (filterScrollResetSkipRef.current) {
       filterScrollResetSkipRef.current = false;
@@ -1280,6 +1470,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     timestampStartDate, timestampEndDate, selectDatabaseDateStart, selectDatabaseDateEnd, selectDatabaseContractororVendorName, selectDatabaseProjectName,
     selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode,
     selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy,
+    selectDatabaseAmount, selectDatabaseBillAmount, selectDatabaseRefundAmount,
     startDate, endDate,
   ]);
   const clearFilters = useCallback(() => {
@@ -1297,11 +1488,52 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     setSelectDatabaseSourceFrom('');
     setSelectDatabaseBranch('');
     setSelectDatabaseEnteredBy('');
+    setSelectDatabaseAmount('');
+    setSelectDatabaseBillAmount('');
+    setSelectDatabaseRefundAmount('');
     setStartDate('');
     setEndDate('');
     setOverallSearch('');
+    setSortConfig({ key: null, direction: 'asc' });
     sessionStorage.removeItem('advanceDatabaseFilters');
   }, []);
+  const hasActiveColumnFilters = Boolean(
+    timestampStartDate || timestampEndDate || selectDatabaseDateStart || selectDatabaseDateEnd
+    || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer
+    || selectDatabaseAmount.trim() || selectDatabaseBillAmount.trim() || selectDatabaseRefundAmount.trim()
+    || selectDatabaseType || selectDatabaseDescription.trim() || selectDatabaseMode
+    || selectDatabaseEntryNo || selectDatabaseSourceFrom || selectDatabaseBranch
+    || selectDatabaseEnteredBy || startDate || endDate
+  );
+  const toggleFilters = useCallback(() => {
+    const willOpen = !showFilters;
+    const scroller = scrollRef.current;
+    if (willOpen) {
+      setShowFilters(true);
+      if (!scroller) return;
+      if (scroller.scrollTop <= 0) return;
+      if (filterNudgeUsedRef.current) return;
+      filterNudgeUsedRef.current = true;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const h = filterRowRef.current?.offsetHeight || 0;
+          if (h > 0) {
+            scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+          }
+        });
+      });
+      return;
+    }
+    const h = filterRowRef.current?.offsetHeight || 0;
+    setShowFilters(false);
+    if (!scroller || h <= 0 || !filterNudgeUsedRef.current) return;
+    filterNudgeUsedRef.current = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scroller.scrollTop = scroller.scrollTop + h;
+      });
+    });
+  }, [showFilters]);
   const handleChange = async (selected) => {
     setSelectedOption(selected);
     setEditFormData(prev => {
@@ -1409,7 +1641,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
         : entry.contractor_id ? opt.id === entry.contractor_id && opt.type === "Contractor"
           : false
     );
-    setSelectedOption(preSelected || null);
+    handleChange(preSelected || null);
     setIsEditModalOpen(true);
   };
   const handleSendEditRequest = async () => {
@@ -1976,85 +2208,29 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           <div className='flex flex-wrap gap-[12px]'>
             <div className=''>
               <label className='block mb-[8px] font-semibold'>Advance Amount</label>
-              <input
-                className='lg:w-[220px] h-[40px] rounded-lg bg-[#ededed] focus:outline-none p-2'
-                value={`₹${totalAdvance.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
-                readOnly
-              />
+              <AdvancePortalFilterAmountOutput value={totalAdvance} />
             </div>
             <div className=''>
               <label className='block mb-[8px] font-semibold'>Bill Amount</label>
-              <input
-                className='lg:w-[220px] h-[40px] rounded-lg bg-[#ededed] focus:outline-none p-2'
-                value={`₹${totalBill.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
-                readOnly
-              />
+              <AdvancePortalFilterAmountOutput value={totalBill} />
             </div>
             <div className=''>
               <label className='block mb-[8px] font-semibold'>Transfer Amount </label>
-              <input
-                value={`₹${totalTransfer.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
-                readOnly
-                className='lg:w-[220px] h-[40px] rounded-lg bg-[#ededed] focus:outline-none p-2' />
+              <AdvancePortalFilterAmountOutput value={totalTransfer} />
             </div>
             <div className=''>
               <label className='block mb-[8px] font-semibold'>Refund Amount</label>
-              <input
-                className='lg:w-[220px] h-[40px] rounded-lg bg-[#ededed] focus:outline-none p-2'
-                value={`₹${totalRefund.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
-                readOnly
-              />
+              <AdvancePortalFilterAmountOutput value={totalRefund} />
             </div>
           </div>
         </div>
       </div>
       <div className="w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
-        <div
-          className={`text-left flex ${timestampStartDate || timestampEndDate || selectDatabaseDateStart || selectDatabaseDateEnd || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseDescription.trim() || selectDatabaseMode || selectDatabaseEntryNo || selectDatabaseSourceFrom || selectDatabaseBranch || selectDatabaseEnteredBy || startDate || endDate
-            ? 'flex-col sm:flex-row sm:justify-between'
-            : 'flex-row justify-between items-center'
-            } mb-[12px] gap-[6px]`}>
-          <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
-            <button
-              className=''
-              onClick={() => {
-                const willOpen = !showFilters;
-                const scroller = scrollRef.current;
-                if (willOpen) {
-                  setShowFilters(true);
-                  if (!scroller) return;
-                  if (scroller.scrollTop <= 0) return;
-                  if (filterNudgeUsedRef.current) return;
-                  filterNudgeUsedRef.current = true;
-                  requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                      const h = filterRowRef.current?.offsetHeight || 0;
-                      if (h > 0) {
-                        scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
-                      }
-                    });
-                  });
-                  return;
-                }
-                const h = filterRowRef.current?.offsetHeight || 0;
-                setShowFilters(false);
-                if (!scroller || h <= 0 || !filterNudgeUsedRef.current) return;
-                filterNudgeUsedRef.current = false;
-                requestAnimationFrame(() => {
-                  requestAnimationFrame(() => {
-                    scroller.scrollTop = scroller.scrollTop + h;
-                  });
-                });
-              }}
-            >
-              <img
-                src={Filter}
-                alt="Toggle Filter"
-                className=" border rounded-md h-[34px]"
-              />
-            </button>
-            {(timestampStartDate || timestampEndDate || selectDatabaseDateStart || selectDatabaseDateEnd || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseDescription.trim() || selectDatabaseMode || selectDatabaseEntryNo || selectDatabaseSourceFrom || selectDatabaseBranch || selectDatabaseEnteredBy || startDate || endDate) && (
-              <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
+        <div className="flex min-w-0 w-full flex-nowrap items-center justify-between gap-[6px] mb-[12px] shrink-0 overflow-hidden">
+          <div className={`flex min-w-0 items-center overflow-hidden gap-[6px]${hasActiveColumnFilters ? ' flex-1 min-w-0' : ' shrink-0'}`}>
+            <EdbcFilterToggleButton onClick={toggleFilters} />
+            {hasActiveColumnFilters && (
+              <div className="flex min-w-0 flex-1 overflow-x-auto flex-nowrap gap-2 no-scrollbar scrollbar-none">
                 {startDate && (
                   <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                     <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Start Date: </span>
@@ -2129,6 +2305,27 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                     <button onClick={() => setSelectDatabaseTransfer('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
+                {selectDatabaseAmount.trim() && (
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">{advCol6Label}: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectDatabaseAmount}</span>
+                    <button onClick={() => setSelectDatabaseAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  </span>
+                )}
+                {selectDatabaseBillAmount.trim() && (
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">{advCol7Label}: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectDatabaseBillAmount}</span>
+                    <button onClick={() => setSelectDatabaseBillAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  </span>
+                )}
+                {selectDatabaseRefundAmount.trim() && (
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">{advCol8Label}: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectDatabaseRefundAmount}</span>
+                    <button onClick={() => setSelectDatabaseRefundAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  </span>
+                )}
                 {selectDatabaseType && (
                   <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                     <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Type: </span>
@@ -2181,25 +2378,19 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
               </div>
             )}
           </div>
-          <div className='flex items-end gap-[6px]'>
-            <button onClick={clearFilters} className='flex h-[34px] w-[32px] shrink-0 items-center justify-center'>
-              <img className='w-full h-full' src={Reload} alt="Reload" />
-            </button>
-            <div className="w-[286px] min-w-[286px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
-              <input
-                type="text"
-                value={overallSearch}
-                onChange={(e) => setOverallSearch(e.target.value)}
-                placeholder="Search Transactions..."
-                className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
-              />
-              <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
-            </div>
-            <div className=' text-left md:text-right md:items-end items-end cursor-default flex justify-end max-w-screen-2xl table-auto overflow-auto w-full scrollbar-none no-scrollbar'>
-              <div className='flex items-end text-center '>
-                <span className='text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportPDF}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
-                <span className='text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportCSV}>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
-              </div>
+          <div className="flex min-w-0 items-center justify-end gap-[6px] shrink-0">
+            <EdbcTableToolbarRightActions
+              onClearFilters={clearFilters}
+              overallSearch={overallSearch}
+              onOverallSearchChange={setOverallSearch}
+              showExportIcons={false}
+              clearButtonType="button"
+              wrapperClassName={null}
+              searchWrapperClassName="h-[34px] min-w-0 flex-1 max-w-[286px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 sm:w-[286px] sm:min-w-[286px] sm:flex-none sm:shrink-0"
+            />
+            <div className="flex shrink-0 items-end gap-2">
+              <span className="text-[#E4572E] flex items-center gap-1 font-semibold hover:underline cursor-pointer" onClick={exportPDF}>PDF<img src={Pdf} alt="Pdf" className="w-4 h-4" /></span>
+              <span className="text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer" onClick={exportCSV}>XL<img src={XL} alt="XL" className="w-4 h-4" /></span>
             </div>
           </div>
         </div>
@@ -2231,13 +2422,6 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                     onSort={handleEdbcSort}
                   />
                   <EdbcColumnHeader
-                    columnId={EDBC_IDS.EDBC4}
-                    label={advCol3Label}
-                    sortField={resolveEdbcSortField('vendor')}
-                    sortDirection={sortConfig.direction}
-                    onSort={handleEdbcSort}
-                  />
-                  <EdbcColumnHeader
                     columnId={EDBC_IDS.EDBC3}
                     label={advCol4Label}
                     sortField={resolveEdbcSortField('project')}
@@ -2252,6 +2436,13 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                     onSort={() => handleSort('transfer')}
                   />
                   <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC4}
+                    label={advCol3Label}
+                    sortField={resolveEdbcSortField('vendor')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
                     columnId={EDBC_IDS.EDBC8}
                     label={advCol6Label}
                     sortField={resolveEdbcSortField('amount')}
@@ -2261,16 +2452,16 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                   <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label={advCol7Label} />
                   <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label={advCol8Label} />
                   <EdbcColumnHeader
-                    columnId={EDBC_IDS.EDBC12}
-                    label={advCol9Label}
-                    sortField={resolveEdbcSortField('type')}
+                    columnId={EDBC_IDS.EDBC9}
+                    label={advCol10Label}
+                    sortField={resolveEdbcSortField('description')}
                     sortDirection={sortConfig.direction}
                     onSort={handleEdbcSort}
                   />
                   <EdbcColumnHeader
-                    columnId={EDBC_IDS.EDBC9}
-                    label={advCol10Label}
-                    sortField={resolveEdbcSortField('description')}
+                    columnId={EDBC_IDS.EDBC12}
+                    label={advCol9Label}
+                    sortField={resolveEdbcSortField('type')}
                     sortDirection={sortConfig.direction}
                     onSort={handleEdbcSort}
                   />
@@ -2342,16 +2533,6 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                         setShowTableDateRangePicker(false);
                       }}
                     />
-                    <EdbcSelectFilter
-                      columnId={EDBC_IDS.EDBC4}
-                      placeholder={advCol3Label}
-                      options={filterOptionsFromData.vendorContractorOptions}
-                      value={selectDatabaseContractororVendorName}
-                      onChange={setSelectDatabaseContractororVendorName}
-                      blankOption={blankOption}
-                      blankValue={BLANK_VALUE}
-                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                    />
                     <EdbcProjectNameFilter
                       placeholder={advCol4Label}
                       options={filterOptionsFromData.projectOptions}
@@ -2370,9 +2551,25 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                       blankValue={BLANK_VALUE}
                       selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                     />
-                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.amount} />
-                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.bill_amount} />
-                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.refund_amount} />
+                    <EdbcSelectFilter
+                      columnId={EDBC_IDS.EDBC4}
+                      placeholder={advCol3Label}
+                      options={filterOptionsFromData.vendorContractorOptions}
+                      value={selectDatabaseContractororVendorName}
+                      onChange={setSelectDatabaseContractororVendorName}
+                      blankOption={blankOption}
+                      blankValue={BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.amount} value={selectDatabaseAmount} onChange={(e) => setSelectDatabaseAmount(e.target.value)} />
+                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.bill_amount} value={selectDatabaseBillAmount} onChange={(e) => setSelectDatabaseBillAmount(e.target.value)} />
+                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.refund_amount} value={selectDatabaseRefundAmount} onChange={(e) => setSelectDatabaseRefundAmount(e.target.value)} />
+                    <EdbcTextInputFilter
+                      columnId={EDBC_IDS.EDBC9}
+                      placeholder={advCol10Label}
+                      value={selectDatabaseDescription}
+                      onChange={(e) => setSelectDatabaseDescription(e.target.value)}
+                    />
                     <EdbcSelectFilter
                       columnId={EDBC_IDS.EDBC12}
                       placeholder={advCol9Label}
@@ -2384,12 +2581,6 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                       blankOption={blankOption}
                       blankValue={BLANK_VALUE}
                       selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                    />
-                    <EdbcTextInputFilter
-                      columnId={EDBC_IDS.EDBC9}
-                      placeholder={advCol10Label}
-                      value={selectDatabaseDescription}
-                      onChange={(e) => setSelectDatabaseDescription(e.target.value)}
                     />
                     <EdbcSelectFilter
                       columnId={EDBC_IDS.EDBC13}
@@ -2474,18 +2665,6 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                         formatValue={formatDateOnly}
                       />
                       <EdbcExpandableBodyCell
-                        columnId={EDBC_IDS.EDBC4}
-                        expense={entry}
-                        rowIndex={index}
-                        expandedCells={expandedCells}
-                        onToggleExpanded={toggleExpandedCell}
-                        getDisplayValue={(row) =>
-                          row.vendor_id
-                            ? getVendorName(row.vendor_id)
-                            : getContractorName(row.contractor_id)
-                        }
-                      />
-                      <EdbcExpandableBodyCell
                         columnId={EDBC_IDS.EDBC3}
                         expense={entry}
                         rowIndex={index}
@@ -2502,6 +2681,18 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                           {getSiteName(entry.transfer_site_id)}
                         </span>
                       </td>
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC4}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) =>
+                          row.vendor_id
+                            ? getVendorName(row.vendor_id)
+                            : getContractorName(row.contractor_id)
+                        }
+                      />
                       <EdbcExpandableBodyCell
                         columnId={EDBC_IDS.EDBC8}
                         expense={entry}
@@ -2530,20 +2721,20 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                         </span>
                       </td>
                       <EdbcExpandableBodyCell
-                        columnId={EDBC_IDS.EDBC12}
-                        expense={entry}
-                        rowIndex={index}
-                        expandedCells={expandedCells}
-                        onToggleExpanded={toggleExpandedCell}
-                        getDisplayValue={(row) => row.type}
-                      />
-                      <EdbcExpandableBodyCell
                         columnId={EDBC_IDS.EDBC9}
                         expense={entry}
                         rowIndex={index}
                         expandedCells={expandedCells}
                         onToggleExpanded={toggleExpandedCell}
                         getDisplayValue={(row) => row.description || ''}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC12}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => row.type}
                       />
                       <EdbcExpandableBodyCell
                         columnId={EDBC_IDS.EDBC13}
@@ -2750,118 +2941,136 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
         )}
         {isEditModalOpen && (
           <div className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]">
-            <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl">
-              <div className="flex items-center justify-between mb-6 border-b-2">
-                <h2 className="text-xl font-normal pb-2">Edit Entry</h2>
-                <button
-                  type="button"
-                  className="text-gray-500 hover:text-black"
-                  onClick={() => {
-                    setIsEditModalOpen(false);
-                    setSelectedFile(null);
-                    if (fileInputRef.current) {
-                      fileInputRef.current.value = '';
-                    }
-                  }}
-                >
-                  <img src={cross} alt="close" className="w-5 h-5" />
-                </button>
+            <div className="bg-white text-left p-6 rounded-lg shadow-lg w-full max-w-2xl">
+              <div className="flex justify-between items-center mb-[14px]">
+                <h2 className="text-[18px] font-semibold text-black">Edit Advance Portal</h2>
+                <span className="text-[16px] font-semibold text-[#E4572E]">{editFormData.entry_no}</span>
               </div>
               <div className="max-h-[75vh] overflow-y-auto">
-                <form className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-gray-500 font-normal text-left">Select Type</label>
-                        <Select
-                          options={[
-                            { value: 'Advance', label: 'Advance' },
-                            { value: 'Bill Settlement', label: 'Bill Settlement' },
-                            { value: 'Refund', label: 'Refund' },
-                            { value: 'Transfer', label: 'Transfer' }
-                          ]}
-                          value={editFormData.type ? { value: editFormData.type, label: editFormData.type } : null}
-                          onChange={(selected) => {
-                            const newType = selected ? selected.value : '';
-                            setEditFormData(prev => {
-                              const updated = { ...prev, type: newType };
-                              if (newType === 'Refund') {
-                                updated.amount = '';
-                                updated.bill_amount = '';
-                              } else if (newType === 'Advance') {
-                                updated.refund_amount = '';
-                                updated.bill_amount = '';
-                              } else if (newType === 'Bill Settlement') {
-                                updated.refund_amount = '';
-                                updated.amount = '';
-                              } else if (newType === 'Transfer') {
-                                updated.refund_amount = '';
-                                updated.bill_amount = '';
-                                updated.payment_mode = '';
-                              }
-                              return updated;
-                            });
-                          }}
-                          placeholder="Select Type..."
-                          isSearchable
-                          isClearable
-                          styles={customStyles}
-                          menuPortalTarget={document.body}
-                          menuPosition="fixed"
-                          className="w-full"
-                        />
-                  </div>
-                  <div>
-                    <label className="block text-gray-500 font-normal text-left">Date</label>
-                    <div className="mt-1">
-                      <input
-                        type="date"
-                        placeholder="dd-mm-yyyy"
-                        value={editFormData.date}
-                        onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
-                        className="block w-full p-2 border-2 border-[rgba(191,152,83,0.2)] rounded-lg focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-[rgba(191,152,83,0.4)] font-normal h-[45px]"
+                <form className="flex flex-col gap-[12px]">
+                  <div className="grid grid-cols-2 gap-3 text-left">
+                    <div className="text-left max-w-[300px]">
+                      <label className={ADVANCE_PORTAL_LABEL_CLASS}>Account Type</label>
+                      <Select
+                        options={[
+                          { value: 'Advance', label: 'Advance' },
+                          { value: 'Bill Settlement', label: 'Bill Settlement' },
+                          { value: 'Refund', label: 'Refund' },
+                          { value: 'Transfer', label: 'Transfer' }
+                        ]}
+                        value={editFormData.type ? { value: editFormData.type, label: editFormData.type } : null}
+                        onChange={(selected) => {
+                          const newType = selected ? selected.value : '';
+                          setEditFormData(prev => {
+                            const updated = { ...prev, type: newType };
+                            if (newType === 'Refund') {
+                              updated.amount = '';
+                              updated.bill_amount = '';
+                            } else if (newType === 'Advance') {
+                              updated.refund_amount = '';
+                              updated.bill_amount = '';
+                            } else if (newType === 'Bill Settlement') {
+                              updated.refund_amount = '';
+                              updated.amount = '';
+                            } else if (newType === 'Transfer') {
+                              updated.refund_amount = '';
+                              updated.bill_amount = '';
+                              updated.payment_mode = '';
+                            }
+                            return updated;
+                          });
+                        }}
+                        placeholder="Account Type"
+                        isSearchable
+                        isClearable
+                        styles={ADVANCE_PORTAL_EDIT_MODAL_SELECT_STYLES}
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
+                        className={ADVANCE_PORTAL_SELECT_CLASS}
                       />
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-gray-500 font-normal text-left">Contractor/Vendor</label>
-                        <Select
-                          options={combinedOptions}
-                          value={selectedOption}
-                          onChange={handleChange}
-                          className="w-full"
-                          isSearchable
-                          isClearable
-                          styles={customStyles}
-                          menuPortalTarget={document.body}
-                          menuPosition="fixed"
+                    <div className="text-left">
+                      <label className={ADVANCE_PORTAL_LABEL_CLASS}>Date</label>
+                      <div className="expense-entry-form-date w-[300px]">
+                        <CustomDateField
+                          value={editFormData.date}
+                          onChange={(v) => setEditFormData({ ...editFormData, date: v })}
+                          placeholder="Date"
+                          className="w-full text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                          controlHeightPx={40}
+                          alwaysOpenBelow
+                          anchor="right"
                         />
-                  </div>
-                  <div>
-                    <label className="block text-gray-500 font-normal text-left">Project Name</label>
-                        <Select
-                          options={sortedSiteOptions || []}
-                          placeholder="Select a site..."
-                          isSearchable={true}
-                          value={sortedSiteOptions.find(site => site.id === editFormData.project_id) || null}
-                          onChange={(selected) => setEditFormData({ ...editFormData, project_id: selected?.id || '' })}
-                          styles={customStyles}
-                          isClearable
-                          className="w-full"
-                          menuPortalTarget={document.body}
-                          menuPosition="fixed"
+                      </div>
+                    </div>
+                    <div className="text-left">
+                      <div className="flex justify-between mb-[8px]">
+                        <label className="text-md font-semibold block">Contractor/Vendor</label>
+                        {selectedOption?.type && <span className="text-[14px] text-[#E4572E] font-semibold block mt-0.5">{selectedOption.type}</span>}
+                      </div>
+                      <Select
+                        options={combinedOptions}
+                        value={selectedOption}
+                        onChange={handleChange}
+                        placeholder="Contractor/Vendor"
+                        className={ADVANCE_PORTAL_SELECT_CLASS}
+                        isSearchable
+                        isClearable
+                        styles={ADVANCE_PORTAL_EDIT_MODAL_SELECT_STYLES}
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
+                      />
+                    </div>
+                    <div className="text-left">
+                      <label className={ADVANCE_PORTAL_LABEL_CLASS}>Overall Advance</label>
+                      <input
+                        value={overallAdvance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        disabled
+                        className={ADVANCE_PORTAL_READONLY_INPUT_CLASS}
+                      />
+                    </div>
+                    <div className="text-left">
+                      <label className={ADVANCE_PORTAL_LABEL_CLASS}>{editFormData.type === 'Transfer' ? 'From Project Name' : 'Project Name'}</label>
+                      <Select
+                        options={sortedSiteOptions || []}
+                        placeholder={editFormData.type === 'Transfer' ? 'From Project Name' : 'Project Name'}
+                        isSearchable={true}
+                        value={sortedSiteOptions.find(site => site.id === editFormData.project_id) || null}
+                        onChange={(selected) => setEditFormData({ ...editFormData, project_id: selected?.id || '' })}
+                        styles={ADVANCE_PORTAL_EDIT_MODAL_SELECT_STYLES}
+                        isClearable
+                        className={ADVANCE_PORTAL_SELECT_CLASS}
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
+                      />
+                    </div>
+                    {editFormData.type !== 'Bill Settlement' && (
+                      <div className="text-left">
+                        <label className={ADVANCE_PORTAL_LABEL_CLASS}>Project Advance</label>
+                        <input
+                          value={editProjectAdvanceDisplay}
+                          readOnly
+                          className={ADVANCE_PORTAL_READONLY_INPUT_CLASS}
                         />
-                  </div>
-                      {editFormData.type === 'Bill Settlement' && (
-                        <>
-                          <div>
-                            <label className="block text-gray-500 font-normal text-left">Bill Amount</label>
-                            <input
-                              value={editFormData.bill_amount}
-                              onChange={(e) => setEditFormData({ ...editFormData, bill_amount: e.target.value })}
-                              className="block w-full p-2 border-2 border-[rgba(191,152,83,0.2)] rounded-lg focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-[rgba(191,152,83,0.4)] font-normal h-[45px]"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-gray-500 font-normal text-left">Category</label>
+                      </div>
+                    )}
+                    {editFormData.type === 'Bill Settlement' && (
+                      <div className="text-left">
+                        <label className={ADVANCE_PORTAL_LABEL_CLASS}>Bill Amount</label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={editFormData.bill_amount}
+                          onChange={(e) => setEditFormData({ ...editFormData, bill_amount: e.target.value })}
+                          className={`${ADVANCE_PORTAL_INPUT_CLASS} no-spinner`}
+                        />
+                      </div>
+                    )}
+                    {editFormData.type === 'Bill Settlement' && (
+                      <div className="col-span-2">
+                        <div className="flex flex-row gap-3">
+                          <div className="text-left flex-1">
+                            <label className={ADVANCE_PORTAL_LABEL_CLASS}>Category</label>
                             <Select
                               options={categoryOptions}
                               value={
@@ -2875,17 +3084,17 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                                   category: selected ? selected.value : '',
                                 }))
                               }
-                              placeholder="Select a category..."
+                              placeholder="Category"
                               isSearchable
                               isClearable
-                              styles={customStyles}
+                              styles={ADVANCE_PORTAL_EDIT_MODAL_SELECT_STYLES}
                               menuPortalTarget={document.body}
                               menuPosition="fixed"
-                              className="w-full"
+                              className={ADVANCE_PORTAL_SELECT_CLASS}
                             />
                           </div>
-                          <div>
-                            <label className="block text-gray-500 font-normal text-left">Discount</label>
+                          <div className="text-left flex-1">
+                            <label className={ADVANCE_PORTAL_LABEL_CLASS}>Discount</label>
                             <input
                               value={formatWithCommas(editFormData.discount_amount)}
                               onChange={(e) => {
@@ -2897,123 +3106,135 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                                   }));
                                 }
                               }}
-                              className="block w-full no-spinner p-2 border-2 border-[rgba(191,152,83,0.2)] rounded-lg focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-[rgba(191,152,83,0.4)] font-normal h-[45px]"
+                              className={`${ADVANCE_PORTAL_INPUT_CLASS} no-spinner`}
                             />
                           </div>
-                        </>
-                      )}
-                  <div>
-                    <label className="block text-gray-500 font-normal text-left">
-                          {editFormData.type === 'Transfer'
-                            ? 'Transfer Amount'
-                            : editFormData.type === 'Refund'
-                              ? 'Refund Amount'
-                              : 'Amount Given'}
-                        </label>
-                        <input
-                          value={editFormData.type === 'Refund' ? formatWithCommas(editFormData.refund_amount) : formatWithCommas(editFormData.amount)}
-                          onChange={handleAmountChange}
-                          className="block w-full no-spinner p-2 border-2 border-[rgba(191,152,83,0.2)] rounded-lg focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-[rgba(191,152,83,0.4)] font-normal h-[45px]"
-                        />
-                  </div>
-                      {editFormData.type === 'Transfer' ? (
-                        <div>
-                          <label className="block text-gray-500 font-normal text-left">Transfer To</label>
-                          <Select
-                            options={sortedSiteOptions}
-                            placeholder="Select a site..."
-                            isSearchable
-                            value={sortedSiteOptions.find(site => site.id === editFormData.transfer_site_id) || null}
-                            onChange={(selected) => setEditFormData({ ...editFormData, transfer_site_id: selected?.id || '' })}
-                            styles={customStyles}
-                            isClearable
-                            className="w-full"
-                            menuPortalTarget={document.body}
-                            menuPosition="fixed"
+                        </div>
+                      </div>
+                    )}
+                    <div className="col-span-2">
+                      <div className="flex flex-row gap-3">
+                        <div className="text-left flex-1">
+                          <label className={ADVANCE_PORTAL_LABEL_CLASS}>
+                            {editFormData.type === 'Transfer'
+                              ? 'Transfer Amount'
+                              : editFormData.type === 'Refund'
+                                ? 'Refund Amount'
+                                : 'Amount Given'}
+                          </label>
+                          <input
+                            value={editFormData.type === 'Refund' ? formatWithCommas(editFormData.refund_amount) : formatWithCommas(editFormData.amount)}
+                            onChange={handleAmountChange}
+                            className={`${ADVANCE_PORTAL_INPUT_CLASS} no-spinner hover:!border-[rgba(191,152,83,0.2)] focus:!border-[rgba(191,152,83,1)]`}
                           />
                         </div>
-                      ) : (
-                        <>
-                          <div>
-                            <label className="block text-gray-500 font-normal text-left">Payment Mode</label>
-                            <Select
-                              options={finalPaymentModeOptions}
-                              value={editFormData.payment_mode ? { value: editFormData.payment_mode, label: editFormData.payment_mode } : null}
-                              onChange={(selected) => setEditFormData({ ...editFormData, payment_mode: selected ? selected.value : '' })}
-                              placeholder="Select"
-                              isSearchable
-                              isClearable
-                              styles={customStyles}
-                              menuPortalTarget={document.body}
-                              menuPosition="fixed"
-                              className="w-full"
-                            />
-                          </div>
-                          <div>
-                            <div className="flex">
-                              <label
-                                className="block text-gray-500 font-normal text-left cursor-pointer"
-                                htmlFor="editFileInput"
-                              >
-                                File URL
-                              </label>
-                              {selectedFile && (
-                                <span className="text-orange-600 ml-4 text-sm">{selectedFile.name}</span>
-                              )}
-                            </div>
-                            <input
-                              type="text"
-                              name="file_url"
-                              value={editFormData.file_url || ''}
-                              onChange={(e) =>
-                                setEditFormData((prev) => ({ ...prev, file_url: e.target.value }))
-                              }
-                              className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                              placeholder="Paste file URL or click label to upload"
-                            />
-                            <input
-                              type="file"
-                              id="editFileInput"
-                              ref={fileInputRef}
-                              className="hidden"
-                              onChange={handleEditFileChange}
-                            />
-                          </div>
-                        </>
+                        <div className="text-left flex-1">
+                          {editFormData.type === 'Transfer' ? (
+                            <>
+                              <label className={ADVANCE_PORTAL_LABEL_CLASS}>To Project Name</label>
+                              <Select
+                                options={sortedSiteOptions}
+                                placeholder="To Project Name"
+                                isSearchable
+                                value={sortedSiteOptions.find(site => site.id === editFormData.transfer_site_id) || null}
+                                onChange={(selected) => setEditFormData({ ...editFormData, transfer_site_id: selected?.id || '' })}
+                                styles={ADVANCE_PORTAL_EDIT_MODAL_SELECT_STYLES}
+                                isClearable
+                                className={ADVANCE_PORTAL_SELECT_CLASS}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <label className={ADVANCE_PORTAL_LABEL_CLASS}>Payment Mode</label>
+                              <Select
+                                options={finalPaymentModeOptions}
+                                value={editFormData.payment_mode ? { value: editFormData.payment_mode, label: editFormData.payment_mode } : null}
+                                onChange={(selected) => setEditFormData({ ...editFormData, payment_mode: selected ? selected.value : '' })}
+                                placeholder="Payment Mode"
+                                isSearchable
+                                isClearable
+                                styles={ADVANCE_PORTAL_EDIT_MODAL_SELECT_STYLES}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                className={ADVANCE_PORTAL_SELECT_CLASS}
+                              />
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-left">
+                    <div className="flex justify-between mb-[8px] w-[616px]">
+                      <label className={ADVANCE_PORTAL_LABEL_CLASS}>File URL</label>
+                      {selectedFile && (
+                        <span className="text-[14px] text-[#E4572E] font-semibold">{selectedFile.name}</span>
                       )}
-                  <div className="col-span-2">
-                    <label className="block text-gray-500 font-normal text-left">Description</label>
+                    </div>
+                    <div className="flex w-[616px] items-center gap-[8px]">
+                      <input
+                        type="text"
+                        name="file_url"
+                        value={editFormData.file_url || ''}
+                        onChange={(e) =>
+                          setEditFormData((prev) => ({ ...prev, file_url: e.target.value }))
+                        }
+                        placeholder="File URL"
+                        className="min-w-0 flex-1 h-[40px] text-[14px] py-0 px-2 box-border border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-semibold placeholder:font-normal"
+                      />
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,image/*,application/pdf"
+                        onChange={handleEditFileChange}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isEditSubmitting}
+                        className="shrink-0 h-[40px] text-[#BF9853]"
+                      >
+                        <img src={UploadFile} alt="Upload" className="w-[40px] h-[40px]" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-left">
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Description</label>
                     <textarea
-                      rows={3}
+                      rows={2}
                       value={editFormData.description}
                       onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                      className="mt-1 block w-full p-2 border-2 border-[rgba(191,152,83,0.2)] rounded-lg focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-[rgba(191,152,83,0.4)] font-normal"
+                      placeholder="Description"
+                      className={`${ADVANCE_PORTAL_TEXTAREA_CLASS} hover:!border-[rgba(191,152,83,0.2)] focus:!border-[rgba(191,152,83,1)]`}
                     />
                   </div>
+                  <div className="flex justify-end space-x-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditModalOpen(false);
+                        setSelectedFile(null);
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = '';
+                        }
+                      }}
+                      className="px-4 py-2 border-2 border-opacity-[] border-[#BF9853] text-[#BF9853] rounded"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleUpdate}
+                      disabled={isEditSubmitting}
+                      className={`px-4 py-2 bg-[#BF9853] text-white rounded transition duration-200 ${isEditSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      {isEditSubmitting ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
                 </form>
-              </div>
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditModalOpen(false);
-                    setSelectedFile(null);
-                    if (fileInputRef.current) {
-                      fileInputRef.current.value = '';
-                    }
-                  }}
-                  className="px-4 py-2 border border-[#BF9853] rounded"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleUpdate}
-                  disabled={isEditSubmitting}
-                  className={`px-4 py-2 rounded text-white ${isEditSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#BF9853]'}`}
-                >
-                  {isEditSubmitting ? 'Saving...' : 'Save'}
-                </button>
               </div>
             </div>
           </div>
@@ -3088,24 +3309,70 @@ const formatDate = (dateString) => {
   return `${day}-${month}-${year} ${hours}:${minutes} ${ampm}`;
 };
 const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, siteOptions }) => {
+  const auditScrollRef = useRef(null);
+  const auditIsDragging = useRef(false);
+  const [auditDragCursor, setAuditDragCursor] = useState(false);
+  const auditStart = useRef({ x: 0, y: 0 });
+  const auditScrollPos = useRef({ left: 0, top: 0 });
+  const handleAuditMouseDown = (e) => {
+    if (e.target.closest('a, button, input, textarea, select')) return;
+    if (!auditScrollRef.current) return;
+    auditIsDragging.current = true;
+    auditStart.current = { x: e.clientX, y: e.clientY };
+    auditScrollPos.current = {
+      left: auditScrollRef.current.scrollLeft,
+      top: auditScrollRef.current.scrollTop,
+    };
+    auditScrollRef.current.style.userSelect = 'none';
+  };
+  const handleAuditMouseMove = (e) => {
+    if (!auditIsDragging.current || !auditScrollRef.current) return;
+    setAuditDragCursor(true);
+    const dx = e.clientX - auditStart.current.x;
+    const dy = e.clientY - auditStart.current.y;
+    auditScrollRef.current.scrollLeft = auditScrollPos.current.left - dx;
+    auditScrollRef.current.scrollTop = auditScrollPos.current.top - dy;
+  };
+  const handleAuditMouseUp = () => {
+    auditIsDragging.current = false;
+    setAuditDragCursor(false);
+    if (auditScrollRef.current) {
+      auditScrollRef.current.style.userSelect = '';
+    }
+  };
+  useEffect(() => {
+    if (!auditDragCursor) return undefined;
+    const handleWindowMouseUp = () => handleAuditMouseUp();
+    window.addEventListener('mouseup', handleWindowMouseUp);
+    return () => window.removeEventListener('mouseup', handleWindowMouseUp);
+  }, [auditDragCursor]);
   if (!show) return null;
   const getNameById = (id, options) => {
     if (!id && id !== 0) return "-";
     const found = options.find(opt => String(opt.id) === String(id));
     return found ? found.label : id;
   };
+  const normalizeAuditId = (id) => {
+    if (id == null || String(id).trim() === "" || String(id) === "0") return null;
+    return id;
+  };
+  const getAssociateFromAudit = (audit, keyPrefix) => {
+    const vendorId = normalizeAuditId(audit[`${keyPrefix}_vendor_id`]);
+    const contractorId = normalizeAuditId(audit[`${keyPrefix}_contractor_id`]);
+    if (vendorId) return { name: getNameById(vendorId, vendorOptions), type: "Vendor" };
+    if (contractorId) return { name: getNameById(contractorId, contractorOptions), type: "Contractor" };
+    return { name: "-", type: "-" };
+  };
   const fields = [
-    { oldKey: "old_date", newKey: "new_date", label: "Date", width: "120px" },
-    { oldKey: "old_type", newKey: "new_type", label: "Type", width: "100px" },
-    { oldKey: "old_project_id", newKey: "new_project_id", label: "Project Name", width: "180px", lookup: siteOptions },
-    { oldKey: "old_vendor_id", newKey: "new_vendor_id", label: "Vendor", width: "150px", lookup: vendorOptions },
-    { oldKey: "old_contractor_id", newKey: "new_contractor_id", label: "Contractor", width: "150px", lookup: contractorOptions },
-    { oldKey: "old_transfer_site_id", newKey: "new_transfer_site_id", label: "Transfer", width: "150px", lookup: siteOptions },
-    { oldKey: "old_payment_mode", newKey: "new_payment_mode", label: "Mode", width: "100px" },
-    { oldKey: "old_description", newKey: "new_description", label: "Description", width: "200px" },
-    { oldKey: "old_amount", newKey: "new_amount", label: "Amount", width: "100px" },
-    { oldKey: "old_bill_amount", newKey: "new_bill_amount", label: "Bill Amount", width: "120px" },
-    { oldKey: "old_refund_amount", newKey: "new_refund_amount", label: "Refund", width: "100px" },
+    { oldKey: "old_date", newKey: "new_date", label: "Date", columnId: EDBC_IDS.EDBC2 },
+    { oldKey: "old_project_id", newKey: "new_project_id", label: "Project Name", columnId: EDBC_IDS.EDBC3, lookup: siteOptions },
+    { oldKey: "old_transfer_site_id", newKey: "new_transfer_site_id", label: "Transfer Project", columnId: EDBC_IDS.EDBC3, lookup: siteOptions },
+    { oldKey: "old_amount", newKey: "new_amount", label: "Advance", columnId: EDBC_IDS.EDBC8 },
+    { oldKey: "old_bill_amount", newKey: "new_bill_amount", label: "Bill Amount", columnId: EDBC_IDS.EDBC8 },
+    { oldKey: "old_refund_amount", newKey: "new_refund_amount", label: "Refund", columnId: EDBC_IDS.EDBC8 },
+    { oldKey: "old_description", newKey: "new_description", label: "Discription", columnId: EDBC_IDS.EDBC9 },
+    { oldKey: "old_type", newKey: "new_type", label: "Type", columnId: EDBC_IDS.EDBC12 },
+    { oldKey: "old_payment_mode", newKey: "new_payment_mode", label: "Mode", columnId: EDBC_IDS.EDBC13 },
   ];
   const formatDateTime = (dateString) => {
     if (!dateString) return "-";
@@ -3118,12 +3385,14 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
     const ampm = hours >= 12 ? "PM" : "AM";
     hours = hours % 12 || 12;
     hours = String(hours).padStart(2, "0");
-    return `${day}-${month}-${year} ${hours}:${minutes} ${ampm}`;
+    return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
   };
   const formatDisplayValue = (value, field) => {
     if (
-      (field.oldKey?.includes("vendor_id") || field.oldKey?.includes("transfer_site_id") ||
-        field.newKey?.includes("vendor_id") || field.newKey?.includes("transfer_site_id")) &&
+      (field.oldKey?.includes("vendor_id") ||
+        field.oldKey?.includes("contractor_id") ||
+        field.oldKey?.includes("transfer_site_id") ||
+        field.oldKey?.includes("project_id")) &&
       String(value) === "0"
     ) {
       return "-";
@@ -3131,81 +3400,102 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
     if (field.lookup) {
       return getNameById(value, field.lookup);
     }
-    if (field.label.includes("Amount")) {
-      return value ? Number(value).toLocaleString("en-IN") : "-";
+    if (field.oldKey?.includes("amount") || field.label === "Advance") {
+      return value ? Number(value).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "-";
     }
     if (field.label === "Date") {
-      if (!value) return "-";
-      const date = new Date(value);
-      const day = String(date.getDate()).padStart(2, "0");
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const year = date.getFullYear();
-      return `${day}-${month}-${year}`;
+      return value ? new Date(value).toLocaleDateString("en-GB") : "-";
     }
     return value ?? "-";
   };
+  const renderFieldCell = (audit, field) => {
+    const oldDisplay = formatDisplayValue(audit[field.oldKey], field);
+    const newDisplay = formatDisplayValue(audit[field.newKey], field);
+    const changed = oldDisplay !== newDisplay;
+    const tdClass = getEdbcColumnConfig(field.columnId)?.tdClass || "";
+    return (
+      <td
+        key={field.label}
+        id={field.columnId}
+        title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+        className={`${tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${changed ? "bg-[#BF9853] font-bold" : ""}`}
+      >
+        {oldDisplay}
+      </td>
+    );
+  };
+  const edbc1TdClass = getEdbcColumnConfig(EDBC_IDS.EDBC1)?.tdClass || "";
+  const edbc4TdClass = getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass || "";
+  const edbc12TdClass = getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass || "";
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[9999]">
-      <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
+      <div className="bg-white rounded-md shadow-lg max-w-[1800px] mx-4 p-2">
         <div className="flex justify-between items-center mt-4 ml-7 mr-7">
           <h2 className="text-xl font-bold">History</h2>
           <button onClick={onClose}>
             <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
           </button>
         </div>
-        <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
-          <table className="table-fixed min-w-full bg-white">
+        <div
+          ref={auditScrollRef}
+          className={`overflow-x-auto overflow-y-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7 no-scrollbar scrollbar-none select-none${auditDragCursor ? ' cursor-grabbing' : ''}`}
+          onMouseDown={handleAuditMouseDown}
+          onMouseMove={handleAuditMouseMove}
+          onMouseUp={handleAuditMouseUp}
+          onMouseLeave={handleAuditMouseUp}
+        >
+          <table className={`table-fixed w-max bg-white border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS}`}>
             <thead className="bg-[#FAF6ED]">
-              <tr>
-                <th style={{ width: "130px" }}>Time Stamp</th>
-                <th style={{ width: "120px" }}>Edited By</th>
-                {fields.map((f) => (
-                  <th
-                    key={f.label}
-                    style={{ width: f.width }}
-                    className="border-b py-2 px-2 text-center font-bold whitespace-nowrap overflow-hidden text-ellipsis"
-                  >
-                    {f.label}
-                  </th>
-                ))}
-              </tr>
+              <EdbcTableHeaderRow>
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC1} label="Time Stamp" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label="Project Name" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label="Transfer Project" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label="Associate" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Associate Type" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Advance" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Bill Amount" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Refund" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC9} label="Discription" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Type" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC13} label="Mode" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Edited By" />
+              </EdbcTableHeaderRow>
             </thead>
             <tbody>
-              {audits.map((audit, index) => (
-                <tr
-                  key={index}
-                  className="odd:bg-white even:bg-[#FAF6ED]"
-                >
-                  <td
-                    className="whitespace-nowrap overflow-hidden text-ellipsis"
-                    style={{ width: "130px" }}
-                  >
-                    {formatDateTime(audit.edited_date)}
-                  </td>
-                  <td
-                    className="whitespace-nowrap overflow-hidden text-ellipsis"
-                    style={{ width: "120px" }}
-                  >
-                    {audit.edited_by}
-                  </td>
-                  {fields.map((f) => {
-                    const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
-                    const newDisplay = formatDisplayValue(audit[f.newKey], f);
-                    const changed = oldDisplay !== newDisplay;
-                    return (
-                      <td
-                        key={f.label}
-                        style={{ width: f.width }}
-                        title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
-                        className={`whitespace-nowrap overflow-hidden text-ellipsis px-2 ${changed ? "bg-[#BF9853] font-bold" : ""
-                          }`}
-                      >
-                        {oldDisplay}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+              {audits.map((audit, index) => {
+                const oldAssociate = getAssociateFromAudit(audit, "old");
+                const newAssociate = getAssociateFromAudit(audit, "new");
+                const associateChanged = oldAssociate.name !== newAssociate.name;
+                const associateTypeChanged = oldAssociate.type !== newAssociate.type;
+                return (
+                  <EdbcTableBodyRow key={index}>
+                    <td id={EDBC_IDS.EDBC1} className={`${edbc1TdClass} whitespace-nowrap overflow-hidden text-ellipsis`}>
+                      {formatDateTime(audit.edited_date)}
+                    </td>
+                    {fields.slice(0, 1).map((field) => renderFieldCell(audit, field))}
+                    {fields.slice(1, 3).map((field) => renderFieldCell(audit, field))}
+                    <td
+                      id={EDBC_IDS.EDBC4}
+                      title={associateChanged ? `Previous: ${oldAssociate.name} → Current: ${newAssociate.name}` : ""}
+                      className={`${edbc4TdClass} whitespace-nowrap overflow-hidden text-ellipsis ${associateChanged ? "bg-[#BF9853] font-bold" : ""}`}
+                    >
+                      {oldAssociate.name}
+                    </td>
+                    <td
+                      id={EDBC_IDS.EDBC12}
+                      title={associateTypeChanged ? `Previous: ${oldAssociate.type} → Current: ${newAssociate.type}` : ""}
+                      className={`${edbc12TdClass} whitespace-nowrap overflow-hidden text-ellipsis ${associateTypeChanged ? "bg-[#BF9853] font-bold" : ""}`}
+                    >
+                      {oldAssociate.type}
+                    </td>
+                    {fields.slice(3).map((field) => renderFieldCell(audit, field))}
+                    <td id={EDBC_IDS.EDBC12} className={`${edbc12TdClass} whitespace-nowrap overflow-hidden text-ellipsis`}>
+                      {audit.edited_by ?? "-"}
+                    </td>
+                  </EdbcTableBodyRow>
+                );
+              })}
             </tbody>
           </table>
         </div>

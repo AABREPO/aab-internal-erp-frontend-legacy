@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Select from 'react-select';
 import Attach from '../Images/Attachfile.svg';
 import axios from "axios";
@@ -14,6 +14,13 @@ import {
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import { resolveExpensesEntryIdAfterSave } from '../../utils/advancePortalWeeklyPaymentBill';
 import { updateWeeklyExpenseById } from '../../utils/expensesEntryWeeklyPaymentBill';
+import {
+    fetchExpensesLinkedToWeeklyExpense,
+    getExpenseAmountNumber,
+    getExpenseProjectId,
+    sumLinkedExpenseAmounts,
+    syncSummaryBillEditProgress,
+} from '../../utils/summaryBillWeeklyExpenses';
 import {
     EXPENSE_ENTRY_MODULE_NAME,
 } from '../../utils/paymentModeArrangement';
@@ -284,6 +291,8 @@ const Form = ({
     const [sideTableContentHeight, setSideTableContentHeight] = useState(null);
     const prevCategoryOptionsLenRef = useRef(0);
     const billPaymentsPrefillAttemptsRef = useRef(0);
+    const summaryBillPrefillEntryRef = useRef(null);
+    const summaryBillOptionsAppliedRef = useRef(null);
     const [userPermissions, setUserPermissions] = useState([]);
     const moduleName = EXPENSE_ENTRY_MODULE_NAME;
     const [paymentMode, setPaymentMode] = useState('');
@@ -328,6 +337,8 @@ const Form = ({
     const [billArrivalDate, setBillArrivalDate] = useState('');
     const [summaryBillTotal, setSummaryBillTotal] = useState(null);
     const [summaryBillRemaining, setSummaryBillRemaining] = useState(null);
+    const [summaryBillEditMode, setSummaryBillEditMode] = useState(false);
+    const [summaryBillLinkedEntries, setSummaryBillLinkedEntries] = useState([]);
     const summaryBillMode = summaryBillTotal != null && Number(summaryBillTotal) > 0;
     const [summaryForceCloseAmount, setSummaryForceCloseAmount] = useState('');
     const [splitRemainingLabel, setSplitRemainingLabel] = useState('Summary Bill Remaining');
@@ -788,9 +799,13 @@ const Form = ({
         if (prefillDataStr && siteOptions.length > 0 && accountTypeOptions.length > 0) {
             try {
                 const prefillData = JSON.parse(prefillDataStr);
-                // Always capture weeklyExpenseId for bill-copy-url sync (Bill Payments / Claim / etc).
-                if (prefillData.weeklyExpenseId != null && prefillData.weeklyExpenseId !== '') {
-                    const wid = Number(prefillData.weeklyExpenseId);
+                // Always capture weekly expense id for bill-copy-url sync and expenses_form link.
+                const rawWeeklyExpenseId =
+                    prefillData.weeklyExpensesId ??
+                    prefillData.weeklyExpenseId ??
+                    prefillData.weekly_expenses_id;
+                if (rawWeeklyExpenseId != null && rawWeeklyExpenseId !== '') {
+                    const wid = Number(rawWeeklyExpenseId);
                     if (Number.isFinite(wid)) {
                         setWeeklyExpenseIdForBillCopyUrl(wid);
                     }
@@ -810,6 +825,9 @@ const Form = ({
                 if (prefillData.fromWeeklyCashRegister) {
                     const prefillSource = String(prefillData.source ?? 'Cash Register').trim();
                     setExpenseEntrySource(prefillSource || 'Cash Register');
+                }
+                if (prefillData.summaryBillEditMode) {
+                    setSummaryBillEditMode(true);
                 }
 
                 const prefillAccountTypeName = normalizeAccountTypeName(
@@ -889,7 +907,11 @@ const Form = ({
                             : null;
                     if (summaryTotalNum != null && summaryTotalNum > 0) {
                         setSummaryBillTotal(summaryTotalNum);
-                        setSummaryBillRemaining((prev) => (prev == null ? summaryTotalNum : prev));
+                        if (prefillData.summaryBillEditMode) {
+                            setSummaryBillRemaining(null);
+                        } else {
+                            setSummaryBillRemaining((prev) => (prev == null ? summaryTotalNum : prev));
+                        }
                         setSplitRemainingLabel(fromBillPaymentsTracker ? 'Bill Payment Remaining' : 'Summary Bill Remaining');
                         setAllowSplitOverpay(fromBillPaymentsTracker);
                         // Do not prefill the Amount box for Summary Bill; user will enter split amounts.
@@ -1193,6 +1215,36 @@ const Form = ({
         vendorOptionsLoaded,
         contractorOptionsLoaded,
         lockUtilityPrefillFields,
+    ]);
+    useEffect(() => {
+        if (!summaryBillEditMode || weeklyExpenseIdForBillCopyUrl == null) return;
+        let cancelled = false;
+        const loadLinkedSummaryBillEntries = async () => {
+            try {
+                const linked = await fetchExpensesLinkedToWeeklyExpense(
+                    weeklyExpenseIdForBillCopyUrl,
+                    activeBranchId
+                );
+                if (cancelled) return;
+                setSummaryBillLinkedEntries(linked);
+                const allocated = sumLinkedExpenseAmounts(linked);
+                const total = Number(summaryBillTotal ?? 0) || 0;
+                const remaining = Math.max(0, Math.round((total - allocated) * 100) / 100);
+                setSummaryBillRemaining(remaining);
+                syncSummaryBillEditProgress(weeklyExpenseIdForBillCopyUrl, total, linked);
+            } catch (error) {
+                console.error('Failed to load linked Summary Bill entries:', error);
+            }
+        };
+        loadLinkedSummaryBillEntries();
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        summaryBillEditMode,
+        weeklyExpenseIdForBillCopyUrl,
+        activeBranchId,
+        summaryBillTotal,
     ]);
     useEffect(() => {
         if (selectedSite && selectedSite.id) {
@@ -1620,6 +1672,178 @@ const Form = ({
         const day = String(d.getDate()).padStart(2, '0');
         return `${y}-${m}-${day}`;
     };
+    const applyExpenseRecordToFormFields = useCallback(
+        (expense, { skipSite = false, skipAmount = false } = {}) => {
+            if (!expense) return;
+
+            setLinkedExpenseEntryRecord(expense);
+            if (expense.eno != null) setEno(expense.eno);
+
+            const billCopy = String(expense.billCopyUrl || expense.billCopy || '').trim();
+            setExistingExpenseBillCopyUrl(billCopy);
+
+            const accountTypeName = normalizeAccountTypeName(expense.accountType);
+            if (accountTypeName) setSelectedAccountType(accountTypeName);
+
+            const expenseDate = expense.date || expense.timestamp;
+            if (expenseDate) {
+                const d = String(expenseDate);
+                setDate(d.includes('T') ? d.split('T')[0] : toLocalDateStr(d));
+            }
+
+            if (!skipSite) {
+                const siteName = expense.siteName || expense.projectName || '';
+                if (siteName) {
+                    const siteOption = siteOptions.find(
+                        (opt) => String(opt.label).trim() === String(siteName).trim()
+                    );
+                    if (siteOption) setSelectedSite(siteOption);
+                }
+            }
+
+            const vid = expense.vendorId ?? expense.vendor_id;
+            const cid = expense.contractorId ?? expense.contractor_id;
+            const normalized = (s) => String(s ?? '').trim().toLowerCase();
+            const vName = normalized(expense.vendor);
+            const cName = normalized(expense.contractor);
+            if (vid != null && String(vid).trim() !== '' && Number.isFinite(Number(vid)) && Number(vid) > 0) {
+                const v = combinedOptions.find(
+                    (o) => o.type === 'Vendor' && Number(o.id) === Number(vid)
+                );
+                if (v) {
+                    setSelectedOption(v);
+                    setSelectedType('Vendor');
+                }
+            } else if (cid != null && String(cid).trim() !== '' && Number.isFinite(Number(cid)) && Number(cid) > 0) {
+                const c = combinedOptions.find(
+                    (o) => o.type === 'Contractor' && Number(o.id) === Number(cid)
+                );
+                if (c) {
+                    setSelectedOption(c);
+                    setSelectedType('Contractor');
+                }
+            } else if (vName) {
+                const v = combinedOptions.find(
+                    (o) => o.type === 'Vendor' && normalized(o.label) === vName
+                );
+                if (v) {
+                    setSelectedOption(v);
+                    setSelectedType('Vendor');
+                }
+            } else if (cName) {
+                const c = combinedOptions.find(
+                    (o) => o.type === 'Contractor' && normalized(c.label) === cName
+                );
+                if (c) {
+                    setSelectedOption(c);
+                    setSelectedType('Contractor');
+                }
+            }
+
+            if (!skipAmount && expense.amount != null && expense.amount !== '') {
+                setAmount(String(Math.abs(Number(expense.amount))));
+            }
+
+            const catOpt = findCategoryOptionByVendorField(expense.category);
+            if (catOpt) applyResolvedCategoryOption(catOpt);
+
+            if (expense.comments != null) setComments(String(expense.comments));
+            if (expense.quantity != null && expense.quantity !== '') {
+                setQuantity(String(expense.quantity));
+            }
+
+            if (expense.paymentMode && !lockClaimPaymentModeCash) {
+                setPaymentMode(expense.paymentMode);
+            }
+
+            const rawBillArrival = expense.billArrivalDate ?? expense.bill_arrival_date ?? '';
+            if (rawBillArrival) {
+                const s = String(rawBillArrival).trim().slice(0, 10);
+                if (/^\d{4}-\d{2}-\d{2}$/.test(s)) setBillArrivalDate(s);
+            }
+
+            if (String(expense.source || '').trim()) {
+                setExpenseEntrySource(String(expense.source).trim());
+            }
+        },
+        [
+            siteOptions,
+            combinedOptions,
+            lockClaimPaymentModeCash,
+            findCategoryOptionByVendorField,
+            applyResolvedCategoryOption,
+        ]
+    );
+    const handleSummaryBillSiteChange = useCallback(
+        (site) => {
+            setSelectedSite(site);
+            if (!summaryBillEditMode || !site) {
+                if (summaryBillEditMode && !site) {
+                    setLinkedExpensesEntryId(null);
+                    setAmount('');
+                    summaryBillPrefillEntryRef.current = null;
+                    summaryBillOptionsAppliedRef.current = null;
+                }
+                return;
+            }
+            const linkedEntry =
+                summaryBillLinkedEntries.find(
+                    (entry) => Number(getExpenseProjectId(entry)) === Number(site.id)
+                ) ||
+                summaryBillLinkedEntries.find(
+                    (entry) =>
+                        String(entry.siteName ?? entry.projectName ?? '')
+                            .trim()
+                            .toLowerCase() === String(site.label ?? '').trim().toLowerCase()
+                );
+            if (linkedEntry?.id != null) {
+                const entryId = String(linkedEntry.id);
+                summaryBillPrefillEntryRef.current = entryId;
+                summaryBillOptionsAppliedRef.current = null;
+                setLinkedExpensesEntryId(linkedEntry.id);
+                applyExpenseRecordToFormFields(linkedEntry, { skipSite: true });
+                if (vendorOptionsLoaded && contractorOptionsLoaded && categoryOptions.length > 0) {
+                    summaryBillOptionsAppliedRef.current = entryId;
+                }
+            } else {
+                summaryBillPrefillEntryRef.current = null;
+                summaryBillOptionsAppliedRef.current = null;
+                setLinkedExpensesEntryId(null);
+                setAmount('');
+            }
+        },
+        [
+            summaryBillEditMode,
+            summaryBillLinkedEntries,
+            applyExpenseRecordToFormFields,
+            vendorOptionsLoaded,
+            contractorOptionsLoaded,
+            categoryOptions.length,
+        ]
+    );
+    useEffect(() => {
+        if (!summaryBillEditMode || !linkedExpensesEntryId) return;
+        if (!vendorOptionsLoaded || !contractorOptionsLoaded || !categoryOptions.length) return;
+        const entryId = String(linkedExpensesEntryId);
+        if (summaryBillPrefillEntryRef.current !== entryId) return;
+        if (summaryBillOptionsAppliedRef.current === entryId) return;
+
+        const cached = summaryBillLinkedEntries.find(
+            (entry) => String(entry.id) === entryId
+        );
+        if (!cached) return;
+
+        applyExpenseRecordToFormFields(cached, { skipSite: true, skipAmount: true });
+        summaryBillOptionsAppliedRef.current = entryId;
+    }, [
+        summaryBillEditMode,
+        linkedExpensesEntryId,
+        summaryBillLinkedEntries,
+        vendorOptionsLoaded,
+        contractorOptionsLoaded,
+        categoryOptions.length,
+        applyExpenseRecordToFormFields,
+    ]);
     useEffect(() => {
         if (linkedExpensesEntryId) return;
         fetchLatestEno();
@@ -1627,6 +1851,7 @@ const Form = ({
 
     useEffect(() => {
         if (!linkedExpensesEntryId) return;
+        if (summaryBillEditMode) return;
         if (!siteOptions.length || !categoryOptions.length) return;
         if (!vendorOptionsLoaded || !contractorOptionsLoaded) return;
 
@@ -1642,95 +1867,7 @@ const Form = ({
                     (e) => String(e.id) === String(linkedExpensesEntryId)
                 );
                 if (!expense || cancelled) return;
-
-                setLinkedExpenseEntryRecord(expense);
-
-                if (expense.eno != null) setEno(expense.eno);
-
-                const billCopy = String(expense.billCopyUrl || expense.billCopy || '').trim();
-                setExistingExpenseBillCopyUrl(billCopy);
-
-                const accountTypeName = normalizeAccountTypeName(expense.accountType);
-                if (accountTypeName) setSelectedAccountType(accountTypeName);
-
-                const expenseDate = expense.date || expense.timestamp;
-                if (expenseDate) {
-                    const d = String(expenseDate);
-                    setDate(d.includes('T') ? d.split('T')[0] : toLocalDateStr(d));
-                }
-
-                const siteName = expense.siteName || expense.projectName || '';
-                if (siteName) {
-                    const siteOption = siteOptions.find(
-                        (opt) => String(opt.label).trim() === String(siteName).trim()
-                    );
-                    if (siteOption) setSelectedSite(siteOption);
-                }
-
-                const vid = expense.vendorId ?? expense.vendor_id;
-                const cid = expense.contractorId ?? expense.contractor_id;
-                const normalized = (s) => String(s ?? '').trim().toLowerCase();
-                const vName = normalized(expense.vendor);
-                const cName = normalized(expense.contractor);
-                if (vid != null && String(vid).trim() !== '' && Number.isFinite(Number(vid)) && Number(vid) > 0) {
-                    const v = combinedOptions.find(
-                        (o) => o.type === 'Vendor' && Number(o.id) === Number(vid)
-                    );
-                    if (v) {
-                        setSelectedOption(v);
-                        setSelectedType('Vendor');
-                    }
-                } else if (cid != null && String(cid).trim() !== '' && Number.isFinite(Number(cid)) && Number(cid) > 0) {
-                    const c = combinedOptions.find(
-                        (o) => o.type === 'Contractor' && Number(o.id) === Number(cid)
-                    );
-                    if (c) {
-                        setSelectedOption(c);
-                        setSelectedType('Contractor');
-                    }
-                } else if (vName) {
-                    const v = combinedOptions.find(
-                        (o) => o.type === 'Vendor' && normalized(o.label) === vName
-                    );
-                    if (v) {
-                        setSelectedOption(v);
-                        setSelectedType('Vendor');
-                    }
-                } else if (cName) {
-                    const c = combinedOptions.find(
-                        (o) => o.type === 'Contractor' && normalized(c.label) === cName
-                    );
-                    if (c) {
-                        setSelectedOption(c);
-                        setSelectedType('Contractor');
-                    }
-                }
-
-                if (expense.amount != null && expense.amount !== '') {
-                    setAmount(String(Math.abs(Number(expense.amount))));
-                }
-
-                const catOpt = findCategoryOptionByVendorField(expense.category);
-                if (catOpt) applyResolvedCategoryOption(catOpt);
-
-                if (expense.comments != null) setComments(String(expense.comments));
-                if (expense.quantity != null && expense.quantity !== '') {
-                    setQuantity(String(expense.quantity));
-                }
-
-                if (expense.paymentMode && !lockClaimPaymentModeCash) {
-                    setPaymentMode(expense.paymentMode);
-                }
-
-                const rawBillArrival = expense.billArrivalDate ?? expense.bill_arrival_date ?? '';
-                if (rawBillArrival) {
-                    const s = String(rawBillArrival).trim().slice(0, 10);
-                    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) setBillArrivalDate(s);
-                }
-
-                if (String(expense.source || '').trim()) {
-                    setExpenseEntrySource(String(expense.source).trim());
-                }
+                applyExpenseRecordToFormFields(expense);
             } catch (error) {
                 console.error('Failed to load linked expense entry:', error);
             }
@@ -1747,7 +1884,8 @@ const Form = ({
         combinedOptions,
         vendorOptionsLoaded,
         contractorOptionsLoaded,
-        lockClaimPaymentModeCash,
+        summaryBillEditMode,
+        applyExpenseRecordToFormFields,
     ]);
 
     const formatDateOnly = (dateString) => {
@@ -1845,7 +1983,28 @@ const Form = ({
             alert('Account type ID is missing. Please re-select the account type.');
             return false;
         }
-        if (summaryBillMode) {
+        if (summaryBillEditMode) {
+            if (!linkedExpensesEntryId) {
+                alert('Please select a project linked to this Summary Bill entry.');
+                return false;
+            }
+            const entryAmt = parseFloat(String(amount).replace(/,/g, '')) || 0;
+            if (entryAmt <= 0) {
+                alert('Please enter a valid amount.');
+                return false;
+            }
+            const linkedEntry = summaryBillLinkedEntries.find(
+                (entry) => String(entry.id) === String(linkedExpensesEntryId)
+            );
+            const oldAmt = linkedEntry ? getExpenseAmountNumber(linkedEntry) : 0;
+            const otherSum = sumLinkedExpenseAmounts(summaryBillLinkedEntries) - oldAmt;
+            const newTotal = otherSum + entryAmt;
+            const total = Number(summaryBillTotal ?? 0) || 0;
+            if (newTotal - total > 0.01) {
+                alert(`Updated total exceeds Summary Bill amount (₹${total.toLocaleString('en-IN')}).`);
+                return false;
+            }
+        } else if (summaryBillMode) {
             const remaining = Number(summaryBillRemaining ?? summaryBillTotal ?? 0) || 0;
             const entryAmt = parseFloat(String(amount).replace(/,/g, '')) || 0;
             if (entryAmt <= 0) {
@@ -1963,6 +2122,9 @@ const Form = ({
             ...bodyData,
             billCopy: billCopyResolved,
             billCopyUrl: billCopyResolved,
+            ...(weeklyExpenseIdForBillCopyUrl != null
+                ? { weeklyExpensesId: weeklyExpenseIdForBillCopyUrl }
+                : {}),
         };
         if (linkedExpensesEntryId != null) {
             const existingRecord = await fetchLinkedExpenseEntryRecord(linkedExpensesEntryId);
@@ -2253,6 +2415,47 @@ const Form = ({
                     toast.warn('Expense saved, but the weekly bill row could not be updated with the file link.');
                 }
             }
+            if (summaryBillEditMode) {
+                const entryAmt = parseFloat(String(amount).replace(/,/g, '')) || 0;
+                const updatedEntries = summaryBillLinkedEntries.map((entry) =>
+                    String(entry.id) === String(expensesId)
+                        ? { ...entry, amount: entryAmt }
+                        : entry
+                );
+                setSummaryBillLinkedEntries(updatedEntries);
+                const allocated = sumLinkedExpenseAmounts(updatedEntries);
+                const total = Number(summaryBillTotal ?? 0) || 0;
+                const nextRemaining = Math.max(0, Math.round((total - allocated) * 100) / 100);
+                setSummaryBillRemaining(nextRemaining);
+                syncSummaryBillEditProgress(weeklyExpenseIdForBillCopyUrl, total, updatedEntries);
+                setSelectedSite(null);
+                setLinkedExpensesEntryId(null);
+                setLinkedExpenseEntryRecord(null);
+                setAmount('');
+                setSelectedFile(null);
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                }
+                setShowReviewModal(false);
+                toast.success(`Saved. Remaining amount: ₹${nextRemaining.toLocaleString('en-IN')}`);
+                if (nextRemaining <= 0.01) {
+                    setSummaryBillTotal(null);
+                    setSummaryBillRemaining(null);
+                    setSummaryBillEditMode(false);
+                    setSummaryBillLinkedEntries([]);
+                    try {
+                        localStorage.removeItem('expenseEntryPrefill');
+                        localStorage.removeItem('summaryBillEditProgress');
+                    } catch {
+                        // ignore
+                    }
+                    resetForm();
+                    if (typeof onSuccess === 'function') {
+                        try { await onSuccess(savedExpenseData || null); } catch { }
+                    }
+                }
+                return;
+            }
             if (summaryBillMode) {
                 const entryAmt = parseFloat(String(amount).replace(/,/g, "")) || 0;
                 const prevRemaining = Number(summaryBillRemaining ?? summaryBillTotal ?? 0) || 0;
@@ -2352,6 +2555,10 @@ const Form = ({
         setSelectedType("");
         setPaymentMode('');
         setBillPaymentsCashRegisterPrefill(false);
+        setSummaryBillEditMode(false);
+        setSummaryBillLinkedEntries([]);
+        setSummaryBillTotal(null);
+        setSummaryBillRemaining(null);
         setWeeklyExpenseIdForBillCopyUrl(null);
         setSelectedEbNumber(null);
         setSelectedMonths('');
@@ -2600,9 +2807,26 @@ const Form = ({
             fileInputRef.current.click();
         }
     };
-    const sortedSiteOptions = siteOptions.sort((a, b) =>
-        a.label.localeCompare(b.label)
-    );
+    const sortedSiteOptions = useMemo(() => {
+        let options = siteOptions;
+        if (summaryBillEditMode && summaryBillLinkedEntries.length > 0) {
+            const linkedProjectIds = new Set();
+            const linkedProjectNames = new Set();
+            summaryBillLinkedEntries.forEach((entry) => {
+                const projectId = getExpenseProjectId(entry);
+                if (projectId != null && projectId !== '') {
+                    linkedProjectIds.add(Number(projectId));
+                }
+                const siteName = String(entry.siteName ?? entry.projectName ?? '').trim().toLowerCase();
+                if (siteName) linkedProjectNames.add(siteName);
+            });
+            options = siteOptions.filter((opt) =>
+                linkedProjectIds.has(Number(opt.id)) ||
+                linkedProjectNames.has(String(opt.label ?? '').trim().toLowerCase())
+            );
+        }
+        return [...options].sort((a, b) => a.label.localeCompare(b.label));
+    }, [siteOptions, summaryBillEditMode, summaryBillLinkedEntries]);
     const formatDateForReview = (dateString) => {
         if (!dateString) return '-';
         const date = new Date(dateString);
@@ -2864,7 +3088,7 @@ const Form = ({
                                         placeholder={EXPENSE_FORM_FIELDS.projectName}
                                         isSearchable={true}
                                         value={selectedSite}
-                                        onChange={setSelectedSite}
+                                        onChange={summaryBillEditMode ? handleSummaryBillSiteChange : setSelectedSite}
                                         styles={customStyles}
                                         isClearable
                                         className="custom-select rounded-lg w-[300px] h-[40px] no-scrollbar scrollbar-none text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
@@ -2875,6 +3099,12 @@ const Form = ({
                                         <label className="text-md font-semibold block">{EXPENSE_FORM_FIELDS.vendorContractorName}<span className="text-[#E4572E]">*</span></label>
                                         {selectedType && <span className="text-[14px] text-[#E4572E] font-semibold block mt-0.5">{selectedType}</span>}
                                     </div>
+                                    {summaryBillEditMode ? (
+                                        <UtilityHubReadonlyField
+                                            value={vendorOrContractorLabel || '-'}
+                                            className="w-[300px]"
+                                        />
+                                    ) : (
                                     <Select
                                         options={combinedOptions}
                                         value={selectedOption}
@@ -2884,6 +3114,7 @@ const Form = ({
                                         isClearable
                                         className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                     />
+                                    )}
                                 </div>
                             </div>
                             <div className='lg:flex gap-[16px]'>

@@ -11,10 +11,15 @@ import {
   isStaffAdvanceChequePaymentMode,
 } from '../../utils/staffAdvanceWeeklyPaymentBill';
 import AdvancePortalEditPaymentModal from '../Advance Portal/AdvancePortalEditPaymentModal';
+import { DATABASE_TABLE_FILTER_SELECT_STYLES, formatEdbcFilterDateDMY } from '../ExpensesEntry/databaseExpensesSharedColumns';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
-import Filter from '../Images/filter (3).png'
+import Filter from '../Images/TableFilter.svg';
+import Search from '../Images/Searchnew.svg';
+import Reload from '../Images/Clear.svg';
+import Pdf from '../Images/pdf.png';
+import XL from '../Images/sheets.png';
 import edit from '../Images/Edit.svg';
 
 // EditModal is now inline - no need for lazy loading
@@ -331,6 +336,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   const [selectType, setSelectType] = useState('');
   const [selectMode, setSelectMode] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [overallSearch, setOverallSearch] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [editingId, setEditingId] = useState(null);
@@ -348,6 +354,8 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const scrollRef = useRef(null);
+  const filterRowRef = useRef(null);
+  const filterNudgeUsedRef = useRef(false);
   const [staffAdvanceCombinedOptions, setStaffAdvanceCombinedOptions] = useState([]);
   const adminUsernames = ['Mahalingam M', 'Admin'];
   const normalizedUsername = (username || '').trim().toLowerCase();
@@ -864,9 +872,27 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
       if (debouncedFilters.selectMode) {
         if (String(entry.staff_payment_mode || "").toLowerCase() !== debouncedFilters.selectMode.toLowerCase()) return false;
       }
+      if (overallSearch.trim()) {
+        const q = overallSearch.toLowerCase().trim();
+        const searchable = [
+          formatDateOnly(entry.date),
+          getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id),
+          getPurposeName(entry.from_purpose_id),
+          getPurposeName(entry.to_purpose_id),
+          entry.amount,
+          entry.staff_refund_amount,
+          entry.type,
+          entry.staff_payment_mode,
+          entry.description,
+          entry.entry_no,
+        ]
+          .map((v) => String(v ?? '').toLowerCase())
+          .join(' ');
+        if (!searchable.includes(q)) return false;
+      }
       return true;
     });
-  }, [records, debouncedFilters, getEmployeeName, getLabourName, getPurposeName]);
+  }, [records, debouncedFilters, overallSearch, getEmployeeName, getLabourName, getPurposeName, formatDateOnly]);
   const advanceTotal = filteredRecords
     .filter(r => r.type === 'Advance')
     .reduce((acc, r) => acc + (r.amount || 0), 0);
@@ -1075,12 +1101,23 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
       }
     };
   },[]);
-  if (isInitialLoading) {
+  const clearFilters = () => {
+    setSelectDate('');
+    setSelectEmployeeName('');
+    setSelectPurpose('');
+    setSelectTransferTo('');
+    setSelectType('');
+    setSelectMode('');
+    setOverallSearch('');
+    setShowFilters(false);
+  };
+  if (error && error.startsWith('Failed to load')) {
     return (
-      <div className="p-6 bg-[#faf6ed] min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#BF9853] mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading data...</p>
+      <div className='flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]'>
+        <div className='px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]'>
+          <div className='bg-white w-full rounded-[6px] p-10 flex flex-1 items-center justify-center'>
+            <div className="text-lg text-red-600">{error}</div>
+          </div>
         </div>
       </div>
     );
@@ -1116,116 +1153,168 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
     }
   };
   return (
-    <div className="bg-[#faf6ed]">
-      <div className=' xl:w-[1850px] bg-white text-left lg:flex gap-5 p-5 ml-10 mr-10 shadow-sm rounded'>
-        <div className=''>
-          <label className='block mb-2 font-semibold'>Advance Amount</label>
-          <input
-            className='w-[183px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
-            value={`₹${advanceTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
-            readOnly
-          />
-        </div>
-        <div className=' '>
-          <label className='block mb-2 font-semibold'>Transfer Amount</label>
-          <input
-            className='w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
-            value={`₹${transferTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
-            readOnly
-          />
-        </div>
-        <div className=''>
-          <label className='block mb-2 font-semibold'>Refund Amount</label>
-          <input
-            className='w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
-            value={`₹${refundTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
-            readOnly
-          />
-        </div>
-      </div>
-      {error && (
-        <div className="mb-4 p-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded-lg w-full">
-          <p className="font-semibold">Warning:</p>
-          <p>{error}</p>
-        </div>
-      )}
-      <div className=' xl:w-[1850px] bg-white mt-5 pt-5 ml-10 mr-10'>
-        <div
-          className={`text-left flex ${selectDate || selectEmployeeName || selectPurpose || selectTransferTo || selectType || selectMode
-            ? 'flex-col sm:flex-row sm:justify-between'
-            : 'flex-row justify-between items-center'
-            } mb-3 gap-2`}>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
-            <button className='pl-2' onClick={() => setShowFilters(!showFilters)}>
-              <img
-                src={Filter}
-                alt="Toggle Filter"
-                className="w-7 h-7 border border-[#BF9853] rounded-md ml-3"
-              />
-            </button>
-            {(selectDate || selectEmployeeName || selectPurpose || selectTransferTo || selectType || selectMode) && (
-              <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
-                {selectDate && (
-                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
-                    <span className="font-normal">Date: </span>
-                    <span className="font-bold">{selectDate}</span>
-                    <button onClick={() => setSelectDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
-                  </span>
-                )}
-                {selectEmployeeName && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Employee: </span>
-                    <span className="font-bold">{selectEmployeeName}</span>
-                    <button onClick={() => setSelectEmployeeName('')} className="text-[#BF9853] text-2xl ml-1">×</button>
-                  </span>
-                )}
-                {selectPurpose && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Purpose:</span>
-                    <span className="font-bold">{selectPurpose}</span>
-                    <button onClick={() => setSelectPurpose('')} className="text-[#BF9853] text-2xl ml-1">×</button>
-                  </span>
-                )}
-                {selectTransferTo && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Transfer To: </span>
-                    <span className="font-bold">{selectTransferTo}</span>
-                    <button onClick={() => setSelectTransferTo('')} className="text-[#BF9853] text-2xl ml-1">×</button>
-                  </span>
-                )}
-                {selectType && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Type: </span>
-                    <span className="font-bold">{selectType}</span>
-                    <button onClick={() => setSelectType('')} className="text-[#BF9853] text-2xl ml-1">×</button>
-                  </span>
-                )}
-                {selectMode && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Mode: </span>
-                    <span className="font-bold">{selectMode}</span>
-                    <button onClick={() => setSelectMode('')} className="text-[#BF9853] text-2xl ml-1">×</button>
-                  </span>
-                )}
+    <div className='flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]'>
+      <div className='px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]'>
+        <div className='w-full pt-[18px] px-[18px] pb-[18px] rounded-[6px] bg-white mb-[18px] text-left flex items-center gap-6'>
+          <div className='w-full xl:w-auto xl:justify-between'>
+            <div className='flex flex-wrap gap-[12px]'>
+              <div>
+                <label className='block mb-[8px] font-semibold'>Advance Amount</label>
+                <input
+                  className='lg:w-[150px] h-[40px] rounded-lg border border-[#00000029] font-semibold bg-[#ededed] focus:outline-none p-2'
+                  value={`₹${advanceTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  readOnly
+                />
               </div>
-            )}
-          </div>
-          <div className='space-x-4 flex justify-end mr-4'>
-            <button onClick={exportPDF} className='text-sm text-[#E4572E] hover:underline font-bold'>Export PDF</button>
-            <button onClick={exportCSV} className='text-sm text-[#007233] hover:underline font-bold'>Export XL</button>
-            <button className='text-sm text-[#BF9853] hover:underline font-bold'>Print</button>
+              <div>
+                <label className='block mb-[8px] font-semibold'>Transfer Amount</label>
+                <input
+                  className='lg:w-[150px] h-[40px] rounded-lg border border-[#00000029] font-semibold bg-[#ededed] focus:outline-none p-2'
+                  value={`₹${transferTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  readOnly
+                />
+              </div>
+              <div>
+                <label className='block mb-[8px] font-semibold'>Refund Amount</label>
+                <input
+                  className='lg:w-[150px] h-[40px] rounded-lg border border-[#00000029] font-semibold bg-[#ededed] focus:outline-none p-2'
+                  value={`₹${refundTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  readOnly
+                />
+              </div>
+            </div>
           </div>
         </div>
-        <div className='border-l-8 border-l-[#BF9853] rounded-lg ml-5 mr-5'>
+        {error && !error.startsWith('Failed to load') && (
+          <div className="mb-[12px] p-3 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded-[6px] w-full">
+            <p className="font-semibold text-sm">Warning:</p>
+            <p className="text-sm">{error}</p>
+          </div>
+        )}
+        <div className="w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
           <div
-            ref={scrollRef}
-            className='overflow-auto max-h-[500px]'
-            style={{ willChange: 'scroll-position' }}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-          >
+            className={`text-left flex ${selectDate || selectEmployeeName || selectPurpose || selectTransferTo || selectType || selectMode
+              ? 'flex-col sm:flex-row sm:justify-between'
+              : 'flex-row justify-between items-center'
+              } mb-[12px] gap-[6px]`}>
+            <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
+              <button
+                className=''
+                onClick={() => {
+                  const willOpen = !showFilters;
+                  const scroller = scrollRef.current;
+                  if (willOpen) {
+                    setShowFilters(true);
+                    if (!scroller) return;
+                    if (scroller.scrollTop <= 0) return;
+                    if (filterNudgeUsedRef.current) return;
+                    filterNudgeUsedRef.current = true;
+                    requestAnimationFrame(() => {
+                      requestAnimationFrame(() => {
+                        const h = filterRowRef.current?.offsetHeight || 0;
+                        if (h > 0) {
+                          scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+                        }
+                      });
+                    });
+                    return;
+                  }
+                  const h = filterRowRef.current?.offsetHeight || 0;
+                  setShowFilters(false);
+                  if (!scroller || h <= 0 || !filterNudgeUsedRef.current) return;
+                  filterNudgeUsedRef.current = false;
+                  requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                      scroller.scrollTop = scroller.scrollTop + h;
+                    });
+                  });
+                }}
+              >
+                <img
+                  src={Filter}
+                  alt="Toggle Filter"
+                  className="border rounded-md h-[34px]"
+                />
+              </button>
+              {(selectDate || selectEmployeeName || selectPurpose || selectTransferTo || selectType || selectMode) && (
+                <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
+                  {selectDate && (
+                    <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
+                      <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(selectDate)}</span>
+                      <button onClick={() => setSelectDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                    </span>
+                  )}
+                  {selectEmployeeName && (
+                    <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Employee: </span>
+                      <span className="font-semibold text-[14px] truncate min-w-0">{selectEmployeeName}</span>
+                      <button onClick={() => setSelectEmployeeName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                    </span>
+                  )}
+                  {selectPurpose && (
+                    <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Purpose: </span>
+                      <span className="font-semibold text-[14px] truncate min-w-0">{selectPurpose}</span>
+                      <button onClick={() => setSelectPurpose('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                    </span>
+                  )}
+                  {selectTransferTo && (
+                    <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Transfer To: </span>
+                      <span className="font-semibold text-[14px] truncate min-w-0">{selectTransferTo}</span>
+                      <button onClick={() => setSelectTransferTo('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                    </span>
+                  )}
+                  {selectType && (
+                    <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Type: </span>
+                      <span className="font-semibold text-[14px] truncate min-w-0">{selectType}</span>
+                      <button onClick={() => setSelectType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                    </span>
+                  )}
+                  {selectMode && (
+                    <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Mode: </span>
+                      <span className="font-semibold text-[14px] truncate min-w-0">{selectMode}</span>
+                      <button onClick={() => setSelectMode('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className='flex items-end gap-[6px]'>
+              <button onClick={clearFilters} className='flex h-[34px] w-[32px] shrink-0 items-center justify-center'>
+                <img className='w-full h-full' src={Reload} alt="Reload" />
+              </button>
+              <div className="w-[286px] min-w-[286px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
+                <input
+                  type="text"
+                  value={overallSearch}
+                  onChange={(e) => setOverallSearch(e.target.value)}
+                  placeholder="Search Transactions..."
+                  className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
+                />
+                <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
+              </div>
+              <div className='text-left md:text-right md:items-end items-end cursor-default flex justify-end max-w-screen-2xl table-auto overflow-auto w-full scrollbar-none no-scrollbar'>
+                <div className='flex items-end text-center'>
+                  <span className='text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportPDF}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
+                  <span className='text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportCSV}>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div
+              ref={scrollRef}
+              className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none no-scrollbar scrollbar-none"
+              onWheel={() => { filterNudgeUsedRef.current = false; }}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            >
             <table className="w-full border-collapse">
               <thead className="sticky top-0 z-10 bg-white ">
                 <tr className="bg-[#FAF6ED]">
@@ -1267,13 +1356,13 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
                   <th className="px-2 min-w-[80px] font-bold text-left">Activity</th>
                 </tr>
                 {showFilters && (
-                  <tr className="bg-white border-b border-gray-200">
+                  <tr ref={filterRowRef} className="bg-white border-b border-gray-200">
                     <th className="pt-2 pb-2 w-44">
                       <input
                         type="date"
                         value={selectDate}
                         onChange={(e) => setSelectDate(e.target.value)}
-                        className="p-1 rounded-md bg-transparent w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none mr-10"
+                        className="p-1 rounded-lg bg-transparent w-32 border-2 border-[rgba(191,152,83,0.2)] focus:outline-none"
                         placeholder="Search Date..."
                       />
                     </th>
@@ -1286,44 +1375,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
                         placeholder="Employee..."
                         isSearchable
                         isClearable
-                        styles={{
-                          control: (provided, state) => ({
-                            ...provided,
-                            backgroundColor: 'transparent',
-                            borderWidth: '3px',
-                            borderColor: state.isFocused
-                              ? 'rgba(191, 152, 83, 0.2)'
-                              : 'rgba(191, 152, 83, 0.2)',
-                            borderRadius: '6px',
-                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                            '&:hover': {
-                              borderColor: 'rgba(191, 152, 83, 0.2)',
-                            },
-                          }),
-                          placeholder: (provided) => ({
-                            ...provided,
-                            color: '#999',
-                            textAlign: 'left',
-                          }),
-                          menu: (provided) => ({
-                            ...provided,
-                            zIndex: 9,
-                          }),
-                          option: (provided, state) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            fontSize: '15px',
-                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                            color: 'black',
-                          }),
-                          singleValue: (provided) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            color: 'black',
-                          }),
-                        }}
+                        styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                       />
                     </th>
                     <th className="pt-2 pb-2 w-[300px]">
@@ -1335,44 +1387,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
                         placeholder="Purpose..."
                         isSearchable
                         isClearable
-                        styles={{
-                          control: (provided, state) => ({
-                            ...provided,
-                            backgroundColor: 'transparent',
-                            borderWidth: '3px',
-                            borderColor: state.isFocused
-                              ? 'rgba(191, 152, 83, 0.2)'
-                              : 'rgba(191, 152, 83, 0.2)',
-                            borderRadius: '6px',
-                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                            '&:hover': {
-                              borderColor: 'rgba(191, 152, 83, 0.2)',
-                            },
-                          }),
-                          placeholder: (provided) => ({
-                            ...provided,
-                            color: '#999',
-                            textAlign: 'left',
-                          }),
-                          menu: (provided) => ({
-                            ...provided,
-                            zIndex: 9,
-                          }),
-                          option: (provided, state) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            fontSize: '15px',
-                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                            color: 'black',
-                          }),
-                          singleValue: (provided) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            color: 'black',
-                          }),
-                        }}
+                        styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                       />
                     </th>
                     <th className="pt-2 pb-2 w-[350px]">
@@ -1384,79 +1399,48 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
                         placeholder="Transfer To..."
                         isSearchable
                         isClearable
-                        styles={{
-                          control: (provided, state) => ({
-                            ...provided,
-                            backgroundColor: 'transparent',
-                            borderWidth: '3px',
-                            borderColor: state.isFocused
-                              ? 'rgba(191, 152, 83, 0.2)'
-                              : 'rgba(191, 152, 83, 0.2)',
-                            borderRadius: '6px',
-                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                            '&:hover': {
-                              borderColor: 'rgba(191, 152, 83, 0.2)',
-                            },
-                          }),
-                          placeholder: (provided) => ({
-                            ...provided,
-                            color: '#999',
-                            textAlign: 'left',
-                          }),
-                          menu: (provided) => ({
-                            ...provided,
-                            zIndex: 9,
-                          }),
-                          option: (provided, state) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            fontSize: '15px',
-                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                            color: 'black',
-                          }),
-                          singleValue: (provided) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            color: 'black',
-                          }),
-                        }}
+                        styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                       />
                     </th>
-                    <th className=' pt-2 pb-2'></th>
-                    <th className=' pt-2 pb-2'></th>
+                    <th className='pt-2 pb-2'></th>
+                    <th className='pt-2 pb-2'></th>
                     <th className="pt-2 pb-2">
-                      <select value={selectType} onChange={(e) => setSelectType(e.target.value)}
-                        className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                      <Select
+                        options={typeOptions.map((type) => ({ value: type, label: type }))}
+                        value={selectType ? { value: selectType, label: selectType } : null}
+                        onChange={(opt) => setSelectType(opt ? opt.value : "")}
+                        className="focus:outline-none text-xs"
                         placeholder="Type..."
-                      >
-                        <option value=''>Select Type...</option>
-                        {typeOptions.map(type => (
-                          <option key={type} value={type}>{type}</option>
-                        ))}
-                      </select>
+                        isClearable
+                        styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                      />
                     </th>
                     <th className="pt-2 pb-2">
-                      <select value={selectMode} onChange={(e) => setSelectMode(e.target.value)}
-                        className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                      <Select
+                        options={modeOptions.map((mode) => ({ value: mode, label: mode }))}
+                        value={selectMode ? { value: selectMode, label: selectMode } : null}
+                        onChange={(opt) => setSelectMode(opt ? opt.value : "")}
+                        className="focus:outline-none text-xs"
                         placeholder="Mode..."
-                      >
-                        <option value=''>Select</option>
-                        {modeOptions.map(mode => (
-                          <option key={mode} value={mode}>{mode}</option>
-                        ))}
-                      </select>
+                        isClearable
+                        styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                      />
                     </th>
                     <th className="pt-2 pb-2"></th>
-                    <th className=' pt-2 pb-2'></th>
-                    <th className=' pt-2 pb-2'></th>
-                    <th className=' pt-2 pb-2'></th>
+                    <th className='pt-2 pb-2'></th>
+                    <th className='pt-2 pb-2'></th>
+                    <th className='pt-2 pb-2'></th>
                   </tr>
                 )}
               </thead>
               <tbody>
-                {currentData.length > 0 ? (
+                {isInitialLoading ? (
+                  <tr>
+                    <td className="p-4 text-center text-sm text-gray-500" colSpan={12}>
+                      Loading data...
+                    </td>
+                  </tr>
+                ) : currentData.length > 0 ? (
                   currentData.map((entry, index) => (
                     <TableRow
                       key={entry.id}
@@ -1478,42 +1462,39 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
                 )}
               </tbody>
             </table>
+            </div>
           </div>
-        </div>
-        {sortedData.length > 0 && (
-          <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white">
-            <div className="flex items-center space-x-2 mb-4 sm:mb-0">
-              <label className="text-sm font-medium text-gray-700">Show:</label>
-              <select value={itemsPerPage} onChange={handleItemsPerPageChange}
-                className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent"
-              >
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-                <option value={200}>200</option>
-                <option value={300}>300</option>
-                <option value={400}>400</option>
-                <option value={500}>500</option>
-                <option value={600}>600</option>
-                <option value={700}>700</option>
-                <option value={800}>800</option>
-                <option value={900}>900</option>
-                <option value={1000}>1000</option>
-              </select>
-              <span className="text-sm text-gray-700">entries</span>
-            </div>
-            <div className="text-sm text-gray-700 mb-4 sm:mb-0">
-              Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
-            </div>
-            <div className="flex items-center space-x-2">
-              <button onClick={goToPreviousPage} disabled={currentPage === 1}
-                className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === 1
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
-                  }`}
-              >
-                Previous
-              </button>
+          {sortedData.length > 0 && (
+            <div className="flex shrink-0 items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-700">Items per page:</span>
+                <select value={itemsPerPage} onChange={handleItemsPerPageChange}
+                  className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                >
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={200}>200</option>
+                  <option value={300}>300</option>
+                  <option value={400}>400</option>
+                  <option value={500}>500</option>
+                  <option value={600}>600</option>
+                  <option value={700}>700</option>
+                  <option value={800}>800</option>
+                  <option value={900}>900</option>
+                  <option value={1000}>1000</option>
+                </select>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-700">
+                  Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
+                </span>
+              </div>
               <div className="flex items-center space-x-1">
+                <button onClick={goToPreviousPage} disabled={currentPage === 1}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                >
+                  Previous
+                </button>
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum;
                   if (totalPages <= 5) {
@@ -1529,29 +1510,26 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
                     <button
                       key={pageNum}
                       onClick={() => goToPage(pageNum)}
-                      className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === pageNum
-                        ? 'bg-[#BF9853] text-white'
-                        : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
+                      className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${currentPage === pageNum
+                        ? 'bg-[#BF9853] text-white border-[#BF9853]'
+                        : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
                         }`}
                     >
                       {pageNum}
                     </button>
                   );
                 })}
+                <button
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                >
+                  Next
+                </button>
               </div>
-              <button
-                onClick={goToNextPage}
-                disabled={currentPage === totalPages}
-                className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === totalPages
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
-                  }`}
-              >
-                Next
-              </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
         {isEditModalOpen && (
           <EditModal
             isOpen={isEditModalOpen}

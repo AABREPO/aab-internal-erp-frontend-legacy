@@ -238,7 +238,7 @@ const EDBC_CONFIG = {
         columnWidthClass: EDBC8_HEADER_W,
         filterWidthClass: EDBC8_HEADER_W,
         headerClass: `pl-[1px] pr-[9px] ${EDBC8_HEADER_W} font-bold text-right cursor-pointer hover:bg-gray-200 select-none`,
-        filterThClass: 'pr-[9px]',
+        filterThClass: 'pr-[1px]',
         tdClass: `pl-[1px] pr-[9px] ${EDBC8_BODY_W} text-right`,
         bodyCellKey: 'amount',
         inputClassName: `${EDBC8_HEADER_W} ${EDBC_TEXT_INPUT_CLASS} px-2 text-right`,
@@ -248,7 +248,7 @@ const EDBC_CONFIG = {
         columnWidthClass: EDBC22_HEADER_W,
         filterWidthClass: EDBC22_HEADER_W,
         headerClass: `pl-[1px] pr-[9px] ${EDBC22_HEADER_W} font-bold text-right cursor-pointer hover:bg-gray-200 select-none`,
-        filterThClass: 'pr-[9px]',
+        filterThClass: 'pr-[1px]',
         tdClass: `pl-[1px] pr-[9px] ${EDBC22_BODY_W} text-right`,
         bodyCellKey: 'amount',
         inputClassName: `${EDBC22_HEADER_W} ${EDBC_TEXT_INPUT_CLASS} px-2 text-right`,
@@ -1506,9 +1506,9 @@ export const EdbcFileBodyCell = ({ columnId, expense }) => {
 /** Shared filter toggle button for EDBC table toolbars. */
 export const EdbcFilterToggleButton = ({
     onClick,
-    buttonClassName = '',
-    imageClassName = ' border rounded-md',
-    type,
+    buttonClassName = 'shrink-0',
+    imageClassName = 'h-[34px] w-auto shrink-0 border rounded-md',
+    type = 'button',
 }) => (
     <button type={type} className={buttonClassName} onClick={onClick}>
         <img src={FilterIcon} alt="Toggle Filter" className={imageClassName} />

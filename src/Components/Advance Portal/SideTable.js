@@ -945,12 +945,7 @@ const SideTable = ({
           : 'flex shrink-0 flex-col sm:flex-row sm:items-center sm:space-x-3'
       }
     >
-      <EdbcFilterToggleButton
-        type="button"
-        buttonClassName="shrink-0"
-        imageClassName="h-[34px] w-auto shrink-0 border rounded-md"
-        onClick={toggleFilters}
-      />
+      <EdbcFilterToggleButton onClick={toggleFilters} />
       {hasActiveColumnFilters && (
         <div
           ref={hideDiscountAndActivity ? filterChipsScrollRef : null}

@@ -5,9 +5,6 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import Select from "react-select";
 import CustomDateField from '../ExpensesEntry/CustomDateField';
-import Filter from '../Images/TableFilter.svg';
-import Search from '../Images/Searchnew.svg';
-import Reload from '../Images/Clear.svg';
 import Pdf from '../Images/pdf.png';
 import XL from '../Images/sheets.png';
 import {
@@ -25,11 +22,14 @@ import {
   EdbcSelectFilter,
   EdbcTextInputFilter,
   EdbcTotalAmountFilter,
+  matchesEdbcAmountFilter,
   EdbcEmptyFilterCell,
   EdbcDateBodyCell,
   EdbcExpandableBodyCell,
   EdbcFileBodyCell,
   EDBC_TABLE_EDGE_TABLE_CLASS,
+  EdbcFilterToggleButton,
+  EdbcTableToolbarRightActions,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
 
 Date.prototype.getWeekNumber = function () {
@@ -106,6 +106,9 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
   const [selectReportType, setSelectReportType] = useState("");
   const [selectReportMode, setSelectReportMode] = useState("");
   const [selectReportDescription, setSelectReportDescription] = useState("");
+  const [selectReportAmount, setSelectReportAmount] = useState("");
+  const [selectReportBillAmount, setSelectReportBillAmount] = useState("");
+  const [selectReportRefundAmount, setSelectReportRefundAmount] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -118,6 +121,9 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
 
   const scrollRef = useRef(null);
   const tableRef = useRef(null);
+  const filterRowRef = useRef(null);
+  const filterNudgeUsedRef = useRef(false);
+  const filterScrollResetSkipRef = useRef(true);
 
   // drag-scroll momentum refs
   const isDragging = useRef(false);
@@ -131,36 +137,50 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
   const customStyles = {
     control: (provided, state) => ({
       ...provided,
+      fontFamily: 'Manrope',
       borderWidth: '2px',
-      lineHeight: '20px',
-      fontSize: '14px',
+      borderRadius: '8px',
       minHeight: '40px',
       height: '40px',
-      borderRadius: '8px',
-      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.5)' : 'rgba(191, 152, 83, 0.25)',
-      boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+      flexWrap: 'nowrap',
+      borderColor: state.isFocused
+        ? 'rgba(191, 152, 83, 1)'
+        : 'rgba(191, 152, 83, 0.2)',
+      boxShadow: state.isFocused
+        ? '0 0 0 1px rgba(101, 102, 53, 0.2)'
+        : 'none',
       '&:hover': {
-        borderColor: 'rgba(191, 152, 83, 0.5)',
+        borderColor: 'rgba(191, 152, 83, 0.2)',
       },
     }),
-    clearIndicator: (provided) => ({
+    valueContainer: (provided, state) => ({
       ...provided,
-      cursor: 'pointer',
-      color: '#000000',
-      flexShrink: 0,
-    }),
-    valueContainer: (provided) => ({
-      ...provided,
+      flex: '1 1 0%',
+      minWidth: 0,
       flexWrap: 'nowrap',
       overflow: 'hidden',
       paddingLeft: '12px',
-      paddingRight: '2px',
+      paddingRight: state.hasValue ? '2px' : provided.paddingRight,
+      paddingTop: 0,
+      paddingBottom: 0,
+      height: '36px',
+      alignItems: 'center',
     }),
-    dropdownIndicator: (provided, state) => ({
+    singleValue: (provided) => ({
       ...provided,
-      display: state.hasValue ? 'none' : 'flex',
-      color: '#000000',
-      flexShrink: 0,
+      maxWidth: '100%',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+      margin: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      color: 'black',
+    }),
+    input: (provided) => ({
+      ...provided,
+      margin: 0,
+      padding: 0,
     }),
     menu: (provided) => ({
       ...provided,
@@ -173,45 +193,77 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
     }),
     menuList: (provided) => ({
       ...provided,
+      paddingTop: 0,
+      paddingBottom: 0,
       maxHeight: '250px',
       overflowY: 'auto',
       scrollbarWidth: 'none',
       msOverflowStyle: 'none',
-      '&::-webkit-scrollbar': { display: 'none' },
+      '&::-webkit-scrollbar': {
+        display: 'none',
+      },
     }),
-    singleValue: (provided) => ({
+    indicatorSeparator: () => ({ display: 'none' }),
+    indicatorsContainer: (provided) => ({
       ...provided,
-      fontWeight: '500',
-      color: 'black',
-      textAlign: 'left',
-      marginRight: 0,
+      flex: '0 0 auto',
+      paddingLeft: '0',
     }),
-    option: (provided, state) => ({
+    dropdownIndicator: (provided, state) => ({
       ...provided,
-      fontWeight: '500',
-      backgroundColor: state.isSelected 
-        ? 'rgba(191, 152, 83, 0.3)' 
-        : state.isFocused 
-          ? 'rgba(191, 152, 83, 0.1)' 
-          : 'white',
-      color: 'black',
-      textAlign: 'left',
+      display: state.hasValue ? 'none' : 'flex',
+      color: '#000000',
+      flexShrink: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
     }),
-    input: (provided) => ({
+    clearIndicator: (provided) => ({
       ...provided,
-      fontWeight: '500',
-      color: 'black',
-      textAlign: 'left',
+      cursor: 'pointer',
+      color: '#000000',
+      flexShrink: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      paddingLeft: '4px',
+      paddingRight: '4px',
     }),
     placeholder: (provided) => ({
       ...provided,
-      fontWeight: '500',
-      color: '#999',
+      color: '#A6A5A6',
       textAlign: 'left',
+      fontWeight: 'normal',
+      fontSize: '14px',
+      paddingLeft: '0px',
+      paddingTop: '0px',
+      paddingBottom: '0px',
+      margin: 0,
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      maxWidth: '100%',
+      position: 'absolute',
     }),
-    indicatorSeparator: (provided) => ({
+    option: (provided, state) => ({
       ...provided,
-      display: 'none',
+      minHeight: 36,
+      height: 'auto',
+      paddingTop: 6,
+      paddingBottom: 6,
+      whiteSpace: 'normal',
+      display: 'flex',
+      alignItems: 'center',
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+      WebkitTapHighlightColor: '#FAF6ED',
+      backgroundColor: state.isSelected
+        ? '#BF9853'
+        : state.isFocused
+          ? '#FAF6ED'
+          : provided.backgroundColor,
+      color: state.isSelected ? '#FFFFFF' : provided.color,
+      ':active': {
+        backgroundColor: state.isSelected ? '#BF9853' : '#FAF6ED',
+      },
     }),
   };
 
@@ -240,6 +292,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
     };
     scrollRef.current.scrollLeft = scroll.current.left - dx;
     scrollRef.current.scrollTop = scroll.current.top - dy;
+    filterNudgeUsedRef.current = false;
     lastMove.current = { time: now, x: e.clientX, y: e.clientY };
   };
   const handleMouseUp = () => {
@@ -652,6 +705,15 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
         String(item.description ?? "").toLowerCase().includes(selectReportDescription.toLowerCase().trim())
       );
     }
+    if (selectReportAmount.trim()) {
+      filtered = filtered.filter((item) => matchesEdbcAmountFilter(item.amount, selectReportAmount));
+    }
+    if (selectReportBillAmount.trim()) {
+      filtered = filtered.filter((item) => matchesEdbcAmountFilter(item.bill_amount, selectReportBillAmount));
+    }
+    if (selectReportRefundAmount.trim()) {
+      filtered = filtered.filter((item) => matchesEdbcAmountFilter(item.refund_amount, selectReportRefundAmount));
+    }
 
     if (overallSearch.trim()) {
       const q = overallSearch.toLowerCase().trim();
@@ -677,7 +739,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
     }
 
     setFilteredData(filtered);
-  }, [advanceData, startDate, endDate, week, year, paymentModeFilter, typeFilter, selectReportDate, selectReportContractorVendor, selectReportProjectName, selectReportTransfer, selectReportType, selectReportMode, selectReportDescription, overallSearch, contractorOptions, vendorOptions, siteOptions]);
+  }, [advanceData, startDate, endDate, week, year, paymentModeFilter, typeFilter, selectReportDate, selectReportContractorVendor, selectReportProjectName, selectReportTransfer, selectReportType, selectReportMode, selectReportDescription, selectReportAmount, selectReportBillAmount, selectReportRefundAmount, overallSearch, contractorOptions, vendorOptions, siteOptions]);
 
   // fromDate/toDate/totalAdvance computations
   const fromDate = filteredData.length
@@ -691,7 +753,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
       const amount = r.amount || 0;
       return sum + (amount);
     }, 0)
-    .toLocaleString("en-IN");
+    .toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const getFilteredReportTotalAmount = (rows) =>
     rows.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
   const getFilteredReportTotalLabel = () => {
@@ -952,11 +1014,11 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
   const formatReportAmount = (value) => {
     if (value == null || value === "" || value === "-") return "";
     const num = Number(value);
-    return Number.isFinite(num) ? num.toLocaleString("en-IN") : "";
+    return Number.isFinite(num) ? `₹${num.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "";
   };
   useEffect(() => {
     setCurrentPage(1);
-  }, [startDate, endDate, week, year, paymentModeFilter, typeFilter, selectReportDate, selectReportContractorVendor, selectReportProjectName, selectReportTransfer, selectReportType, selectReportMode, selectReportDescription, overallSearch]);
+  }, [startDate, endDate, week, year, paymentModeFilter, typeFilter, selectReportDate, selectReportContractorVendor, selectReportProjectName, selectReportTransfer, selectReportType, selectReportMode, selectReportDescription, selectReportAmount, selectReportBillAmount, selectReportRefundAmount, overallSearch]);
   const openPdfExportModal = () => {
     if (!filteredData.length) {
       alert("No data to export");
@@ -981,7 +1043,71 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
     setSelectReportType("");
     setSelectReportMode("");
     setSelectReportDescription("");
+    setSelectReportAmount("");
+    setSelectReportBillAmount("");
+    setSelectReportRefundAmount("");
+    setSortConfig({ key: null, direction: "asc" });
   }, []);
+
+  const hasActiveColumnFilters = Boolean(
+    selectReportDate || selectReportContractorVendor || selectReportProjectName || selectReportTransfer
+    || selectReportAmount.trim() || selectReportBillAmount.trim() || selectReportRefundAmount.trim()
+    || selectReportType || selectReportMode || selectReportDescription.trim()
+  );
+  const toggleFilters = useCallback(() => {
+    const willOpen = !showFilters;
+    const scroller = scrollRef.current;
+    if (willOpen) {
+      setShowFilters(true);
+      if (!scroller) return;
+      if (scroller.scrollTop <= 0) return;
+      if (filterNudgeUsedRef.current) return;
+      filterNudgeUsedRef.current = true;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const h = filterRowRef.current?.offsetHeight || 0;
+          if (h > 0) {
+            scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+          }
+        });
+      });
+      return;
+    }
+    const h = filterRowRef.current?.offsetHeight || 0;
+    setShowFilters(false);
+    if (!scroller || h <= 0 || !filterNudgeUsedRef.current) return;
+    filterNudgeUsedRef.current = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scroller.scrollTop = scroller.scrollTop + h;
+      });
+    });
+  }, [showFilters]);
+
+  useEffect(() => {
+    if (filterScrollResetSkipRef.current) {
+      filterScrollResetSkipRef.current = false;
+      return;
+    }
+    if (!showFilters) return;
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    filterNudgeUsedRef.current = false;
+    requestAnimationFrame(() => {
+      scroller.scrollTop = 0;
+    });
+  }, [
+    selectReportDate,
+    selectReportContractorVendor,
+    selectReportProjectName,
+    selectReportTransfer,
+    selectReportType,
+    selectReportMode,
+    selectReportDescription,
+    selectReportAmount,
+    selectReportBillAmount,
+    selectReportRefundAmount,
+  ]);
 
   const getSiteEngineerForPdfRow = useCallback(
     (row) => {
@@ -1098,9 +1224,9 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
           contractorOptions.find(c => c.id === row.contractor_id)?.label ||
           vendorOptions.find(v => v.id === row.vendor_id)?.label || "",
         project: siteOptions.find(s => s.id === row.project_id)?.label || "",
-        advance: row.amount?.toLocaleString("en-IN") || "0",
-        bill: row.bill_amount?.toLocaleString("en-IN") || "0",
-        refund: row.refund_amount?.toLocaleString("en-IN") || "0",
+        advance: row.amount?.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00",
+        bill: row.bill_amount?.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00",
+        refund: row.refund_amount?.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00",
         transfer: siteOptions.find(s => s.id === row.transfer_site_id)?.label || "",
         mode: row.payment_mode || "-",
       };
@@ -1131,7 +1257,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
           { content: "Mode", styles: { fontStyle: 'bold' } },
           filteredReportModeLabel,
           { content: filteredReportTotalLabel, styles: { fontStyle: 'bold' } },
-          { content: filteredReportTotal.toLocaleString("en-IN"), styles: { halign: 'right' } },
+          { content: filteredReportTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), styles: { halign: 'right' } },
         ],
       ],
       theme: 'grid',
@@ -1274,7 +1400,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
               { content: "End Date", styles: { fontStyle: 'bold' } },
               billSettlementToDate,
               { content: "Total Bill Amount", styles: { fontStyle: 'bold' } },
-              totalBillAmount.toLocaleString("en-IN"),
+              totalBillAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
             ],
           ],
           theme: 'grid',
@@ -1306,9 +1432,9 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
               contractorOptions.find(c => c.id === row.contractor_id)?.label ||
               vendorOptions.find(v => v.id === row.vendor_id)?.label || "",
             project: siteOptions.find(s => s.id === row.project_id)?.label || "",
-            advance: row.amount?.toLocaleString("en-IN") || "0",
-            bill: row.bill_amount?.toLocaleString("en-IN") || "0",
-            refund: row.refund_amount?.toLocaleString("en-IN") || "0",
+            advance: row.amount?.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00",
+            bill: row.bill_amount?.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00",
+            refund: row.refund_amount?.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00",
             transfer: siteOptions.find(s => s.id === row.transfer_site_id)?.label || "",
             mode: row.payment_mode || "-",
           };
@@ -1425,7 +1551,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
     ];
     const summaryRow = [
       "", "", "", "",
-      `${filteredReportTotalLabel}: ${filteredReportTotal.toLocaleString("en-IN")}`,
+      `${filteredReportTotalLabel}: ${filteredReportTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       "", "", "", "", `Mode: ${filteredReportModeLabel}`, "", ""
     ];
     const rows = sortedData.map((row, idx) => {
@@ -1438,9 +1564,9 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
         new Date(row.date).toLocaleDateString("en-GB"),
         contractor || vendor || "",
         project || "",
-        (row.amount ?? 0).toLocaleString("en-IN"),
-        (row.bill_amount ?? 0).toLocaleString("en-IN"),
-        (row.refund_amount ?? 0).toLocaleString("en-IN"),
+        (row.amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        (row.bill_amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        (row.refund_amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         transferSite || "",
         row.type || "",
         row.payment_mode || "",
@@ -1510,7 +1636,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
           ["Bill Settlement Report", "", "", "", "", "", "", "", "", "", "", ""],
           [`Generated: ${timestamp}`, "", "", "", "", "", "", "", "", "", "", ""],
           ["", "", "", "", "", "", "", "", "", "", "", ""],
-          ["Start Date", billSettlementFromDate, "End Date", billSettlementToDate, "Total Bill Amount", totalBillAmount.toLocaleString("en-IN"), "", "", "", "", "", ""],
+          ["Start Date", billSettlementFromDate, "End Date", billSettlementToDate, "Total Bill Amount", totalBillAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), "", "", "", "", "", ""],
           ["", "", "", "", "", "", "", "", "", "", "", ""],
         ];
         const billSettlementRows = sortedBillSettlement.map((row, idx) => {
@@ -1533,9 +1659,9 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
               : rowDate.toLocaleDateString("en-GB")),
             contractor || vendor || "",
             project || "",
-            (row.amount ?? 0).toLocaleString("en-IN"),
-            (row.bill_amount ?? 0).toLocaleString("en-IN"),
-            (row.refund_amount ?? 0).toLocaleString("en-IN"),
+            (row.amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            (row.bill_amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            (row.refund_amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
             transferSite || "",
             row.type || "",
             row.payment_mode || "",
@@ -1559,6 +1685,25 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
       `AdvanceReport_${fromDate.replace(/\//g, "-")}_to_${toDate.replace(/\//g, "-")}_${timestamp}.xlsx`
     );
   };
+  const weekSelectOptions = useMemo(() => {
+    const selectedYear = parseInt(year, 10);
+    if (!Number.isFinite(selectedYear)) return [];
+    const now = new Date();
+    const currentWeekNum = getISOWeekNumber(now);
+    const currentWeekYear = getWeekYear(now);
+    let maxWeek = 0;
+    if (selectedYear < currentWeekYear) {
+      maxWeek = getISOWeekNumber(new Date(selectedYear, 11, 28));
+    } else if (selectedYear === currentWeekYear) {
+      maxWeek = currentWeekNum;
+    }
+    if (maxWeek < 1) return [];
+    return Array.from({ length: maxWeek }, (_, i) => {
+      const w = maxWeek - i;
+      const label = `Week ${String(w).padStart(2, "0")}`;
+      return { value: label, label };
+    });
+  }, [year]);
   // Keep rendering the page while loading; data will populate once fetched.
   if (error) {
     return (
@@ -1572,10 +1717,11 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
   return (
     <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]">
       <div className="px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
-      <div className="flex flex-wrap flex-col xl:space-y-0 space-y-4 xl:flex-row items-start justify-between bg-white px-[18px] pt-[18px] pb-[18px] rounded-md w-full mx-auto mb-[18px] shrink-0">
-        <div className="flex flex-wrap gap-[12px] text-left">
+      <div className="w-full rounded-[6px] bg-white mb-[18px] shrink-0">
+        <div className="flex flex-wrap items-center justify-between text-left max-md:flex-col max-md:items-stretch">
+        <div className="flex flex-wrap items-center space-x-3 text-left p-[18px]">
           <div>
-            <label className="block font-semibold mb-1">Week No</label>
+            <label className="block font-semibold mb-[8px]">Week No</label>
             <Select
               value={week ? { value: week, label: week } : null}
               onChange={(selectedOption) => {
@@ -1584,20 +1730,17 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
                 setStartDate("");
                 setEndDate("");
               }}
-              options={Array.from({ length: 53 }, (_, i) => ({
-                value: `Week ${String(i + 1).padStart(2, "0")}`,
-                label: `Week ${String(i + 1).padStart(2, "0")}`,
-              }))}
-              placeholder="Select"
+              options={weekSelectOptions}
+              placeholder="Week No"
               isSearchable
               isClearable
               styles={customStyles}
-              className="w-full h-[40px]"
+              className="w-[150px] h-[40px]"
               classNamePrefix="select"
             />
           </div>
           <div>
-            <label className="block font-semibold mb-1">Year</label>
+            <label className="block font-semibold mb-[8px]">Year</label>
             <Select
               value={year ? { value: year, label: year } : null}
               onChange={(selectedOption) => setYear(selectedOption ? selectedOption.value : "")}
@@ -1605,62 +1748,41 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
                 value: y.toString(),
                 label: y.toString(),
               }))}
-              placeholder="Select Year"
+              placeholder="Year"
               isSearchable
               isClearable
               styles={customStyles}
-              className="w-full h-[40px]"
+              className="w-[150px] h-[40px]"
               classNamePrefix="select"
             />
           </div>
           <div>
-            <label className="block font-semibold mb-1">Start Date</label>
-            <CustomDateField
-              value={startDate}
-              onChange={(v) => {
-                setStartDate(v);
-                if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-                  setWeek("");
-                }
-              }}
-              placeholder="Select date"
-              alwaysOpenBelow
-              controlHeightPx={40}
-              className="w-full"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">End Date</label>
-            <CustomDateField
-              value={endDate}
-              onChange={(v) => {
-                setEndDate(v);
-                if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-                  setWeek("");
-                }
-              }}
-              placeholder="Select date"
-              alwaysOpenBelow
-              controlHeightPx={40}
-              className="w-full"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">Payment Mode</label>
+            <label className="block font-semibold mb-[8px]">Payment Mode</label>
             <Select
               value={paymentModeFilter ? { value: paymentModeFilter, label: paymentModeFilter } : null}
               onChange={(selectedOption) => setPaymentModeFilter(selectedOption ? selectedOption.value : "")}
               options={finalPaymentModeOptions}
-              placeholder="All Modes"
+              placeholder="Payment Mode"
               isSearchable
               isClearable
-              styles={customStyles}
-              className="w-[168px]"
+              styles={{
+                ...customStyles,
+                placeholder: (provided) => ({
+                  ...customStyles.placeholder(provided),
+                  color: '#A6A5A6',
+                }),
+                dropdownIndicator: (provided, state) => ({
+                  ...customStyles.dropdownIndicator(provided, state),
+                  paddingLeft: 0,
+                  paddingRight: 4,
+                }),
+              }}
+              className="w-[150px] h-[40px]"
               classNamePrefix="select"
             />
           </div>
           <div>
-            <label className="block font-semibold mb-1">Type</label>
+            <label className="block font-semibold mb-[8px]">Type</label>
             <Select
               value={typeFilter ? { value: typeFilter, label: typeFilter } : null}
               onChange={(selectedOption) => setTypeFilter(selectedOption ? selectedOption.value : "")}
@@ -1670,56 +1792,83 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
                 { value: "Refund", label: "Refund" },
                 { value: "Transfer", label: "Transfer" },
               ]}
-              placeholder="All Types"
+              placeholder="Type"
               isSearchable
               isClearable
-              styles={customStyles}
-              className="w-[168px]"
+              styles={{
+                ...customStyles,
+                placeholder: (provided) => ({
+                  ...customStyles.placeholder(provided),
+                  color: '#A6A5A6',
+                }),
+                dropdownIndicator: (provided, state) => ({
+                  ...customStyles.dropdownIndicator(provided, state),
+                  paddingLeft: 0,
+                  paddingRight: 4,
+                }),
+              }}
+              className="w-[150px] h-[40px]"
               classNamePrefix="select"
             />
           </div>
         </div>
-        <div>
-          <div className="text-sm border-2 border-[#E4572E] border-opacity-15 px-[4px] ml-auto">
-            <div className="grid grid-cols-[max-content_auto_max-content] gap-x-1 gap-y-1">
-              <span className="font-semibold text-right">From Date</span>
-              <span>:</span>
-              <span className="text-red-500 text-right">
+        <div className="flex items-center flex-wrap justify-end pr-[18px] max-xl:basis-full max-xl:pl-[18px] max-xl:justify-start max-xl:pb-[18px] max-md:justify-start max-md:px-[18px] max-md:pb-[18px] max-md:w-full">
+          <div
+            className="rounded-md px-4 py-[8px] text-sm shrink-0"
+            style={{
+              backgroundColor: '#FFFDF9',
+              backgroundImage: [
+                'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+                'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+              ].join(', '),
+              backgroundSize: '100% 1px, 100% 1px, 1px 100%, 1px 100%',
+              backgroundPosition: '0 0, 0 100%, 0 0, 100% 0',
+              backgroundRepeat: 'repeat-x, repeat-x, repeat-y, repeat-y',
+            }}
+          >
+            <div className="flex justify-between text-[14px] gap-6 py-0.5">
+              <span className="flex shrink-0 w-[110px] text-black font-semibold">
+                <span className="whitespace-nowrap">From Date</span>
+                <span className="ml-auto">:</span>
+              </span>
+              <span className="font-semibold" style={{ color: '#E4572E' }}>
                 {startDate
                   ? new Date(startDate).toLocaleDateString("en-GB")
                   : fromDate || "-"}
               </span>
-              <span className="font-semibold text-right">To Date</span>
-              <span>:</span>
-              <span className="text-red-500 text-right">
+            </div>
+            <div className="flex justify-between text-[14px] gap-6 py-0.5">
+              <span className="flex shrink-0 w-[110px] text-black font-semibold">
+                <span className="whitespace-nowrap">To Date</span>
+                <span className="ml-auto">:</span>
+              </span>
+              <span className="font-semibold" style={{ color: '#E4572E' }}>
                 {endDate
                   ? new Date(endDate).toLocaleDateString("en-GB")
                   : toDate || "-"}
               </span>
-              <span className="font-semibold text-right">Total Advance</span>
-              <span>:</span>
-              <span className="text-red-500 font-semibold text-right">{totalAdvance}</span>
+            </div>
+            <div className="flex justify-between text-[14px] gap-6 py-0.5">
+              <span className="flex shrink-0 w-[110px] text-black font-semibold">
+                <span className="whitespace-nowrap">Total Advance</span>
+                <span className="ml-auto">:</span>
+              </span>
+              <span className="font-semibold" style={{ color: '#E4572E' }}>
+                {totalAdvance}
+              </span>
             </div>
           </div>
         </div>
+        </div>
       </div>
       <div className="w-full max-w-[1850px] mx-auto pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
-        <div
-          className={`text-left flex ${selectReportDate || selectReportContractorVendor || selectReportProjectName || selectReportTransfer || selectReportType || selectReportMode || selectReportDescription.trim()
-            ? 'flex-col sm:flex-row sm:justify-between'
-            : 'flex-row justify-between items-center'
-            } mb-[12px] gap-[6px] shrink-0`}
-        >
-          <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
-            <button className='' type="button" onClick={() => setShowFilters((prev) => !prev)}>
-              <img
-                src={Filter}
-                alt="Toggle Filter"
-                className=" border rounded-md h-[34px]"
-              />
-            </button>
-            {(selectReportDate || selectReportContractorVendor || selectReportProjectName || selectReportTransfer || selectReportType || selectReportMode || selectReportDescription.trim()) && (
-              <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
+        <div className="flex min-w-0 w-full flex-nowrap items-center justify-between gap-[6px] mb-[12px] shrink-0 overflow-hidden">
+          <div className={`flex min-w-0 items-center overflow-hidden gap-[6px]${hasActiveColumnFilters ? ' flex-1 min-w-0' : ' shrink-0'}`}>
+            <EdbcFilterToggleButton onClick={toggleFilters} />
+            {hasActiveColumnFilters && (
+              <div className="flex min-w-0 flex-1 overflow-x-auto flex-nowrap gap-2 no-scrollbar scrollbar-none">
                 {selectReportDate && (
                   <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                     <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
@@ -1748,6 +1897,27 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
                     <button onClick={() => setSelectReportTransfer('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
+                {selectReportAmount.trim() && (
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Advance: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectReportAmount}</span>
+                    <button onClick={() => setSelectReportAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  </span>
+                )}
+                {selectReportBillAmount.trim() && (
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Bill Payment: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectReportBillAmount}</span>
+                    <button onClick={() => setSelectReportBillAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  </span>
+                )}
+                {selectReportRefundAmount.trim() && (
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Refund: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectReportRefundAmount}</span>
+                    <button onClick={() => setSelectReportRefundAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  </span>
+                )}
                 {selectReportType && (
                   <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                     <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Type: </span>
@@ -1772,25 +1942,19 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
               </div>
             )}
           </div>
-          <div className='flex items-end gap-[6px]'>
-            <button onClick={clearFilters} className='flex h-[34px] w-[32px] shrink-0 items-center justify-center'>
-              <img className='w-full h-full' src={Reload} alt="Reload" />
-            </button>
-            <div className="w-[286px] min-w-[286px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
-              <input
-                type="text"
-                value={overallSearch}
-                onChange={(e) => setOverallSearch(e.target.value)}
-                placeholder="Search Transactions..."
-                className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
-              />
-              <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
-            </div>
-            <div className=' text-left md:text-right md:items-end items-end cursor-default flex justify-end'>
-              <div className='flex items-end text-center '>
-                <span className='text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={openPdfExportModal}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
-                <span className='text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={handleExportExcel}>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
-              </div>
+          <div className="flex min-w-0 items-center justify-end gap-[6px] shrink-0">
+            <EdbcTableToolbarRightActions
+              onClearFilters={clearFilters}
+              overallSearch={overallSearch}
+              onOverallSearchChange={setOverallSearch}
+              showExportIcons={false}
+              clearButtonType="button"
+              wrapperClassName={null}
+              searchWrapperClassName="h-[34px] min-w-0 flex-1 max-w-[286px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 sm:w-[286px] sm:min-w-[286px] sm:flex-none sm:shrink-0"
+            />
+            <div className="flex shrink-0 items-end gap-2">
+              <span className="text-[#E4572E] flex items-center gap-1 font-semibold hover:underline cursor-pointer" onClick={openPdfExportModal}>PDF<img src={Pdf} alt="Pdf" className="w-4 h-4" /></span>
+              <span className="text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer" onClick={handleExportExcel}>XL<img src={XL} alt="XL" className="w-4 h-4" /></span>
             </div>
           </div>
         </div>
@@ -1798,6 +1962,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
         <div
           ref={scrollRef}
           className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none scrollbar-none no-scrollbar"
+          onWheel={() => { filterNudgeUsedRef.current = false; }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
@@ -1815,16 +1980,16 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
                   onSort={handleEdbcSort}
                 />
                 <EdbcColumnHeader
-                  columnId={EDBC_IDS.EDBC4}
-                  label="Contractor/Vendor"
-                  sortField={resolveEdbcSortField("cv")}
+                  columnId={EDBC_IDS.EDBC3}
+                  label="Project Name"
+                  sortField={resolveEdbcSortField("project")}
                   sortDirection={sortConfig.direction}
                   onSort={handleEdbcSort}
                 />
                 <EdbcColumnHeader
-                  columnId={EDBC_IDS.EDBC3}
-                  label="Project Name"
-                  sortField={resolveEdbcSortField("project")}
+                  columnId={EDBC_IDS.EDBC4}
+                  label="Contractor/Vendor"
+                  sortField={resolveEdbcSortField("cv")}
                   sortDirection={sortConfig.direction}
                   onSort={handleEdbcSort}
                 />
@@ -1877,12 +2042,21 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
                 <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="File" />
               </EdbcTableHeaderRow>
               {showFilters && (
-                <EdbcTableFilterRow>
+                <EdbcTableFilterRow ref={filterRowRef}>
                   <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC21} />
                   <EdbcDateFilter
                     placeholder="Date"
                     value={selectReportDate}
                     onChange={setSelectReportDate}
+                  />
+                  <EdbcProjectNameFilter
+                    placeholder="Project Name"
+                    options={reportFilterOptions.projectOptions}
+                    value={selectReportProjectName}
+                    onChange={setSelectReportProjectName}
+                    blankOption={blankOption}
+                    blankValue={BLANK_VALUE}
+                    selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                   />
                   <EdbcSelectFilter
                     columnId={EDBC_IDS.EDBC4}
@@ -1894,18 +2068,9 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
                     blankValue={BLANK_VALUE}
                     selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                   />
-                  <EdbcProjectNameFilter
-                    placeholder="Project Name"
-                    options={reportFilterOptions.projectOptions}
-                    value={selectReportProjectName}
-                    onChange={setSelectReportProjectName}
-                    blankOption={blankOption}
-                    blankValue={BLANK_VALUE}
-                    selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                  />
-                  <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={reportTotals.amount} />
-                  <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={reportTotals.bill_amount} />
-                  <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={reportTotals.refund_amount} />
+                  <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={reportTotals.amount} value={selectReportAmount} onChange={(e) => setSelectReportAmount(e.target.value)} />
+                  <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={reportTotals.bill_amount} value={selectReportBillAmount} onChange={(e) => setSelectReportBillAmount(e.target.value)} />
+                  <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={reportTotals.refund_amount} value={selectReportRefundAmount} onChange={(e) => setSelectReportRefundAmount(e.target.value)} />
                   <EdbcProjectNameFilter
                     placeholder="Transfer"
                     options={reportFilterOptions.transferOptions}
@@ -1969,20 +2134,20 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
                       formatValue={formatExpenseDateOnly}
                     />
                     <EdbcExpandableBodyCell
-                      columnId={EDBC_IDS.EDBC4}
-                      expense={row}
-                      rowIndex={index}
-                      expandedCells={expandedCells}
-                      onToggleExpanded={toggleExpandedCell}
-                      getDisplayValue={getReportContractorVendorName}
-                    />
-                    <EdbcExpandableBodyCell
                       columnId={EDBC_IDS.EDBC3}
                       expense={row}
                       rowIndex={index}
                       expandedCells={expandedCells}
                       onToggleExpanded={toggleExpandedCell}
                       getDisplayValue={getReportProjectName}
+                    />
+                    <EdbcExpandableBodyCell
+                      columnId={EDBC_IDS.EDBC4}
+                      expense={row}
+                      rowIndex={index}
+                      expandedCells={expandedCells}
+                      onToggleExpanded={toggleExpandedCell}
+                      getDisplayValue={getReportContractorVendorName}
                     />
                     <EdbcExpandableBodyCell
                       columnId={EDBC_IDS.EDBC8}

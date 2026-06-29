@@ -29,6 +29,18 @@ import {
     buildWeeklyPaymentExpenseTypeSummary,
 } from '../../utils/weeklyPaymentStaffAdvancePdf';
 import { syncExpensesEntryFromWeeklyExpenseEdit } from '../../utils/expensesEntryWeeklyPaymentBill';
+import {
+    buildSummaryBillExpenseEditPrefill,
+    buildBillExpenseEntryPrefill,
+    canCloseSummaryBillExpenseModal,
+    clearLinkedExpensesOnWeeklyTypeChange,
+    clearWeeklyExpenseBillCopyUrl,
+    isSummaryBillPaymentRow,
+    isWeeklyRowAmountMatchingLinkedExpenses,
+    resolveLinkedExpensesForWeeklyRow,
+    updatePartyOnLinkedExpenses,
+    weeklyRowHadExpenseEntryLink,
+} from '../../utils/summaryBillWeeklyExpenses';
 import Change from '../Images/dropdownchange.png';
 import { useLiveDataSync } from '../../utils/useLiveDataSync';
 import { useWeeklyPaymentRegisterPermissions } from '../../utils/useWeeklyPaymentRegisterPermissions';
@@ -590,8 +602,10 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
         else if (name === "amount") {
             let numericValue = parseFloat(value);
             if (isNaN(numericValue)) numericValue = "";
-            if (numericValue > balance) {
-                alert(`Amount cannot exceed balance: ${balance}`);
+            const originalAmount = Number(editingOriginalRow?.amount ?? 0) || 0;
+            const availableBalance = Number(balance) + originalAmount;
+            if (numericValue > availableBalance) {
+                alert(`Amount cannot exceed balance: ${availableBalance}`);
                 numericValue = "";
             }
             if (numericValue < 0) numericValue = 0;
@@ -828,60 +842,30 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
         const payments = weeklyPaymentBills.filter(bill => bill.weekly_payment_expense_id === expenseId);
         return payments;
     };
-    // File upload functions — Bill rows open Expenses Entry (Bill Payments) like Utility Dashboard
-    const handleFileUploadClick = (row) => {
+    // File upload — Bill/Claim rows: simple file popup when linked amounts match; else Expenses Entry form
+    const handleFileUploadClick = async (row) => {
         if (row.type === 'Bill Payment' || row.type === 'Claim') {
-            const project = siteOptions.find((opt) => Number(opt.id) === Number(row.project_id));
-            const resolvedSiteName = project?.label ?? '';
-            const isSummaryBillProject = String(resolvedSiteName).trim() === "Summary Bill";
-            const siteName = isSummaryBillProject ? "" : resolvedSiteName;
-            let dateStr = '';
-            if (row.date) {
-                const d = String(row.date);
-                dateStr = d.includes('T') ? d.split('T')[0] : d;
+            try {
+                const linked = await resolveLinkedExpensesForWeeklyRow(row, activeBranchId);
+                if (linked.length > 0) {
+                    if (isWeeklyRowAmountMatchingLinkedExpenses(row, linked)) {
+                        setCurrentFileRow(row);
+                        setSelectedFileForPopup(null);
+                        setFileUploadPopup(true);
+                        return;
+                    }
+                    if (isSummaryBillPaymentRow(row, siteOptions)) {
+                        openSummaryBillExpenseEditModal(row);
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to resolve linked expenses for file upload:', error);
             }
-            const rawVid = row.vendor_id ?? row.vendorId;
-            const rawCid = row.contractor_id ?? row.contractorId;
-            const vendorName =
-                row.vendor ??
-                row.vendor_name ??
-                row.vendorName ??
-                (rawVid != null && !Number.isNaN(Number(rawVid)) ? getVendorName(Number(rawVid)) : "") ??
-                "";
-            const contractorName =
-                row.contractor ??
-                row.contractor_name ??
-                row.contractorName ??
-                (rawCid != null && !Number.isNaN(Number(rawCid)) ? getContractorName(Number(rawCid)) : "") ??
-                "";
-            const prefill = {
-                accountType: row.type === 'Claim' ? 'Claim Payment' : 'Bill Payments',
-                siteName,
-                amount: row.amount,
-                date: dateStr,
-                client_id: row.client_id ?? row.clientId ?? "",
-                client_name: row.client_name ?? row.clientName ?? "",
-                vendorId:
-                    rawVid != null && String(rawVid).trim() !== '' && !Number.isNaN(Number(rawVid))
-                        ? Number(rawVid)
-                        : null,
-                contractorId:
-                    rawCid != null && String(rawCid).trim() !== '' && !Number.isNaN(Number(rawCid))
-                        ? Number(rawCid)
-                        : null,
-                vendorName,
-                contractorName,
-                summaryBillTotal:
-                    isSummaryBillProject && row.amount != null && row.amount !== ""
-                        ? Number(row.amount)
-                        : null,
-                paymentMode: 'Cash',
-                expensesEntryId: row.expenses_entry_id ?? row.expensesEntryId ?? null,
-                fromWeeklyCashRegister: true,
-                weeklyExpenseId: row.id,
-                weeklyExpenseRow: row,
-                source: 'Cash Register',
-            };
+            const prefill = buildBillExpenseEntryPrefill(row, siteOptions, {
+                getVendorName,
+                getContractorName,
+            });
             localStorage.setItem('expenseEntryPrefill', JSON.stringify(prefill));
             setShowBillExpenseEntryModal(true);
             return;
@@ -967,21 +951,15 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
         setSelectedFileForPopup(null);
         setFileUploadPopup(true);
     };
-    const canCloseExpenseEntryModal = () => {
-        try {
-            const raw = localStorage.getItem('expenseEntryPrefill');
-            if (!raw) return true;
-            const parsed = JSON.parse(raw);
-            const total = Number(parsed?.summaryBillTotal ?? parsed?.summary_bill_total ?? 0);
-            if (Number.isFinite(total) && total > 0) {
-                alert('Please complete the full Summary Bill amount before closing this popup.');
-                return false;
-            }
-            return true;
-        } catch {
-            return true;
-        }
+    const openSummaryBillExpenseEditModal = (row) => {
+        const prefill = buildSummaryBillExpenseEditPrefill(row, siteOptions, {
+            getVendorName,
+            getContractorName,
+        });
+        localStorage.setItem('expenseEntryPrefill', JSON.stringify(prefill));
+        setShowBillExpenseEntryModal(true);
     };
+    const canCloseExpenseEntryModal = () => canCloseSummaryBillExpenseModal();
     const handleFileSelectInPopup = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -2655,6 +2633,59 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                 setEditingOriginalRow(null);
                 return;
             }
+            const orig = editingOriginalRow || row;
+            const typeChanged = normalize(editFormData.type) !== normalize(orig.type);
+            const summaryBillPaymentOrig = isSummaryBillPaymentRow(orig, siteOptions);
+            const summaryBillAmountChanged =
+                summaryBillPaymentOrig &&
+                !typeChanged &&
+                Math.abs(Number(editFormData.amount || 0) - Number(orig.amount || 0)) > 0.01;
+            if (typeChanged && weeklyRowHadExpenseEntryLink(orig, siteOptions)) {
+                try {
+                    await clearLinkedExpensesOnWeeklyTypeChange(row.id, orig, username, activeBranchId);
+                    if (orig.bill_copy_url || orig.billCopyUrl) {
+                        await clearWeeklyExpenseBillCopyUrl(row.id, username);
+                    }
+                } catch (deleteError) {
+                    console.error('Failed to delete linked expense entries on type change:', deleteError);
+                    alert('Failed to delete linked expense entries. Please try again.');
+                    return;
+                }
+                editFormData.expenses_entry_id = null;
+            } else if (!typeChanged && summaryBillPaymentOrig) {
+                const vendorChanged = normalize(editFormData.vendor_id) !== normalize(orig.vendor_id);
+                const contractorChanged = normalize(editFormData.contractor_id) !== normalize(orig.contractor_id);
+                if (vendorChanged || contractorChanged) {
+                    const vid = editFormData.vendor_id;
+                    const cid = editFormData.contractor_id;
+                    const vendorName =
+                        vid != null && String(vid).trim() !== '' && !Number.isNaN(Number(vid))
+                            ? (vendorOptions.find((v) => Number(v.id) === Number(vid))?.value ||
+                                  vendorOptions.find((v) => Number(v.id) === Number(vid))?.label ||
+                                  '')
+                            : '';
+                    const contractorName =
+                        cid != null && String(cid).trim() !== '' && !Number.isNaN(Number(cid))
+                            ? (contractorOptions.find((c) => Number(c.id) === Number(cid))?.value ||
+                                  contractorOptions.find((c) => Number(c.id) === Number(cid))?.label ||
+                                  '')
+                            : '';
+                    try {
+                        await updatePartyOnLinkedExpenses(row.id, {
+                            vendorId: vid || null,
+                            contractorId: cid || null,
+                            vendor: vendorName,
+                            contractor: contractorName,
+                            editedBy: username,
+                            branchId: activeBranchId,
+                        });
+                    } catch (partyUpdateError) {
+                        console.error('Failed to update linked Summary Bill expense entries:', partyUpdateError);
+                        alert('Failed to update linked expense entries. Please try again.');
+                        return;
+                    }
+                }
+            }
             const onlyDescriptionChanged =
                 changedFields.length === 1 && changedFields[0] === "description";
             const wasLoan = row.type === "Loan";
@@ -2815,13 +2846,14 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                 editFormData.loan_portal_id = null;
             }
             if (!onlyDescriptionChanged) {
-                const preservedExpensesEntryId =
-                    row.expenses_entry_id ??
-                    row.expensesEntryId ??
-                    editingOriginalRow?.expenses_entry_id ??
-                    editingOriginalRow?.expensesEntryId ??
-                    editFormData.expenses_entry_id ??
-                    null;
+                const preservedExpensesEntryId = typeChanged
+                    ? null
+                    : row.expenses_entry_id ??
+                      row.expensesEntryId ??
+                      editingOriginalRow?.expenses_entry_id ??
+                      editingOriginalRow?.expensesEntryId ??
+                      editFormData.expenses_entry_id ??
+                      null;
                 const finalEditData = {
                     ...row,
                     ...editFormData,
@@ -2835,7 +2867,10 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                     finalEditData.contractor_id = null;
                     finalEditData.vendor_id = null;
                 }
-                if (preservedExpensesEntryId != null && preservedExpensesEntryId !== '') {
+                if (typeChanged && weeklyRowHadExpenseEntryLink(orig, siteOptions)) {
+                    finalEditData.expenses_entry_id = null;
+                    finalEditData.bill_copy_url = null;
+                } else if (preservedExpensesEntryId != null && preservedExpensesEntryId !== '') {
                     finalEditData.expenses_entry_id = preservedExpensesEntryId;
                 }
                 const response = await fetch(
@@ -2872,7 +2907,7 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                 editingOriginalRow?.expensesEntryId ??
                 editFormData.expenses_entry_id ??
                 null;
-            if (expensesEntryId) {
+            if (expensesEntryId && !typeChanged && !weeklyRowHadExpenseEntryLink(orig, siteOptions)) {
                 const weeklyRowForSync = {
                     ...row,
                     ...editFormData,
@@ -2908,6 +2943,9 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
             await refreshWeeklyPaymentData();
             setEditingRowId(null);
             setEditingOriginalRow(null);
+            if (summaryBillAmountChanged) {
+                openSummaryBillExpenseEditModal({ ...row, ...editFormData });
+            }
         } catch (error) {
             console.error("❌ Error updating expense:", error);
         }
@@ -5774,6 +5812,7 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                                     if (!canCloseExpenseEntryModal()) return;
                                     setShowBillExpenseEntryModal(false);
                                     localStorage.removeItem('expenseEntryPrefill');
+                                    localStorage.removeItem('summaryBillEditProgress');
                                 }}
                                 className="w-3 h-3 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
                             >
@@ -5810,6 +5849,7 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                                 onSuccess={async () => {
                                     setShowBillExpenseEntryModal(false);
                                     localStorage.removeItem('expenseEntryPrefill');
+                                    localStorage.removeItem('summaryBillEditProgress');
                                     try {
                                         await fetchExpenses();
                                     } catch {

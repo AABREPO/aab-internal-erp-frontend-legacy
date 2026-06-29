@@ -41,8 +41,105 @@ const ADVANCE_PORTAL_INPUT_CLASS =
   'border-2 border-[#BF9853] rounded-lg px-[8px] w-[300px] h-[40px] focus:outline-none border-opacity-[0.20] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
 const ADVANCE_PORTAL_READONLY_INPUT_CLASS =
   'border-2 border-[#BF9853] rounded-lg px-[8px] w-[300px] h-[40px] focus:outline-none border-opacity-[0.20] bg-[#ededed] text-[14px] font-semibold';
+const ADVANCE_PORTAL_AMOUNT_INPUT_CLASS =
+  'pl-[20px] pr-4 border-2 border-[#BF9853] rounded-lg w-full h-full focus:outline-none border-opacity-[0.20] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const formatNumber = (num) => {
+  if (!num) return '';
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+};
+const formatAmountDisplay = (value) => {
+  if (value === '' || value === null || value === undefined) return '';
+  const normalized = String(value).replace(/,/g, '');
+  const num = Number(normalized);
+  if (Number.isNaN(num)) return String(value);
+  return num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+const ADVANCE_PORTAL_READONLY_AMOUNT_INPUT_CLASS =
+  'pl-[12px] pr-4 border-2 border-[#BF9853] rounded-lg w-full h-full focus:outline-none border-opacity-[0.20] bg-[#ededed] text-[14px] font-medium cursor-default';
+const ADVANCE_PORTAL_FILTER_AMOUNT_INPUT_CLASS =
+  'pl-[12px] pr-2 border border-[#00000029] rounded-lg w-full h-full focus:outline-none bg-[#ededed] text-[14px] font-medium cursor-default';
+const ADVANCE_PORTAL_MODAL_READONLY_AMOUNT_INPUT_CLASS =
+  'pl-7 pr-3 border-2 border-[#BF9853] border-opacity-25 rounded-lg w-full h-full text-gray-600 bg-gray-100 text-sm cursor-default focus:outline-none';
+const AdvancePortalAmountOutput = ({
+  value,
+  variant = 'form',
+  className = '',
+  fullWidth = false,
+}) => {
+  const isFilter = variant === 'filter';
+  const isModalReadonly = variant === 'modal-readonly';
+  const wrapperClass = isFilter
+    ? `relative lg:w-[150px] w-full h-[40px] ${className}`.trim()
+    : isModalReadonly
+      ? `relative w-full h-[45px] ${className}`.trim()
+      : fullWidth
+        ? `relative w-full h-[40px] ${className}`.trim()
+        : `relative w-[300px] h-[40px] ${className}`.trim();
+  const rupeeClass = isFilter
+    ? 'absolute top-1/2 left-2 transform -translate-y-1/2 text-gray-600 text-sm pointer-events-none'
+    : isModalReadonly
+      ? 'absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-600 pointer-events-none'
+      : 'absolute top-1/2 left-[8px] transform -translate-y-1/2 text-gray-600 text-lg pointer-events-none';
+  const inputClass = isFilter
+    ? ADVANCE_PORTAL_FILTER_AMOUNT_INPUT_CLASS
+    : isModalReadonly
+      ? ADVANCE_PORTAL_MODAL_READONLY_AMOUNT_INPUT_CLASS
+      : ADVANCE_PORTAL_READONLY_AMOUNT_INPUT_CLASS;
+  const formattedValue = formatAmountDisplay(value);
+  const displayValue = isModalReadonly
+    ? formattedValue
+    : (formattedValue ? `₹${formattedValue}` : '');
+
+  return (
+    <div className={wrapperClass}>
+      {isModalReadonly && <span className={rupeeClass}>₹</span>}
+      <input
+        type="text"
+        readOnly
+        tabIndex={-1}
+        value={displayValue}
+        className={inputClass}
+      />
+    </div>
+  );
+};
+const AdvancePortalAmountInput = ({
+  value,
+  onChange,
+  placeholder = '',
+  variant = 'form',
+  className = '',
+  fullWidth = false,
+}) => {
+  const isModal = variant === 'modal';
+  const wrapperClass = isModal
+    ? `relative w-full h-[45px] ${className}`.trim()
+    : fullWidth
+      ? `relative w-full h-[40px] ${className}`.trim()
+      : `relative w-[300px] h-[40px] ${className}`.trim();
+  const rupeeClass = isModal
+    ? 'absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-600'
+    : 'absolute top-1/2 left-[8px] transform -translate-y-1/2 text-gray-600 text-lg';
+  const inputClass = isModal
+    ? 'w-full h-[45px] border-2 border-[#BF9853] rounded-lg pl-7 pr-3 border-opacity-20 focus:outline-none text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500'
+    : ADVANCE_PORTAL_AMOUNT_INPUT_CLASS;
+
+  return (
+    <div className={wrapperClass}>
+      <span className={rupeeClass}>₹</span>
+      <input
+        type="text"
+        value={formatNumber(value)}
+        onChange={onChange}
+        placeholder={placeholder}
+        onWheel={(e) => e.target.blur()}
+        className={inputClass}
+      />
+    </div>
+  );
+};
 const ADVANCE_PORTAL_TEXTAREA_CLASS =
-  'border-2 border-[#BF9853] rounded-md px-[8px] lg:w-[616px] w-[300px] h-[60px] focus:outline-none border-opacity-[0.20] resize-none text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+  'border-2 border-[#BF9853] rounded-md px-[8px] w-[616px]  h-[60px] focus:outline-none border-opacity-[0.20] resize-none text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
 const ADVANCE_PORTAL_LABEL_CLASS = 'text-md font-semibold mb-[8px] block';
 const ADVANCE_PORTAL_FORM_FIELDS = {
   selectType: 'Account Type',
@@ -164,7 +261,7 @@ const AdvancePortal = ({
   const [siteOptions, setSiteOptions] = useState([]);
   const [advanceAmount, setAdvanceAmount] = useState('');
   const [dateValue, setDateValue] = useState('');
-  const [projectAdvance, setProjectAdvance] = useState('');
+  const [projectAdvance, setProjectAdvance] = useState('0.00');
   const [paymentMode, setPaymentMode] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -350,30 +447,28 @@ const AdvancePortal = ({
       sessionStorage.removeItem('description');
     }
   }, [selectedType, selectedOption, selectedSite, overallAdvance, billAmount, discountAmount, advanceAmount, transferSiteId, paymentMode, description, lockTypePrefill]);
-  const formatWithCommas = (value) => {
-    if (value === '' || value === null || value === undefined) return "";
-    const numericValue = typeof value === 'number' ? value : Number(value);
-    if (Number.isNaN(numericValue)) {
-      return value.toString();
-    }
-    return numericValue.toLocaleString("en-IN", { maximumFractionDigits: 0 });
-  };
   const handleAmountChange = (e) => {
-    const rawValue = e.target.value.replace(/,/g, "");
+    const rawValue = e.target.value.replace(/,/g, '');
     if (!isNaN(rawValue)) {
       setAdvanceAmount(rawValue);
     }
   };
   const handleDiscountChange = (e) => {
-    const rawValue = e.target.value.replace(/,/g, "");
+    const rawValue = e.target.value.replace(/,/g, '');
     if (!isNaN(rawValue)) {
       setDiscountAmount(rawValue);
     }
   };
   const handleBillAmountChange = (e) => {
-    const rawValue = e.target.value.replace(/,/g, "");
-    if (rawValue === "" || /^\d*\.?\d*$/.test(rawValue)) {
+    const rawValue = e.target.value.replace(/,/g, '');
+    if (!isNaN(rawValue)) {
       setBillAmount(rawValue);
+    }
+  };
+  const handleEditFormAmountChange = (field) => (e) => {
+    const rawValue = e.target.value.replace(/,/g, '');
+    if (!isNaN(rawValue)) {
+      setEditFormData((prev) => ({ ...prev, [field]: rawValue }));
     }
   };
   const handleProjectChange = (selected) => {
@@ -383,6 +478,9 @@ const AdvancePortal = ({
     } else {
       localStorage.removeItem("advanceProjectName");
     }
+  };
+  const handleTransferSiteChange = (selected) => {
+    setTransferSiteId(selected ? selected.id : '');
   };
   useEffect(() => {
     const fetchVendorNames = async () => {
@@ -1360,7 +1458,7 @@ const AdvancePortal = ({
   }, [advanceData, selectedOption]);
   useEffect(() => {
     if (!selectedOption || !selectedSite) {
-      setProjectAdvance('');
+      setProjectAdvance('0.00');
       return;
     }
     const idField = selectedOption.type === 'Vendor' ? 'vendor_id' : 'contractor_id';
@@ -1369,7 +1467,7 @@ const AdvancePortal = ({
         (item) => item[idField] === selectedOption.id && item.project_id === selectedSite.id
       )
       .reduce((sum, entry) => sum + computeAdvanceBalanceDelta(entry), 0);
-    setProjectAdvance(total.toLocaleString('en-IN', { maximumFractionDigits: 2 }));
+    setProjectAdvance(total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
   }, [advanceData, selectedOption, selectedSite]);
   useEffect(() => {
     // Default date to today, but do NOT override Bill Settlement popup prefill
@@ -1490,8 +1588,9 @@ const AdvancePortal = ({
     return `${day}-${month}-${year}`;
   };
   const vendorOrContractorLabel = selectedOption?.label || '-';
-  const formattedAdvanceAmount = advanceAmount ? formatWithCommas(advanceAmount) : '-';
-  const formattedBillAmount = billAmount ? formatWithCommas(billAmount) : '-';
+  const formatReviewAmount = (val) => (val && val !== '-' ? `₹${val}` : val);
+  const formattedAdvanceAmount = advanceAmount ? formatNumber(advanceAmount) : '-';
+  const formattedBillAmount = billAmount ? formatNumber(billAmount) : '-';
   const transferSiteLabel = selectedType === 'Transfer' && transferSiteId
     ? sortedSiteOptions.find(option => option.id === parseInt(transferSiteId))?.label || '-'
     : '-';
@@ -1504,33 +1603,33 @@ const AdvancePortal = ({
     { label: 'Project ID', value: selectedSite?.id || '-' },
   ];
   if (selectedType === 'Bill Settlement') {
-    const formattedDiscountAmount = discountAmount ? formatWithCommas(discountAmount) : '-';
+    const formattedDiscountAmount = discountAmount ? formatNumber(discountAmount) : '-';
     reviewDetails.push(
-      { label: 'Bill Amount', value: formattedBillAmount },
-      { label: 'Discount Amount', value: formattedDiscountAmount },
+      { label: 'Bill Amount', value: formatReviewAmount(formattedBillAmount) },
+      { label: 'Discount Amount', value: formatReviewAmount(formattedDiscountAmount) },
       { label: 'Category', value: selectedCategory?.label || '-' }
     );
   }
   if (selectedType === 'Transfer') {
     reviewDetails.push(
-      { label: 'Transfer Amount', value: formattedAdvanceAmount },
+      { label: 'Transfer Amount', value: formatReviewAmount(formattedAdvanceAmount) },
       { label: 'Transfer To Site', value: transferSiteLabel }
     );
   } else if (selectedType === 'Refund') {
     reviewDetails.push(
-      { label: 'Refund Amount', value: formattedAdvanceAmount },
+      { label: 'Refund Amount', value: formatReviewAmount(formattedAdvanceAmount) },
       { label: 'Payment Mode', value: paymentMode || '-' }
     );
   } else if (selectedType === 'Advance') {
     reviewDetails.push(
-      { label: 'Advance Amount', value: formattedAdvanceAmount },
+      { label: 'Advance Amount', value: formatReviewAmount(formattedAdvanceAmount) },
       { label: 'Payment Mode', value: paymentMode || '-' }
     );
   } else if (selectedType === 'Bill Settlement') {
     const rawAmount = advanceAmount.toString().replace(/,/g, '').trim();
     if (rawAmount) {
       reviewDetails.push(
-        { label: 'Amount Given', value: formattedAdvanceAmount },
+        { label: 'Amount Given', value: formatReviewAmount(formattedAdvanceAmount) },
         { label: 'Payment Mode', value: paymentMode || '-' }
       );
     }
@@ -2009,35 +2108,21 @@ const AdvancePortal = ({
               </div>
               <div>
                 <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Amount Given</label>
-                <input
-                  readOnly
-                  value={filteredAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='lg:w-[150px] h-[40px] border border-[#00000029] rounded-lg bg-[#ededed] focus:outline-none p-2 text-sm'
-                />
+                <AdvancePortalAmountOutput variant="filter" value={filteredAmount} />
               </div>
               <div>
                 <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Today Amount</label>
-                <input
-                  readOnly
-                  type='text'
-                  value={todayAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='lg:w-[150px] h-[40px] border border-[#00000029] rounded-lg bg-[#ededed] focus:outline-none p-2 text-sm'
-                />
+                <AdvancePortalAmountOutput variant="filter" value={todayAmount} />
               </div>
               <div>
                 <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Total Outstanding</label>
-                <input
-                  readOnly
-                  type='text'
-                  value={totalOutstanding.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='lg:w-[150px] h-[40px] border border-[#00000029] rounded-lg bg-[#ededed] focus:outline-none p-2 text-sm'
-                />
+                <AdvancePortalAmountOutput variant="filter" value={totalOutstanding} />
               </div>
             </div>
           </div>
           )}
-        <div className={`w-full flex-1 min-h-0 min-w-0 overflow-hidden flex flex-col ${modalEmbedded ? 'bg-white p-0 rounded-none' : 'pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px]'}`}>
-            <div className='xl:flex flex-1 min-h-0 xl:min-w-0 px- gap-[18px]'>
+        <div className={`w-full flex-1 min-h-0 min-w-0 max-xl:overflow-y-auto xl:overflow-hidden no-scrollbar scrollbar-none flex flex-col ${modalEmbedded ? 'bg-white p-0 rounded-none' : 'pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px]'}`}>
+            <div className='max-xl:flex-none xl:flex flex-1 min-h-0 xl:min-w-0 gap-[18px]'>
               <div className='shrink-0 w-fit' ref={leftFormColRef}>
                 <div className='grid grid-cols-2 gap-3 text-left'>
                   <div className='text-left max-w-[300px]'>
@@ -2102,11 +2187,7 @@ const AdvancePortal = ({
                   </div>
                   <div className='text-left'>
                     <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.overallAdvance}</label>
-                    <input
-                      value={overallAdvance.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                      disabled
-                      className={ADVANCE_PORTAL_READONLY_INPUT_CLASS}
-                    />
+                    <AdvancePortalAmountOutput value={overallAdvance} />
                   </div>
                   <div className='text-left'>
                     <label className={ADVANCE_PORTAL_LABEL_CLASS}>{selectedType === 'Transfer' ? ADVANCE_PORTAL_FORM_FIELDS.fromProjectName : ADVANCE_PORTAL_FORM_FIELDS.projectName}<span className="text-[#E4572E]">*</span></label>
@@ -2124,23 +2205,16 @@ const AdvancePortal = ({
                   {selectedType !== 'Bill Settlement' && (
                     <div className='text-left'>
                       <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.projectAdvance}</label>
-                      <input
-                        value={projectAdvance}
-                        readOnly
-                        onChange={(e) => setProjectAdvance(e.target.value)}
-                        className={ADVANCE_PORTAL_READONLY_INPUT_CLASS}
-                      />
+                      <AdvancePortalAmountOutput value={projectAdvance} />
                     </div>
                   )}
                   {selectedType === 'Bill Settlement' && (
                     <div className='text-left'>
                       <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.billAmount}<span className="text-[#E4572E]">*</span></label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={formatWithCommas(billAmount)}
+                      <AdvancePortalAmountInput
+                        value={billAmount}
                         onChange={handleBillAmountChange}
-                        className={`${ADVANCE_PORTAL_INPUT_CLASS} no-spinner`}
+                        placeholder={ADVANCE_PORTAL_FORM_FIELDS.billAmount}
                       />
                     </div>
                   )}
@@ -2162,10 +2236,11 @@ const AdvancePortal = ({
                         </div>
                         <div className="text-left flex-1">
                           <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.discount}<span className="text-[#E4572E]">*</span></label>
-                          <input
-                            value={formatWithCommas(discountAmount)}
+                          <AdvancePortalAmountInput
+                            value={discountAmount}
                             onChange={handleDiscountChange}
-                            className={`${ADVANCE_PORTAL_INPUT_CLASS} no-spinner`}
+                            placeholder={ADVANCE_PORTAL_FORM_FIELDS.discount}
+                            fullWidth
                           />
                         </div>
                       </div>
@@ -2181,25 +2256,31 @@ const AdvancePortal = ({
                               ? ADVANCE_PORTAL_FORM_FIELDS.refundAmount
                               : ADVANCE_PORTAL_FORM_FIELDS.amountGiven}<span className="text-[#E4572E]">*</span>
                         </label>
-                        <input
-                          value={formatWithCommas(advanceAmount)}
+                        <AdvancePortalAmountInput
+                          value={advanceAmount}
                           onChange={handleAmountChange}
-                          className={`${ADVANCE_PORTAL_INPUT_CLASS} no-spinner hover:!border-[rgba(191,152,83,0.2)] focus:!border-[rgba(191,152,83,1)]`}
+                          placeholder={
+                            selectedType === 'Transfer'
+                              ? ADVANCE_PORTAL_FORM_FIELDS.transferAmount
+                              : selectedType === 'Refund'
+                                ? ADVANCE_PORTAL_FORM_FIELDS.refundAmount
+                                : ADVANCE_PORTAL_FORM_FIELDS.amountGiven
+                          }
+                          fullWidth
                         />
                       </div>
-                      <div className="text-left flex-1">
+                      <div className="text-left">
                         {selectedType === 'Transfer' ? (
                           <>
                             <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.toProjectName}<span className="text-[#E4572E]">*</span></label>
                             <Select
-                              options={sortedSiteOptions}
+                              options={sortedSiteOptions || []}
                               placeholder={ADVANCE_PORTAL_FORM_FIELDS.toProjectName}
-                              isSearchable
-                              value={sortedSiteOptions.find(option => option.id === parseInt(transferSiteId)) || null}
-                              onChange={(selected) => setTransferSiteId(selected ? selected.id : '')}
+                              isSearchable={true}
+                              value={sortedSiteOptions.find((option) => option.id === parseInt(transferSiteId, 10)) || null}
+                              onChange={handleTransferSiteChange}
                               styles={customStyles}
                               isClearable
-                              menuPortalTarget={document.body}
                               className={ADVANCE_PORTAL_SELECT_CLASS}
                             />
                           </>
@@ -2309,31 +2390,31 @@ const AdvancePortal = ({
                   </div>
                   <div>
                     <label className="block mb-2 font-semibold text-sm">Amount</label>
-                    <input
-                      type="number"
+                    <AdvancePortalAmountInput
+                      variant="modal"
                       value={editFormData.amount}
-                      onChange={(e) => setEditFormData({ ...editFormData, amount: e.target.value })}
-                      className="border-2 border-[#BF9853] border-opacity-30 w-full h-[45px] rounded-lg no-spinner focus:outline-none text-sm"
+                      onChange={handleEditFormAmountChange('amount')}
+                      placeholder="Amount"
                     />
                   </div>
                 </div>
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4'>
                   <div>
                     <label className="block mb-2 font-semibold text-sm">Bill Amount</label>
-                    <input
-                      type="number"
+                    <AdvancePortalAmountInput
+                      variant="modal"
                       value={editFormData.bill_amount}
-                      onChange={(e) => setEditFormData({ ...editFormData, bill_amount: e.target.value })}
-                      className="border-2 border-[#BF9853] border-opacity-30 w-full h-[45px] rounded-lg no-spinner focus:outline-none text-sm"
+                      onChange={handleEditFormAmountChange('bill_amount')}
+                      placeholder="Bill Amount"
                     />
                   </div>
                   <div>
                     <label className="block mb-2 font-semibold text-sm">Discount Amount</label>
-                    <input
-                      type="number"
+                    <AdvancePortalAmountInput
+                      variant="modal"
                       value={editFormData.discount_amount}
-                      onChange={(e) => setEditFormData({ ...editFormData, discount_amount: e.target.value })}
-                      className="border-2 border-[#BF9853] border-opacity-30 w-full h-[45px] rounded-lg no-spinner focus:outline-none text-sm"
+                      onChange={handleEditFormAmountChange('discount_amount')}
+                      placeholder="Discount Amount"
                     />
                   </div>
                   <div>
@@ -2371,11 +2452,11 @@ const AdvancePortal = ({
                   </div>
                   <div>
                     <label className="block mb-2 font-semibold text-sm">Refund Amount</label>
-                    <input
-                      type="number"
+                    <AdvancePortalAmountInput
+                      variant="modal"
                       value={editFormData.refund_amount}
-                      onChange={(e) => setEditFormData({ ...editFormData, refund_amount: e.target.value })}
-                      className="border-2 border-[#BF9853] border-opacity-30 w-full h-[45px] rounded-lg no-spinner focus:outline-none text-sm"
+                      onChange={handleEditFormAmountChange('refund_amount')}
+                      placeholder="Refund Amount"
                     />
                   </div>
                 </div>
@@ -2531,11 +2612,9 @@ const AdvancePortal = ({
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
-                        <input
-                          type="number"
+                        <AdvancePortalAmountOutput
+                          variant="modal-readonly"
                           value={paymentModalData.amount}
-                          readOnly
-                          className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
                         />
                       </div>
                       <div>
@@ -2714,12 +2793,11 @@ const AdvancePortal = ({
                           <>
                             <div>
                               <label className="text-sm font-semibold mb-1 block">Bill Amount</label>
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                value={formatWithCommas(billAmount)}
+                              <AdvancePortalAmountInput
+                                variant="modal"
+                                value={billAmount}
                                 onChange={handleBillAmountChange}
-                                className="w-full h-[45px] no-spinner border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20 focus:outline-none"
+                                placeholder={ADVANCE_PORTAL_FORM_FIELDS.billAmount}
                               />
                             </div>
                             <div className="col-span-2">
@@ -2739,10 +2817,11 @@ const AdvancePortal = ({
                                 </div>
                                 <div className="flex-1">
                                   <label className="text-sm font-semibold mb-1 block">Discount</label>
-                                  <input
-                                    value={formatWithCommas(discountAmount)}
+                                  <AdvancePortalAmountInput
+                                    variant="modal"
+                                    value={discountAmount}
                                     onChange={handleDiscountChange}
-                                    className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                    placeholder={ADVANCE_PORTAL_FORM_FIELDS.discount}
                                   />
                                 </div>
                               </div>
@@ -2774,24 +2853,31 @@ const AdvancePortal = ({
                                   ? 'Amount Given'
                                   : 'Amount Given'}
                           </label>
-                          <input
-                            value={formatWithCommas(advanceAmount)}
+                          <AdvancePortalAmountInput
+                            variant="modal"
+                            value={advanceAmount}
                             onChange={handleAmountChange}
-                            className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                            placeholder={
+                              selectedType === 'Transfer'
+                                ? ADVANCE_PORTAL_FORM_FIELDS.transferAmount
+                                : selectedType === 'Refund'
+                                  ? ADVANCE_PORTAL_FORM_FIELDS.refundAmount
+                                  : ADVANCE_PORTAL_FORM_FIELDS.amountGiven
+                            }
                           />
                         </div>
                         {selectedType === 'Transfer' && (
-                          <div>
-                            <label className="text-sm font-semibold mb-1 block">Transfer To Site</label>
+                          <div className="text-left">
+                            <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.toProjectName}<span className="text-[#E4572E]">*</span></label>
                             <Select
-                              options={sortedSiteOptions}
-                              placeholder="Select a site..."
-                              isSearchable
-                              value={sortedSiteOptions.find(option => option.id === parseInt(transferSiteId)) || null}
-                              onChange={(selected) => setTransferSiteId(selected ? selected.id : '')}
+                              options={sortedSiteOptions || []}
+                              placeholder={ADVANCE_PORTAL_FORM_FIELDS.toProjectName}
+                              isSearchable={true}
+                              value={sortedSiteOptions.find((option) => option.id === parseInt(transferSiteId, 10)) || null}
+                              onChange={handleTransferSiteChange}
                               styles={customStyles}
                               isClearable
-                              className="custom-select rounded-lg"
+                              className={ADVANCE_PORTAL_SELECT_CLASS}
                             />
                           </div>
                         )}

@@ -337,7 +337,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         expensesLoadingMore,
         expensesTotalCount,
         refetchExpenses,
-    } = useExpensesListLoader(activeBranchId);
+    } = useExpensesListLoader(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [filteredExpenses, setFilteredExpenses] = useState([]);
     const [editId, setEditId] = useState(null);
@@ -1162,6 +1162,14 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         };
         fetchBranches();
     }, []);
+    useEffect(() => {
+        const branchFilterOptionsBuilt = (Array.isArray(branchOptions) ? branchOptions : []).map((branch) => ({
+            value: String(branch.id),
+            label: branch.branch || String(branch.id),
+        }));
+        branchFilterOptionsBuilt.unshift(blankOption);
+        setBranchFilterOptions(branchFilterOptionsBuilt);
+    }, [branchOptions]);
     const generateTodayPDF = () => {
         const today = new Date().toISOString().slice(0, 10);
         const todayExpenses = expenses.filter(exp => {
@@ -1301,7 +1309,6 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             );
         });
         setFilteredExpenses(filtered);
-        setCurrentPage(1); // Reset to first page when filters change
         // Dynamically update dropdown options from filtered data
         const getOptions = (data, key, includeBlank = true) =>
             buildEdbcSelectFilterOptions(data, key, {
@@ -1337,27 +1344,6 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         const staffOptionsBuilt = uniqueStaff.map((staff) => ({ value: staff, label: staff }));
         staffOptionsBuilt.unshift(blankOption);
         setStaffOptions(staffOptionsBuilt);
-        const uniqueBranchIds = [];
-        const seenBranchIds = new Set();
-        let hasBlankBranch = false;
-        filtered.forEach((item) => {
-            const rawId = item.branch_id ?? item.branchId;
-            if (isBlankish(rawId)) {
-                hasBlankBranch = true;
-                return;
-            }
-            const id = String(rawId);
-            if (!seenBranchIds.has(id)) {
-                seenBranchIds.add(id);
-                uniqueBranchIds.push(id);
-            }
-        });
-        const branchFilterOptionsBuilt = uniqueBranchIds.map(id => ({
-            value: String(id),
-            label: branchOptions.find(branch => String(branch.id) === String(id))?.branch || String(id)
-        }));
-        branchFilterOptionsBuilt.unshift(blankOption);
-        setBranchFilterOptions(branchFilterOptionsBuilt);
 
         const uniqueEnteredBy = [];
         const seenEnteredBy = new Set();
@@ -1423,7 +1409,37 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         uniqueEno.unshift(BLANK_VALUE);
         setEnoOptions(uniqueEno);
 
-    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedSource, selectedPaymentModes, selectedBranch, selectedEnteredBy, selectedAccountType, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, selectedStaff, selectedQuantity, selectedAmount, selectedDescription, selectedServiceNumber, selectedBillArrival, overallSearch, expenses, machineToolsIdToLabel, branchOptions, expenseEntryPaymentModeOrder]);
+    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedSource, selectedPaymentModes, selectedBranch, selectedEnteredBy, selectedAccountType, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, selectedStaff, selectedQuantity, selectedAmount, selectedDescription, selectedServiceNumber, selectedBillArrival, overallSearch, expenses, machineToolsIdToLabel, expenseEntryPaymentModeOrder]);
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [
+        selectedSiteName,
+        selectedVendor,
+        selectedContractor,
+        selectedCategory,
+        selectedMachineTools,
+        selectedSource,
+        selectedPaymentModes,
+        selectedBranch,
+        selectedEnteredBy,
+        selectedAccountType,
+        startDate,
+        endDate,
+        timestampStartDate,
+        timestampEndDate,
+        selectedEno,
+        selectedStaff,
+        selectedQuantity,
+        selectedAmount,
+        selectedDescription,
+        selectedServiceNumber,
+        selectedBillArrival,
+        overallSearch,
+    ]);
+    useEffect(() => {
+        const totalPages = Math.max(1, Math.ceil(filteredExpenses.length / itemsPerPage));
+        setCurrentPage((page) => (page > totalPages ? totalPages : page));
+    }, [filteredExpenses.length, itemsPerPage]);
     useEffect(() => {
         if (filterScrollResetSkipRef.current) {
             filterScrollResetSkipRef.current = false;

@@ -311,7 +311,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         expensesLoadingMore,
         expensesTotalCount,
         refetchExpenses,
-    } = useExpensesListLoader(activeBranchId);
+    } = useExpensesListLoader(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [filteredExpenses, setFilteredExpenses] = useState([]);
     const [exportFilteredExpenses, setExportFilteredExpenses] = useState([]);
@@ -1018,6 +1018,14 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         fetchBranches();
     }, []);
     useEffect(() => {
+        const branchFilterOptionsBuilt = (Array.isArray(branchOptions) ? branchOptions : []).map((branch) => ({
+            value: String(branch.id),
+            label: branch.branch || String(branch.id),
+        }));
+        branchFilterOptionsBuilt.unshift(blankOption);
+        setBranchFilterOptions(branchFilterOptionsBuilt);
+    }, [branchOptions]);
+    useEffect(() => {
         const fetchAccountType = async () => {
             try {
                 const response = await fetch("https://backendaab.in/demoAabuilderDash/api/account_type/getAll", {
@@ -1217,7 +1225,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
             );
         });
         setFilteredExpenses(filtered);
-        setCurrentPage(1);
         const anyFilterApplied = [
             selectedSiteName,
             selectedVendor,
@@ -1252,13 +1259,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                 expenseEntryPaymentModeOrder
             )
         );
-        const uniqueBranchIds = [...new Set(filtered.map(item => item.branch_id ?? item.branchId).filter(val => !isBlankish(val)))];
-        const branchFilterOptionsBuilt = uniqueBranchIds.map(id => ({
-            value: String(id),
-            label: branchOptions.find(branch => String(branch.id) === String(id))?.branch || String(id)
-        }));
-        branchFilterOptionsBuilt.unshift(blankOption);
-        setBranchFilterOptions(branchFilterOptionsBuilt);
         const uniqueEnteredBy = [];
         const seenEnteredBy = new Set();
         filtered.forEach((item) => {
@@ -1309,9 +1309,35 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         overallSearch,
         expenses,
         machineToolsIdToLabel,
-        branchOptions,
         expenseEntryPaymentModeOrder
     ]);
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [
+        selectedSiteName,
+        selectedVendor,
+        selectedContractor,
+        selectedCategory,
+        selectedMachineTools,
+        selectedSource,
+        selectedPaymentModes,
+        selectedBranch,
+        selectedEnteredBy,
+        selectedAccountType,
+        startDate,
+        endDate,
+        selectedEno,
+        selectedBillArrival,
+        selectedQuantity,
+        selectedAmount,
+        selectedDescription,
+        selectedServiceNumber,
+        overallSearch,
+    ]);
+    useEffect(() => {
+        const totalPages = Math.max(1, Math.ceil(filteredExpenses.length / itemsPerPage));
+        setCurrentPage((page) => (page > totalPages ? totalPages : page));
+    }, [filteredExpenses.length, itemsPerPage]);
     useEffect(() => {
         if (!showBillArrivalCalendar) return undefined;
         const closeCalendar = () => setShowBillArrivalCalendar(false);

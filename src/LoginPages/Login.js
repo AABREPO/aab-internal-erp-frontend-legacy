@@ -17,13 +17,28 @@ const LoginPage = ({ onLogin }) => {
     const [adminPassword, setAdminPassword] = useState('');
     const [userImage, setUserImage] = useState(null);
     const [userId, setUserId] = useState('');
+    const [branchOptions, setBranchOptions] = useState([]);
+    const [selectedBranchId, setSelectedBranchId] = useState('');
     const navigate = useNavigate();
 
     const handleLogin = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post('https://backendaab.in/aabuilderDash/api/login', { email, password });
-            const { username, userImage, position, email: userEmail, userRoles, id } = response.data;
+            const response = await axios.post('https://backendaab.in/demoAabuilderDash/api/login', { email, password });
+            const {
+                username,
+                userImage,
+                position,
+                email: userEmail,
+                userRoles,
+                id,
+                branch_id,
+                branchId,
+                brachId
+            } = response.data;
+            const resolvedBranchId = branch_id ?? branchId ?? brachId ?? '';
+            console.log('Login API user details:', response.data);
+            console.log('Resolved branchId:', resolvedBranchId);
             setUserId(id);
             console.log("ID: ",id);
             onLogin({
@@ -33,6 +48,8 @@ const LoginPage = ({ onLogin }) => {
                 email: userEmail || '',
                 userRoles: userRoles || [],
                 userId: id, 
+                branchId: resolvedBranchId,
+                brachId: resolvedBranchId,
             });
             navigate('');
         } catch (err) {
@@ -42,8 +59,18 @@ const LoginPage = ({ onLogin }) => {
     };
     const refreshUserData = async () => {
         try {
-            const response = await axios.get(`https://backendaab.in/aabuilderDash/api/user/id/${userId}`);
-            const { username, userImage, position, email: userEmail, userRoles } = response.data;
+            const response = await axios.get(`https://backendaab.in/demoAabuilderDash/api/user/id/${userId}`);
+            const {
+                username,
+                userImage,
+                position,
+                email: userEmail,
+                userRoles,
+                branch_id,
+                branchId,
+                brachId
+            } = response.data;
+            const resolvedBranchId = branch_id ?? branchId ?? brachId ?? '';
             console.log("Refreshing!!!!");
             onLogin({
                 username: username || '',
@@ -51,6 +78,8 @@ const LoginPage = ({ onLogin }) => {
                 position: position || '',
                 email: userEmail || '',
                 userRoles: userRoles || [],
+                branchId: resolvedBranchId,
+                brachId: resolvedBranchId,
             });
         } catch (err) {
             console.error('Failed to refresh user data', err);
@@ -61,6 +90,20 @@ const LoginPage = ({ onLogin }) => {
             refreshUserData(); // from above
         }, 10000); // every 10 seconds
         return () => clearInterval(interval);
+    }, []);
+    useEffect(() => {
+        const fetchBranches = async () => {
+            try {
+                const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/branch/getAll', {
+                    withCredentials: true
+                });
+                const branches = Array.isArray(response.data) ? response.data : [];
+                setBranchOptions(branches);
+            } catch (err) {
+                console.error('Failed to load branches', err);
+            }
+        };
+        fetchBranches();
     }, []);
 
     const handleImageUpload = (e) => {
@@ -81,7 +124,7 @@ const LoginPage = ({ onLogin }) => {
             return;
         }
         try {
-            const response = await axios.post('https://backendaab.in/aabuilderDash/api/sign-in', {
+            const response = await axios.post('https://backendaab.in/demoAabuilderDash/api/sign-in', {
                 username,
                 email,
                 password,
@@ -89,13 +132,14 @@ const LoginPage = ({ onLogin }) => {
                 userImage,
                 adminUsername: adminUser,
                 adminPassword,
+                branchId: selectedBranchId ? Number(selectedBranchId) : null,
             },{
                 headers: {
                     'Content-Type': 'application/json',
                 }
             });
             console.log(response.ok);
-            onLogin({ username, userImage, position, email });
+            onLogin({ username, userImage, position, email, branchId: selectedBranchId ? Number(selectedBranchId) : '' });
             navigate('');
         } catch (err) {
             console.error(err);
@@ -209,6 +253,27 @@ const LoginPage = ({ onLogin }) => {
                                 required
                                 placeholder='Enter Position'
                             />
+                        </div>
+                    )}
+                    {isRegistering && (
+                        <div>
+                            <label htmlFor="branchId" className="block text-base font-semibold -ml-[20rem]">
+                                Branch
+                            </label>
+                            <select
+                                id="branchId"
+                                value={selectedBranchId}
+                                onChange={(e) => setSelectedBranchId(e.target.value)}
+                                className="mt-1 block w-full px-3 py-2 border border-[#FAF6ED] border-r-[0.20rem] border-l-[0.20rem] border-b-[0.20rem] border-t-[0.20rem] rounded-md shadow-sm focus:outline-none focus:ring-[#BF9853] focus:border-[#BF9853] sm:text-sm bg-white"
+                                required
+                            >
+                                <option value="">Select Branch</option>
+                                {branchOptions.map((branch) => (
+                                    <option key={branch.id} value={branch.id}>
+                                        {branch.branch}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                     )}
                     <div className="relative">

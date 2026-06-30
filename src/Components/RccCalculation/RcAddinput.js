@@ -21,6 +21,7 @@ const RcAddInput = () => {
   const [isBeamTypesOpen, setIsBeamTypesOpen] = useState(false);
   const [isCalculationFormulaOpen, setIsCalculationFormulaOpen] = useState(false);
   const [measurementImage, setMeasurementImage] = useState(null);
+  const [steelConfiguration, setSteelConfiguration] = useState('');
   const closeCalculationFormula = () => setIsCalculationFormulaOpen(false);
   const openCalculationFormula = () => setIsCalculationFormulaOpen(true);
   const openFloorName = () => setIsFloorNameOpen(true);
@@ -30,7 +31,32 @@ const RcAddInput = () => {
   const openBeamTypes = () => setIsBeamTypesOpen(true);
   const closeBeamTypes = () => setIsBeamTypesOpen(false);
   const closeFormulaOpen = () => setIsFormulaOpen(false);
-  const openModal = () => setIsModalOpen(true);
+  const resetAddFormState = () => {
+    setBeamName('');
+    setFormula('');
+    setBeamRate('');
+    setAField('');
+    setIsAEditable(false);
+    setIsAMultiple(false);
+    setBField('');
+    setIsBEditable(false);
+    setIsBMultiple(false);
+    setCField('');
+    setIsCEditable(false);
+    setIsCMultiple(false);
+    setSteelConfiguration('');
+    setSelectedFileName('');
+    setSelectedFile(null);
+    setSelectedFileNames('');
+    setFile(null);
+    setMeasurementImage(null);
+    setSelectedVariantId(null);
+  };
+  const openModal = () => {
+    resetAddFormState();
+    setIsEditModalOpen(false);
+    setIsModalOpen(true);
+  };
   const closeModal = () => setIsModalOpen(false);
   const [BeamNameSearch, setBeamNameSearch] = useState("");
   const [file, setFile] = useState(null);
@@ -55,6 +81,15 @@ const RcAddInput = () => {
   const [rccBeamTypes, setRccBeamTypes] = useState([]);
   const [isAreaModalOpens, setIsAreaModalOpens] = useState(false);
   const [message, setMessage] = useState('');
+  const [aField, setAField] = useState('');
+  const [isAEditable, setIsAEditable] = useState(false);
+  const [isAMultiple, setIsAMultiple] = useState(false);
+  const [bField, setBField] = useState('');
+  const [isBEditable, setIsBEditable] = useState(false);
+  const [isBMultiple, setIsBMultiple] = useState(false);
+  const [cField, setCField] = useState('');
+  const [isCEditable, setIsCEditable] = useState(false);
+  const [isCMultiple, setIsCMultiple] = useState(false);
   console.log(message);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [areaEdit, setAreaEdit] = useState(null);
@@ -143,7 +178,7 @@ const RcAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/paint/bulkUploadPaintVariants", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paint/bulkUploadPaintVariants", {
         method: "POST",
         body: formData,
       });
@@ -168,7 +203,7 @@ const RcAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/rcc/formulas/bulk_upload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/rcc/formulas/bulk_upload", {
         method: "POST",
         body: formData,
       });
@@ -194,7 +229,7 @@ const RcAddInput = () => {
   };
   const fetchRccBeamData = useCallback(async () => {
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/rcc/all/beamNameData");
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/rcc/all/beamNameData");
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
@@ -241,7 +276,7 @@ const RcAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/bulkUpload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/bulkUpload", {
         method: "POST",
         body: formData,
       });
@@ -261,7 +296,7 @@ const RcAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/paints/bulk-upload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paints/bulk-upload", {
         method: "POST",
         body: formData,
       });
@@ -281,7 +316,7 @@ const RcAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/floorNameBulkUpload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/floorNameBulkUpload", {
         method: "POST",
         body: formData,
       });
@@ -301,7 +336,7 @@ const RcAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/beam_types/bulkUpload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/beam_types/bulkUpload", {
         method: "POST",
         body: formData,
       });
@@ -321,7 +356,7 @@ const RcAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/paint_type/bulk_upload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paint_type/bulk_upload", {
         method: "POST",
         body: formData,
       });
@@ -341,7 +376,7 @@ const RcAddInput = () => {
   const handleEditFloorName = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/nameFloor/${selectedFloorId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/nameFloor/${selectedFloorId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -361,7 +396,7 @@ const RcAddInput = () => {
   const handleEditRccSize = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/rcc/size/edit/${selectedRccSizeId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/rcc/size/edit/${selectedRccSizeId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -381,7 +416,7 @@ const RcAddInput = () => {
   const handleEditBeamType = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/beam_types/edit/${selectedTypeId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/beam_types/edit/${selectedTypeId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -401,7 +436,7 @@ const RcAddInput = () => {
 
   const deleteFloor = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/nameFloor/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/nameFloor/${id}`, {
         method: 'DELETE',
       });
 
@@ -418,7 +453,7 @@ const RcAddInput = () => {
   };
   const deleteRccSize = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/rcc/size/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/rcc/size/delete/${id}`, {
         method: 'DELETE',
       });
 
@@ -435,7 +470,7 @@ const RcAddInput = () => {
   };
   const deleteBeamTyper = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/beam_types/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/beam_types/delete/${id}`, {
         method: 'DELETE',
       });
 
@@ -455,7 +490,7 @@ const RcAddInput = () => {
 
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/nameFloor/all", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/nameFloor/all", {
           method: "DELETE",
         });
 
@@ -479,7 +514,7 @@ const RcAddInput = () => {
 
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/rcc/size/deleteAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/rcc/size/deleteAll", {
           method: "DELETE",
         });
 
@@ -503,7 +538,7 @@ const RcAddInput = () => {
 
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/beam_types/delete/all", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/beam_types/delete/all", {
           method: "DELETE",
         });
 
@@ -528,7 +563,7 @@ const RcAddInput = () => {
 
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/rcc/delete/allRccBeamNames", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/rcc/delete/allRccBeamNames", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -548,7 +583,7 @@ const RcAddInput = () => {
   };
   const handleRccBeamDataDelete = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/rcc/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/rcc/delete/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -567,7 +602,7 @@ const RcAddInput = () => {
     if (!areaEdit) return;
 
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/nameArea/${areaEdit.id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/nameArea/${areaEdit.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -586,12 +621,39 @@ const RcAddInput = () => {
       console.error('Error updating item:', error);
     }
   };
+  const parseBool = (obj, ...keyVariants) => {
+    if (!obj) return false;
+    const objKeys = Object.keys(obj);
+    for (const objKey of objKeys) {
+      const objKeyLower = objKey.toLowerCase();
+      for (const variant of keyVariants) {
+        if (objKeyLower === String(variant).toLowerCase()) {
+          const val = obj[objKey];
+          if (typeof val === 'boolean') return val;
+          if (val === '1' || val === 1 || val === 'true' || val === true) return true;
+          if (val === '0' || val === 0 || val === 'false' || val === false) return false;
+          return false;
+        }
+      }
+    }
+    return false;
+  };
   const handleEditClick = (variantId, variantData) => {
     setSelectedVariantId(variantId);
     setBeamName(variantData.beamName);
     setFormula(variantData.formula);
     setBeamRate(variantData.rate);
+    setAField(variantData.a || '');
+    setIsAEditable(parseBool(variantData, 'isAEditable', 'isaeditable', 'aEditable', 'is_a_editable'));
+    setIsAMultiple(parseBool(variantData, 'isAMultiple', 'isamultiple', 'aMultiple', 'is_a_multiple'));
+    setBField(variantData.b || '');
+    setIsBEditable(parseBool(variantData, 'isBEditable', 'isbeditable', 'bEditable', 'is_b_editable'));
+    setIsBMultiple(parseBool(variantData, 'isBMultiple', 'isbmultiple', 'bMultiple', 'is_b_multiple'));
+    setCField(variantData.c || '');
+    setIsCEditable(parseBool(variantData, 'isCEditable', 'isceditable', 'cEditable', 'is_c_editable'));
+    setIsCMultiple(parseBool(variantData, 'isCMultiple', 'iscmultiple', 'cMultiple', 'is_c_multiple'));
     setMeasurementImage(variantData.image);
+    setSteelConfiguration(variantData.steelConfiguration || '');
     setIsEditModalOpen(true);
   };
   const editRccBeamData = async (e) => {
@@ -600,6 +662,16 @@ const RcAddInput = () => {
     formData.append("beamName", beamNamess);
     formData.append("formula", formula);
     formData.append("rate", rate);
+    if (aField) formData.append("a", aField);
+    formData.append("isAEditable", isAEditable);
+    formData.append("isAMultiple", isAMultiple);
+    if (bField) formData.append("b", bField);
+    formData.append("isBEditable", isBEditable);
+    formData.append("isBMultiple", isBMultiple);
+    if (cField) formData.append("c", cField);
+    formData.append("isCEditable", isCEditable);
+    formData.append("isCMultiple", isCMultiple);
+    formData.append("steelConfiguration", steelConfiguration);
 
     if (measurementImage && measurementImage.startsWith("data:image")) {
       const base64Data = measurementImage.split(',')[1];
@@ -620,7 +692,7 @@ const RcAddInput = () => {
     }
 
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/rcc/edit/${selectedVariantId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/rcc/edit/${selectedVariantId}`, {
         method: "PUT",
         body: formData,
       });
@@ -644,7 +716,7 @@ const RcAddInput = () => {
   const handlePaintFormulasDeleteAll = async () => {
     if (window.confirm("Are you sure you want to delete all Formulas?")) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/rcc/formulas/delete/all", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/rcc/formulas/delete/all", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -663,7 +735,7 @@ const RcAddInput = () => {
   }, []);
   const fetchCalculationFormula = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/rcc/formulas/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/rcc/formulas/getAll');
       if (response.ok) {
         const data = await response.json();
         setCalculationFormulaOptions(data);
@@ -680,7 +752,7 @@ const RcAddInput = () => {
     e.preventDefault();
     const newTileArea = { formulas: calculationFormulas };
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/rcc/formulas/save', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/rcc/formulas/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -705,7 +777,7 @@ const RcAddInput = () => {
   }, []);
   const fetchTileFloorNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/floorName');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/floorName');
       if (response.ok) {
         const data = await response.json();
         setTileFloorNames(data);
@@ -722,7 +794,7 @@ const RcAddInput = () => {
   }, []);
   const fetchBeamTypes = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/beam_types/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/beam_types/getAll');
       if (response.ok) {
         const data = await response.json();
         setRccBeamTypes(data);
@@ -738,7 +810,7 @@ const RcAddInput = () => {
     e.preventDefault();
     const newTileFloor = { floorName };
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/nameFloor', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/nameFloor', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -764,7 +836,7 @@ const RcAddInput = () => {
   }, []);
   const fetchRccSize = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/rcc/size/get');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/rcc/size/get');
       if (response.ok) {
         const data = await response.json();
         setRccSizeList(data);
@@ -780,7 +852,7 @@ const RcAddInput = () => {
     e.preventDefault();
     const newRccSize = { size };
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/rcc/size/save', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/rcc/size/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -809,7 +881,7 @@ const RcAddInput = () => {
     };
     console.log(newBeamData);
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/beam_types/save', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/beam_types/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -836,9 +908,19 @@ const RcAddInput = () => {
     formData.append("beamName", beamNamess);
     formData.append("formula", formula);
     formData.append("rate", rate);
+    if (aField) formData.append("a", aField);
+    formData.append("isAEditable", isAEditable);
+    formData.append("isAMultiple", isAMultiple);
+    if (bField) formData.append("b", bField);
+    formData.append("isBEditable", isBEditable);
+    formData.append("isBMultiple", isBMultiple);
+    if (cField) formData.append("c", cField);
+    formData.append("isCEditable", isCEditable);
+    formData.append("isCMultiple", isCMultiple);
+    formData.append("steelConfiguration", steelConfiguration);
     if (measurementImage) formData.append("measurementImage", measurementImage);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/rcc/upload/beamName", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/rcc/upload/beamName", {
         method: "POST",
         body: formData,
       });
@@ -853,7 +935,7 @@ const RcAddInput = () => {
     e.preventDefault();
     try {
       const response = await fetch(
-        `https://backendaab.in/aabuilderDash/api/rcc/formulas/edit/${calculationFormulas.id}`,
+        `https://backendaab.in/demoAabuilderDash/api/rcc/formulas/edit/${calculationFormulas.id}`,
         {
           method: 'PUT',
           headers: {
@@ -876,7 +958,7 @@ const RcAddInput = () => {
 
   const handleDeleteFormula = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/rcc/formulas/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/rcc/formulas/delete/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -1389,86 +1471,155 @@ const RcAddInput = () => {
         </div>
       )}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-          <div className="bg-white rounded-md lg:w-[34rem] w-[18rem] px-2 py-2">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeModal}>
-                <img src={cross} alt='cross' className='lg:w-5 w-4 lg:h-5 h-4' />
-              </button>
-            </div>
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl lg:w-[56rem] lg:max-w-[90vw] w-full max-h-[90vh] overflow-y-auto px-6 py-6 relative">
+            <button className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors p-1" onClick={closeModal}>
+              <img src={cross} alt='close' className='w-5 h-5' />
+            </button>
             <form onSubmit={handleSubmitBeamData}>
-              <div className="lg:mb-4 lg:-mt-0 -mt-4">
-                <label className="block text-base font-medium lg:mb-2 mb-3 lg:-ml-[20.5rem] -ml-[9rem]">Structure Name</label>
-                <input
-                  type="text"
-                  className="lg:w-[27rem] w-[15rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg lg:h-12 h-11 focus:outline-none lg:-mt-0 -mt-2"
-                  placeholder="Enter here"
-                  onChange={(e) => setBeamName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className=' flex ml-8 '>
-                <div className="mb-4 -ml-36">
-                  <label className="block text-base font-medium mb-2 lg:-ml-3 ml-8">Formula</label>
-                  <select
-                    className="lg:w-60 w-40 lg:ml-40 ml-32 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg lg:h-14 h-12 focus:outline-none"
-                    onChange={(e) => setFormula(e.target.value)}
-                    required
-                  >
-                    <option value="">Select Formula..</option>
-                    {formulasOptions.length > 0 ? (
-                      formulasOptions.map((option, index) => (
-                        <option key={index} value={option}>
-                          {option}
-                        </option>
-                      ))
-                    ) : (
-                      <option disabled>Loading options...</option>
+              <div className="flex flex-col lg:flex-row lg:items-start gap-6 mb-6 pr-8">
+                <div className="flex-1 min-w-0 flex flex-col gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Structure Name</label>
+                    <input
+                      type="text"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 h-11 focus:outline-none focus:ring-2 focus:ring-[#BF9853]/30 focus:border-[#BF9853] transition-shadow"
+                      placeholder="Enter structure name"
+                      onChange={(e) => setBeamName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Formula</label>
+                      <select
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 h-11 focus:outline-none focus:ring-2 focus:ring-[#BF9853]/30 focus:border-[#BF9853] transition-shadow"
+                        onChange={(e) => setFormula(e.target.value)}
+                        required
+                      >
+                        <option value="">Select Formula..</option>
+                        {formulasOptions.length > 0 ? (
+                          formulasOptions.map((option, index) => (
+                            <option key={index} value={option}>{option}</option>
+                          ))
+                        ) : (
+                          <option disabled>Loading options...</option>
+                        )}
+                      </select>
+                    </div>
+                    <div className="w-full sm:w-32">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Rate</label>
+                      <input
+                        type="text"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 h-11 focus:outline-none focus:ring-2 focus:ring-[#BF9853]/30 focus:border-[#BF9853] transition-shadow"
+                        placeholder="Rate"
+                        onChange={(e) => setBeamRate(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="border-b border-r border-gray-200 px-3 py-2 text-left font-semibold text-gray-700 w-12"></th>
+                            <th className="border-b border-r border-gray-200 px-3 py-2 text-left font-semibold text-gray-700">Dimension</th>
+                            <th className="border-b border-r border-gray-200 px-3 py-2 text-center font-semibold text-gray-700 w-20">Editable</th>
+                            <th className="border-b border-gray-200 px-3 py-2 text-center font-semibold text-gray-700 w-20">Multiple</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b border-gray-200 bg-white">
+                            <td className="border-r border-gray-200 px-3 py-2 font-semibold text-gray-700">A</td>
+                            <td className="border-r border-gray-200 px-3 py-1.5">
+                              <select className="w-full border border-gray-200 rounded px-2 py-1 h-8 bg-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]/30" value={aField} onChange={(e) => setAField(e.target.value)}>
+                                <option value="">Blank</option>
+                                <option value="Length">Length</option>
+                                <option value="Breadth">Breadth</option>
+                                <option value="Height">Height</option>
+                              </select>
+                            </td>
+                            <td className="border-r border-gray-200 px-3 py-2 text-center">
+                              <input type="checkbox" checked={isAEditable} onChange={(e) => setIsAEditable(e.target.checked)} className="rounded border-gray-300" />
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <input type="checkbox" checked={isAMultiple} onChange={(e) => setIsAMultiple(e.target.checked)} className="rounded border-gray-300" />
+                            </td>
+                          </tr>
+                          <tr className="border-b border-gray-200 bg-gray-50/30">
+                            <td className="border-r border-gray-200 px-3 py-2 font-semibold text-gray-700">B</td>
+                            <td className="border-r border-gray-200 px-3 py-1.5">
+                              <select className="w-full border border-gray-200 rounded px-2 py-1 h-8 bg-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]/30" value={bField} onChange={(e) => setBField(e.target.value)}>
+                                <option value="">Blank</option>
+                                <option value="Length">Length</option>
+                                <option value="Breadth">Breadth</option>
+                                <option value="Height">Height</option>
+                              </select>
+                            </td>
+                            <td className="border-r border-gray-200 px-3 py-2 text-center">
+                              <input type="checkbox" checked={isBEditable} onChange={(e) => setIsBEditable(e.target.checked)} className="rounded border-gray-300" />
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <input type="checkbox" checked={isBMultiple} onChange={(e) => setIsBMultiple(e.target.checked)} className="rounded border-gray-300" />
+                            </td>
+                          </tr>
+                          <tr className="bg-white">
+                            <td className="border-r border-gray-200 px-3 py-2 font-semibold text-gray-700">C</td>
+                            <td className="border-r border-gray-200 px-3 py-1.5">
+                              <select className="w-full border border-gray-200 rounded px-2 py-1 h-8 bg-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]/30" value={cField} onChange={(e) => setCField(e.target.value)}>
+                                <option value="">Blank</option>
+                                <option value="Length">Length</option>
+                                <option value="Breadth">Breadth</option>
+                                <option value="Height">Height</option>
+                              </select>
+                            </td>
+                            <td className="border-r border-gray-200 px-3 py-2 text-center">
+                              <input type="checkbox" checked={isCEditable} onChange={(e) => setIsCEditable(e.target.checked)} className="rounded border-gray-300" />
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <input type="checkbox" checked={isCMultiple} onChange={(e) => setIsCMultiple(e.target.checked)} className="rounded border-gray-300" />
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+                <div className="lg:flex-shrink-0 lg:w-80 w-full">
+                  <div className="bg-gray-50/80 border border-gray-200 rounded-lg p-4">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Steel Configuration</label>
+                    <select
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 h-11 bg-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]/30 focus:border-[#BF9853] transition-shadow"
+                      value={steelConfiguration}
+                      onChange={(e) => setSteelConfiguration(e.target.value)}
+                    >
+                      <option value="">Select configuration</option>
+                      <option value="Steel Type">Steel Type</option>
+                      <option value="Beam Type">Beam Type</option>
+                    </select>
+                    {(steelConfiguration === 'Steel Type' || steelConfiguration === 'Beam Type') && (
+                      <div className="mt-3">
+                        {steelConfiguration === 'Steel Type' && <SteelTypeView />}
+                        {steelConfiguration === 'Beam Type' && <BeamTypeView />}
+                      </div>
                     )}
-                  </select>
-                </div>
-                <div className="mb-2">
-                  <label className="block text-base font-medium mb-2 lg:-ml-[4.5rem] -ml-6">Rate</label>
-                  <input
-                    type="text"
-                    className="lg:w-32 w-[4.5rem] lg:ml-4 ml-2  border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg lg:h-14 h-12 focus:outline-none"
-                    placeholder="Enter here"
-                    onChange={(e) => setBeamRate(e.target.value)}
-                    required
-                  />
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center space-x-2 lg:ml-12 ml-5 lg:mt-0 -mt-2">
-                <label
-                  htmlFor="fileInput"
-                  className="cursor-pointer flex items-center text-orange-600 font-bold"
-                >
-                  <img src={attach} alt="attach" className="w-5 h-5" />
-                  <h1 className="lg:ml-4 ml-2 text-lg">Attach file</h1>
+              <div className="flex items-center gap-3 mb-5">
+                <label htmlFor="fileInput" className="cursor-pointer flex items-center text-[#E4572E] font-semibold hover:text-[#c94a26] transition-colors">
+                  <img src={attach} alt="attach" className="w-5 h-5 mr-2" />
+                  Attach file
                 </label>
-                <input
-                  type="file"
-                  id="fileInput"
-                  className="hidden"
-                  onChange={BeamImageUpload}
-                />
-                {selectedFileName && (
-                  <span className="text-gray-600 ml-4 text-sm italic">
-                    {selectedFileName}
-                  </span>
-                )}
+                <input type="file" id="fileInput" className="hidden" onChange={BeamImageUpload} />
+                {selectedFileName && <span className="text-gray-500 text-sm">{selectedFileName}</span>}
               </div>
-              <div className="flex space-x-5 lg:mt-4 mt-2 lg:ml-12 ml-5 lg:mb-4 mb-2">
-                <button
-                  type="submit"
-                  className="btn bg-[#BF9853] text-white lg:px-8 px-4 lg:py-2 py-1 rounded-lg hover:bg-yellow-800 font-semibold"
-                >
-                  Submit
+              <div className="flex gap-3 pt-2 border-t border-gray-200">
+                <button type="submit" className="px-6 py-2.5 bg-[#BF9853] text-white rounded-lg font-semibold hover:bg-[#a88447] transition-colors shadow-sm">
+                  Save
                 </button>
-                <button
-                  type="button"
-                  className="lg:px-8 px-4 lg:py-2 py-1 border rounded-lg text-[#BF9853] border-[#BF9853] "
-                  onClick={closeModal}>
+                <button type="button" className="px-6 py-2.5 border border-[#BF9853] text-[#BF9853] rounded-lg font-semibold hover:bg-[#BF9853]/5 transition-colors" onClick={closeModal}>
                   Cancel
                 </button>
               </div>
@@ -1681,77 +1832,161 @@ const RcAddInput = () => {
         </div>
       )}
       {isEditModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
-          <div className="bg-white rounded-md w-[28rem] p-6 relative">
-            <button
-              className="absolute top-4 right-4 text-red-500"
-              onClick={() => setIsEditModalOpen(false)}
-            >
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl lg:w-[56rem] lg:max-w-[90vw] w-full max-h-[90vh] overflow-y-auto p-6 relative">
+            <button className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors p-1" onClick={() => setIsEditModalOpen(false)}>
               <img src={cross} alt="Close" className="w-5 h-5" />
             </button>
             <form onSubmit={editRccBeamData}>
-              <div className="mb-4">
-                <label className="block text-base font-medium mb-2 -ml-[15rem]">Structure Name</label>
-                <input
-                  type="text"
-                  className="w-[21rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-12 focus:outline-none"
-                  placeholder="Enter here"
-                  value={beamNamess}
-                  onChange={(e) => setBeamName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className=' flex ml-4 '>
-                <div className="mb-4">
-                  <label className="block text-base font-medium mb-2 -ml-[7rem]">Formula</label>
-                  <select
-                    className="w-48 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-12 focus:outline-none"
-                    value={formula}
-                    onChange={(e) => setFormula(e.target.value)}
-                    required
-                  >
-                    <option value="">Select Formula..</option>
-                    {formulasOptions.length > 0 ? (
-                      formulasOptions.map((option, index) => (
-                        <option key={index} value={option}>
-                          {option}
-                        </option>
-                      ))
-                    ) : (
-                      <option disabled>Loading options...</option>
+              <div className="flex flex-col lg:flex-row lg:items-start gap-6 mb-6 pr-8">
+                <div className="flex-1 min-w-0 flex flex-col gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Structure Name</label>
+                    <input
+                      type="text"
+                      className="w-full max-w-md border border-gray-200 rounded-lg px-3 py-2.5 h-11 focus:outline-none focus:ring-2 focus:ring-[#BF9853]/30 focus:border-[#BF9853] transition-shadow"
+                      placeholder="Enter here"
+                      value={beamNamess}
+                      onChange={(e) => setBeamName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1 max-w-xs">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Formula</label>
+                      <select
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 h-11 focus:outline-none focus:ring-2 focus:ring-[#BF9853]/30 focus:border-[#BF9853] transition-shadow"
+                        value={formula}
+                        onChange={(e) => setFormula(e.target.value)}
+                        required
+                      >
+                        <option value="">Select Formula..</option>
+                        {formulasOptions.length > 0 ? (
+                          formulasOptions.map((option, index) => (
+                            <option key={index} value={option}>{option}</option>
+                          ))
+                        ) : (
+                          <option disabled>Loading options...</option>
+                        )}
+                      </select>
+                    </div>
+                    <div className="w-full sm:w-32">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Rate</label>
+                      <input
+                        type="text"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 h-11 focus:outline-none focus:ring-2 focus:ring-[#BF9853]/30 focus:border-[#BF9853] transition-shadow"
+                        placeholder="Rate"
+                        value={rate}
+                        onChange={(e) => setBeamRate(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700 mb-2">Dimensions</p>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="border-b border-r border-gray-200 px-3 py-2 text-left font-semibold text-gray-700 w-12"></th>
+                            <th className="border-b border-r border-gray-200 px-3 py-2 text-left font-semibold text-gray-700">Dimension</th>
+                            <th className="border-b border-r border-gray-200 px-3 py-2 text-center font-semibold text-gray-700 w-20">Editable</th>
+                            <th className="border-b border-gray-200 px-3 py-2 text-center font-semibold text-gray-700 w-20">Multiple</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b border-gray-200 bg-white">
+                            <td className="border-r border-gray-200 px-3 py-2 font-semibold text-gray-700">A</td>
+                            <td className="border-r border-gray-200 px-3 py-1.5">
+                              <select className="w-full border border-gray-200 rounded px-2 py-1 h-8 bg-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]/30" value={aField} onChange={(e) => setAField(e.target.value)}>
+                                <option value="">Blank</option>
+                                <option value="Length">Length</option>
+                                <option value="Breadth">Breadth</option>
+                                <option value="Height">Height</option>
+                              </select>
+                            </td>
+                            <td className="border-r border-gray-200 px-3 py-2 text-center">
+                              <input type="checkbox" checked={isAEditable} onChange={(e) => setIsAEditable(e.target.checked)} className="rounded border-gray-300" />
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <input type="checkbox" checked={isAMultiple} onChange={(e) => setIsAMultiple(e.target.checked)} className="rounded border-gray-300" />
+                            </td>
+                          </tr>
+                          <tr className="border-b border-gray-200 bg-gray-50/30">
+                            <td className="border-r border-gray-200 px-3 py-2 font-semibold text-gray-700">B</td>
+                            <td className="border-r border-gray-200 px-3 py-1.5">
+                              <select className="w-full border border-gray-200 rounded px-2 py-1 h-8 bg-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]/30" value={bField} onChange={(e) => setBField(e.target.value)}>
+                                <option value="">Blank</option>
+                                <option value="Length">Length</option>
+                                <option value="Breadth">Breadth</option>
+                                <option value="Height">Height</option>
+                              </select>
+                            </td>
+                            <td className="border-r border-gray-200 px-3 py-2 text-center">
+                              <input type="checkbox" checked={isBEditable} onChange={(e) => setIsBEditable(e.target.checked)} className="rounded border-gray-300" />
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <input type="checkbox" checked={isBMultiple} onChange={(e) => setIsBMultiple(e.target.checked)} className="rounded border-gray-300" />
+                            </td>
+                          </tr>
+                          <tr className="bg-white">
+                            <td className="border-r border-gray-200 px-3 py-2 font-semibold text-gray-700">C</td>
+                            <td className="border-r border-gray-200 px-3 py-1.5">
+                              <select className="w-full border border-gray-200 rounded px-2 py-1 h-8 bg-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]/30" value={cField} onChange={(e) => setCField(e.target.value)}>
+                                <option value="">Blank</option>
+                                <option value="Length">Length</option>
+                                <option value="Breadth">Breadth</option>
+                                <option value="Height">Height</option>
+                              </select>
+                            </td>
+                            <td className="border-r border-gray-200 px-3 py-2 text-center">
+                              <input type="checkbox" checked={isCEditable} onChange={(e) => setIsCEditable(e.target.checked)} className="rounded border-gray-300" />
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <input type="checkbox" checked={isCMultiple} onChange={(e) => setIsCMultiple(e.target.checked)} className="rounded border-gray-300" />
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+                <div className="lg:flex-shrink-0 lg:w-80 w-full">
+                  <div className="bg-gray-50/80 border border-gray-200 rounded-lg p-4">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Steel Configuration</label>
+                    <select
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 h-11 bg-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]/30 focus:border-[#BF9853] transition-shadow"
+                      value={steelConfiguration}
+                      onChange={(e) => setSteelConfiguration(e.target.value)}
+                    >
+                      <option value="">Select configuration</option>
+                      <option value="Steel Type">Steel Type</option>
+                      <option value="Beam Type">Beam Type</option>
+                    </select>
+                    {(steelConfiguration === 'Steel Type' || steelConfiguration === 'Beam Type') && (
+                      <div className="mt-3">
+                        {steelConfiguration === 'Steel Type' && <SteelTypeView />}
+                        {steelConfiguration === 'Beam Type' && <BeamTypeView />}
+                      </div>
                     )}
-                  </select>
-                </div>
-                <div className="mb-4">
-                  <label className="block text-base font-medium mb-2 -ml-[4.5rem]">Rate</label>
-                  <input
-                    type="text"
-                    className="w-32 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-12 focus:outline-none"
-                    placeholder="Enter here"
-                    value={rate}
-                    onChange={(e) => setBeamRate(e.target.value)}
-                    required
-                  />
+                  </div>
                 </div>
               </div>
-              <div className="mb-4 ml-6">
+              <div className="mb-5">
                 {measurementImage ? (
                   <img
                     src={measurementImage.startsWith("data:image")
                       ? measurementImage
                       : `data:image/png;base64,${measurementImage}`}
-                    alt="Edit Paint"
-                    className="w-40 h-16 object-cover"
+                    alt="Measurement"
+                    className="w-40 h-16 object-cover rounded-lg border border-gray-200"
                   />
                 ) : (
-                  <span>No Image</span>
+                  <span className="text-gray-500 text-sm">No Image</span>
                 )}
-                <label
-                  htmlFor="fileInput"
-                  className="cursor-pointer flex items-center text-[#E4572E] font-bold mt-2"
-                >
-                  <img src={attach} alt="attach" className="w-4 h-4" />
-                  <h1 className="ml-2 text-sm">Attach Color</h1>
+                <label htmlFor="fileInput" className="cursor-pointer flex items-center text-[#E4572E] font-semibold mt-2 hover:text-[#c94a26] transition-colors">
+                  <img src={attach} alt="attach" className="w-4 h-4 mr-2" />
+                  Attach Color
                 </label>
                 <div className=' flex'>
                   <input
@@ -1767,15 +2002,11 @@ const RcAddInput = () => {
                   </div>
                 </div>
               </div>
-              <div className="flex space-x-5 mt-8 ml-8">
-                <button type="submit" className="bg-[#BF9853] text-white px-8 py-2 rounded-lg font-semibold">
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button type="submit" className="px-6 py-2.5 bg-[#BF9853] text-white rounded-lg font-semibold hover:bg-[#a88447] transition-colors shadow-sm">
                   Save
                 </button>
-                <button
-                  type="button"
-                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                  onClick={() => setIsEditModalOpen(false)}
-                >
+                <button type="button" className="px-6 py-2.5 border border-[#BF9853] text-[#BF9853] rounded-lg font-semibold hover:bg-[#BF9853]/5 transition-colors" onClick={() => setIsEditModalOpen(false)}>
                   Cancel
                 </button>
               </div>
@@ -1851,6 +2082,84 @@ function ModalArea({ isOpen, onClose, onFileChange, onUpload }) {
               Close
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function SteelTypeView() {
+  return (
+    <div className="mt-4 flex justify-center">
+      <div className="relative bg-[#FAF6ED] rounded-md p-4 border border-[#D6C29A] inline-block">
+        <div className="absolute inset-x-0 -top-5 flex justify-center text-[10px] font-semibold text-gray-700">
+          24"
+        </div>
+        <div className="absolute inset-x-0 -bottom-5 flex justify-center text-[10px] font-semibold text-gray-700">
+          24"
+        </div>
+        <div className="absolute -left-8 inset-y-0 flex items-center text-[10px] font-semibold text-gray-700">
+          36"
+        </div>
+        <div className="absolute -right-8 inset-y-0 flex items-center text-[10px] font-semibold text-gray-700">
+          36"
+        </div>
+        <div className="w-52 h-40 bg-[#E9DBC0] flex items-center justify-center relative">
+          <div className="absolute inset-x-6 top-1 flex justify-between text-[9px] text-gray-700">
+            <span>9"</span>
+            <span>9"</span>
+          </div>
+          <div className="absolute left-1 inset-y-6 flex flex-col justify-between text-[9px] text-gray-700">
+            <span>9"</span>
+            <span>9"</span>
+          </div>
+          <div className="absolute right-1 inset-y-6 flex flex-col justify-between text-[9px] text-gray-700 items-end">
+            <span>9"</span>
+            <span>9"</span>
+          </div>
+          <div className="bg-white w-32 h-24 border border-gray-400 flex items-center justify-center relative">
+            <span className="absolute -bottom-4 text-[10px] text-[#BF9853] font-semibold">10'</span>
+            <span className="absolute -right-4 text-[10px] text-[#BF9853] font-semibold rotate-90">10'</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function BeamTypeView() {
+  const layers = ['T1*', 'T2', 'T3', 'T4', 'B4', 'B3', 'B2', 'B1*'];
+  return (
+    <div className="flex justify-start">
+      <div className="inline-block">
+        <div className="flex justify-center mb-1 text-[10px] text-gray-600 font-medium">
+          <span>12"</span>
+        </div>
+        <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+          <div className="grid grid-cols-5 bg-gray-100 text-[11px] font-semibold text-gray-700">
+            <div className="col-span-1 border-r border-gray-300 px-2 py-1 text-left">Layer</div>
+            <div className="col-span-1 border-r border-gray-300 px-2 py-1 text-center">Qty</div>
+            <div className="col-span-1 border-r border-gray-300 px-2 py-1 text-center">Dia</div>
+            <div className="col-span-1 border-r border-gray-300 px-2 py-1 text-center">Qty</div>
+            <div className="col-span-1 px-2 py-1 text-center">Dia</div>
+          </div>
+          <div className="bg-white text-[11px]">
+            {layers.map((layer, index) => (
+              <div
+                key={layer}
+                className={`grid grid-cols-5 border-t border-gray-100 ${
+                  index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                }`}
+              >
+                <div className="col-span-1 px-2 py-1 text-left font-medium">{layer}</div>
+                <div className="col-span-1 px-2 py-1 text-center text-gray-500">–</div>
+                <div className="col-span-1 px-2 py-1 text-center text-gray-500">–</div>
+                <div className="col-span-1 px-2 py-1 text-center text-gray-500">–</div>
+                <div className="col-span-1 px-2 py-1 text-center text-gray-500">–</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="flex justify-center mt-1 text-[10px] text-gray-700">
+          <span>12"</span>
         </div>
       </div>
     </div>

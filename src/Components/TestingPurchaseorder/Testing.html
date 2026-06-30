@@ -1,0 +1,2280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>PO – Full Flow (Items + Add Input + Review)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --card-bg: #ffffff;
+      --primary: #2563eb;
+      --primary-soft: #dbeafe;
+      --danger: #ef4444;
+      --text-main: #111827;
+      --text-sub: #6b7280;
+      --border-soft: #e5e7eb;
+      --radius-lg: 16px;
+      --radius-xl: 22px;
+      --shadow-soft: 0 8px 24px rgba(15, 23, 42, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #e0f2fe 0, #f9fafb 38%, #f4f5f7 100%);
+      color: var(--text-main);
+    }
+
+    .app {
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100vh;
+      padding: 16px 14px 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 2px 2px;
+    }
+
+    .app-title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .app-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .app-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-sub);
+    }
+
+    .step-pill {
+      font-size: 0.7rem;
+      border-radius: 999px;
+      padding: 4px 10px;
+      background: rgba(15, 23, 42, 0.9);
+      color: #f9fafb;
+      white-space: nowrap;
+    }
+
+    /* === STEP 1: META + CATALOG === */
+    .meta-card {
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: var(--radius-xl);
+      padding: 10px 12px 12px;
+      box-shadow: var(--shadow-soft);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .meta-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .field {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 0.75rem;
+    }
+
+    .field label {
+      color: var(--text-sub);
+    }
+
+    .field-input,
+    .field-select {
+      border-radius: 999px;
+      border: 1px solid #d1d5db;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      outline: none;
+      font-family: inherit;
+      background: #ffffff;
+    }
+
+    .field-input:focus,
+    .field-select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px var(--primary-soft);
+    }
+
+    .badge-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 0.7rem;
+    }
+
+    .small-pill {
+      border-radius: 999px;
+      padding: 3px 8px;
+      background: #eff6ff;
+      color: #1d4ed8;
+    }
+
+    .search-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 1px 3px rgba(148, 163, 184, 0.35);
+    }
+
+    .search-bar input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 0.82rem;
+      background: transparent;
+    }
+
+    .search-icon {
+      font-size: 0.9rem;
+      color: var(--text-sub);
+    }
+
+    .catalog-wrapper {
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: var(--radius-xl);
+      padding: 10px 8px 12px;
+      box-shadow: var(--shadow-soft);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .catalog-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+      padding: 0 2px;
+      color: var(--text-sub);
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .catalog-header strong {
+      color: var(--text-main);
+      font-size: 0.8rem;
+    }
+
+    .tab-row {
+      display: inline-flex;
+      border-radius: 999px;
+      padding: 2px;
+      background: #f3f4f6;
+      gap: 2px;
+    }
+
+    .tab {
+      border-radius: 999px;
+      border: none;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      background: transparent;
+      color: #6b7280;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      background: #ffffff;
+      color: #111827;
+      box-shadow: 0 1px 3px rgba(148, 163, 184, 0.4);
+    }
+
+    .item-list {
+      list-style: none;
+      margin: 0;
+      padding: 4px 0 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .item-card {
+      background: #ffffff;
+      border-radius: var(--radius-lg);
+      padding: 8px 10px;
+      border: 1px solid #e5e7eb;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .item-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .item-name-group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .item-name {
+      font-size: 0.86rem;
+      font-weight: 600;
+    }
+
+    .item-meta {
+      font-size: 0.72rem;
+      color: var(--text-sub);
+    }
+
+    .item-badge {
+      align-self: flex-start;
+      font-size: 0.7rem;
+      border-radius: 999px;
+      padding: 3px 8px;
+      background: #eef2ff;
+      color: #4f46e5;
+    }
+
+    .item-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      margin-top: 2px;
+    }
+
+    .rate-text {
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .rate-text span {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--text-sub);
+      font-weight: 400;
+    }
+
+    .qty-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .qty-input {
+      width: 60px;
+      border-radius: 999px;
+      border: 1px solid #d1d5db;
+      padding: 4px 6px;
+      font-size: 0.78rem;
+      text-align: center;
+      outline: none;
+    }
+
+    .qty-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px var(--primary-soft);
+    }
+
+    .add-btn {
+      border-radius: 999px;
+      border: none;
+      padding: 5px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: #111827;
+      color: white;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .in-cart-pill {
+      font-size: 0.72rem;
+      border-radius: 999px;
+      padding: 3px 8px;
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .add-input-btn {
+      border-radius: 999px;
+      border: none;
+      padding: 5px 10px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      background: #eff6ff;
+      color: #1d4ed8;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* Cart bar */
+    .cart-bar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: none;
+      justify-content: center;
+      z-index: 30;
+    }
+
+    .cart-bar-inner {
+      max-width: 480px;
+      margin: 0 auto 10px;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: #0f172a;
+      color: #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.65);
+    }
+
+    .cart-bar-text {
+      font-size: 0.78rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .cart-bar-text strong {
+      color: #ffffff;
+    }
+
+    .cart-bar-sub {
+      font-size: 0.7rem;
+      color: #9ca3af;
+    }
+
+    .cart-bar-btn {
+      border-radius: 999px;
+      border: none;
+      padding: 7px 12px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: #f97316;
+      color: #111827;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* Cart bottom sheet */
+    .sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease-out;
+      z-index: 40;
+    }
+
+    .sheet-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .sheet {
+      width: 100%;
+      max-width: 480px;
+      background: #ffffff;
+      border-radius: 18px 18px 0 0;
+      box-shadow: 0 -6px 22px rgba(15, 23, 42, 0.25);
+      padding: 10px 16px 16px;
+      transform: translateY(100%);
+      transition: transform 0.2s ease-out;
+      max-height: 70vh;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .sheet.open {
+      transform: translateY(0);
+    }
+
+    .sheet-handle {
+      width: 42px;
+      height: 4px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      margin: 4px auto 6px;
+    }
+
+    .sheet-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .sheet-title {
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .sheet-subtitle {
+      font-size: 0.72rem;
+      color: var(--text-sub);
+    }
+
+    .sheet-close-btn {
+      border: none;
+      background: #f3f4f6;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+
+    .cart-items {
+      margin: 0;
+      padding: 4px 0 0;
+      list-style: none;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .cart-item-row {
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: #f9fafb;
+    }
+
+    .cart-item-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      font-size: 0.8rem;
+    }
+
+    .cart-item-name {
+      font-weight: 600;
+    }
+
+    .cart-item-meta {
+      font-size: 0.72rem;
+      color: var(--text-sub);
+    }
+
+    .cart-item-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+    }
+
+    .cart-qty-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .cart-qty-input {
+      width: 60px;
+      border-radius: 999px;
+      border: 1px solid #d1d5db;
+      padding: 3px 6px;
+      text-align: center;
+      font-size: 0.78rem;
+    }
+
+    .cart-remove-btn {
+      border: none;
+      background: transparent;
+      color: #b91c1c;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
+    .cart-line-total {
+      font-weight: 600;
+    }
+
+    .sheet-footer {
+      border-top: 1px solid #e5e7eb;
+      padding-top: 6px;
+      margin-top: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.78rem;
+    }
+
+    .sheet-summary-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .sheet-footer-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .sheet-btn {
+      flex: 1;
+      border-radius: 999px;
+      border: none;
+      padding: 7px 10px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .sheet-btn.primary {
+      background: var(--primary);
+      color: #ffffff;
+    }
+
+    .sheet-btn.outline {
+      background: #ffffff;
+      color: #111827;
+      border: 1px solid #e5e7eb;
+    }
+
+    /* === Add Input Overlay === */
+    .add-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      display: none;
+      justify-content: center;
+      align-items: flex-start;
+      z-index: 50;
+      overflow-y: auto;
+    }
+
+    .add-overlay.open {
+      display: flex;
+    }
+
+    .add-panel {
+      width: 100%;
+      max-width: 480px;
+      margin: 10px auto 20px;
+      background: #f3f4f6;
+      border-radius: 24px;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.45);
+      padding: 10px 10px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .add-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 0 2px;
+    }
+
+    .add-panel-title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .add-panel-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .add-panel-subtitle {
+      font-size: 0.74rem;
+      color: var(--text-sub);
+    }
+
+    .add-panel-close-btn {
+      border-radius: 999px;
+      border: none;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      background: #111827;
+      color: #f9fafb;
+      cursor: pointer;
+    }
+
+    .lists-card {
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: var(--radius-xl);
+      padding: 8px 10px;
+      box-shadow: var(--shadow-soft);
+      font-size: 0.78rem;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .lists-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .lists-label {
+      font-size: 0.72rem;
+      color: var(--text-sub);
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      min-height: 18px;
+    }
+
+    .chip {
+      border-radius: 999px;
+      padding: 3px 8px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      font-size: 0.7rem;
+    }
+
+    .chip.empty {
+      background: transparent;
+      color: #9ca3af;
+      padding: 0;
+    }
+
+    .form-card {
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: var(--radius-xl);
+      padding: 10px 10px 12px;
+      box-shadow: var(--shadow-soft);
+      font-size: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .form-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .form-header small {
+      font-size: 0.7rem;
+      color: var(--text-sub);
+    }
+
+    .form-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .field-small {
+      flex: 1;
+      min-width: 140px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .field-small label {
+      font-size: 0.75rem;
+      color: var(--text-sub);
+    }
+
+    .field-small-input {
+      border-radius: 10px;
+      border: 1px solid #d1d5db;
+      padding: 6px 8px;
+      font-size: 0.8rem;
+      outline: none;
+      font-family: inherit;
+      background: #ffffff;
+    }
+
+    .field-small-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px var(--primary-soft);
+    }
+
+    .field-small-input[type="number"] {
+      text-align: right;
+    }
+
+    .primary-btn {
+      border-radius: 999px;
+      border: none;
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: #111827;
+      color: #f9fafb;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .primary-btn span {
+      font-size: 1rem;
+    }
+
+    .table-card {
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: var(--radius-xl);
+      padding: 8px 8px 10px;
+      box-shadow: var(--shadow-soft);
+      font-size: 0.78rem;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .table-header small {
+      font-size: 0.7rem;
+      color: var(--text-sub);
+    }
+
+    .table-wrapper {
+      border-radius: 14px;
+      border: 1px solid #e5e7eb;
+      overflow: hidden;
+      background: #f9fafb;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 600px;
+      font-size: 0.74rem;
+    }
+
+    thead {
+      background: #f3f4f6;
+    }
+
+    th,
+    td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      font-weight: 600;
+      color: #4b5563;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .qty-cell {
+      text-align: right;
+    }
+
+    .empty-text {
+      font-size: 0.75rem;
+      color: #9ca3af;
+      padding: 8px 4px;
+    }
+
+    .remove-btn {
+      border: none;
+      background: none;
+      color: #b91c1c;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
+    .bottom-note {
+      font-size: 0.7rem;
+      color: #9ca3af;
+      text-align: center;
+      margin-top: 2px;
+    }
+
+    /* === STEP 2: REVIEW SCREEN === */
+    #screenReview {
+      display: none;
+      gap: 12px;
+    }
+
+    .summary-card {
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: var(--radius-xl);
+      padding: 10px 12px 10px;
+      box-shadow: var(--shadow-soft);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.8rem;
+    }
+
+    .summary-top-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .summary-col {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .label {
+      font-size: 0.72rem;
+      color: var(--text-sub);
+    }
+
+    .value {
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+      font-size: 0.7rem;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 3px 8px;
+      background: #eff6ff;
+      color: #1d4ed8;
+    }
+
+    .editable {
+      border-bottom: 1px dashed #cbd5f5;
+      cursor: text;
+    }
+
+    .editable[contenteditable="true"]:focus {
+      outline: none;
+      background: #eef2ff;
+    }
+
+    .items-card-review {
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: var(--radius-xl);
+      padding: 10px 8px 10px;
+      box-shadow: var(--shadow-soft);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .items-header-review {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      padding: 0 2px;
+    }
+
+    .items-header-review span {
+      color: var(--text-sub);
+      font-size: 0.75rem;
+    }
+
+    .tiny-link-btn {
+      border: none;
+      background: none;
+      padding: 0;
+      font-size: 0.75rem;
+      color: #2563eb;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .table-wrapper-review {
+      margin-top: 4px;
+      border-radius: 14px;
+      border: 1px solid #e5e7eb;
+      overflow: hidden;
+      background: #f9fafb;
+      overflow-x: auto;
+    }
+
+    .num-input {
+      width: 70px;
+      border-radius: 999px;
+      border: 1px solid #d1d5db;
+      padding: 3px 6px;
+      text-align: right;
+      font-size: 0.75rem;
+      outline: none;
+    }
+
+    .num-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px var(--primary-soft);
+    }
+
+    .item-desc {
+      font-weight: 500;
+      font-size: 0.78rem;
+    }
+
+    .item-sub {
+      font-size: 0.7rem;
+      color: var(--text-sub);
+    }
+
+    .amount-cell {
+      font-weight: 600;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .terms-card {
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: var(--radius-xl);
+      padding: 8px 10px 10px;
+      box-shadow: var(--shadow-soft);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.78rem;
+    }
+
+    .terms-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .terms-field {
+      flex: 1;
+      min-width: 150px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .terms-input {
+      border-radius: 10px;
+      border: 1px solid #d1d5db;
+      padding: 5px 8px;
+      font-size: 0.78rem;
+      font-family: inherit;
+      outline: none;
+    }
+
+    .terms-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px var(--primary-soft);
+    }
+
+    .terms-textarea {
+      border-radius: 10px;
+      border: 1px solid #d1d5db;
+      padding: 5px 8px;
+      font-size: 0.78rem;
+      font-family: inherit;
+      outline: none;
+      min-height: 60px;
+      resize: vertical;
+    }
+
+    .terms-textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px var(--primary-soft);
+    }
+
+    .totals-card {
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: var(--radius-xl);
+      padding: 8px 10px 10px;
+      box-shadow: var(--shadow-soft);
+      font-size: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .totals-row strong {
+      font-weight: 600;
+    }
+
+    .totals-row.total {
+      margin-top: 2px;
+      padding-top: 4px;
+      border-top: 1px solid #e5e7eb;
+      font-size: 0.85rem;
+    }
+
+    .bottom-actions {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: none;
+      justify-content: center;
+      padding: 8px 10px;
+      z-index: 30;
+    }
+
+    .bottom-actions-inner {
+      max-width: 480px;
+      width: 100%;
+      border-radius: 16px;
+      padding: 8px 10px;
+      background: #0f172a;
+      display: flex;
+      gap: 8px;
+    }
+
+    .action-btn {
+      flex: 1;
+      border-radius: 999px;
+      border: none;
+      padding: 8px 10px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .action-btn.secondary {
+      background: #111827;
+      color: #e5e7eb;
+      border: 1px solid #4b5563;
+    }
+
+    .action-btn.primary {
+      background: #22c55e;
+      color: #064e3b;
+    }
+
+    @media (min-width: 600px) {
+      .app {
+        padding-top: 24px;
+      }
+      .add-panel {
+        margin-top: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- SCREEN 1: PO GENERATION (ITEMS + CART + ADD INPUT) -->
+  <div id="screenItems" class="app">
+    <header class="app-header">
+      <div class="app-title-block">
+        <div class="app-title">Create Purchase Order</div>
+        <div class="app-subtitle">Step 1 • Select items and build PO cart</div>
+      </div>
+      <div class="step-pill">1 / 3 • Items</div>
+    </header>
+
+    <section class="meta-card">
+      <div class="meta-row">
+        <div class="field">
+          <label for="vendor">Vendor</label>
+          <select id="vendor" class="field-select">
+            <option>Safi Traders</option>
+            <option>Madurai Ready-Mix</option>
+            <option>Sri Venkateswara Electricals</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="project">Project / Site</label>
+          <select id="project" class="field-select">
+            <option>Villa #12</option>
+            <option>G+1 House</option>
+            <option>Apartment Block A</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="meta-row">
+        <div class="field">
+          <label for="incharge">Site Incharge</label>
+          <select id="incharge" class="field-select">
+            <option>Arun Kumar</option>
+            <option>Meena R</option>
+            <option>Suresh B</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="needBy">Need by</label>
+          <input id="needBy" class="field-input" type="date" />
+        </div>
+      </div>
+
+      <div class="badge-row">
+        <span class="small-pill">PO Date: Today</span>
+        <span class="small-pill">PO Type: Materials</span>
+      </div>
+    </section>
+
+    <div class="search-bar">
+      <span class="search-icon">🔍</span>
+      <input id="searchInput" type="text" placeholder="Search item by name, code or category..." />
+    </div>
+
+    <section class="catalog-wrapper">
+      <div class="catalog-header">
+        <div><strong>Item Catalog</strong> • Tap + add to PO</div>
+        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+          <button class="add-input-btn" type="button" id="openAddInputBtn">
+            + Add New Item
+          </button>
+          <div class="tab-row">
+            <button class="tab active" type="button">All</button>
+            <button class="tab" type="button">Material</button>
+            <button class="tab" type="button">Service</button>
+          </div>
+        </div>
+      </div>
+
+      <ul class="item-list" id="itemList">
+        <li class="item-card"
+            data-id="CEM-OPC-53"
+            data-name="OPC 53 Grade Cement"
+            data-unit="bag"
+            data-rate="420"
+            data-category="Material">
+          <div class="item-top">
+            <div class="item-name-group">
+              <div class="item-name">OPC 53 Grade Cement</div>
+              <div class="item-meta">Code: CEM-OPC-53 • Unit: bag • Stock at site: 28</div>
+            </div>
+            <div class="item-badge">Material</div>
+          </div>
+          <div class="item-bottom">
+            <div class="rate-text">
+              ₹ 420
+              <span>per bag</span>
+            </div>
+            <div class="qty-row">
+              <input type="number" min="1" step="1" value="10" class="qty-input" />
+              <button class="add-btn" type="button">Add</button>
+              <span class="in-cart-pill" style="display:none;"></span>
+            </div>
+          </div>
+        </li>
+
+        <li class="item-card"
+            data-id="RIV-12MM"
+            data-name="TMT Steel Bar 12mm"
+            data-unit="kg"
+            data-rate="68"
+            data-category="Material">
+          <div class="item-top">
+            <div class="item-name-group">
+              <div class="item-name">TMT Steel Bar 12mm</div>
+              <div class="item-meta">Code: RIV-12MM • Unit: kg • Stock at site: 120</div>
+            </div>
+            <div class="item-badge">Material</div>
+          </div>
+          <div class="item-bottom">
+            <div class="rate-text">
+              ₹ 68
+              <span>per kg</span>
+            </div>
+            <div class="qty-row">
+              <input type="number" min="1" step="1" value="50" class="qty-input" />
+              <button class="add-btn" type="button">Add</button>
+              <span class="in-cart-pill" style="display:none;"></span>
+            </div>
+          </div>
+        </li>
+
+        <li class="item-card"
+            data-id="SAND-M"
+            data-name="M-Sand"
+            data-unit="cu.m"
+            data-rate="1550"
+            data-category="Material">
+          <div class="item-top">
+            <div class="item-name-group">
+              <div class="item-name">M-Sand</div>
+              <div class="item-meta">Code: SAND-M • Unit: cu.m • Stock at site: 12</div>
+            </div>
+            <div class="item-badge">Material</div>
+          </div>
+          <div class="item-bottom">
+            <div class="rate-text">
+              ₹ 1,550
+              <span>per cu.m</span>
+            </div>
+            <div class="qty-row">
+              <input type="number" min="1" step="0.5" value="3" class="qty-input" />
+              <button class="add-btn" type="button">Add</button>
+              <span class="in-cart-pill" style="display:none;"></span>
+            </div>
+          </div>
+        </li>
+
+        <li class="item-card"
+            data-id="LAB-CONC"
+            data-name="Concreting Labour Charges"
+            data-unit="day"
+            data-rate="8500"
+            data-category="Service">
+          <div class="item-top">
+            <div class="item-name-group">
+              <div class="item-name">Concreting Labour Charges</div>
+              <div class="item-meta">Code: LAB-CONC • Unit: day • Crew size: 8</div>
+            </div>
+            <div class="item-badge">Service</div>
+          </div>
+          <div class="item-bottom">
+            <div class="rate-text">
+              ₹ 8,500
+              <span>per day</span>
+            </div>
+            <div class="qty-row">
+              <input type="number" min="1" step="1" value="1" class="qty-input" />
+              <button class="add-btn" type="button">Add</button>
+              <span class="in-cart-pill" style="display:none;"></span>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <!-- Cart bar -->
+  <div class="cart-bar" id="cartBar">
+    <div class="cart-bar-inner">
+      <div class="cart-bar-text">
+        <strong id="cartBarTitle">0 items in PO cart</strong>
+        <span class="cart-bar-sub" id="cartBarSub">Total qty: 0 • Value: ₹ 0</span>
+      </div>
+      <button class="cart-bar-btn" type="button" id="cartBarButton">
+        Review Cart →
+      </button>
+    </div>
+  </div>
+
+  <!-- Cart bottom sheet -->
+  <div class="sheet-backdrop" id="cartSheetBackdrop">
+    <div class="sheet" id="cartSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <div class="sheet-title">PO Cart</div>
+          <div class="sheet-subtitle" id="sheetSubtitle">
+            Items selected for this PO
+          </div>
+        </div>
+        <button class="sheet-close-btn" type="button" id="sheetCloseBtn">
+          Close
+        </button>
+      </div>
+
+      <ul class="cart-items" id="cartItems"></ul>
+
+      <div class="sheet-footer">
+        <div class="sheet-summary-row">
+          <span>Total items</span>
+          <span id="summaryItems">0</span>
+        </div>
+        <div class="sheet-summary-row">
+          <span>Total quantity</span>
+          <span id="summaryQty">0</span>
+        </div>
+        <div class="sheet-summary-row">
+          <span><strong>Estimated PO value</strong></span>
+          <span id="summaryTotal"><strong>₹ 0</strong></span>
+        </div>
+
+        <div class="sheet-footer-actions">
+          <button class="sheet-btn outline" type="button" id="sheetClearBtn">
+            Clear cart
+          </button>
+          <button class="sheet-btn primary" type="button" id="sheetNextBtn">
+            Next: Review & Generate →
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Input Overlay -->
+  <div class="add-overlay" id="addInputOverlay">
+    <div class="add-panel">
+      <div class="add-panel-header">
+        <div class="add-panel-title-block">
+          <div class="add-panel-title">Add Input</div>
+          <div class="add-panel-subtitle">
+            Add Category, Item Name, Model, Brand, Type, Quantity
+          </div>
+        </div>
+        <button class="add-panel-close-btn" id="addInputCloseBtn" type="button">Close</button>
+      </div>
+
+      <section class="lists-card">
+        <div class="lists-row">
+          <span class="lists-label">Category list</span>
+          <div class="chip-row" id="inputListCategory">
+            <span class="chip empty">No entries yet</span>
+          </div>
+        </div>
+        <div class="lists-row">
+          <span class="lists-label">Item Name list</span>
+          <div class="chip-row" id="inputListItemName">
+            <span class="chip empty">No entries yet</span>
+          </div>
+        </div>
+        <div class="lists-row">
+          <span class="lists-label">Model list</span>
+          <div class="chip-row" id="inputListModel">
+            <span class="chip empty">No entries yet</span>
+          </div>
+        </div>
+        <div class="lists-row">
+          <span class="lists-label">Brand list</span>
+          <div class="chip-row" id="inputListBrand">
+            <span class="chip empty">No entries yet</span>
+          </div>
+        </div>
+        <div class="lists-row">
+          <span class="lists-label">Type list</span>
+          <div class="chip-row" id="inputListType">
+            <span class="chip empty">No entries yet</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="form-card">
+        <div class="form-header">
+          <div>
+            <strong style="font-size:0.8rem;">New Input</strong>
+            <small>Fill details and add to Catalog</small>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="field-small">
+            <label for="inputCategory">Category</label>
+            <input id="inputCategory" class="field-small-input" type="text" placeholder="e.g. Cement, Steel" />
+          </div>
+          <div class="field-small">
+            <label for="inputItemName">Item Name</label>
+            <input id="inputItemName" class="field-small-input" type="text" placeholder="e.g. OPC 53 Grade Cement" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="field-small">
+            <label for="inputModel">Model</label>
+            <input id="inputModel" class="field-small-input" type="text" placeholder="e.g. OPC-53" />
+          </div>
+          <div class="field-small">
+            <label for="inputBrand">Brand</label>
+            <input id="inputBrand" class="field-small-input" type="text" placeholder="e.g. Ramco, Ultratech" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="field-small">
+            <label for="inputType">Type</label>
+            <input id="inputType" class="field-small-input" type="text" placeholder="e.g. Material / Service" />
+          </div>
+          <div class="field-small">
+            <label for="inputQuantity">Quantity</label>
+            <input id="inputQuantity" class="field-small-input" type="number" min="0" step="1" placeholder="e.g. 50" />
+          </div>
+        </div>
+
+        <button class="primary-btn" type="button" id="addInputAddBtn">
+          <span>＋</span> Add to Catalog
+        </button>
+      </section>
+
+      <section class="table-card">
+        <div class="table-header">
+          <strong style="font-size:0.8rem;">Added Inputs</strong>
+          <small id="inputCountLabel">0 items</small>
+        </div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Item Name</th>
+                <th>Model</th>
+                <th>Brand</th>
+                <th>Type</th>
+                <th style="text-align:right;">Quantity</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="inputItemsBody"></tbody>
+          </table>
+        </div>
+        <div class="empty-text" id="inputEmptyText">
+          No items added yet. Use the form above to create your first entry.
+        </div>
+      </section>
+
+      <div class="bottom-note">
+        When you add here, a new item card is created in the PO catalog.
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: PO REVIEW -->
+  <div id="screenReview" class="app">
+    <header class="app-header">
+      <div class="app-title-block">
+        <div class="app-title">Review Purchase Order</div>
+        <div class="app-subtitle">Step 2 • Verify items, amounts & terms</div>
+      </div>
+      <div class="step-pill">2 / 3 • Review</div>
+    </header>
+
+    <section class="summary-card">
+      <div class="summary-top-row">
+        <div class="summary-col">
+          <span class="label">Vendor</span>
+          <span class="value editable" id="reviewVendor" contenteditable="true">Safi Traders</span>
+        </div>
+        <div class="summary-col">
+          <span class="label">Project / Site</span>
+          <span class="value editable" id="reviewProject" contenteditable="true">Villa #12</span>
+        </div>
+        <div class="summary-col">
+          <span class="label">Site Incharge</span>
+          <span class="value editable" id="reviewIncharge" contenteditable="true">Arun Kumar</span>
+        </div>
+      </div>
+
+      <div class="summary-top-row">
+        <div class="summary-col">
+          <span class="label">PO No.</span>
+          <span class="value editable" contenteditable="true">PO-2025-0012</span>
+        </div>
+        <div class="summary-col">
+          <span class="label">PO Date</span>
+          <span class="value editable" contenteditable="true">26 Nov 2025</span>
+        </div>
+        <div class="summary-col">
+          <span class="label">Need by</span>
+          <span class="value editable" id="reviewNeedBy" contenteditable="true">-</span>
+        </div>
+      </div>
+
+      <div class="pill-row">
+        <span class="pill">Status: Draft</span>
+        <span class="pill">Type: Materials + Service</span>
+      </div>
+    </section>
+
+    <section class="items-card-review">
+      <div class="items-header-review">
+        <div>
+          <strong>Line Items</strong>
+          <span>• Edit qty, rate, discount, tax</span>
+        </div>
+        <button class="tiny-link-btn" type="button" id="addRowBtn">+ Add row</button>
+      </div>
+
+      <div class="table-wrapper-review">
+        <table id="itemsTable">
+          <thead>
+            <tr>
+              <th style="width: 26%;">Item / Description</th>
+              <th style="width: 6%;">Unit</th>
+              <th style="width: 10%;">Qty</th>
+              <th style="width: 12%;">Rate</th>
+              <th style="width: 10%;">Disc %</th>
+              <th style="width: 10%;">Tax %</th>
+              <th style="width: 14%;">Amount</th>
+              <th style="width: 8%;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- rows from cart -->
+          </tbody>
+        </table>
+      </div>
+      <small style="font-size:0.7rem; color:#9ca3af; padding:0 2px;">
+        Amount = (Qty × Rate − Discount) + Tax. Edit on this screen before generating PO.
+      </small>
+    </section>
+
+    <section class="terms-card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <strong style="font-size:0.8rem;">Terms & Delivery</strong>
+        <span style="font-size:0.7rem; color:#9ca3af;">Optional but recommended</span>
+      </div>
+
+      <div class="terms-row">
+        <div class="terms-field">
+          <span class="label">Payment terms</span>
+          <input class="terms-input" id="paymentTerms" type="text"
+                 value="Within 15 days against invoice submission" />
+        </div>
+        <div class="terms-field">
+          <span class="label">Transport / unloading</span>
+          <input class="terms-input" id="transportTerms" type="text"
+                 value="Delivery at site, unloading by vendor" />
+        </div>
+      </div>
+
+      <div class="terms-row">
+        <div class="terms-field">
+          <span class="label">Delivery address</span>
+          <textarea class="terms-textarea" id="deliveryAddress">AA Builders – Site,
+Near Thiruthangal Road, Srivilliputtur, Tamil Nadu.</textarea>
+        </div>
+      </div>
+
+      <div class="terms-row">
+        <div class="terms-field">
+          <span class="label">PO notes / special instructions</span>
+          <textarea class="terms-textarea" id="poNotes">Please supply fresh material. Any damaged / wet bags will be rejected at site. Inform site incharge before dispatch.</textarea>
+        </div>
+      </div>
+    </section>
+
+    <section class="totals-card">
+      <div class="totals-row">
+        <span>Sub-total (before discount)</span>
+        <span id="subTotal">₹ 0</span>
+      </div>
+      <div class="totals-row">
+        <span>Discount total</span>
+        <span id="discountTotal">₹ 0</span>
+      </div>
+      <div class="totals-row">
+        <span>Taxable value</span>
+        <span id="taxableTotal">₹ 0</span>
+      </div>
+      <div class="totals-row">
+        <span>Tax total (CGST+SGST/IGST)</span>
+        <span id="taxTotal">₹ 0</span>
+      </div>
+      <div class="totals-row total">
+        <span><strong>Grand Total</strong></span>
+        <span id="grandTotal"><strong>₹ 0</strong></span>
+      </div>
+    </section>
+  </div>
+
+  <!-- Bottom actions for Review -->
+  <div class="bottom-actions" id="bottomActions">
+    <div class="bottom-actions-inner">
+      <button class="action-btn secondary" type="button" id="backBtn">
+        ← Back to Items
+      </button>
+      <button class="action-btn primary" type="button" id="generateBtn">
+        Generate PO →
+      </button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const screenItems = document.getElementById("screenItems");
+      const screenReview = document.getElementById("screenReview");
+
+      const itemListEl = document.getElementById("itemList");
+      const cartBar = document.getElementById("cartBar");
+      const cartBarTitle = document.getElementById("cartBarTitle");
+      const cartBarSub = document.getElementById("cartBarSub");
+      const cartBarButton = document.getElementById("cartBarButton");
+
+      const cartSheetBackdrop = document.getElementById("cartSheetBackdrop");
+      const cartSheet = document.getElementById("cartSheet");
+      const sheetCloseBtn = document.getElementById("sheetCloseBtn");
+      const cartItemsEl = document.getElementById("cartItems");
+      const summaryItems = document.getElementById("summaryItems");
+      const summaryQty = document.getElementById("summaryQty");
+      const summaryTotal = document.getElementById("summaryTotal");
+      const sheetClearBtn = document.getElementById("sheetClearBtn");
+      const sheetNextBtn = document.getElementById("sheetNextBtn");
+
+      const searchInput = document.getElementById("searchInput");
+
+      const openAddInputBtn = document.getElementById("openAddInputBtn");
+      const addInputOverlay = document.getElementById("addInputOverlay");
+      const addInputCloseBtn = document.getElementById("addInputCloseBtn");
+
+      const vendorSel = document.getElementById("vendor");
+      const projectSel = document.getElementById("project");
+      const inchargeSel = document.getElementById("incharge");
+      const needByInput = document.getElementById("needBy");
+
+      // Cart
+      const cart = {};
+
+      function formatCurrency(num) {
+        const n = Number(num) || 0;
+        return n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+      }
+
+      function updateCartBadgeForItem(cardEl) {
+        const id = cardEl.dataset.id;
+        const pill = cardEl.querySelector(".in-cart-pill");
+        if (!pill) return;
+
+        if (cart[id]) {
+          pill.style.display = "inline-flex";
+          pill.textContent = `${cart[id].qty} ${cart[id].unit} in cart`;
+        } else {
+          pill.style.display = "none";
+        }
+      }
+
+      function recalcCart() {
+        let items = 0;
+        let totalQty = 0;
+        let totalValue = 0;
+
+        Object.values(cart).forEach((line) => {
+          items += 1;
+          totalQty += line.qty;
+          totalValue += line.qty * line.rate;
+        });
+
+        if (items > 0 && screenItems.style.display !== "none") {
+          cartBar.style.display = "flex";
+        } else {
+          cartBar.style.display = "none";
+        }
+
+        cartBarTitle.textContent = `${items} item${items !== 1 ? "s" : ""} in PO cart`;
+        cartBarSub.textContent =
+          `Total qty: ${totalQty} • Value: ₹ ${formatCurrency(totalValue)}`;
+
+        summaryItems.textContent = items;
+        summaryQty.textContent = totalQty;
+        summaryTotal.innerHTML = `<strong>₹ ${formatCurrency(totalValue)}</strong>`;
+
+        document.querySelectorAll(".item-card").forEach(updateCartBadgeForItem);
+      }
+
+      function openCartSheet() {
+        buildCartSheetItems();
+        cartSheetBackdrop.classList.add("open");
+        cartSheet.classList.add("open");
+      }
+
+      function closeCartSheet() {
+        cartSheetBackdrop.classList.remove("open");
+        cartSheet.classList.remove("open");
+      }
+
+      function buildCartSheetItems() {
+        cartItemsEl.innerHTML = "";
+
+        if (Object.keys(cart).length === 0) {
+          const li = document.createElement("li");
+          li.textContent = "No items in cart. Add items from the list.";
+          li.style.fontSize = "0.8rem";
+          li.style.color = "#6b7280";
+          cartItemsEl.appendChild(li);
+          return;
+        }
+
+        Object.values(cart).forEach((line) => {
+          const li = document.createElement("li");
+          li.className = "cart-item-row";
+          li.dataset.id = line.id;
+
+          const top = document.createElement("div");
+          top.className = "cart-item-top";
+          top.innerHTML = `
+            <div>
+              <div class="cart-item-name">${line.name}</div>
+              <div class="cart-item-meta">${line.id} • ${line.category}</div>
+            </div>
+            <div class="cart-item-meta">₹ ${formatCurrency(line.rate)} / ${line.unit}</div>
+          `;
+
+          const bottom = document.createElement("div");
+          bottom.className = "cart-item-bottom";
+
+          const qtyGroup = document.createElement("div");
+          qtyGroup.className = "cart-qty-group";
+          qtyGroup.innerHTML = `
+            <span>Qty</span>
+            <input type="number" min="0.01" step="0.01" class="cart-qty-input" value="${line.qty}" />
+            <span>${line.unit}</span>
+            <button class="cart-remove-btn" type="button">Remove</button>
+          `;
+
+          const lineTotal = document.createElement("div");
+          lineTotal.className = "cart-line-total";
+          lineTotal.textContent = `₹ ${formatCurrency(line.qty * line.rate)}`;
+
+          bottom.appendChild(qtyGroup);
+          bottom.appendChild(lineTotal);
+
+          li.appendChild(top);
+          li.appendChild(bottom);
+          cartItemsEl.appendChild(li);
+        });
+
+        cartItemsEl.querySelectorAll(".cart-item-row").forEach((row) => {
+          const id = row.dataset.id;
+          const qtyInput = row.querySelector(".cart-qty-input");
+          const removeBtn = row.querySelector(".cart-remove-btn");
+          const lineTotalEl = row.querySelector(".cart-line-total");
+
+          qtyInput.addEventListener("input", () => {
+            let val = parseFloat(qtyInput.value);
+            if (!val || val <= 0) val = 0;
+            if (cart[id]) {
+              cart[id].qty = val;
+              const line = cart[id];
+              lineTotalEl.textContent = `₹ ${formatCurrency(line.qty * line.rate)}`;
+              if (val === 0) {
+                delete cart[id];
+                row.remove();
+              }
+              recalcCart();
+              if (Object.keys(cart).length === 0) {
+                buildCartSheetItems();
+              }
+            }
+          });
+
+          removeBtn.addEventListener("click", () => {
+            delete cart[id];
+            row.remove();
+            recalcCart();
+            if (Object.keys(cart).length === 0) {
+              buildCartSheetItems();
+            }
+          });
+        });
+      }
+
+      function attachItemCardEvents(card) {
+        const addBtn = card.querySelector(".add-btn");
+        const qtyInput = card.querySelector(".qty-input");
+        if (!addBtn || !qtyInput) return;
+
+        addBtn.addEventListener("click", () => {
+          const id = card.dataset.id;
+          const name = card.dataset.name;
+          const unit = card.dataset.unit || "unit";
+          const category = card.dataset.category || "Custom";
+          const rate = Number(card.dataset.rate) || 0;
+          let qty = parseFloat(qtyInput.value);
+
+          if (!qty || qty <= 0) {
+            alert("Enter a valid quantity to add.");
+            return;
+          }
+
+          if (cart[id]) {
+            cart[id].qty += qty;
+          } else {
+            cart[id] = { id, name, unit, rate, qty, category };
+          }
+
+          recalcCart();
+        });
+      }
+
+      itemListEl.querySelectorAll(".item-card").forEach(attachItemCardEvents);
+
+      searchInput.addEventListener("input", () => {
+        const term = searchInput.value.trim().toLowerCase();
+        document.querySelectorAll(".item-card").forEach((card) => {
+          const name = (card.dataset.name || "").toLowerCase();
+          const id = (card.dataset.id || "").toLowerCase();
+          const category = (card.dataset.category || "").toLowerCase();
+          const match =
+            name.includes(term) || id.includes(term) || category.includes(term);
+          card.style.display = match ? "" : "none";
+        });
+      });
+
+      document.querySelectorAll(".tab-row .tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          document.querySelectorAll(".tab-row .tab").forEach((t) =>
+            t.classList.remove("active")
+          );
+          tab.classList.add("active");
+
+          const label = tab.textContent.trim();
+          document.querySelectorAll(".item-card").forEach((card) => {
+            const category = card.dataset.category;
+            if (label === "All") {
+              card.style.display = "";
+            } else if (label === "Material" && category === "Material") {
+              card.style.display = "";
+            } else if (label === "Service" && category === "Service") {
+              card.style.display = "";
+            } else {
+              card.style.display = "none";
+            }
+          });
+        });
+      });
+
+      cartBarButton.addEventListener("click", openCartSheet);
+      sheetCloseBtn.addEventListener("click", closeCartSheet);
+      cartSheetBackdrop.addEventListener("click", (e) => {
+        if (e.target === cartSheetBackdrop) closeCartSheet();
+      });
+
+      sheetClearBtn.addEventListener("click", () => {
+        if (!confirm("Clear all items from PO cart?")) return;
+        Object.keys(cart).forEach((k) => delete cart[k]);
+        recalcCart();
+        buildCartSheetItems();
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          closeCartSheet();
+          closeAddInputOverlay();
+        }
+      });
+
+      recalcCart();
+
+      /* === ADD INPUT OVERLAY === */
+      function openAddInputOverlay() {
+        addInputOverlay.classList.add("open");
+      }
+
+      function closeAddInputOverlay() {
+        addInputOverlay.classList.remove("open");
+      }
+
+      openAddInputBtn.addEventListener("click", openAddInputOverlay);
+      addInputCloseBtn.addEventListener("click", closeAddInputOverlay);
+      addInputOverlay.addEventListener("click", (e) => {
+        if (e.target === addInputOverlay) closeAddInputOverlay();
+      });
+
+      const inputCategory = document.getElementById("inputCategory");
+      const inputItemName = document.getElementById("inputItemName");
+      const inputModel = document.getElementById("inputModel");
+      const inputBrand = document.getElementById("inputBrand");
+      const inputType = document.getElementById("inputType");
+      const inputQuantity = document.getElementById("inputQuantity");
+
+      const inputListCategory = document.getElementById("inputListCategory");
+      const inputListItemName = document.getElementById("inputListItemName");
+      const inputListModel = document.getElementById("inputListModel");
+      const inputListBrand = document.getElementById("inputListBrand");
+      const inputListType = document.getElementById("inputListType");
+
+      const inputItemsBody = document.getElementById("inputItemsBody");
+      const inputEmptyText = document.getElementById("inputEmptyText");
+      const inputCountLabel = document.getElementById("inputCountLabel");
+
+      const addInputAddBtn = document.getElementById("addInputAddBtn");
+
+      const inputItems = [];
+      const inputLists = {
+        category: new Set(),
+        itemName: new Set(),
+        model: new Set(),
+        brand: new Set(),
+        type: new Set(),
+      };
+
+      function makeChipList(set, container) {
+        container.innerHTML = "";
+        if (set.size === 0) {
+          const span = document.createElement("span");
+          span.className = "chip empty";
+          span.textContent = "No entries yet";
+          container.appendChild(span);
+          return;
+        }
+        Array.from(set).sort().forEach((val) => {
+          const span = document.createElement("span");
+          span.className = "chip";
+          span.textContent = val;
+          container.appendChild(span);
+        });
+      }
+
+      function refreshInputLists() {
+        makeChipList(inputLists.category, inputListCategory);
+        makeChipList(inputLists.itemName, inputListItemName);
+        makeChipList(inputLists.model, inputListModel);
+        makeChipList(inputLists.brand, inputListBrand);
+        makeChipList(inputLists.type, inputListType);
+      }
+
+      function refreshInputTable() {
+        inputItemsBody.innerHTML = "";
+        if (inputItems.length === 0) {
+          inputEmptyText.style.display = "block";
+        } else {
+          inputEmptyText.style.display = "none";
+        }
+
+        inputItems.forEach((item, index) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${item.category}</td>
+            <td>${item.itemName}</td>
+            <td>${item.model}</td>
+            <td>${item.brand}</td>
+            <td>${item.type}</td>
+            <td class="qty-cell">${item.quantity}</td>
+            <td><button class="remove-btn" data-index="${index}" type="button">✕</button></td>
+          `;
+          inputItemsBody.appendChild(tr);
+        });
+
+        inputItemsBody.querySelectorAll(".remove-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const idx = parseInt(btn.dataset.index, 10);
+            if (!isNaN(idx)) {
+              inputItems.splice(idx, 1);
+              recalcListsFromInputItems();
+              refreshInputTable();
+            }
+          });
+        });
+
+        inputCountLabel.textContent = `${inputItems.length} item${inputItems.length === 1 ? "" : "s"}`;
+      }
+
+      function recalcListsFromInputItems() {
+        inputLists.category.clear();
+        inputLists.itemName.clear();
+        inputLists.model.clear();
+        inputLists.brand.clear();
+        inputLists.type.clear();
+
+        inputItems.forEach((it) => {
+          if (it.category) inputLists.category.add(it.category);
+          if (it.itemName) inputLists.itemName.add(it.itemName);
+          if (it.model) inputLists.model.add(it.model);
+          if (it.brand) inputLists.brand.add(it.brand);
+          if (it.type) inputLists.type.add(it.type);
+        });
+
+        refreshInputLists();
+      }
+
+      function createCatalogCardFromInput(item) {
+        const li = document.createElement("li");
+        li.className = "item-card";
+        const id = item.model || ("NEW-" + Date.now() + "-" + Math.floor(Math.random() * 1000));
+
+        li.dataset.id = id;
+        li.dataset.name = item.itemName;
+        li.dataset.unit = "unit";
+        li.dataset.rate = "0";
+        li.dataset.category = item.type || "Custom";
+
+        li.innerHTML = `
+          <div class="item-top">
+            <div class="item-name-group">
+              <div class="item-name">${item.itemName}</div>
+              <div class="item-meta">
+                Cat: ${item.category || "-"} • Model: ${item.model || "-"} • Brand: ${item.brand || "-"}
+              </div>
+            </div>
+            <div class="item-badge">${item.type || "Custom"}</div>
+          </div>
+          <div class="item-bottom">
+            <div class="rate-text">
+              ₹ 0
+              <span>per unit</span>
+            </div>
+            <div class="qty-row">
+              <input type="number" min="1" step="1" value="${item.quantity || 1}" class="qty-input" />
+              <button class="add-btn" type="button">Add</button>
+              <span class="in-cart-pill" style="display:none;"></span>
+            </div>
+          </div>
+        `;
+
+        itemListEl.appendChild(li);
+        attachItemCardEvents(li);
+      }
+
+      function addInputItem() {
+        const category = inputCategory.value.trim();
+        const itemName = inputItemName.value.trim();
+        const model = inputModel.value.trim();
+        const brand = inputBrand.value.trim();
+        const type = inputType.value.trim();
+        const quantity = parseFloat(inputQuantity.value);
+
+        if (!category || !itemName) {
+          alert("Category and Item Name are required.");
+          return;
+        }
+        if (!quantity || quantity <= 0) {
+          alert("Please enter a valid Quantity.");
+          return;
+        }
+
+        const item = { category, itemName, model, brand, type, quantity };
+        inputItems.push(item);
+
+        if (category) inputLists.category.add(category);
+        if (itemName) inputLists.itemName.add(itemName);
+        if (model) inputLists.model.add(model);
+        if (brand) inputLists.brand.add(brand);
+        if (type) inputLists.type.add(type);
+
+        refreshInputLists();
+        refreshInputTable();
+
+        createCatalogCardFromInput(item);
+
+        inputItemName.value = "";
+        inputModel.value = "";
+        inputQuantity.value = "";
+      }
+
+      addInputAddBtn.addEventListener("click", addInputItem);
+      inputQuantity.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          addInputItem();
+        }
+      });
+
+      refreshInputLists();
+      refreshInputTable();
+
+      /* === REVIEW SCREEN LOGIC === */
+      const reviewVendorEl = document.getElementById("reviewVendor");
+      const reviewProjectEl = document.getElementById("reviewProject");
+      const reviewInchargeEl = document.getElementById("reviewIncharge");
+      const reviewNeedByEl = document.getElementById("reviewNeedBy");
+
+      const itemsTable = document.getElementById("itemsTable");
+      const itemsTbody = itemsTable.querySelector("tbody");
+
+      const subTotalEl = document.getElementById("subTotal");
+      const discountTotalEl = document.getElementById("discountTotal");
+      const taxableTotalEl = document.getElementById("taxableTotal");
+      const taxTotalEl = document.getElementById("taxTotal");
+      const grandTotalEl = document.getElementById("grandTotal");
+
+      const addRowBtn = document.getElementById("addRowBtn");
+      const backBtn = document.getElementById("backBtn");
+      const generateBtn = document.getElementById("generateBtn");
+      const bottomActions = document.getElementById("bottomActions");
+
+      function parseNum(value) {
+        const n = parseFloat(value);
+        return isNaN(n) ? 0 : n;
+      }
+
+      function formatCurrencyPO(num) {
+        const n = Number(num) || 0;
+        return "₹ " + n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+      }
+
+      function recalcReview() {
+        let subTotal = 0;
+        let discountTotal = 0;
+        let taxableTotal = 0;
+        let taxTotal = 0;
+
+        itemsTbody.querySelectorAll("tr").forEach((row) => {
+          const qty = parseNum(row.querySelector(".qty-input")?.value);
+          const rate = parseNum(row.querySelector(".rate-input")?.value);
+          const discPct = parseNum(row.querySelector(".disc-input")?.value);
+          const taxPct = parseNum(row.querySelector(".tax-input")?.value);
+
+          const lineBase = qty * rate;
+          const discAmt = lineBase * (discPct / 100);
+          const taxable = lineBase - discAmt;
+          const taxAmt = taxable * (taxPct / 100);
+          const lineTotal = taxable + taxAmt;
+
+          subTotal += lineBase;
+          discountTotal += discAmt;
+          taxableTotal += taxable;
+          taxTotal += taxAmt;
+
+          const outCell = row.querySelector(".amount-output");
+          if (outCell) {
+            outCell.textContent = formatCurrencyPO(lineTotal);
+          }
+        });
+
+        const grandTotal = taxableTotal + taxTotal;
+
+        subTotalEl.textContent = formatCurrencyPO(subTotal);
+        discountTotalEl.textContent = "-" + formatCurrencyPO(discountTotal).replace("₹ ", "₹ ");
+        taxableTotalEl.textContent = formatCurrencyPO(taxableTotal);
+        taxTotalEl.textContent = formatCurrencyPO(taxTotal);
+        grandTotalEl.innerHTML = "<strong>" + formatCurrencyPO(grandTotal) + "</strong>";
+      }
+
+      function attachReviewRowEvents(row) {
+        const inputs = row.querySelectorAll(".qty-input, .rate-input, .disc-input, .tax-input");
+        inputs.forEach((inp) => {
+          inp.addEventListener("input", recalcReview);
+        });
+
+        const removeBtn = row.querySelector(".remove-btn");
+        if (removeBtn) {
+          removeBtn.addEventListener("click", () => {
+            row.remove();
+            recalcReview();
+          });
+        }
+      }
+
+      function buildReviewRowsFromCart() {
+        itemsTbody.innerHTML = "";
+
+        if (Object.keys(cart).length === 0) return;
+
+        Object.values(cart).forEach((line) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>
+              <div class="item-desc">${line.name}</div>
+              <div class="item-sub">Code: ${line.id}</div>
+            </td>
+            <td>${line.unit}</td>
+            <td><input type="number" class="num-input qty-input" min="0" step="1" value="${line.qty}"></td>
+            <td><input type="number" class="num-input rate-input" min="0" step="0.01" value="${line.rate}"></td>
+            <td><input type="number" class="num-input disc-input" min="0" step="0.1" value="0"></td>
+            <td><input type="number" class="num-input tax-input" min="0" step="0.1" value="18"></td>
+            <td class="amount-cell amount-output">₹ 0</td>
+            <td><button class="remove-btn" type="button">✕</button></td>
+          `;
+          itemsTbody.appendChild(tr);
+          attachReviewRowEvents(tr);
+        });
+
+        recalcReview();
+      }
+
+      function initReviewScreenFromCart() {
+        if (Object.keys(cart).length === 0) {
+          alert("PO cart is empty. Please add at least one item.");
+          return;
+        }
+
+        reviewVendorEl.textContent = vendorSel.value || "Vendor";
+        reviewProjectEl.textContent = projectSel.value || "Project / Site";
+        reviewInchargeEl.textContent = inchargeSel.value || "Site Incharge";
+        reviewNeedByEl.textContent = needByInput.value || "-";
+
+        buildReviewRowsFromCart();
+
+        screenItems.style.display = "none";
+        cartBar.style.display = "none";
+        closeCartSheet();
+
+        screenReview.style.display = "flex";
+        bottomActions.style.display = "flex";
+      }
+
+      sheetNextBtn.addEventListener("click", () => {
+        initReviewScreenFromCart();
+      });
+
+      addRowBtn.addEventListener("click", () => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>
+            <div class="item-desc" contenteditable="true">New item</div>
+            <div class="item-sub" contenteditable="true">Code / description</div>
+          </td>
+          <td contenteditable="true">unit</td>
+          <td><input type="number" class="num-input qty-input" min="0" step="1" value="1"></td>
+          <td><input type="number" class="num-input rate-input" min="0" step="0.01" value="0"></td>
+          <td><input type="number" class="num-input disc-input" min="0" step="0.1" value="0"></td>
+          <td><input type="number" class="num-input tax-input" min="0" step="0.1" value="18"></td>
+          <td class="amount-cell amount-output">₹ 0</td>
+          <td><button class="remove-btn" type="button">✕</button></td>
+        `;
+        itemsTbody.appendChild(tr);
+        attachReviewRowEvents(tr);
+        recalcReview();
+      });
+
+      backBtn.addEventListener("click", () => {
+        screenReview.style.display = "none";
+        bottomActions.style.display = "none";
+        screenItems.style.display = "flex";
+        recalcCart();
+      });
+
+      generateBtn.addEventListener("click", () => {
+        alert("PO generated (mock). Hook this button to your ERP backend.");
+      });
+    })();
+  </script>
+</body>
+</html>

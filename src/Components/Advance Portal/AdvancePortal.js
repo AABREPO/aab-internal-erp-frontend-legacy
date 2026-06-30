@@ -1,0 +1,2955 @@
+import { useState, useEffect, useRef } from 'react';
+import Select from 'react-select';
+import Attach from '../Images/Attachfile.svg';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import SideTable from './SideTable';
+import { use } from 'react';
+import {
+  postBankRegisterLogSave,
+  bankRegisterLogSaveUrlMatchingRequest,
+  isPaymentModeRequiringBankRegisterLog,
+} from '../../utils/bankRegisterLogBeforeWeeklyBill';
+import {
+  syncWeeklyPaymentBillsForAdvancePortal,
+  needsAdvancePortalPaymentModalForWeeklyBill,
+  getAdvancePortalDisplayAmount,
+  resolveExpensesEntryIdAfterSave,
+  buildAdvancePortalExpensesEntryLinkFields,
+  resolveAdvancePortalIdFromSaveResponse,
+  linkExpensesEntryIdToAdvancePortal,
+} from '../../utils/advancePortalWeeklyPaymentBill';
+import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
+import {
+  ADVANCE_PORTAL_MODULE_NAME,
+  fetchPaymentModeSelectOptionsForModule,
+  subscribePaymentModeArrangementRefresh,
+} from '../../utils/paymentModeArrangement';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
+import {
+  appendExpenseToFormCache,
+  findDuplicateExpenses,
+  getLatestEnoFromExpenses,
+  prefetchExpensesFormData,
+  toExpenseLocalDateStr,
+} from '../../utils/expensesFormPrefetch';
+import AdvancePortalEditPaymentModal from './AdvancePortalEditPaymentModal';
+import CustomDateField from '../ExpensesEntry/CustomDateField';
+const ADVANCE_PORTAL_SELECT_CLASS =
+  'custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const ADVANCE_PORTAL_INPUT_CLASS =
+  'border-2 border-[#BF9853] rounded-lg px-[8px] w-[300px] h-[40px] focus:outline-none border-opacity-[0.20] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const ADVANCE_PORTAL_READONLY_INPUT_CLASS =
+  'border-2 border-[#BF9853] rounded-lg px-[8px] w-[300px] h-[40px] focus:outline-none border-opacity-[0.20] bg-[#ededed] text-[14px] font-semibold';
+const ADVANCE_PORTAL_AMOUNT_INPUT_CLASS =
+  'pl-[20px] pr-4 border-2 border-[#BF9853] rounded-lg w-full h-full focus:outline-none border-opacity-[0.20] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const formatNumber = (num) => {
+  if (!num) return '';
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+};
+const formatAmountDisplay = (value) => {
+  if (value === '' || value === null || value === undefined) return '';
+  const normalized = String(value).replace(/,/g, '');
+  const num = Number(normalized);
+  if (Number.isNaN(num)) return String(value);
+  return num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+const ADVANCE_PORTAL_READONLY_AMOUNT_INPUT_CLASS =
+  'pl-[12px] pr-4 border-2 border-[#BF9853] rounded-lg w-full h-full focus:outline-none border-opacity-[0.20] bg-[#ededed] text-[14px] font-medium cursor-default';
+const ADVANCE_PORTAL_FILTER_AMOUNT_INPUT_CLASS =
+  'pl-[12px] pr-2 border border-[#00000029] rounded-lg w-full h-full focus:outline-none bg-[#ededed] text-[14px] font-medium cursor-default';
+const ADVANCE_PORTAL_MODAL_READONLY_AMOUNT_INPUT_CLASS =
+  'pl-7 pr-3 border-2 border-[#BF9853] border-opacity-25 rounded-lg w-full h-full text-gray-600 bg-gray-100 text-sm cursor-default focus:outline-none';
+const AdvancePortalAmountOutput = ({
+  value,
+  variant = 'form',
+  className = '',
+  fullWidth = false,
+}) => {
+  const isFilter = variant === 'filter';
+  const isModalReadonly = variant === 'modal-readonly';
+  const wrapperClass = isFilter
+    ? `relative lg:w-[150px] w-full h-[40px] ${className}`.trim()
+    : isModalReadonly
+      ? `relative w-full h-[45px] ${className}`.trim()
+      : fullWidth
+        ? `relative w-full h-[40px] ${className}`.trim()
+        : `relative w-[300px] h-[40px] ${className}`.trim();
+  const rupeeClass = isFilter
+    ? 'absolute top-1/2 left-2 transform -translate-y-1/2 text-gray-600 text-sm pointer-events-none'
+    : isModalReadonly
+      ? 'absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-600 pointer-events-none'
+      : 'absolute top-1/2 left-[8px] transform -translate-y-1/2 text-gray-600 text-lg pointer-events-none';
+  const inputClass = isFilter
+    ? ADVANCE_PORTAL_FILTER_AMOUNT_INPUT_CLASS
+    : isModalReadonly
+      ? ADVANCE_PORTAL_MODAL_READONLY_AMOUNT_INPUT_CLASS
+      : ADVANCE_PORTAL_READONLY_AMOUNT_INPUT_CLASS;
+  const formattedValue = formatAmountDisplay(value);
+  const displayValue = isModalReadonly
+    ? formattedValue
+    : (formattedValue ? `₹${formattedValue}` : '');
+
+  return (
+    <div className={wrapperClass}>
+      {isModalReadonly && <span className={rupeeClass}>₹</span>}
+      <input
+        type="text"
+        readOnly
+        tabIndex={-1}
+        value={displayValue}
+        className={inputClass}
+      />
+    </div>
+  );
+};
+const AdvancePortalAmountInput = ({
+  value,
+  onChange,
+  placeholder = '',
+  variant = 'form',
+  className = '',
+  fullWidth = false,
+}) => {
+  const isModal = variant === 'modal';
+  const wrapperClass = isModal
+    ? `relative w-full h-[45px] ${className}`.trim()
+    : fullWidth
+      ? `relative w-full h-[40px] ${className}`.trim()
+      : `relative w-[300px] h-[40px] ${className}`.trim();
+  const rupeeClass = isModal
+    ? 'absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-600'
+    : 'absolute top-1/2 left-[8px] transform -translate-y-1/2 text-gray-600 text-lg';
+  const inputClass = isModal
+    ? 'w-full h-[45px] border-2 border-[#BF9853] rounded-lg pl-7 pr-3 border-opacity-20 focus:outline-none text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500'
+    : ADVANCE_PORTAL_AMOUNT_INPUT_CLASS;
+
+  return (
+    <div className={wrapperClass}>
+      <span className={rupeeClass}>₹</span>
+      <input
+        type="text"
+        value={formatNumber(value)}
+        onChange={onChange}
+        placeholder={placeholder}
+        onWheel={(e) => e.target.blur()}
+        className={inputClass}
+      />
+    </div>
+  );
+};
+const ADVANCE_PORTAL_TEXTAREA_CLASS =
+  'border-2 border-[#BF9853] rounded-md px-[8px] w-[616px]  h-[60px] focus:outline-none border-opacity-[0.20] resize-none text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const ADVANCE_PORTAL_LABEL_CLASS = 'text-md font-semibold mb-[8px] block';
+const ADVANCE_PORTAL_FORM_FIELDS = {
+  selectType: 'Account Type',
+  date: 'Date',
+  contractorVendor: 'Contractor/Vendor',
+  overallAdvance: 'Overall Advance',
+  projectName: 'Project Name',
+  fromProjectName: 'From Project Name',
+  toProjectName: 'To Project Name',
+  projectAdvance: 'Project Advance',
+  billAmount: 'Bill Amount',
+  category: 'Category',
+  discount: 'Discount',
+  amountGiven: 'Amount Given',
+  transferAmount: 'Transfer Amount',
+  refundAmount: 'Refund Amount',
+  paymentMode: 'Payment Mode',
+  description: 'Description',
+  attachFile: 'Attach file',
+};
+const advancePortalReadonlyFieldClass =
+  'min-h-[45px] border-2 border-[#BF9853] border-opacity-20 rounded-lg bg-[#FAF6ED] px-3 flex items-center text-sm font-medium text-[#202020]';
+const AdvancePortalReadonlyField = ({ value, className = '' }) => (
+  <div className={`${advancePortalReadonlyFieldClass} ${className}`.trim()} aria-readonly="true">
+    {value || '—'}
+  </div>
+);
+const getNetBillAmount = (entry) => {
+  const bill = parseFloat(entry?.bill_amount) || 0;
+  const discount = parseFloat(entry?.discount_amount) || 0;
+  return bill - discount;
+};
+const computeAdvanceBalanceDelta = (entry) => {
+  const amount = parseFloat(entry?.amount) || 0;
+  const refund = parseFloat(entry?.refund_amount) || 0;
+  return amount - getNetBillAmount(entry) - refund;
+};
+/** One table row per entry; discount_amount is shown on the main row only. */
+const expandPortalTableRows = (entries) =>
+  (entries || []).map((entry, index) => ({
+    entry,
+    isDiscountRow: false,
+    rowKey: `${entry.advancePortalId ?? entry.entry_no ?? index}`,
+  }));
+const AdvancePortal = ({
+  username,
+  userRoles = [],
+  paymentModeOptions = [],
+  embedded = false,
+  modalEmbedded = false,
+  onSuccess,
+  lockTypePrefill = false,
+  refreshSignal,
+  isActive = true,
+}) => {
+  const resolveEnteredBy = () => {
+    const propUsername = typeof username === 'string' ? username.trim() : '';
+    if (propUsername) return propUsername;
+    try {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      return user?.name || user?.username || user?.userName || '';
+    } catch {
+      return '';
+    }
+  };
+  const enteredBy = resolveEnteredBy();
+  const resolveActiveBranchId = () => {
+    try {
+      const selectedBranchId = localStorage.getItem("selectedBranchId");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const fallbackBranchId = user?.branchId ?? user?.branch_id ?? user?.brachId;
+      const resolved = Number(selectedBranchId || fallbackBranchId);
+      return Number.isFinite(resolved) && resolved > 0 ? resolved : null;
+    } catch {
+      return null;
+    }
+  };
+  const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
+  const withBranchUrl = (baseUrl) => {
+    const url = new URL(baseUrl);
+    if (activeBranchId !== null && activeBranchId !== undefined && activeBranchId !== "") {
+      url.searchParams.set("branchId", String(activeBranchId));
+    }
+    return url.toString();
+  };
+  useEffect(() => {
+    const syncBranch = () => {
+      const nextBranchId = resolveActiveBranchId();
+      setActiveBranchId((prevBranchId) => (prevBranchId === nextBranchId ? prevBranchId : nextBranchId));
+    };
+    syncBranch();
+    window.addEventListener("branchSelectionChanged", syncBranch);
+    return () => window.removeEventListener("branchSelectionChanged", syncBranch);
+  }, []);
+ 
+  const [backendPaymentModeOptions, setBackendPaymentModeOptions] = useState([]);
+  const finalPaymentModeOptions = backendPaymentModeOptions.length > 0 ? backendPaymentModeOptions : paymentModeOptions.length > 0 ? paymentModeOptions : '';
+  useEffect(() => {
+    const fetchPaymentModes = async () => {
+      try {
+        const options = await fetchPaymentModeSelectOptionsForModule(
+          ADVANCE_PORTAL_MODULE_NAME,
+          paymentModeOptions
+        );
+        setBackendPaymentModeOptions(options);
+      } catch (error) {
+        console.error('Error fetching payment modes:', error);
+      }
+    };
+    fetchPaymentModes();
+    return subscribePaymentModeArrangementRefresh(fetchPaymentModes);
+  }, [paymentModeOptions]);
+  const [selectedType, setSelectedType] = useState('Advance')
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [combinedOptions, setCombinedOptions] = useState([]);
+  const [vendorOptions, setVendorOptions] = useState([]);
+  const [contractorOptions, setContractorOptions] = useState([]);
+  const [selectedSite, setSelectedSite] = useState(null);
+  const [siteOptions, setSiteOptions] = useState([]);
+  const [advanceAmount, setAdvanceAmount] = useState('');
+  const [dateValue, setDateValue] = useState('');
+  const [projectAdvance, setProjectAdvance] = useState('0.00');
+  const [paymentMode, setPaymentMode] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [todayAmount, setTodayAmount] = useState(0);
+  const [totalOutstanding, setTotalOutstanding] = useState(0);
+  const [filteredPaymentMode, setFilteredPaymentMode] = useState('');
+  const [filteredAmount, setFilteredAmount] = useState(0);
+  const [description, setDescription] = useState('');
+  const [transferSiteId, setTransferSiteId] = useState('');
+  const [entryNo, setEntryNo] = useState(1);
+  const [advanceData, setAdvanceData] = useState([]);
+  const [overallAdvance, setOverallAdvance] = useState(0);
+  const [selectedAdvanceFile, setSelectedAdvanceFile] = useState(null);
+  const fileInputRef = useRef(null);
+  const leftFormColRef = useRef(null);
+  const descriptionSectionRef = useRef(null);
+  const advanceHeaderRef = useRef(null);
+  const [sideTableAreaHeight, setSideTableAreaHeight] = useState(null);
+  const [sideTableContentHeight, setSideTableContentHeight] = useState(null);
+  const [billAmount, setBillAmount] = useState('');
+  const [discountAmount, setDiscountAmount] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Expenses Entry Form states
+  const [eno, setEno] = useState(null);
+  const [categoryOptions, setCategoryOptions] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [accountDetails, setAccountDetails] = useState([]);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editFormData, setEditFormData] = useState({});
+  const [editingId, setEditingId] = useState(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const pendingEditUpdateRef = useRef(null);
+  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
+  const [isEditPaymentSubmitting, setIsEditPaymentSubmitting] = useState(false);
+  const [editPaymentModalData, setEditPaymentModalData] = useState({
+    chequeNo: '',
+    chequeDate: '',
+    transactionNumber: '',
+    accountNumber: '',
+  });
+  const [paymentModalData, setPaymentModalData] = useState({
+    date: new Date().toISOString().split('T')[0],
+    amount: "",
+    paymentMode: "",
+    chequeNo: "",
+    chequeDate: "",
+    transactionNumber: "",
+    accountNumber: ""
+  });
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [isReviewEditMode, setIsReviewEditMode] = useState(false);
+  const [filePreviewUrl, setFilePreviewUrl] = useState(null);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateMatchedExpenses, setDuplicateMatchedExpenses] = useState([]);
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
+  const [pendingActionAfterIgnore, setPendingActionAfterIgnore] = useState(null);
+  const duplicateCheckPromiseRef = useRef(null);
+  const duplicateBypassedRef = useRef(false);
+  const lastDuplicateCheckRef = useRef([]);
+  const clearTransientFormSessionState = () => {
+    // Keep selectedOption/selectedSite available for popup prefill flows.
+    sessionStorage.removeItem('advanceAmount');
+    sessionStorage.removeItem('billAmount');
+    sessionStorage.removeItem('discountAmount');
+    sessionStorage.removeItem('paymentMode');
+    sessionStorage.removeItem('description');
+    sessionStorage.removeItem('transferSiteId');
+  };
+  const notifyParentSuccess = async () => {
+    notifyOrbitModuleDataChanged('portal');
+    if (typeof onSuccess === 'function') {
+      try { await onSuccess(); } catch { }
+    }
+  };
+  const putWeeklyExpenseBillCopyUrl = async (weeklyExpenseId, url) => {
+    if (weeklyExpenseId == null || url == null || String(url).trim() === '') return false;
+    const res = await fetch(
+      `https://backendaab.in/demoAabuildersDash/api/weekly-expenses/${weeklyExpenseId}/bill-copy-url`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(url),
+      }
+    );
+    return res.ok;
+  };
+  useEffect(() => {
+    const savedselectedType = sessionStorage.getItem('selectedType');
+    const savedContractorVendor = sessionStorage.getItem('selectedOption');
+    const savedProjectName = sessionStorage.getItem('selectedSite');
+    const savedoverallAdvance = sessionStorage.getItem('overallAdvance');
+    const savedbillAmount = sessionStorage.getItem('billAmount');
+    const saveddiscountAmount = sessionStorage.getItem('discountAmount');
+    const savedadvanceAmount = sessionStorage.getItem('advanceAmount');
+    const savedtransferSiteId = sessionStorage.getItem('transferSiteId');
+    const savedpaymentMode = sessionStorage.getItem('paymentMode');
+    const saveddescription = sessionStorage.getItem('description');
+    const savedBillSettlementDate = sessionStorage.getItem('cashRegisterBillSettlementDate');
+    try {
+      if (savedselectedType) setSelectedType(JSON.parse(savedselectedType));
+      if (savedContractorVendor) setSelectedOption(JSON.parse(savedContractorVendor));
+      if (savedProjectName) setSelectedSite(JSON.parse(savedProjectName));
+      if (savedoverallAdvance) setOverallAdvance(JSON.parse(savedoverallAdvance));
+      if (savedbillAmount) setBillAmount(JSON.parse(savedbillAmount));
+      if (saveddiscountAmount) setDiscountAmount(JSON.parse(saveddiscountAmount));
+      if (savedadvanceAmount) setAdvanceAmount(JSON.parse(savedadvanceAmount));
+      if (savedtransferSiteId) setTransferSiteId(JSON.parse(savedtransferSiteId));
+      if (savedpaymentMode) setPaymentMode(JSON.parse(savedpaymentMode));
+      if (saveddescription) setDescription(JSON.parse(saveddescription));
+      if (savedBillSettlementDate) {
+        const d = JSON.parse(savedBillSettlementDate);
+        if (d) {
+          setDateValue(d);
+          setPaymentModalData((prev) => ({ ...prev, date: d }));
+        }
+      }
+    } catch (error) {
+      console.error("Error parsing sessionStorage data:", error);
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+  const handleBeforeUnload = () => {
+    sessionStorage.removeItem('selectedType');
+    sessionStorage.removeItem('selectedOption');
+    sessionStorage.removeItem('selectedSite');
+    sessionStorage.removeItem('overallAdvance');
+    sessionStorage.removeItem('billAmount');
+    sessionStorage.removeItem('discountAmount');
+    sessionStorage.removeItem('advanceAmount');
+    sessionStorage.removeItem('transferSiteId');
+    sessionStorage.removeItem('paymentMode');
+    sessionStorage.removeItem('description');
+  };
+  useEffect(() => {
+    if (lockTypePrefill) return;
+    if (selectedType) sessionStorage.setItem('selectedType', JSON.stringify(selectedType));
+    else sessionStorage.removeItem('selectedType');
+    if (selectedOption) sessionStorage.setItem('selectedOption', JSON.stringify(selectedOption));
+    else sessionStorage.removeItem('selectedOption');
+    if (selectedSite) sessionStorage.setItem('selectedSite', JSON.stringify(selectedSite));
+    else sessionStorage.removeItem('selectedSite');
+    if (overallAdvance !== null && overallAdvance !== undefined && String(overallAdvance).trim() !== '') {
+      sessionStorage.setItem('overallAdvance', JSON.stringify(overallAdvance));
+    } else {
+      sessionStorage.removeItem('overallAdvance');
+    }
+    if (billAmount !== null && billAmount !== undefined && String(billAmount).trim() !== '') {
+      sessionStorage.setItem('billAmount', JSON.stringify(billAmount));
+    } else {
+      sessionStorage.removeItem('billAmount');
+    }
+
+    if (discountAmount !== null && discountAmount !== undefined && String(discountAmount).trim() !== '') {
+      sessionStorage.setItem('discountAmount', JSON.stringify(discountAmount));
+    } else {
+      sessionStorage.removeItem('discountAmount');
+    }
+
+    if (advanceAmount !== null && advanceAmount !== undefined && String(advanceAmount).trim() !== '') {
+      sessionStorage.setItem('advanceAmount', JSON.stringify(advanceAmount));
+    } else {
+      sessionStorage.removeItem('advanceAmount');
+    }
+
+    if (transferSiteId !== null && transferSiteId !== undefined && String(transferSiteId).trim() !== '') {
+      sessionStorage.setItem('transferSiteId', JSON.stringify(transferSiteId));
+    } else {
+      sessionStorage.removeItem('transferSiteId');
+    }
+
+    if (paymentMode !== null && paymentMode !== undefined && String(paymentMode).trim() !== '') {
+      sessionStorage.setItem('paymentMode', JSON.stringify(paymentMode));
+    } else {
+      sessionStorage.removeItem('paymentMode');
+    }
+
+    if (description !== null && description !== undefined && String(description).trim() !== '') {
+      sessionStorage.setItem('description', JSON.stringify(description));
+    } else {
+      sessionStorage.removeItem('description');
+    }
+  }, [selectedType, selectedOption, selectedSite, overallAdvance, billAmount, discountAmount, advanceAmount, transferSiteId, paymentMode, description, lockTypePrefill]);
+  const handleAmountChange = (e) => {
+    const rawValue = e.target.value.replace(/,/g, '');
+    if (!isNaN(rawValue)) {
+      setAdvanceAmount(rawValue);
+    }
+  };
+  const handleDiscountChange = (e) => {
+    const rawValue = e.target.value.replace(/,/g, '');
+    if (!isNaN(rawValue)) {
+      setDiscountAmount(rawValue);
+    }
+  };
+  const handleBillAmountChange = (e) => {
+    const rawValue = e.target.value.replace(/,/g, '');
+    if (!isNaN(rawValue)) {
+      setBillAmount(rawValue);
+    }
+  };
+  const handleEditFormAmountChange = (field) => (e) => {
+    const rawValue = e.target.value.replace(/,/g, '');
+    if (!isNaN(rawValue)) {
+      setEditFormData((prev) => ({ ...prev, [field]: rawValue }));
+    }
+  };
+  const handleProjectChange = (selected) => {
+    setSelectedSite(selected);
+    if (selected) {
+      localStorage.setItem("advanceProjectName", JSON.stringify(selected));
+    } else {
+      localStorage.removeItem("advanceProjectName");
+    }
+  };
+  const handleTransferSiteChange = (selected) => {
+    setTransferSiteId(selected ? selected.id : '');
+  };
+  useEffect(() => {
+    const fetchVendorNames = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.vendorName,
+          label: item.vendorName,
+          id: item.id,
+          type: "Vendor",
+          category: item.category,
+        }));
+        setVendorOptions(formattedData);
+      } catch (error) {
+        console.error("Fetch error: ", error);
+      }
+    };
+    fetchVendorNames();
+  }, []);
+  useEffect(() => {
+    const fetchContractorNames = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.contractorName,
+          label: item.contractorName,
+          id: item.id,
+          type: "Contractor",
+          category: item.category,
+        }));
+        setContractorOptions(formattedData);
+      } catch (error) {
+        console.error("Fetch error: ", error);
+      }
+    };
+    fetchContractorNames();
+  }, []);
+  useEffect(() => {
+    if (selectedType !== 'Bill Settlement') return;
+    if (!selectedOption) return;
+    if (!Array.isArray(categoryOptions) || categoryOptions.length === 0) return;
+    if (selectedCategory) return;
+    const party = selectedOption.type === 'Vendor'
+      ? vendorOptions.find(v => Number(v.id) === Number(selectedOption.id))
+      : selectedOption.type === 'Contractor'
+        ? contractorOptions.find(c => Number(c.id) === Number(selectedOption.id))
+        : null;
+    const partyCategory = party?.category ? String(party.category).trim() : '';
+    if (!partyCategory) return;
+    const match = categoryOptions.find(cat => String(cat.label).trim() === partyCategory);
+    if (match) setSelectedCategory(match);
+  }, [selectedType, selectedOption, categoryOptions, vendorOptions, contractorOptions, selectedCategory]);
+  useEffect(() => {
+    const fetchSites = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.siteName,
+          label: item.siteName,
+          id: item.id,
+          sNo: item.siteNo
+        }));
+        const predefinedSiteOptions = [
+          { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+          { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+          { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+          { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+          { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+          { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+          { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+          { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+          { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+          { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
+          { value: "Bill Payment Tracker", label: "Bill Payment Tracker", id: 12, sNo: "12" },
+        ];
+        // Combine backend data with predefined options
+        const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
+        setSiteOptions(combinedSiteOptions);
+      } catch (error) {
+        console.error("Fetch error: ", error);
+        const predefinedSiteOptions = [
+          { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+          { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+          { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+          { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+          { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+          { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+          { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+          { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+          { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+          { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
+          { value: "Bill Payment Tracker", label: "Bill Payment Tracker", id: 12, sNo: "12" },
+        ];
+        setSiteOptions(predefinedSiteOptions);
+      }
+    };
+    fetchSites();
+  }, []);
+  // Fetch categories for expenses form
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          id: item.id,
+          value: item.category,
+          label: item.category,
+        }));
+        setCategoryOptions(formattedData);
+      } catch (error) {
+        console.error("Fetch error: ", error);
+      }
+    };
+    fetchCategories();
+  }, []);
+  // Fetch account details
+  useEffect(() => {
+    const fetchAccountDetails = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/account-details/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        setAccountDetails(data);
+      } catch (error) {
+        console.error("Error fetching account details:", error);
+      }
+    };
+    fetchAccountDetails();
+  }, []);
+  // Fetch latest ENo for expenses form
+  const fetchLatestEno = async () => {
+    try {
+      const expenses = await prefetchExpensesFormData({ branchId: activeBranchId });
+      setEno(getLatestEnoFromExpenses(expenses));
+    } catch (error) {
+      console.error('Error fetching latest ENo:', error);
+    }
+  };
+  useEffect(() => {
+    fetchLatestEno();
+    const onExpensesSync = () => {
+      prefetchExpensesFormData({ branchId: activeBranchId, force: true })
+        .then((expenses) => setEno(getLatestEnoFromExpenses(expenses)))
+        .catch(() => {});
+    };
+    window.addEventListener('expensesDataSync', onExpensesSync);
+    return () => window.removeEventListener('expensesDataSync', onExpensesSync);
+  }, [activeBranchId]);
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll');
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        const data = await response.json();
+        setAdvanceData(data);
+      } catch (error) {
+        console.error('Error fetching advance portal data:', error);
+      }
+    };
+    fetchData();
+  }, [activeBranchId]);
+  const handleChange = (selected) => {
+    setSelectedOption(selected);
+    if (selected) {
+      localStorage.setItem("advanceContractorVendor", JSON.stringify(selected));
+    } else {
+      localStorage.removeItem("advanceContractorVendor");
+    }
+  };
+  // Combine vendor and contractor options
+  useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions]); }, [vendorOptions, contractorOptions]);
+  // Get button label based on selected type
+  const getButtonLabel = () => {
+    switch (selectedType) {
+      case 'Advance':
+        return 'Pay Advance';
+      case 'Transfer':
+        return 'Transfer';
+      case 'Bill Settlement':
+        return 'Settle Bill';
+      case 'Refund':
+        return 'Refund';
+      default:
+        return 'Submit';
+    }
+  };
+  // Sort site options alphabetically by label
+  const sortedSiteOptions = siteOptions.sort((a, b) =>
+    a.label.localeCompare(b.label)
+  );
+  const customStyles = {
+    control: (provided, state) => ({
+      ...provided,
+      fontFamily: 'Manrope',
+      borderWidth: '2px',
+      borderRadius: '8px',
+      minHeight: '40px',
+      height: '40px',
+      flexWrap: 'nowrap',
+      borderColor: state.isFocused
+        ? 'rgba(191, 152, 83, 1)'
+        : 'rgba(191, 152, 83, 0.2)',
+      boxShadow: state.isFocused
+        ? '0 0 0 1px rgba(101, 102, 53, 0.2)'
+        : 'none',
+      '&:hover': {
+        borderColor: 'rgba(191, 152, 83, 0.2)',
+      },
+    }),
+    valueContainer: (provided, state) => ({
+      ...provided,
+      flex: '1 1 0%',
+      minWidth: 0,
+      flexWrap: 'nowrap',
+      overflow: 'hidden',
+      paddingLeft: '12px',
+      paddingRight: state.hasValue ? '2px' : provided.paddingRight,
+      paddingTop: 0,
+      paddingBottom: 0,
+      height: '36px',
+      alignItems: 'center',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      maxWidth: '100%',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+      margin: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      color: 'black',
+    }),
+    input: (provided) => ({
+      ...provided,
+      margin: 0,
+      padding: 0,
+    }),
+    menu: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+      maxHeight: '300px',
+    }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      paddingTop: 0,
+      paddingBottom: 0,
+      maxHeight: '250px',
+      overflowY: 'auto',
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none',
+      '&::-webkit-scrollbar': {
+        display: 'none',
+      },
+    }),
+    indicatorSeparator: () => ({ display: 'none' }),
+    indicatorsContainer: (provided) => ({
+      ...provided,
+      flex: '0 0 auto',
+      paddingLeft: '0',
+    }),
+    dropdownIndicator: (provided, state) => ({
+      ...provided,
+      display: state.hasValue ? 'none' : 'flex',
+      color: '#000000',
+      flexShrink: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+    }),
+    clearIndicator: (provided) => ({
+      ...provided,
+      cursor: 'pointer',
+      color: '#000000',
+      flexShrink: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      paddingLeft: '4px',
+      paddingRight: '4px',
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      fontWeight: 'normal',
+      fontSize: '14px',
+      color: '#6b7280',
+      margin: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      textAlign: 'left',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      maxWidth: '100%',
+      position: 'absolute',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      minHeight: 36,
+      height: 'auto',
+      paddingTop: 6,
+      paddingBottom: 6,
+      whiteSpace: 'normal',
+      display: 'flex',
+      alignItems: 'center',
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+      WebkitTapHighlightColor: '#FAF6ED',
+      backgroundColor: state.isSelected
+        ? '#BF9853'
+        : state.isFocused
+          ? '#FAF6ED'
+          : provided.backgroundColor,
+      color: state.isSelected ? '#FFFFFF' : provided.color,
+      ':active': {
+        backgroundColor: state.isSelected ? '#BF9853' : '#FAF6ED',
+      },
+    }),
+  };
+  const fetchAdvanceData = async () => {
+    try {
+      const res = await fetch('https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll');
+      const json = await res.json();
+      setAdvanceData(json);
+    } catch (error) {
+      console.error('Error fetching advance data:', error);
+    }
+  };
+  useTabRefreshSignal(refreshSignal, isActive, fetchAdvanceData);
+  const validateFormFields = () => {
+    // --- Common validation based on type ---
+    if (selectedType === 'Advance' || selectedType === 'Refund') {
+      if (!selectedOption || !selectedSite || !advanceAmount || !paymentMode) {
+        alert("Please fill Nessacary details");
+        return false;
+      }
+    } else if (selectedType === 'Bill Settlement') {
+      if (!selectedOption || !selectedSite || !billAmount || !selectedCategory) {
+        alert("Please fill Nessacary details");
+        return false;
+      }
+      // --- File upload validation for Bill Settlement ---
+      if (!selectedAdvanceFile) {
+        alert("Please attach the bill file for Bill Settlement");
+        return false;
+      }
+      // --- Extra validation for Bill Settlement ---
+      const rawAmount = advanceAmount.toString().replace(/,/g, '').trim();
+      if (rawAmount && !paymentMode) {
+        alert("Please select Payment Mode if you enter Amount Given");
+        return false;
+      }
+    } else if (selectedType === 'Transfer') {
+      if (!selectedOption || !selectedSite || !advanceAmount || !transferSiteId) {
+        alert("Please fill Nessacary details");
+        return false;
+      }
+    } else {
+      alert("Please select a valid type");
+      return false;
+    }
+    // --- Validation for Amount Given ---
+    const rawAmount = advanceAmount.toString().replace(/,/g, '').trim();
+    if ((selectedType === 'Advance' || selectedType === 'Refund' || selectedType === 'Transfer') && !rawAmount) {
+      alert("Please fill the Amount Given");
+      return false;
+    }
+    // --- Validation for Bill Amount (only if type is Bill Settlement) ---
+    if (selectedType === 'Bill Settlement') {
+      const rawBillAmount = billAmount.toString().trim();
+      if (!rawBillAmount) {
+        alert("Please fill the Bill Amount");
+        return false;
+      }
+    }
+    return true;
+  };
+  const formatDateOnlyForDup = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
+  const formatDateForDup = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const hour12 = String(hours % 12 || 12).padStart(2, '0');
+    return `${day}-${month}-${year} ${hour12}:${minutes} ${ampm}`;
+  };
+  const normalizeStr = (s) => (s == null ? '' : String(s).trim());
+
+  const checkForDuplicateEntry = async (checkDate, checkAmount) => {
+    const vendorLabel = normalizeStr(selectedOption?.type === 'Vendor' ? selectedOption.label : '');
+    const contractorLabel = normalizeStr(selectedOption?.type === 'Contractor' ? selectedOption.label : '');
+    const siteLabel = normalizeStr(selectedSite ? selectedSite.label : '');
+    const dateStr = checkDate
+      ? (typeof checkDate === 'string' && checkDate.includes('-') ? checkDate.split('T')[0] : toExpenseLocalDateStr(checkDate))
+      : '';
+    const amountNum = parseFloat(checkAmount) || 0;
+    const partyType = selectedOption?.type === 'Vendor'
+      ? 'Vendor'
+      : selectedOption?.type === 'Contractor'
+        ? 'Contractor'
+        : '';
+
+    try {
+      await prefetchExpensesFormData({ branchId: activeBranchId });
+      return findDuplicateExpenses({
+        dateStr,
+        amountNum,
+        siteLabel,
+        selectedProjectId: selectedSite ? Number(selectedSite.id) : null,
+        selectedType: partyType,
+        vendorLabel,
+        contractorLabel,
+        selectedId: selectedOption ? Number(selectedOption.id) : null,
+        branchId: activeBranchId,
+      });
+    } catch (err) {
+      console.error('Error checking duplicate:', err);
+      return [];
+    }
+  };
+  const startDuplicateCheck = (checkDate, checkAmount, actionAfterIgnore = null) => {
+    duplicateBypassedRef.current = false;
+    lastDuplicateCheckRef.current = [];
+    setDuplicateMatchedExpenses([]);
+    setShowDuplicateModal(false);
+    setPendingActionAfterIgnore(actionAfterIgnore);
+    setCheckingDuplicate(true);
+    const checkPromise = checkForDuplicateEntry(checkDate, checkAmount)
+      .then((duplicates) => {
+        const matches = Array.isArray(duplicates) ? duplicates : [];
+        lastDuplicateCheckRef.current = matches;
+        if (matches.length > 0 && !duplicateBypassedRef.current) {
+          setDuplicateMatchedExpenses(matches);
+          setShowDuplicateModal(true);
+        }
+        return matches;
+      })
+      .catch((err) => {
+        console.error('Error checking duplicate:', err);
+        lastDuplicateCheckRef.current = [];
+        return [];
+      })
+      .finally(() => {
+        setCheckingDuplicate(false);
+        duplicateCheckPromiseRef.current = null;
+      });
+    duplicateCheckPromiseRef.current = checkPromise;
+    return checkPromise;
+  };
+  const handleDuplicateIgnore = () => {
+    duplicateBypassedRef.current = true;
+    setShowDuplicateModal(false);
+    setDuplicateMatchedExpenses([]);
+    lastDuplicateCheckRef.current = [];
+    const action = pendingActionAfterIgnore;
+    setPendingActionAfterIgnore(null);
+    if (action === 'paymentSubmit') {
+      handlePaymentSubmit(true);
+    }
+  };
+  const handleDuplicateCancel = () => {
+    setShowDuplicateModal(false);
+    setDuplicateMatchedExpenses([]);
+    setPendingActionAfterIgnore(null);
+  };
+  const handleSubmit = async () => {
+    if (!validateFormFields()) {
+      return;
+    }
+    setShowReviewModal(true);
+    setIsReviewEditMode(false);
+    if (selectedType === 'Advance' || selectedType === 'Bill Settlement') {
+      const checkAmount = selectedType === 'Bill Settlement'
+        ? (parseFloat(billAmount) || 0)
+        : (parseFloat(advanceAmount.toString().replace(/,/g, '')) || 0);
+      startDuplicateCheck(dateValue, checkAmount, 'review');
+    }
+  };
+  const handleReviewConfirm = async () => {
+    if (isReviewEditMode) {
+      return;
+    }
+    if (!validateFormFields()) {
+      return;
+    }
+    if (selectedType === 'Advance' || selectedType === 'Bill Settlement') {
+      if (duplicateCheckPromiseRef.current) {
+        await duplicateCheckPromiseRef.current;
+      }
+      const pendingDuplicates = lastDuplicateCheckRef.current;
+      if (pendingDuplicates.length > 0 && !duplicateBypassedRef.current) {
+        setDuplicateMatchedExpenses(pendingDuplicates);
+        setPendingActionAfterIgnore('review');
+        setShowDuplicateModal(true);
+        return;
+      }
+    }
+    // Check if payment mode requires popup details (all modes except Cash and Direct)
+    const requiresPaymentDetails = paymentMode && paymentMode !== 'Cash' && paymentMode !== 'Direct' && finalPaymentModeOptions.some(opt => opt.value === paymentMode);
+    if (requiresPaymentDetails) {
+      // Set up payment modal data and show popup
+      setPaymentModalData({
+        date: dateValue,
+        amount: advanceAmount,
+        paymentMode: paymentMode,
+        chequeNo: "",
+        chequeDate: "",
+        transactionNumber: "",
+        accountNumber: ""
+      });
+      setShowPaymentModal(true);
+      setShowReviewModal(false);
+      return; // Don't proceed with normal submission
+    }
+    submitAdvanceData();
+  };
+  const handleReviewClose = () => {
+    setShowReviewModal(false);
+    setIsReviewEditMode(false);
+    setShowDuplicateModal(false);
+    setDuplicateMatchedExpenses([]);
+    duplicateBypassedRef.current = false;
+    lastDuplicateCheckRef.current = [];
+    setPendingActionAfterIgnore(null);
+  };
+  const handleReviewSave = () => {
+    if (!validateFormFields()) {
+      return;
+    }
+    setIsReviewEditMode(false);
+  };
+  const renderReviewRow = (label, value) => (
+    <div className="flex justify-between gap-4 border border-gray-100 rounded-lg px-4 py-2" key={label}>
+      <span className="text-sm font-semibold text-gray-600">{label}</span>
+      <span className="text-sm text-gray-800 text-right break-words">{value || '-'}</span>
+    </div>
+  );
+  const saveAdvancePortalWithLogs = async (payload, context = 'Advance Portal Save') => {
+    const url = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save');
+    const bodyPayload =
+      payload && typeof payload === 'object'
+        ? { ...payload, entered_by: enteredBy, source: 'Advance Portal' }
+        : { entered_by: enteredBy, source: 'Advance Portal' };
+    console.groupCollapsed(`[${context}] advance_portal/save`);
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyPayload)
+      });
+      const responseText = await response.text();
+      let responseBody = responseText;
+      try {
+        responseBody = responseText ? JSON.parse(responseText) : null;
+      } catch {
+        // Keep raw text if response is not JSON
+      }
+      console.groupEnd();
+      return { response, data: responseBody };
+    } catch (error) {
+      console.error('Request failed:', error);
+      console.groupEnd();
+      throw error;
+    }
+  };
+  const buildBillSettlementExpensesPayload = ({ date, fileUrl, accountType, includeEno = false }) => {
+    let vendor = '';
+    let contractor = '';
+    if (selectedOption?.type === 'Vendor') {
+      vendor = selectedOption.label;
+    } else if (selectedOption?.type === 'Contractor') {
+      contractor = selectedOption.label;
+    }
+    const payload = {
+      accountType,
+      date,
+      siteName: selectedSite ? selectedSite.label : '',
+      projectId: selectedSite ? selectedSite.id : null,
+      vendor,
+      vendorId: selectedOption?.type === 'Vendor' ? selectedOption.id : null,
+      contractor,
+      contractorId: selectedOption?.type === 'Contractor' ? selectedOption.id : null,
+      quantity: '',
+      amount: parseInt(billAmount) || 0,
+      category: selectedCategory ? selectedCategory.label : '',
+      comments: description,
+      machineTools: '',
+      billCopyUrl: fileUrl || '',
+      source: 'Advance Portal',
+      branchId: activeBranchId,
+      enteredBy,
+    };
+    if (eno != null) {
+      payload.eno = eno;
+    }
+    if (includeEno) {
+      payload.discount_amount = parseFloat(discountAmount) || 0;
+    }
+    return payload;
+  };
+  const saveExpensesFormEntry = async (expensesPayload) => {
+    const expensesResponse = await fetch(withBranchUrl('https://backendaab.in/demoAabuilderDash/expenses_form/save'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(expensesPayload),
+    });
+    const responseText = await expensesResponse.text();
+    if (!expensesResponse.ok) {
+      throw new Error(`Expenses form submission failed: ${responseText}`);
+    }
+    const expensesEntryId = resolveExpensesEntryIdAfterSave(responseText);
+    if (!expensesEntryId) {
+      console.error('expenses_form/save response missing id:', responseText);
+      throw new Error(
+        'Expenses save response did not include id. Backend must return { id } from expenses_form/save.'
+      );
+    }
+    appendExpenseToFormCache(
+      {
+        ...expensesPayload,
+        id: expensesEntryId,
+        timestamp: new Date().toISOString(),
+      },
+      activeBranchId
+    );
+    return expensesEntryId;
+  };
+  const linkBillSettlementExpenseToAdvancePortal = async (
+    advancePortalId,
+    expensesEntryId,
+    advancePayload
+  ) => {
+    if (!expensesEntryId) return;
+    if (!advancePortalId) {
+      console.warn(
+        'Advance portal save response did not include id; expenses_entry_id was sent on save payload only.'
+      );
+      return;
+    }
+    await linkExpensesEntryIdToAdvancePortal(advancePortalId, expensesEntryId, {
+      editedBy: enteredBy,
+      advancePayload,
+      buildUrl: (url) => withBranchUrl(url),
+    });
+  };
+  const submitAdvanceData = async () => {
+    setIsSubmitting(true); // Start loading
+    setShowReviewModal(false);
+    try {
+      // Upload file if exists (for Bill Settlement)
+      let fileUrl = '';
+      if (selectedAdvanceFile && selectedType === 'Bill Settlement') {
+        try {
+          const formData = new FormData();
+          const formatDateOnly = (dateString) => {
+            const date = new Date(dateString);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}-${month}-${year}`;
+          };
+          const now = new Date();
+          const timestamp = now.toLocaleString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true
+          })
+            .replace(",", "")
+            .replace(/\s/g, "-");
+          const finalName = `${timestamp} ${selectedSite.sNo} ${selectedOption.label}`;
+          formData.append('files', selectedAdvanceFile);
+          formData.append('folder', 'FileUpload / Advance_Portal');
+          formData.append('fileName', finalName);
+          const uploadResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/files/upload", {
+            method: "POST",
+            body: formData,
+          });
+          if (!uploadResponse.ok) {
+            throw new Error('File upload failed');
+          }
+          const uploadResult = await uploadResponse.json();
+          fileUrl = uploadResult.urls[0];
+        } catch (error) {
+          console.error('Error during file upload:', error);
+          alert('Error during file upload. Please try again.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+      const res = await fetch('https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll');
+      if (!res.ok) throw new Error('Failed to fetch entry numbers');
+      const allData = await res.json();
+      const maxEntryNo = allData.length > 0 ? Math.max(...allData.map(item => item.entry_no || 0)) : 0;
+      const nextEntryNo = maxEntryNo + 1;
+      const createPayload = (overrides = {}) => ({
+        type: selectedType,
+        date: dateValue,
+        vendor_id: selectedOption?.type === 'Vendor' ? selectedOption.id : 0,
+        contractor_id: selectedOption?.type === 'Contractor' ? selectedOption.id : 0,
+        project_id: selectedSite?.id || 0,
+        transfer_site_id: selectedType === 'Transfer' ? parseInt(transferSiteId) : 0,
+        payment_mode: selectedType !== 'Transfer' ? paymentMode : '',
+        amount:
+          selectedType === 'Advance' || selectedType === 'Transfer' || selectedType === 'Bill Settlement'
+            ? parseFloat(advanceAmount) || 0
+            : 0,
+        bill_amount: selectedType === 'Bill Settlement' ? parseFloat(billAmount) || 0 : 0,
+        discount_amount: selectedType === 'Bill Settlement' ? parseFloat(discountAmount) || 0 : 0,
+        refund_amount: selectedType === 'Refund' ? parseFloat(advanceAmount) || 0 : 0,
+        entry_no: nextEntryNo,
+        week_no: getWeekNumber(),
+        description: description,
+        file_url: fileUrl,
+        branch_id: activeBranchId,
+        ...overrides,
+        entered_by: enteredBy,
+        source: "Advance Portal",
+      });
+      if (selectedType === 'Transfer') {
+        const amountValue = parseFloat(advanceAmount) || 0;
+        const transferSiteIdInt = parseInt(transferSiteId);
+        // Check if transferring to Loan Portal (id = 11)
+        if (transferSiteIdInt === 11) {
+          // First, create loan entry in LoanPortal
+          const loanPayload = {
+            type: "Transfer",
+            date: dateValue,
+            amount: Math.abs(amountValue),
+            loan_payment_mode: "",
+            loan_refund_amount: 0,
+            from_purpose_id: 1, // Set to 1 as per requirement
+            transfer_Project_id: 0,
+            to_purpose_id: 0,
+            vendor_id: selectedOption?.type === "Vendor" ? selectedOption.id : 0,
+            contractor_id: selectedOption?.type === "Contractor" ? selectedOption.id : 0,
+            employee_id: 0,
+            labour_id: 0,
+            project_id: 0,
+            description: "Transfer from Advance Portal",
+            file_url: "",
+            branch_id: activeBranchId,
+            entered_by: enteredBy,
+            source: "Advance Portal",
+          };
+          // Save to LoanPortal
+          const loanResponse = await fetch(withBranchUrl("https://backendaab.in/demoAabuildersDash/api/loans/save"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(loanPayload)
+          });
+          if (!loanResponse.ok) {
+            throw new Error('Failed to save loan portal data');
+          }
+          const loanResult = await loanResponse.json();
+          const loanPortalId = loanResult.id || loanResult.loanPortalId;
+          // Now save advance portal entry with negative amount and loan_portal_id
+          const advancePayload = createPayload({
+            amount: -Math.abs(amountValue),
+            loan_portal_id: loanPortalId,
+          });
+          const { response: advanceSaveResponse } = await saveAdvancePortalWithLogs(advancePayload, 'Transfer to Loan Portal');
+          if (!advanceSaveResponse.ok) {
+            throw new Error('Failed to save advance portal data');
+          }
+        } else if (transferSiteIdInt === 12 && selectedOption?.type === 'Vendor') {
+          // Check if transferring to Bill Payment Tracker (id = 12) and it's a vendor
+          // First, create vendor carry forward entry in Bill Payment Tracker
+          const vendorCarryForwardPayload = {
+            type: "Transfer",
+            date: dateValue,
+            vendor_id: selectedOption.id,
+            payment_mode: paymentMode || "",
+            amount: Math.abs(amountValue),
+            bill_amount: 0,
+            refund_amount: 0,
+            branch_id: activeBranchId,
+            entered_by: enteredBy,
+            source: "Advance Portal",
+          };
+          // Save to VendorCarryForwardAmountManagement
+          const vendorCarryForwardResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/vendor_carry_forward/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(vendorCarryForwardPayload)
+          });
+          if (!vendorCarryForwardResponse.ok) {
+            throw new Error('Failed to save vendor carry forward amount management data');
+          }
+          const vendorCarryForwardResult = await vendorCarryForwardResponse.json();
+          const vendorCarryForwardId = vendorCarryForwardResult.id || vendorCarryForwardResult.vendorCarryForwardId;
+          // Now save advance portal entry with negative amount and vendor_carry_forward_id
+          const advancePayload = createPayload({
+            amount: -Math.abs(amountValue),
+            vendor_carry_forward_id: vendorCarryForwardId,
+          });
+          const { response: advanceSaveResponse } = await saveAdvancePortalWithLogs(advancePayload, 'Transfer to Bill Payment Tracker');
+          if (!advanceSaveResponse.ok) {
+            throw new Error('Failed to save advance portal data');
+          }
+        } else {
+          // Normal transfer logic for other sites
+          const firstPayload = createPayload({ amount: -Math.abs(amountValue) });
+          const secondPayload = createPayload({
+            project_id: transferSiteIdInt,
+            transfer_site_id: selectedSite?.id || 0,
+            amount: Math.abs(amountValue)
+          });
+          const [firstSave, secondSave] = await Promise.all([
+            saveAdvancePortalWithLogs(firstPayload, 'Transfer Source Entry'),
+            saveAdvancePortalWithLogs(secondPayload, 'Transfer Destination Entry')
+          ]);
+          if (!firstSave.response.ok || !secondSave.response.ok) {
+            throw new Error('Failed to save advance portal data');
+          }
+        }
+      } else {
+        let expensesEntryId = null;
+        if (selectedType === 'Bill Settlement') {
+          const expensesPayload = buildBillSettlementExpensesPayload({
+            date: dateValue,
+            fileUrl,
+            accountType: 'Bill Settlement',
+            includeEno: true,
+          });
+          expensesEntryId = await saveExpensesFormEntry(expensesPayload);
+          setEno(eno + 1);
+        }
+        const payload = createPayload(
+          expensesEntryId != null ? buildAdvancePortalExpensesEntryLinkFields(expensesEntryId) : {}
+        );
+        const { response: advanceSaveResponse, data: advanceSaveResult } =
+          await saveAdvancePortalWithLogs(payload, 'Advance Portal Submit');
+        if (!advanceSaveResponse.ok) {
+          throw new Error('Failed to save advance portal data');
+        }
+        if (expensesEntryId) {
+          const advancePortalId = resolveAdvancePortalIdFromSaveResponse(advanceSaveResult);
+          await linkBillSettlementExpenseToAdvancePortal(advancePortalId, expensesEntryId, payload);
+        }
+        // If opened from Weekly Cash Register Bill Settlement row, update that row with uploaded bill URL
+        if (selectedType === 'Bill Settlement' && fileUrl) {
+          try {
+            const raw = sessionStorage.getItem("advancePortalWeeklyExpenseIdForBillCopyUrl");
+            const wid = raw ? Number(JSON.parse(raw)) : null;
+            if (Number.isFinite(wid)) {
+              await putWeeklyExpenseBillCopyUrl(wid, fileUrl);
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
+      toast.success('Advance saved successfully!', {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
+      setAdvanceAmount('');
+      setDescription('');
+      setPaymentMode('');
+      setBillAmount('');
+      setDiscountAmount('');
+      setSelectedAdvanceFile(null);
+      setSelectedCategory(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      setEntryNo(nextEntryNo);
+      clearTransientFormSessionState();
+      try { sessionStorage.removeItem("advancePortalWeeklyExpenseIdForBillCopyUrl"); } catch { }
+      fetchAdvanceData();
+      await notifyParentSuccess();
+    } catch (error) {
+      console.error('Error submitting data:', error);
+      toast.error('Failed to save data!', {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  const getWeekNumber = () => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 1);
+    const diff = (now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60000);
+    const oneWeek = 604800000;
+    return Math.floor(diff / oneWeek) + 1;
+  };
+  useEffect(() => {
+    if (!selectedOption) {
+      setOverallAdvance(0);
+      return;
+    }
+    const total = advanceData
+      .filter((item) => (
+        selectedOption.type === 'Vendor'
+          ? item.vendor_id === selectedOption.id
+          : selectedOption.type === 'Contractor'
+            ? item.contractor_id === selectedOption.id
+            : false
+      ))
+      .reduce((sum, curr) => sum + computeAdvanceBalanceDelta(curr), 0);
+    setOverallAdvance(total);
+  }, [advanceData, selectedOption]);
+  useEffect(() => {
+    if (!selectedOption || !selectedSite) {
+      setProjectAdvance('0.00');
+      return;
+    }
+    const idField = selectedOption.type === 'Vendor' ? 'vendor_id' : 'contractor_id';
+    const total = advanceData
+      .filter(
+        (item) => item[idField] === selectedOption.id && item.project_id === selectedSite.id
+      )
+      .reduce((sum, entry) => sum + computeAdvanceBalanceDelta(entry), 0);
+    setProjectAdvance(total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  }, [advanceData, selectedOption, selectedSite]);
+  useEffect(() => {
+    // Default date to today, but do NOT override Bill Settlement popup prefill
+    // (WeeklyPayment sets this in sessionStorage before opening embedded popup).
+    try {
+      const saved = sessionStorage.getItem('cashRegisterBillSettlementDate');
+      if (saved) {
+        const d = JSON.parse(saved);
+        if (d) {
+          setDateValue(d);
+          setPaymentModalData((prev) => ({ ...prev, date: d }));
+          return;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    const today = new Date();
+    const formatted = today.toISOString().split('T')[0];
+    setDateValue(formatted);
+  }, []);
+  useEffect(() => {
+    if (!fromDate || !toDate) {
+      setFilteredAmount(0);
+      return;
+    }
+    const from = new Date(fromDate);
+    const to = new Date(toDate);
+    to.setHours(23, 59, 59, 999);
+    const filtered = advanceData.filter(entry => {
+      const entryDate = new Date(entry.date);
+      const isInDateRange = entryDate >= from && entryDate <= to;
+      const isMatchingPayment =
+        !filteredPaymentMode || entry.payment_mode === filteredPaymentMode;
+      return isInDateRange && isMatchingPayment;
+    });
+    const total = filtered.reduce((sum, entry) => {
+      const amount = parseFloat(entry.amount) || 0;
+      return sum + amount;
+    }, 0);
+    setFilteredAmount(total);
+  }, [fromDate, toDate, filteredPaymentMode, advanceData]);
+  useEffect(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTotal = advanceData
+      .filter(entry => {
+        const entryDate = new Date(entry.date);
+        entryDate.setHours(0, 0, 0, 0);
+        return entryDate.getTime() === today.getTime();
+      })
+      .reduce((sum, entry) => {
+        const amount = parseFloat(entry.amount) || 0;
+        return sum + amount;
+      }, 0);
+    setTodayAmount(todayTotal);
+  }, [advanceData]);
+  useEffect(() => {
+    const { totalAmount, totalRefund, totalBill } = advanceData.reduce(
+      (acc, entry) => {
+        acc.totalAmount += parseFloat(entry.amount) || 0;
+        acc.totalRefund += parseFloat(entry.refund_amount) || 0;
+        acc.totalBill += getNetBillAmount(entry);
+        return acc;
+      },
+      { totalAmount: 0, totalRefund: 0, totalBill: 0 }
+    );
+    const outstanding = totalAmount - totalRefund - totalBill;
+    setTotalOutstanding(outstanding);
+  }, [advanceData]);
+  useEffect(() => {
+    if (embedded) return undefined;
+    const syncSideTableHeights = () => {
+      if (window.innerWidth < 1280) {
+        setSideTableAreaHeight(null);
+        setSideTableContentHeight(null);
+        return;
+      }
+      const leftEl = leftFormColRef.current;
+      const descriptionEl = descriptionSectionRef.current;
+      if (!leftEl || !descriptionEl) return;
+      const leftTop = leftEl.getBoundingClientRect().top;
+      const descriptionBottom = descriptionEl.getBoundingClientRect().bottom;
+      const alignHeight = Math.round(descriptionBottom - leftTop);
+      if (alignHeight > 0) {
+        setSideTableAreaHeight(alignHeight);
+        setSideTableContentHeight(alignHeight);
+      }
+    };
+    const scheduleSync = () => {
+      requestAnimationFrame(() => requestAnimationFrame(syncSideTableHeights));
+    };
+    scheduleSync();
+    const leftEl = leftFormColRef.current;
+    if (!leftEl) return undefined;
+    const ro = new ResizeObserver(scheduleSync);
+    ro.observe(leftEl);
+    const descriptionEl = descriptionSectionRef.current;
+    if (descriptionEl) ro.observe(descriptionEl);
+    const headerEl = advanceHeaderRef.current;
+    if (headerEl) ro.observe(headerEl);
+    window.addEventListener('resize', scheduleSync);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', scheduleSync);
+    };
+  }, [embedded, selectedType]);
+  const formatNumber = (num) => {
+    if (!num) return '';
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  };
+  const formatDateForReview = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
+  const vendorOrContractorLabel = selectedOption?.label || '-';
+  const formatReviewAmount = (val) => (val && val !== '-' ? `₹${val}` : val);
+  const formattedAdvanceAmount = advanceAmount ? formatNumber(advanceAmount) : '-';
+  const formattedBillAmount = billAmount ? formatNumber(billAmount) : '-';
+  const transferSiteLabel = selectedType === 'Transfer' && transferSiteId
+    ? sortedSiteOptions.find(option => option.id === parseInt(transferSiteId))?.label || '-'
+    : '-';
+  const reviewDetails = [
+    { label: 'Type', value: selectedType || '-' },
+    { label: 'Date', value: formatDateForReview(dateValue) || '-' },
+    { label: 'Contractor/Vendor', value: vendorOrContractorLabel },
+    { label: selectedOption?.type === 'Vendor' ? 'Vendor ID' : 'Contractor ID', value: selectedOption?.id || '-' },
+    { label: 'Project Name', value: selectedSite?.label || '-' },
+    { label: 'Project ID', value: selectedSite?.id || '-' },
+  ];
+  if (selectedType === 'Bill Settlement') {
+    const formattedDiscountAmount = discountAmount ? formatNumber(discountAmount) : '-';
+    reviewDetails.push(
+      { label: 'Bill Amount', value: formatReviewAmount(formattedBillAmount) },
+      { label: 'Discount Amount', value: formatReviewAmount(formattedDiscountAmount) },
+      { label: 'Category', value: selectedCategory?.label || '-' }
+    );
+  }
+  if (selectedType === 'Transfer') {
+    reviewDetails.push(
+      { label: 'Transfer Amount', value: formatReviewAmount(formattedAdvanceAmount) },
+      { label: 'Transfer To Site', value: transferSiteLabel }
+    );
+  } else if (selectedType === 'Refund') {
+    reviewDetails.push(
+      { label: 'Refund Amount', value: formatReviewAmount(formattedAdvanceAmount) },
+      { label: 'Payment Mode', value: paymentMode || '-' }
+    );
+  } else if (selectedType === 'Advance') {
+    reviewDetails.push(
+      { label: 'Advance Amount', value: formatReviewAmount(formattedAdvanceAmount) },
+      { label: 'Payment Mode', value: paymentMode || '-' }
+    );
+  } else if (selectedType === 'Bill Settlement') {
+    const rawAmount = advanceAmount.toString().replace(/,/g, '').trim();
+    if (rawAmount) {
+      reviewDetails.push(
+        { label: 'Amount Given', value: formatReviewAmount(formattedAdvanceAmount) },
+        { label: 'Payment Mode', value: paymentMode || '-' }
+      );
+    }
+  }
+  reviewDetails.push(
+    { label: 'Description', value: description || '-' },
+    { label: 'File Attached', value: selectedAdvanceFile ? selectedAdvanceFile.name : 'No file attached' }
+  );
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedAdvanceFile(file);
+    }
+    // This ensures the input is cleared even if the same file is selected again next time
+    e.target.value = '';
+  };
+  // File preview URL effect
+  useEffect(() => {
+    if (!selectedAdvanceFile) {
+      setFilePreviewUrl(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(selectedAdvanceFile);
+    setFilePreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [selectedAdvanceFile]);
+  const handleChangeAttachment = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+  const isPdfPreview = selectedAdvanceFile?.type?.toLowerCase().includes('pdf');
+  const handleEditClick = (entry) => {
+    setEditingId(entry.advancePortalId);
+    setEditFormData({
+      date: entry.date?.split('T')[0] || '',
+      amount: entry.amount || '',
+      project_id: entry.project_id || '',
+      vendor_id: entry.vendor_id || '',
+      contractor_id: entry.contractor_id || '',
+      entry_no: entry.entry_no || '',
+      week_no: entry.week_no || '',
+      file_url: entry.file_url || '',
+      description: entry.description || '',
+      bill_amount: entry.bill_amount || '',
+      discount_amount: entry.discount_amount || '',
+      type: entry.type || '',
+      transfer_site_id: entry.transfer_site_id || '',
+      payment_mode: entry.payment_mode || '',
+      refund_amount: entry.refund_amount || ''
+    });
+    setIsEditModalOpen(true);
+  };
+  const handlePaymentSubmit = async (skipDuplicateCheck = false) => {
+    if (!paymentModalData.accountNumber && paymentModalData.paymentMode !== "Cash" && paymentModalData.paymentMode !== "Direct") {
+      alert("Please select account number.");
+      return;
+    }
+    if (paymentModalData.paymentMode === "Cheque" && (!paymentModalData.chequeNo || !paymentModalData.chequeDate)) {
+      alert("Please enter cheque number and date.");
+      return;
+    }
+    // File upload validation for Bill Settlement
+    if (selectedType === 'Bill Settlement' && !selectedAdvanceFile) {
+      alert("Please attach the bill file for Bill Settlement");
+      return;
+    }
+    // Category validation for Bill Settlement
+    if (selectedType === 'Bill Settlement' && !selectedCategory) {
+      alert("Please select a category for Bill Settlement");
+      return;
+    }
+
+    if (!skipDuplicateCheck && (selectedType === 'Advance' || selectedType === 'Bill Settlement')) {
+      const checkAmount = selectedType === 'Bill Settlement'
+        ? (parseFloat(billAmount) || 0)
+        : (parseFloat(paymentModalData.amount) || 0);
+      setCheckingDuplicate(true);
+      try {
+        const duplicates = await checkForDuplicateEntry(paymentModalData.date, checkAmount);
+        lastDuplicateCheckRef.current = Array.isArray(duplicates) ? duplicates : [];
+        if (duplicates?.length > 0 && !duplicateBypassedRef.current) {
+          setDuplicateMatchedExpenses(duplicates);
+          setPendingActionAfterIgnore('paymentSubmit');
+          setShowDuplicateModal(true);
+          return;
+        }
+      } catch (err) {
+        console.error('Duplicate check failed:', err);
+      } finally {
+        setCheckingDuplicate(false);
+      }
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Upload file if exists (for Bill Settlement)
+      let fileUrl = '';
+      if (selectedAdvanceFile && selectedType === 'Bill Settlement') {
+        try {
+          const formData = new FormData();
+          const formatDateOnly = (dateString) => {
+            const date = new Date(dateString);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}-${month}-${year}`;
+          };
+          const now = new Date();
+          const timestamp = now.toLocaleString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true
+          })
+            .replace(",", "")
+            .replace(/\s/g, "-");
+          const finalName = `${timestamp} ${selectedSite.sNo} ${selectedOption.label}`;
+          formData.append('files', selectedAdvanceFile);
+          formData.append('folder', 'FileUpload / Advance_Portal');
+          formData.append('fileName', finalName);
+          const uploadResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/files/upload", {
+            method: "POST",
+            body: formData,
+          });
+          if (!uploadResponse.ok) {
+            throw new Error('File upload failed');
+          }
+          const uploadResult = await uploadResponse.json();
+          fileUrl = uploadResult.urls[0];
+        } catch (error) {
+          console.error('Error during file upload:', error);
+          alert('Error during file upload. Please try again.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+      // Get entry number
+      const res = await fetch('https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll');
+      if (!res.ok) throw new Error('Failed to fetch entry numbers');
+      const allData = await res.json();
+      const maxEntryNo = allData.length > 0 ? Math.max(...allData.map(item => item.entry_no || 0)) : 0;
+      const nextEntryNo = maxEntryNo + 1;
+      let expensesEntryId = null;
+      if (selectedType === 'Bill Settlement') {
+        const expensesPayload = buildBillSettlementExpensesPayload({
+          date: paymentModalData.date,
+          fileUrl,
+          accountType: 'Bill Settlement',
+          includeEno: true,
+        });
+        expensesEntryId = await saveExpensesFormEntry(expensesPayload);
+        setEno(eno + 1);
+      }
+      // Create advance portal payload
+      const advancePayload = {
+        type: selectedType,
+        date: paymentModalData.date,
+        vendor_id: selectedOption?.type === 'Vendor' ? selectedOption.id : 0,
+        contractor_id: selectedOption?.type === 'Contractor' ? selectedOption.id : 0,
+        project_id: selectedSite?.id || 0,
+        transfer_site_id: selectedType === 'Transfer' ? parseInt(transferSiteId) : 0,
+        payment_mode: paymentModalData.paymentMode,
+        amount:
+          selectedType === 'Advance' || selectedType === 'Transfer' || selectedType === 'Bill Settlement'
+            ? parseFloat(paymentModalData.amount) || 0
+            : 0,
+        bill_amount: selectedType === 'Bill Settlement' ? parseFloat(billAmount) || 0 : 0,
+        discount_amount: selectedType === 'Bill Settlement' ? parseFloat(discountAmount) || 0 : 0,
+        refund_amount: selectedType === 'Refund' ? parseFloat(paymentModalData.amount) || 0 : 0,
+        entry_no: nextEntryNo,
+        week_no: getWeekNumber(),
+        description: description,
+        file_url: fileUrl,
+        branch_id: activeBranchId,
+        entered_by: enteredBy,
+        source: "Advance Portal",
+        ...buildAdvancePortalExpensesEntryLinkFields(expensesEntryId),
+      };
+      const advanceSaveUrl = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save');
+      if (isPaymentModeRequiringBankRegisterLog(paymentModalData.paymentMode)) {
+        await postBankRegisterLogSave(
+          bankRegisterLogSaveUrlMatchingRequest(advanceSaveUrl),
+          "Advance Portal",
+          {
+            bill_payment_mode: paymentModalData.paymentMode,
+            amount: parseFloat(paymentModalData.amount) || 0,
+            entered_by: enteredBy,
+          }
+        );
+      }
+      // Save to advance portal
+      const { response: advanceResponse, data: advanceResult } = await saveAdvancePortalWithLogs(advancePayload, 'Advance Portal Payment Submit');
+      if (!advanceResponse.ok) {
+        throw new Error('Failed to save advance portal data');
+      }
+      if (expensesEntryId) {
+        const advancePortalId =
+          resolveAdvancePortalIdFromSaveResponse(advanceResult) ??
+          resolveAdvancePortalIdFromSaveResponse(advanceResult?.data);
+        await linkBillSettlementExpenseToAdvancePortal(advancePortalId, expensesEntryId, advancePayload);
+      }
+      // If opened from Weekly Cash Register Bill Settlement row, update that row with uploaded bill URL
+      if (selectedType === 'Bill Settlement' && fileUrl) {
+        try {
+          const raw = sessionStorage.getItem("advancePortalWeeklyExpenseIdForBillCopyUrl");
+          const wid = raw ? Number(JSON.parse(raw)) : null;
+          if (Number.isFinite(wid)) {
+            await putWeeklyExpenseBillCopyUrl(wid, fileUrl);
+          }
+        } catch {
+          // ignore
+        }
+      }
+      // Save to weekly payment bills only if payment mode is not "Direct"
+      let isWeeklyPaymentBillSaved = false;
+      if (paymentModalData.paymentMode !== "Direct") {
+        // Create weekly payment bills payload
+        const weeklyPaymentBillPayload = {
+          date: paymentModalData.date,
+          created_at: new Date().toISOString(),
+          contractor_id: selectedOption?.type === 'Contractor' ? selectedOption.id : null,
+          vendor_id: selectedOption?.type === 'Vendor' ? selectedOption.id : null,
+          employee_id: null,
+          project_id: selectedSite?.id || null,
+          type: selectedType,
+          bill_payment_mode: paymentModalData.paymentMode,
+          amount: parseFloat(paymentModalData.amount),
+          discount_amount: selectedType === 'Bill Settlement' ? parseFloat(discountAmount) || 0 : 0,
+          status: true,
+          weekly_number: "",
+          weekly_payment_expense_id: null,
+          advance_portal_id: advanceResult.id || advanceResult.advancePortalId,
+          staff_advance_portal_id: null,
+          claim_payment_id: null,
+          cheque_number: paymentModalData.chequeNo || null,
+          cheque_date: paymentModalData.chequeDate || null,
+          transaction_number: paymentModalData.transactionNumber || null,
+          account_number: paymentModalData.accountNumber || null,
+          branch_id: activeBranchId,
+          entered_by: enteredBy,
+          source: "Advance Portal",
+        };
+        // Save to weekly payment bills
+        const weeklyBillSaveUrl = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save');
+        const weeklyResponse = await fetch(weeklyBillSaveUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(weeklyPaymentBillPayload)
+        });
+        if (!weeklyResponse.ok) {
+          throw new Error('Failed to save weekly payment bills data');
+        }
+        isWeeklyPaymentBillSaved = true;
+      }
+      const successMessage = isWeeklyPaymentBillSaved
+        ? 'Advance saved successfully and added to Weekly Payment Bills!'
+        : 'Advance saved successfully!';
+      toast.success(successMessage, {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
+      // Reset form
+      setAdvanceAmount('');
+      setDescription('');
+      setPaymentMode('');
+      setBillAmount('');
+      setDiscountAmount('');
+      setSelectedAdvanceFile(null);
+      setSelectedCategory(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      setEntryNo(nextEntryNo);
+      setShowPaymentModal(false);
+      clearTransientFormSessionState();
+      try { sessionStorage.removeItem("advancePortalWeeklyExpenseIdForBillCopyUrl"); } catch { }
+      fetchAdvanceData();
+      await notifyParentSuccess();
+    } catch (error) {
+      console.error('Error submitting data:', error);
+      toast.error('Failed to save data!', {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  const handleUpdate = async () => {
+    try {
+      if (editFormData.type === "Transfer") {
+        // Find all rows with the same entry_no
+        const sameEntryRows = advanceData.filter(r => r.entry_no === editFormData.entry_no);
+        if (sameEntryRows.length === 2) {
+          const [record1, record2] = sameEntryRows;
+          // Figure out which is being edited
+          const editedRecord = sameEntryRows.find(r => r.advancePortalId === editingId);
+          const otherRecord = sameEntryRows.find(r => r.advancePortalId !== editingId);
+          // Ensure numeric
+          const enteredAmount = parseFloat(editFormData.amount) || 0;
+          // Prepare updated data
+          const updatedEdited = {
+            ...editFormData,
+            transfer_site_id: parseInt(editFormData.transfer_site_id),
+            amount: enteredAmount, // positive
+            branch_id: editFormData.branch_id ?? activeBranchId
+          };
+          const updatedOther = {
+            ...otherRecord,
+            project_id: parseInt(editFormData.transfer_site_id), // new "to" site
+            transfer_site_id: editedRecord.project_id, // old "from" site
+            amount: -Math.abs(enteredAmount), // negative
+            branch_id: otherRecord.branch_id ?? activeBranchId
+          };
+          // Send both PUT requests
+          await Promise.all([
+            fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${editedRecord.advancePortalId}?editedBy=${encodeURIComponent(enteredBy)}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(updatedEdited)
+            }),
+            fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${otherRecord.advancePortalId}?editedBy=${encodeURIComponent(enteredBy)}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(updatedOther)
+            })
+          ]);
+          await Promise.all([
+            syncWeeklyPaymentBillsForAdvancePortal(editedRecord.advancePortalId, updatedEdited, {
+              editedBy: enteredBy,
+              branchId: activeBranchId,
+            }),
+            syncWeeklyPaymentBillsForAdvancePortal(otherRecord.advancePortalId, updatedOther, {
+              editedBy: enteredBy,
+              branchId: activeBranchId,
+            }),
+          ]);
+        } else {
+          console.warn('Could not find both Transfer records for entry_no:', editFormData.entry_no);
+        }
+      } else {
+        const payload = {
+          ...editFormData,
+          branch_id: editFormData.branch_id ?? activeBranchId
+        };
+        if (await needsAdvancePortalPaymentModalForWeeklyBill(editingId, payload)) {
+          pendingEditUpdateRef.current = { payload };
+          setEditPaymentModalData({
+            chequeNo: '',
+            chequeDate: '',
+            transactionNumber: '',
+            accountNumber: '',
+          });
+          setShowEditPaymentModal(true);
+          return;
+        }
+        const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${editingId}?editedBy=${encodeURIComponent(enteredBy)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error('Failed to update');
+        await syncWeeklyPaymentBillsForAdvancePortal(editingId, payload, {
+          editedBy: enteredBy,
+          branchId: activeBranchId,
+        });
+      }
+      setIsEditModalOpen(false);
+      await fetchAdvanceData();
+      await notifyParentSuccess();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  const handleEditPaymentModalSubmit = async () => {
+    if (!editPaymentModalData.accountNumber) {
+      alert('Please select account number.');
+      return;
+    }
+    if (editFormData.payment_mode === 'Cheque' && (!editPaymentModalData.chequeNo || !editPaymentModalData.chequeDate)) {
+      alert('Please enter cheque number and date.');
+      return;
+    }
+    const pending = pendingEditUpdateRef.current;
+    if (!pending?.payload || !editingId) return;
+    setIsEditPaymentSubmitting(true);
+    try {
+      const payload = pending.payload;
+      const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${editingId}?editedBy=${encodeURIComponent(enteredBy)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('Failed to update');
+      await syncWeeklyPaymentBillsForAdvancePortal(editingId, payload, {
+        editedBy: enteredBy,
+        branchId: activeBranchId,
+        modalPaymentData: editPaymentModalData,
+      });
+      setShowEditPaymentModal(false);
+      pendingEditUpdateRef.current = null;
+      setIsEditModalOpen(false);
+      await fetchAdvanceData();
+      await notifyParentSuccess();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update record. Please try again.');
+    } finally {
+      setIsEditPaymentSubmitting(false);
+    }
+  };
+  return (
+    <div className={`flex flex-col overflow-hidden ${modalEmbedded ? 'bg-white h-auto' : 'h-[calc(100vh-104px)] bg-[#FAF6ED]'}`}>
+      <div className={`flex flex-col flex-1 min-h-0 overflow-hidden ${modalEmbedded ? 'bg-white p-0' : 'px-[18px] pt-[18px] pb-[18px] bg-[#FAF6ED]'}`}>
+          {!embedded && (
+          <div className='w-full pt-[18px] px-[18px] pb-[18px] rounded-[6px] bg-white mb-[18px] text-left flex items-center gap-6'>
+            <div className='flex flex-wrap gap-[10px] w-full'>
+              <div>
+                <label className='block mb-[8px] font-semibold text-sm sm:text-base'>From Date</label>
+                <div className='w-[150px]'>
+                  <CustomDateField
+                    value={fromDate}
+                    onChange={setFromDate}
+                    placeholder="From Date"
+                    className="w-[150px] [&>div]:!w-[150px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                    controlHeightPx={40}
+                    alwaysOpenBelow
+                    anchor="right"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className='block mb-[8px] font-semibold text-sm sm:text-base'>To Date</label>
+                <div className='w-[150px]'>
+                  <CustomDateField
+                    value={toDate}
+                    onChange={setToDate}
+                    placeholder="To Date"
+                    className="w-[150px] [&>div]:!w-[150px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                    controlHeightPx={40}
+                    alwaysOpenBelow
+                    anchor="right"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Payment Mode</label>
+                <Select
+                  options={finalPaymentModeOptions}
+                  value={filteredPaymentMode ? { value: filteredPaymentMode, label: filteredPaymentMode } : null}
+                  onChange={(selected) => setFilteredPaymentMode(selected ? selected.value : '')}
+                  placeholder="Payment Mode"
+                  isSearchable
+                  isClearable
+                  menuPortalTarget={document.body}
+                  styles={{
+                    ...customStyles,
+                    placeholder: (provided) => ({
+                      ...customStyles.placeholder(provided),
+                      color: '#A6A5A6',
+                    }),
+                    dropdownIndicator: (provided, state) => ({
+                      ...customStyles.dropdownIndicator(provided, state),
+                      paddingLeft: 0,
+                      paddingRight: 4,
+                    }),
+                  }}
+                  className='lg:w-[150px] rounded-lg focus:outline-none '
+                />
+              </div>
+              <div>
+                <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Amount Given</label>
+                <AdvancePortalAmountOutput variant="filter" value={filteredAmount} />
+              </div>
+              <div>
+                <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Today Amount</label>
+                <AdvancePortalAmountOutput variant="filter" value={todayAmount} />
+              </div>
+              <div>
+                <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Total Outstanding</label>
+                <AdvancePortalAmountOutput variant="filter" value={totalOutstanding} />
+              </div>
+            </div>
+          </div>
+          )}
+        <div className={`w-full flex-1 min-h-0 min-w-0 max-xl:overflow-y-auto xl:overflow-hidden no-scrollbar scrollbar-none flex flex-col ${modalEmbedded ? 'bg-white p-0 rounded-none' : 'pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px]'}`}>
+            <div className='max-xl:flex-none xl:flex flex-1 min-h-0 xl:min-w-0 gap-[18px]'>
+              <div className='shrink-0 w-fit' ref={leftFormColRef}>
+                <div className='grid grid-cols-2 gap-3 text-left'>
+                  <div className='text-left max-w-[300px]'>
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.selectType}<span className="text-[#E4572E]">*</span></label>
+                    {lockTypePrefill ? (
+                      <AdvancePortalReadonlyField
+                        value={selectedType}
+                        className="w-[300px]"
+                      />
+                    ) : (
+                    <Select
+                      options={[
+                        { value: 'Advance', label: 'Advance' },
+                        { value: 'Bill Settlement', label: 'Bill Settlement' },
+                        { value: 'Refund', label: 'Refund' },
+                        { value: 'Transfer', label: 'Transfer' }
+                      ]}
+                      value={selectedType ? { value: selectedType, label: selectedType } : null}
+                      onChange={(selected) => {
+                        const newType = selected ? selected.value : '';
+                        setSelectedType(newType);
+                        setAdvanceAmount('');
+                        setBillAmount('');
+                      }}
+                      placeholder={ADVANCE_PORTAL_FORM_FIELDS.selectType}
+                      isSearchable
+                      isClearable
+                      styles={customStyles}
+                      className={ADVANCE_PORTAL_SELECT_CLASS}
+                    />
+                    )}
+                  </div>
+                  <div className='text-left'>
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.date}<span className="text-[#E4572E]">*</span></label>
+                    <div className="expense-entry-form-date w-[300px]">
+                      <CustomDateField
+                        value={dateValue}
+                        onChange={setDateValue}
+                        placeholder={ADVANCE_PORTAL_FORM_FIELDS.date}
+                        className="w-full text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                        controlHeightPx={40}
+                        alwaysOpenBelow
+                        anchor="right"
+                      />
+                    </div>
+                  </div>
+                  <div className='text-left'>
+                    <div className='flex justify-between mb-[8px]'>
+                      <label className="text-md font-semibold block">{ADVANCE_PORTAL_FORM_FIELDS.contractorVendor}<span className="text-[#E4572E]">*</span></label>
+                      {selectedOption?.type && <span className="text-[14px] text-[#E4572E] font-semibold block mt-0.5">{selectedOption.type}</span>}
+                    </div>
+                    <Select
+                      options={combinedOptions}
+                      value={selectedOption}
+                      onChange={handleChange}
+                      placeholder={ADVANCE_PORTAL_FORM_FIELDS.contractorVendor}
+                      className={ADVANCE_PORTAL_SELECT_CLASS}
+                      isClearable
+                      isSearchable
+                      styles={customStyles}
+                    />
+                  </div>
+                  <div className='text-left'>
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.overallAdvance}</label>
+                    <AdvancePortalAmountOutput value={overallAdvance} />
+                  </div>
+                  <div className='text-left'>
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>{selectedType === 'Transfer' ? ADVANCE_PORTAL_FORM_FIELDS.fromProjectName : ADVANCE_PORTAL_FORM_FIELDS.projectName}<span className="text-[#E4572E]">*</span></label>
+                    <Select
+                      options={sortedSiteOptions || []}
+                      placeholder={selectedType === 'Transfer' ? ADVANCE_PORTAL_FORM_FIELDS.fromProjectName : ADVANCE_PORTAL_FORM_FIELDS.projectName}
+                      isSearchable={true}
+                      value={selectedSite}
+                      onChange={handleProjectChange}
+                      styles={customStyles}
+                      isClearable
+                      className={ADVANCE_PORTAL_SELECT_CLASS}
+                    />
+                  </div>
+                  {selectedType !== 'Bill Settlement' && (
+                    <div className='text-left'>
+                      <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.projectAdvance}</label>
+                      <AdvancePortalAmountOutput value={projectAdvance} />
+                    </div>
+                  )}
+                  {selectedType === 'Bill Settlement' && (
+                    <div className='text-left'>
+                      <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.billAmount}<span className="text-[#E4572E]">*</span></label>
+                      <AdvancePortalAmountInput
+                        value={billAmount}
+                        onChange={handleBillAmountChange}
+                        placeholder={ADVANCE_PORTAL_FORM_FIELDS.billAmount}
+                      />
+                    </div>
+                  )}
+                  {selectedType === 'Bill Settlement' && (
+                    <div className="col-span-2">
+                      <div className="flex flex-row gap-3">
+                        <div className="text-left flex-1">
+                          <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.category}<span className="text-[#E4572E]">*</span></label>
+                          <Select
+                            options={categoryOptions}
+                            value={selectedCategory}
+                            onChange={setSelectedCategory}
+                            styles={customStyles}
+                            isClearable
+                            isSearchable
+                            placeholder={ADVANCE_PORTAL_FORM_FIELDS.category}
+                            className={ADVANCE_PORTAL_SELECT_CLASS}
+                          />
+                        </div>
+                        <div className="text-left flex-1">
+                          <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.discount}<span className="text-[#E4572E]">*</span></label>
+                          <AdvancePortalAmountInput
+                            value={discountAmount}
+                            onChange={handleDiscountChange}
+                            placeholder={ADVANCE_PORTAL_FORM_FIELDS.discount}
+                            fullWidth
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="col-span-2">
+                    <div className="flex flex-row gap-3">
+                      <div className="text-left flex-1">
+                        <label className={ADVANCE_PORTAL_LABEL_CLASS}>
+                          {selectedType === 'Transfer'
+                            ? ADVANCE_PORTAL_FORM_FIELDS.transferAmount
+                            : selectedType === 'Refund'
+                              ? ADVANCE_PORTAL_FORM_FIELDS.refundAmount
+                              : ADVANCE_PORTAL_FORM_FIELDS.amountGiven}<span className="text-[#E4572E]">*</span>
+                        </label>
+                        <AdvancePortalAmountInput
+                          value={advanceAmount}
+                          onChange={handleAmountChange}
+                          placeholder={
+                            selectedType === 'Transfer'
+                              ? ADVANCE_PORTAL_FORM_FIELDS.transferAmount
+                              : selectedType === 'Refund'
+                                ? ADVANCE_PORTAL_FORM_FIELDS.refundAmount
+                                : ADVANCE_PORTAL_FORM_FIELDS.amountGiven
+                          }
+                          fullWidth
+                        />
+                      </div>
+                      <div className="text-left">
+                        {selectedType === 'Transfer' ? (
+                          <>
+                            <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.toProjectName}<span className="text-[#E4572E]">*</span></label>
+                            <Select
+                              options={sortedSiteOptions || []}
+                              placeholder={ADVANCE_PORTAL_FORM_FIELDS.toProjectName}
+                              isSearchable={true}
+                              value={sortedSiteOptions.find((option) => option.id === parseInt(transferSiteId, 10)) || null}
+                              onChange={handleTransferSiteChange}
+                              styles={customStyles}
+                              isClearable
+                              className={ADVANCE_PORTAL_SELECT_CLASS}
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.paymentMode}<span className="text-[#E4572E]">*</span></label>
+                            <Select
+                              options={finalPaymentModeOptions}
+                              value={paymentMode ? { value: paymentMode, label: paymentMode } : null}
+                              onChange={(selected) => setPaymentMode(selected ? selected.value : '')}
+                              placeholder={ADVANCE_PORTAL_FORM_FIELDS.paymentMode}
+                              isSearchable
+                              isClearable
+                              styles={customStyles}
+                              className={ADVANCE_PORTAL_SELECT_CLASS}
+                            />
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className='col-span-2 text-left' ref={descriptionSectionRef}>
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.description}</label>
+                    <textarea
+                      rows={2}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder={ADVANCE_PORTAL_FORM_FIELDS.description}
+                      className={`${ADVANCE_PORTAL_TEXTAREA_CLASS} hover:!border-[rgba(191,152,83,0.2)] focus:!border-[rgba(191,152,83,1)]`}
+                    />
+                  </div>
+                  <div className='col-span-2 min-w-0 overflow-hidden'>
+                    <div className="flex items-start justify-between lg:w-[616px] w-[300px] gap-2 flex-wrap mb-2 min-w-0">
+                      <div className='flex shrink-0'>
+                        <label htmlFor="fileInput" className="cursor-pointer flex items-center gap-[6px] text-orange-600">
+                          <img className='w-[15px] h-[16px]' alt='' src={Attach}></img>
+                          <span className="text-[14px] font-semibold">{ADVANCE_PORTAL_FORM_FIELDS.attachFile}</span>
+                        </label>
+                        <input type="file" id="fileInput" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
+                      </div>
+                      {selectedAdvanceFile && (
+                        <span
+                          className="text-gray-600 text-[12px] break-words min-w-0 text-right"
+                          title={selectedAdvanceFile.name}
+                        >
+                          {selectedAdvanceFile.name}
+                        </span>
+                      )}
+                    </div>
+                    <button className='bg-[#c7934c] text-white w-full sm:w-[120px] h-[33px] rounded flex items-center justify-center text-sm xl:mb-0 mb-2'
+                      onClick={handleSubmit} disabled={isSubmitting || checkingDuplicate}
+                    >
+                      {checkingDuplicate ? 'Checking...' : isSubmitting ? 'Saving...' : getButtonLabel()}
+                    </button>
+                    <ToastContainer
+                      position="top-right"
+                      autoClose={3000}
+                      hideProgressBar={false}
+                      closeOnClick
+                      pauseOnHover
+                      draggable
+                      theme="colored"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div
+                className={`min-w-0 flex-1 flex flex-col ${sideTableAreaHeight != null ? 'h-full' : 'overflow-x-auto'}`}
+                style={sideTableAreaHeight != null ? { height: `${sideTableAreaHeight}px` } : undefined}
+              >
+                <div
+                  className={`expense-form-side-table-host min-h-0 overflow-hidden ${sideTableContentHeight != null ? 'flex-1 min-h-0' : ''}`}
+                  style={
+                    sideTableContentHeight != null
+                      ? { height: `${sideTableContentHeight}px` }
+                      : undefined
+                  }
+                >
+                  <SideTable
+                    advanceData={advanceData}
+                    selectedOption={selectedOption}
+                    siteOptions={siteOptions}
+                    selectedSite={selectedSite}
+                    onEditClick={handleEditClick}
+                    hideDiscountAndActivity
+                    projectAdvance={projectAdvance}
+                    advanceHeaderRef={advanceHeaderRef}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        {isEditModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+            <div className="bg-white p-4 sm:p-6 rounded-lg w-full max-w-[600px] max-h-[90vh] overflow-y-auto">
+              <h2 className="text-lg font-bold mb-4">Edit Entry</h2>
+              <div className='text-left'>
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4'>
+                  <div>
+                    <label className="mb-2 font-semibold block text-sm">Date</label>
+                    <input
+                      type="date"
+                      value={editFormData.date}
+                      onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
+                      className="border-2 border-[#BF9853] border-opacity-30 w-full h-[45px] pl-3 rounded-lg focus:outline-none text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-2 font-semibold text-sm">Amount</label>
+                    <AdvancePortalAmountInput
+                      variant="modal"
+                      value={editFormData.amount}
+                      onChange={handleEditFormAmountChange('amount')}
+                      placeholder="Amount"
+                    />
+                  </div>
+                </div>
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4'>
+                  <div>
+                    <label className="block mb-2 font-semibold text-sm">Bill Amount</label>
+                    <AdvancePortalAmountInput
+                      variant="modal"
+                      value={editFormData.bill_amount}
+                      onChange={handleEditFormAmountChange('bill_amount')}
+                      placeholder="Bill Amount"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-2 font-semibold text-sm">Discount Amount</label>
+                    <AdvancePortalAmountInput
+                      variant="modal"
+                      value={editFormData.discount_amount}
+                      onChange={handleEditFormAmountChange('discount_amount')}
+                      placeholder="Discount Amount"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-2 font-semibold text-sm">Type</label>
+                    <Select
+                      options={[
+                        { value: 'Advance', label: 'Advance' },
+                        { value: 'Bill Settlement', label: 'Bill Settlement' },
+                        { value: 'Refund', label: 'Refund' },
+                        { value: 'Transfer', label: 'Transfer' }
+                      ]}
+                      value={editFormData.type ? { value: editFormData.type, label: editFormData.type } : null}
+                      onChange={(selected) => setEditFormData({ ...editFormData, type: selected ? selected.value : '' })}
+                      placeholder="Select Type"
+                      isSearchable
+                      isClearable
+                      styles={customStyles}
+                      className="w-full focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4'>
+                  <div>
+                    <label className="block mb-2 font-semibold text-sm">Payment Mode</label>
+                    <Select
+                      options={finalPaymentModeOptions}
+                      value={editFormData.payment_mode ? { value: editFormData.payment_mode, label: editFormData.payment_mode } : null}
+                      onChange={(selected) => setEditFormData({ ...editFormData, payment_mode: selected ? selected.value : '' })}
+                      placeholder="Select"
+                      isSearchable
+                      isClearable
+                      styles={customStyles}
+                      className="w-full focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-2 font-semibold text-sm">Refund Amount</label>
+                    <AdvancePortalAmountInput
+                      variant="modal"
+                      value={editFormData.refund_amount}
+                      onChange={handleEditFormAmountChange('refund_amount')}
+                      placeholder="Refund Amount"
+                    />
+                  </div>
+                </div>
+                <div className='mb-4'>
+                  <label className="block mb-2 font-semibold text-sm">Transfer Site</label>
+                  <Select
+                    options={sortedSiteOptions}
+                    value={sortedSiteOptions.find(site => site.id === editFormData.transfer_site_id) || null}
+                    onChange={(selected) => setEditFormData({ ...editFormData, transfer_site_id: selected?.id || '' })}
+                    isClearable
+                    isSearchable
+                    styles={customStyles}
+                    className="w-full focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-center sm:justify-end gap-3 mt-4">
+                <button onClick={() => setIsEditModalOpen(false)} className="w-[100px] h-[45px] border border-[#BF9853] rounded text-sm">
+                  Cancel
+                </button>
+                <button onClick={handleUpdate} className="w-[100px] h-[45px] bg-[#BF9853] text-white rounded text-sm">
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showDuplicateModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+            <div className="bg-white rounded-lg w-full max-w-[1600px] max-h-[90vh] shadow-lg flex flex-col">
+              <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-bold text-black">Possible Duplicate Entry - Matching expenses found</h3>
+                  <button
+                    type="button"
+                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl font-bold"
+                    onClick={handleDuplicateCancel}
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="mt-2 text-sm text-gray-600">
+                  Same date, vendor/contractor, project and amount detected. Total Entries: {duplicateMatchedExpenses.length} |
+                  Total Amount: ₹{duplicateMatchedExpenses.reduce((sum, item) => sum + Number(item.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div className="flex-1 overflow-auto p-4">
+                <div className="overflow-x-auto border-l-8 border-l-[#BF9853] rounded-lg">
+                  <table className="table-fixed min-w-full border-collapse">
+                    <thead>
+                      <tr className="bg-[#FAF6ED]">
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">Time Stamp</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">Date</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">E.No</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">Project Name</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">Vendor</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">Contractor</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">A/C Type</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">Amount</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">Comments</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">Attach File</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {duplicateMatchedExpenses.map((expense, index) => (
+                        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-[#FAF6ED]'}>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">{formatDateForDup(expense.timestamp || expense.date)}</td>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">{formatDateOnlyForDup(expense.date)}</td>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.eno || '-'}</td>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.siteName || '-'}</td>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.vendor || '-'}</td>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.contractor || '-'}</td>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.accountType || '-'}</td>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">
+                            ₹{Number(expense.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.comments || '-'}</td>
+                          <td className="px-3 py-2 text-left text-sm border-b">
+                            {(expense.billCopy || expense.billCopyUrl) ? (
+                              <a
+                                href={expense.billCopy || expense.billCopyUrl}
+                                className="text-red-500 underline font-semibold"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                View
+                              </a>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-between">
+                <span className="text-sm text-gray-600">Do you want to proceed anyway?</span>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    className="px-4 py-2 bg-[#BF9853] text-white rounded font-medium hover:bg-[#a67c3a] transition-colors duration-200"
+                    onClick={handleDuplicateIgnore}
+                  >
+                    Ignore & Continue
+                  </button>
+                  <button
+                    type="button"
+                    className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded font-medium hover:bg-gray-50 transition-colors duration-200"
+                    onClick={handleDuplicateCancel}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        <AdvancePortalEditPaymentModal
+          isOpen={showEditPaymentModal}
+          onClose={() => {
+            setShowEditPaymentModal(false);
+            pendingEditUpdateRef.current = null;
+          }}
+          onSubmit={handleEditPaymentModalSubmit}
+          isSubmitting={isEditPaymentSubmitting}
+          paymentMode={editFormData.payment_mode}
+          date={editFormData.date}
+          amount={getAdvancePortalDisplayAmount(editFormData)}
+          paymentModalData={editPaymentModalData}
+          setPaymentModalData={setEditPaymentModalData}
+          accountDetails={accountDetails}
+          selectStyles={customStyles}
+        />
+        {showPaymentModal && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white text-left rounded-xl p-8 w-[800px] max-h-[100vh] overflow-y-auto flex flex-col">
+              <h3 className="text-lg font-semibold mb-4 text-center">Payment Details</h3>
+              <div className="flex-1 overflow-hidden">
+                <div className="space-y-4 mb-4">
+                  <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                        <input
+                          type="date"
+                          value={paymentModalData.date}
+                          onChange={(e) => setPaymentModalData(prev => ({ ...prev, date: e.target.value }))}
+                          readOnly
+                          className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none bg-gray-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                        <AdvancePortalAmountOutput
+                          variant="modal-readonly"
+                          value={paymentModalData.amount}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
+                        <input
+                          type="text"
+                          value={paymentModalData.paymentMode}
+                          readOnly
+                          className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  {(paymentModalData.paymentMode === "GPay" || paymentModalData.paymentMode === "PhonePe" || paymentModalData.paymentMode === "Gpay" ||
+                    paymentModalData.paymentMode === "Net Banking" || paymentModalData.paymentMode === "Cheque") && (
+                      <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                        <div className="space-y-4">
+                          {paymentModalData.paymentMode === "Cheque" && (
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No<span className="text-red-500">*</span></label>
+                                <input
+                                  type="text"
+                                  value={paymentModalData.chequeNo}
+                                  onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                                  placeholder="Enter cheque number"
+                                  className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date<span className="text-red-500">*</span></label>
+                                <input
+                                  type="date"
+                                  value={paymentModalData.chequeDate}
+                                  onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                                  className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                />
+                              </div>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                              <input
+                                type="text"
+                                value={paymentModalData.transactionNumber}
+                                onChange={(e) => setPaymentModalData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                                placeholder="Enter transaction number"
+                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Account Number<span className="text-red-500">*</span></label>
+                              <Select
+                                options={accountDetails.map((account) => ({
+                                  value: account.account_number,
+                                  label: account.account_number
+                                }))}
+                                value={paymentModalData.accountNumber ? { value: paymentModalData.accountNumber, label: paymentModalData.accountNumber } : null}
+                                onChange={(selected) => setPaymentModalData(prev => ({ ...prev, accountNumber: selected ? selected.value : '' }))}
+                                placeholder="Select Account"
+                                isSearchable
+                                isClearable
+                                styles={customStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                className="w-full focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-4">
+                <button onClick={() => setShowPaymentModal(false)} className="w-[100px] h-[45px] border border-[#BF9853] rounded">
+                  Cancel
+                </button>
+                <button onClick={handlePaymentSubmit} disabled={isSubmitting} className="w-[100px] h-[45px] bg-[#BF9853] text-white rounded">
+                  {isSubmitting ? 'Saving...' : 'Submit'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showReviewModal && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white text-left rounded-xl p-6 w-[1400px] h-[680px] overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">Review Submission</h3>
+                  {checkingDuplicate && (selectedType === 'Advance' || selectedType === 'Bill Settlement') && (
+                    <p className="text-sm text-amber-700 mt-1">Checking for duplicate entries…</p>
+                  )}
+                </div>
+                <button onClick={handleReviewClose} className="text-2xl font-bold text-gray-400 hover:text-gray-700">
+                  ×
+                </button>
+              </div>
+              <div className="flex flex-1 gap-6 overflow-hidden">
+                <div className="flex-[0.40] flex flex-col">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-base font-semibold text-gray-700">Advance Details</h4>
+                    <button type="button" onClick={() => setIsReviewEditMode((prev) => !prev)}
+                      className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg hover:bg-[#FFF8EE]"
+                    >
+                      {isReviewEditMode ? 'Cancel Edit' : 'Edit'}
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto pr-4">
+                    {isReviewEditMode ? (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-semibold mb-1 block">Type</label>
+                          {lockTypePrefill ? (
+                            <AdvancePortalReadonlyField value={selectedType} />
+                          ) : (
+                          <Select
+                            options={[
+                              { value: 'Advance', label: 'Advance' },
+                              { value: 'Bill Settlement', label: 'Bill Settlement' },
+                              { value: 'Refund', label: 'Refund' },
+                              { value: 'Transfer', label: 'Transfer' }
+                            ]}
+                            value={selectedType ? { value: selectedType, label: selectedType } : null}
+                            onChange={(selected) => {
+                              const newType = selected ? selected.value : '';
+                              setSelectedType(newType);
+                              setAdvanceAmount('');
+                              setBillAmount('');
+                            }}
+                            placeholder="Select Type..."
+                            isSearchable
+                            isClearable
+                            styles={customStyles}
+                            className="custom-select rounded-lg"
+                          />
+                          )}
+                        </div>
+                        <div>
+                          <label className="text-sm font-semibold mb-1 block">Date</label>
+                          <input
+                            type="date"
+                            value={dateValue}
+                            onChange={(e) => setDateValue(e.target.value)}
+                            className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-semibold mb-1 block">Contractor/Vendor</label>
+                          <Select
+                            options={combinedOptions}
+                            value={selectedOption}
+                            onChange={handleChange}
+                            styles={customStyles}
+                            isClearable
+                            isSearchable
+                            className="custom-select rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-semibold mb-1 block">Project Name</label>
+                          <Select
+                            options={sortedSiteOptions || []}
+                            placeholder="Select a site..."
+                            isSearchable={true}
+                            value={selectedSite}
+                            onChange={handleProjectChange}
+                            styles={customStyles}
+                            isClearable
+                            className="custom-select rounded-lg"
+                          />
+                        </div>
+                        {selectedType === 'Bill Settlement' && (
+                          <>
+                            <div>
+                              <label className="text-sm font-semibold mb-1 block">Bill Amount</label>
+                              <AdvancePortalAmountInput
+                                variant="modal"
+                                value={billAmount}
+                                onChange={handleBillAmountChange}
+                                placeholder={ADVANCE_PORTAL_FORM_FIELDS.billAmount}
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <div className="flex flex-col sm:flex-row gap-4">
+                                <div className="flex-1">
+                                  <label className="text-sm font-semibold mb-1 block">Category</label>
+                                  <Select
+                                    options={categoryOptions}
+                                    value={selectedCategory}
+                                    onChange={setSelectedCategory}
+                                    styles={customStyles}
+                                    isClearable
+                                    isSearchable
+                                    placeholder="Select a category..."
+                                    className="custom-select rounded-lg"
+                                  />
+                                </div>
+                                <div className="flex-1">
+                                  <label className="text-sm font-semibold mb-1 block">Discount</label>
+                                  <AdvancePortalAmountInput
+                                    variant="modal"
+                                    value={discountAmount}
+                                    onChange={handleDiscountChange}
+                                    placeholder={ADVANCE_PORTAL_FORM_FIELDS.discount}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                        {selectedType !== 'Transfer' && selectedType !== 'Bill Settlement' && (
+                          <div>
+                            <label className="text-sm font-semibold mb-1 block">Payment Mode</label>
+                            <Select
+                              options={finalPaymentModeOptions}
+                              value={paymentMode ? { value: paymentMode, label: paymentMode } : null}
+                              onChange={(selected) => setPaymentMode(selected ? selected.value : '')}
+                              placeholder="Select"
+                              isSearchable
+                              isClearable
+                              styles={customStyles}
+                              className="custom-select rounded-lg"
+                            />
+                          </div>
+                        )}
+                        <div>
+                          <label className="text-sm font-semibold mb-1 block">
+                            {selectedType === 'Transfer'
+                              ? 'Transfer Amount'
+                              : selectedType === 'Refund'
+                                ? 'Refund Amount'
+                                : selectedType === 'Bill Settlement'
+                                  ? 'Amount Given'
+                                  : 'Amount Given'}
+                          </label>
+                          <AdvancePortalAmountInput
+                            variant="modal"
+                            value={advanceAmount}
+                            onChange={handleAmountChange}
+                            placeholder={
+                              selectedType === 'Transfer'
+                                ? ADVANCE_PORTAL_FORM_FIELDS.transferAmount
+                                : selectedType === 'Refund'
+                                  ? ADVANCE_PORTAL_FORM_FIELDS.refundAmount
+                                  : ADVANCE_PORTAL_FORM_FIELDS.amountGiven
+                            }
+                          />
+                        </div>
+                        {selectedType === 'Transfer' && (
+                          <div className="text-left">
+                            <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.toProjectName}<span className="text-[#E4572E]">*</span></label>
+                            <Select
+                              options={sortedSiteOptions || []}
+                              placeholder={ADVANCE_PORTAL_FORM_FIELDS.toProjectName}
+                              isSearchable={true}
+                              value={sortedSiteOptions.find((option) => option.id === parseInt(transferSiteId, 10)) || null}
+                              onChange={handleTransferSiteChange}
+                              styles={customStyles}
+                              isClearable
+                              className={ADVANCE_PORTAL_SELECT_CLASS}
+                            />
+                          </div>
+                        )}
+                        <div className="col-span-2">
+                          <label className="text-sm font-semibold mb-1 block">Description</label>
+                          <textarea
+                            rows={2}
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Type your text here..."
+                            className="w-full border-2 border-[#BF9853] rounded-lg px-3 py-2 border-opacity-20"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {reviewDetails.map((detail) => renderReviewRow(detail.label, detail.value))}
+                      </div>
+                    )}
+                  </div>
+                  {isReviewEditMode && (
+                    <div className="flex justify-end gap-3 mt-4">
+                      <button type="button" onClick={() => setIsReviewEditMode(false)} className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg">
+                        Discard
+                      </button>
+                      <button type="button" onClick={handleReviewSave} className="px-4 py-2 bg-[#BF9853] text-white rounded-lg">
+                        Save Changes
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="w-px bg-gray-200"></div>
+                <div className="flex-[0.65] flex flex-col">
+                  <h4 className="text-base font-semibold text-gray-700 mb-3">Preview</h4>
+                  <div className="flex-1 border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">
+                    {filePreviewUrl ? (
+                      isPdfPreview ? (
+                        <iframe
+                          src={`${filePreviewUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                          title="Attachment preview"
+                          className="w-full h-full rounded-lg border-none"
+                        />
+                      ) : (
+                        <img src={filePreviewUrl} alt="Attachment preview" className="w-full h-full object-contain" />
+                      )
+                    ) : (
+                      <p className="text-sm text-gray-500">No file selected</p>
+                    )}
+                  </div>
+                  {selectedAdvanceFile && (
+                    <p className="text-xs text-gray-500 mt-2 break-words">{selectedAdvanceFile.name}</p>
+                  )}
+                  <button type="button" onClick={handleChangeAttachment} className="mt-4 px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg hover:bg-[#FFF8EE]">
+                    Change Attachfile
+                  </button>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button type="button" onClick={handleReviewClose} className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg">
+                  Close
+                </button>
+                <button type="button" onClick={handleReviewConfirm} disabled={isSubmitting || isReviewEditMode}
+                  className={`px-4 py-2 rounded-lg text-white ${isSubmitting || isReviewEditMode ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#BF9853]'}`}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Confirm & Submit'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+export default AdvancePortal

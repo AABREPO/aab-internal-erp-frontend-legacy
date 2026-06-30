@@ -125,7 +125,7 @@ const History = () => {
     };
     useEffect(() => {
         axios
-            .get('https://backendaab.in/aabuilderDash/expenses_form/get_form')
+            .get('https://backendaab.in/demoAabuilderDash/expenses_form/get_form')
             .then((response) => {
                 const sortedExpenses = response.data.sort((a, b) => {
                     const enoA = parseInt(a.eno, 10);
@@ -147,7 +147,7 @@ const History = () => {
     }, []);
     useEffect(() => {
         axios
-            .get('https://backendaab.in/aabuilderDash/api/account_type/daily_checklist')
+            .get('https://backendaab.in/demoAabuilderDash/api/account_type/daily_checklist')
             .then((response) => {
                 const sortedExpenses = response.data.sort((a, b) => new Date(b.date) - new Date(a.date));
                 const uniqueUrls = [
@@ -238,7 +238,7 @@ const History = () => {
     };
     const fetchAuditDetails = async (expenseId) => {
         try {
-            const response = await fetch(`https://backendaab.in/aabuilderDash/expenses_form/audit/${expenseId}`);
+            const response = await fetch(`https://backendaab.in/demoAabuilderDash/expenses_form/audit/${expenseId}`);
             const data = await response.json();
             setAudits(data);
             setShowModal(true);
@@ -334,7 +334,7 @@ const History = () => {
                                         .map((checklistData, index) => {
                                             const { checklistNumber, timestamp, entryChecklistUrl } = checklistData;
                                             const formattedDate = timestamp
-                                                ? new Date(timestamp).toLocaleDateString('en-GB')
+                                                ? new Date(new Date(timestamp).getTime() - 330 * 60000).toLocaleDateString('en-GB')
                                                 : '';
                                             const serialNumber = (index + 1).toString().padStart(2, '0');
 
@@ -390,8 +390,6 @@ const History = () => {
                                             );
                                         })}
                                 </tbody>
-
-
                             </table>
                         ) : (
                             <p>No checklist URLs available</p>
@@ -451,7 +449,7 @@ const History = () => {
                         >
                             <table className="table-fixed  min-w-[1765px] w-screen border-collapse">
                                 <thead>
-                                    <tr className="bg-[#FAF6ED]">
+                                    <tr className="bg-[#FAF6ED] sticky top-0 z-10">
                                         <th className="px-2 w-[240px] font-bold text-left">Time stamp</th>
                                         <th className="px-2 p-2 w-36 font-bold text-left">Date</th>
                                         <th className="px-2 w-[120px] font-bold text-left">E.No</th>
@@ -477,7 +475,7 @@ const History = () => {
                                             <td className="px-2 text-left font-semibold">{expense.contractor}</td>
                                             <td className="px-2 text-left font-semibold">{expense.quantity}</td>
                                             <td className="text-sm text-left pl-2 font-semibold">
-                                                ₹{Number(expense.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
                                             <td className="px-2 text-left font-semibold">{expense.comments}</td>
                                             <td className="px-2 text-left font-semibold">{expense.category}</td>
@@ -533,7 +531,7 @@ const History = () => {
 export default History
 const formatDate = (dateString) => {
     const date = new Date(dateString);
-    date.setMinutes(date.getMinutes());
+    date.setMinutes(date.getMinutes() - 330);
 
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');

@@ -1,0 +1,6833 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { flushSync } from 'react-dom';
+import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
+import DatePickerModal from '../PurchaseOrder/DatePickerModal';
+import EditIcon from '../Images/edit1.png';
+import DeleteIcon from '../Images/delete.png';
+import FlottingButton from '../Images/Flotting Button Black.png'
+import FlottingButtonWhite from '../Images/Flotting Button.png'
+import Close from '../Images/close.png'
+import Edit from '../Images/edit.png'
+import Swap from '../Images/Down.svg'
+import Swap1 from '../Images/Down1.svg'
+import CloseIcon from '../Images/Close F.svg'
+import DropdownIcon from '../Images/Dropdown F.svg'
+import Search from '../Images/Search.png'
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
+const Transfer = ({ user }) => {
+  const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_item_name';
+  const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_brand';
+  const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_item_id';
+  const FILE_UPLOAD_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/files';
+  const [entryNo, setEntryNo] = useState(0);
+  const [date, setDate] = useState(() => {
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const year = today.getFullYear();
+    return `${day}/${month}/${year}`;
+  });
+  const [selectedFrom, setSelectedFrom] = useState(null);
+  const [selectedTo, setSelectedTo] = useState(null);
+  const [selectedServiceStore, setSelectedServiceStore] = useState(null);
+  const [selectedIncharge, setSelectedIncharge] = useState(null);
+  const [selectedRelocateItemId, setSelectedRelocateItemId] = useState(null);
+  const [selectedCurrentLocation, setSelectedCurrentLocation] = useState(null);
+  const [selectedRelocateLocation, setSelectedRelocateLocation] = useState(null);
+  const [relocateItemDetails, setRelocateItemDetails] = useState(null);
+
+  // Resolve module permissions (Create/Edit/Delete) for mobile create actions.
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    const moduleName = 'Tools Tracker';
+    const resolvedUserRoles =
+      user?.userRoles ||
+      (() => {
+        try {
+          const stored = JSON.parse(localStorage.getItem('user') || '{}');
+          return stored?.userRoles || [];
+        } catch {
+          return [];
+        }
+      })();
+
+    fetchUserModulePermissions(resolvedUserRoles, moduleName)
+      .then(setModulePermissions)
+      .catch(() => setModulePermissions([]));
+  }, [user?.userRoles]);
+
+  const canCreate = modulePermissions.includes('Create');
+  const [vendorOptions, setVendorOptions] = useState([]);
+  const [items, setItems] = useState([]);
+  const [fromOptions, setFromOptions] = useState([]);
+  const [toOptions, setToOptions] = useState([]);
+  const [serviceStoreOptions, setServiceStoreOptions] = useState([]);
+  const [inchargeOptions, setInchargeOptions] = useState([]);
+  const [showFromDropdown, setShowFromDropdown] = useState(false);
+  const [showToDropdown, setShowToDropdown] = useState(false);
+  const [showServiceStoreDropdown, setShowServiceStoreDropdown] = useState(false);
+  const [showInchargeDropdown, setShowInchargeDropdown] = useState(false);
+  const [showRelocateItemIdDropdown, setShowRelocateItemIdDropdown] = useState(false);
+  const [showCurrentLocationDropdown, setShowCurrentLocationDropdown] = useState(false);
+  const [showRelocateLocationDropdown, setShowRelocateLocationDropdown] = useState(false);
+  const [toSearchQuery, setToSearchQuery] = useState('');
+  const [toFavorites, setToFavorites] = useState(() => {
+    const saved = localStorage.getItem('favoriteToSites');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [serviceStoreSearchQuery, setServiceStoreSearchQuery] = useState('');
+  const [serviceStoreFavorites, setServiceStoreFavorites] = useState(() => {
+    const saved = localStorage.getItem('favoriteServiceStores');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [fromSearchQuery, setFromSearchQuery] = useState('');
+  const [fromFavorites, setFromFavorites] = useState(() => {
+    const saved = localStorage.getItem('favoriteFromSites');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [inchargeSearchQuery, setInchargeSearchQuery] = useState('');
+  const [inchargeFavorites, setInchargeFavorites] = useState(() => {
+    const saved = localStorage.getItem('favoriteIncharges');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [relocateLocationSearchQuery, setRelocateLocationSearchQuery] = useState('');
+  const [relocateLocationFavorites, setRelocateLocationFavorites] = useState(() => {
+    const saved = localStorage.getItem('favoriteRelocateLocations');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [currentLocationSearchQuery, setCurrentLocationSearchQuery] = useState('');
+  const [currentLocationFavorites, setCurrentLocationFavorites] = useState(() => {
+    const saved = localStorage.getItem('favoriteCurrentLocations');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [relocateItemIdSearchQuery, setRelocateItemIdSearchQuery] = useState('');
+  const [relocateItemIdFavorites, setRelocateItemIdFavorites] = useState(() => {
+    const saved = localStorage.getItem('favoriteItemIds');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [entryServiceMode, setEntryServiceMode] = useState('Entry');
+  const [serviceFlowMode, setServiceFlowMode] = useState('sent'); // 'sent' | 'return' - for Service tab
+  const [isSwapIconToggled, setIsSwapIconToggled] = useState(false);
+  const [isServiceSwapIconToggled, setIsServiceSwapIconToggled] = useState(false);
+  const [showAddItemsModal, setShowAddItemsModal] = useState(false);
+  const [showAddModalItemNameModal, setShowAddModalItemNameModal] = useState(false);
+  const [showAddModalBrandModal, setShowAddModalBrandModal] = useState(false);
+  const [showAddModalItemIdModal, setShowAddModalItemIdModal] = useState(false);
+  const [itemNameOptions, setItemNameOptions] = useState([]);
+  const [brandOptions, setBrandOptions] = useState([]);
+  const [itemIdOptions, setItemIdOptions] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [categoryOptions, setCategoryOptions] = useState([]);
+  const [addItemFormData, setAddItemFormData] = useState({
+    itemName: '',
+    itemNameId: null,
+    brand: '',
+    brandId: null,
+    itemId: '',
+    itemIdDbId: null,
+    model: '',
+    quantity: '',
+    machineNumber: ''
+  });
+  const [toolsItemNameListData, setToolsItemNameListData] = useState([]);
+  const [toolsBrandFullData, setToolsBrandFullData] = useState([]);
+  const [toolsItemIdFullData, setToolsItemIdFullData] = useState([]);
+  const [apiItemIdOptions, setApiItemIdOptions] = useState([]);
+  const [stockManagementData, setStockManagementData] = useState([]);
+  const [toolsTrackerManagementData, setToolsTrackerManagementData] = useState([]);
+  const [machineStatusData, setMachineStatusData] = useState([]); // Machine status data from new API
+  const [machineNumbersList, setMachineNumbersList] = useState([]); // For resolving machine_number_id to machine_number
+  const [selectedItemNameQuantity, setSelectedItemNameQuantity] = useState(0);
+  const [selectedItemMachineNumber, setSelectedItemMachineNumber] = useState('');
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadFiles, setUploadFiles] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const pendingUploadCountRef = useRef(0);
+  const pendingUploadResolversRef = useRef([]);
+  const beginPendingFileUpload = useCallback(() => {
+    pendingUploadCountRef.current += 1;
+  }, []);
+  const endPendingFileUpload = useCallback(() => {
+    pendingUploadCountRef.current = Math.max(0, pendingUploadCountRef.current - 1);
+    if (pendingUploadCountRef.current === 0) {
+      const resolvers = pendingUploadResolversRef.current.splice(0);
+      resolvers.forEach((r) => r());
+    }
+  }, []);
+  const waitForPendingFileUploads = useCallback(() => {
+    if (pendingUploadCountRef.current === 0) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      pendingUploadResolversRef.current.push(resolve);
+    });
+  }, []);
+  const [uploadStatus, setUploadStatus] = useState('');
+  const [uploadDescription, setUploadDescription] = useState('');
+  const [statusOptions] = useState(['Working', 'Not Working', 'Under Repair', 'Machine Dead']);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_tracker_stock_management';
+  const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_tracker_management';
+  const TOOLS_MACHINE_STATUS_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools-machine-status';
+  const TOOLS_MACHINE_NUMBER_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_machine_number';
+  const [isSaving, setIsSaving] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showUniversalSearchModal, setShowUniversalSearchModal] = useState(false);
+  const [universalSearchQuery, setUniversalSearchQuery] = useState('');
+  const [showSearchConfirmModal, setShowSearchConfirmModal] = useState(false);
+  const [selectedSearchItem, setSelectedSearchItem] = useState(null);
+  const [showSearchUploadModal, setShowSearchUploadModal] = useState(false);
+  const [showSearchQtyModal, setShowSearchQtyModal] = useState(false);
+  const [pendingSearchItem, setPendingSearchItem] = useState(null);
+  const [pendingSearchQty, setPendingSearchQty] = useState('');
+  const [searchUploadFiles, setSearchUploadFiles] = useState([]);
+  const [isSearchUploading, setIsSearchUploading] = useState(false);
+  const [searchUploadStatus, setSearchUploadStatus] = useState('');
+  const [searchUploadDescription, setSearchUploadDescription] = useState('');
+  const [showSearchStatusDropdown, setShowSearchStatusDropdown] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [expandedItemId, setExpandedItemId] = useState(null);
+  const [swipeStates, setSwipeStates] = useState({});
+  const [isEditingTransferDetails, setIsEditingTransferDetails] = useState(false);
+  const [showImageViewer, setShowImageViewer] = useState(false);
+  const [showImageViewerStatusDropdown, setShowImageViewerStatusDropdown] = useState(false);
+  const [imageViewerData, setImageViewerData] = useState({
+    images: [],
+    currentIndex: 0,
+    itemName: '',
+    itemUniqueId: '',
+    itemId: '',
+    toLocation: '',
+    machineStatus: ''
+  });
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [cloneModeActive, setCloneModeActive] = useState(false);
+  const [editEntryId, setEditEntryId] = useState(null);
+  const [originalEditData, setOriginalEditData] = useState(null);
+  const [editLoadVersion, setEditLoadVersion] = useState(0);
+  const initialImageCountByItemIdRef = useRef({});
+  const pendingEditPayloadRef = useRef(null);
+  const [customAlert, setCustomAlert] = useState({
+    isOpen: false,
+    message: ''
+  });
+  const closeCustomAlert = () => {
+    setCustomAlert({ isOpen: false, message: '' });
+  };
+  // Route existing alert(...) calls to a styled in-app modal.
+  const alert = (message) => {
+    setCustomAlert({
+      isOpen: true,
+      message: String(message ?? '')
+    });
+  };
+  const filteredStatusOptions = React.useMemo(
+    () =>
+      entryServiceMode === 'Service' && serviceFlowMode === 'sent'
+        ? statusOptions.filter((status) => status !== 'Working')
+        : statusOptions,
+    [entryServiceMode, serviceFlowMode, statusOptions]
+  );
+  useEffect(() => {
+    const handleEditEntryEvent = (event) => {
+      pendingEditPayloadRef.current = event?.detail || null;
+      setEditLoadVersion((prev) => prev + 1);
+    };
+
+    window.addEventListener('editToolsTrackerEntry', handleEditEntryEvent);
+    return () => {
+      window.removeEventListener('editToolsTrackerEntry', handleEditEntryEvent);
+    };
+  }, []);
+  useEffect(() => {
+    const fetchSites = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.siteName,
+          label: item.siteName,
+          sNo: item.siteNo,
+          id: item.id,
+        }));
+        setFromOptions(formattedData);
+        setToOptions(formattedData);
+      } catch (error) {
+        console.error("Fetch error: ", error);
+      }
+    };
+    fetchSites();
+  }, []);
+  useEffect(() => {
+    const fetchServiceStoreVendors = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll', {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const serviceStoreVendors = data
+            .filter(vendor => vendor.makeAsServiceShop === true)
+            .map(vendor => ({
+              value: vendor.vendorName,
+              label: vendor.vendorName,
+              id: vendor.id,
+            }));
+          setServiceStoreOptions(serviceStoreVendors);
+          // Also store all vendors for purchase store lookup
+          const allVendors = data.map(vendor => ({
+            value: vendor.vendorName,
+            label: vendor.vendorName,
+            id: vendor.id,
+          }));
+          setVendorOptions(allVendors);
+        } else {
+          console.log('Error fetching service store vendors.');
+        }
+      } catch (error) {
+        console.error('Error fetching service store vendors:', error);
+      }
+    };
+    fetchServiceStoreVendors();
+  }, []);
+  useEffect(() => {
+    const fetchSiteIncharge = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/site_engineers');
+        if (response.ok) {
+          const data = await response.json();
+          const formatted = data.map((item) => ({
+            value: item.id,
+            label: item.employee_name || item.employeeName,
+            mobileNumber: item.employee_mobile_number || item.employeeMobileNumber,
+            id: item.id,
+            user_name: item.user_name || item.userName,
+          }));
+          setInchargeOptions(formatted);
+        } else {
+          console.log('Error fetching site incharge.');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    };
+    fetchSiteIncharge();
+  }, []);
+  // Auto-fill project incharge when logged-in username matches employee user_name
+  useEffect(() => {
+    const username = (user?.username || user?.name) ? String(user?.username || user?.name).trim().toLowerCase() : '';
+    if (!username) return;
+    if (selectedIncharge) return;
+    if (localStorage.getItem('editingToolsTrackerEntryId') || cloneModeActive) return;
+
+    if (!Array.isArray(inchargeOptions) || inchargeOptions.length === 0) return;
+
+    const matchedOption = inchargeOptions.find((opt) => {
+      const optUserName = opt.user_name || opt.userName || '';
+      return String(optUserName).trim().toLowerCase() === username;
+    });
+
+    if (matchedOption) {
+      setSelectedIncharge(matchedOption);
+    }
+  }, [user, selectedIncharge, inchargeOptions, cloneModeActive]);
+  useEffect(() => {
+    const fetchEntryNo = async () => {
+      try {
+        let endpoint;
+        if (entryServiceMode === 'Service') {
+          endpoint = serviceFlowMode === 'return'
+            ? `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getServiceReturnCount`
+            : `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getServiceCount`;
+        } else if (entryServiceMode === 'Relocate') {
+          endpoint = `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getRelocationCount`;
+        } else {
+          endpoint = `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getEntryCount`;
+        }
+        const response = await fetch(endpoint);
+        if (response.ok) {
+          const data = await response.json();
+          setEntryNo(data + 1);
+        } else if (entryServiceMode === 'Service' && serviceFlowMode === 'return') {
+          const fallbackRes = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getServiceCount`);
+          if (fallbackRes.ok) {
+            const fallbackData = await fallbackRes.json();
+            setEntryNo(fallbackData + 1);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching entry number:', error);
+      }
+    };
+    fetchEntryNo();
+  }, [entryServiceMode, serviceFlowMode]);
+  useEffect(() => {
+    // Update current location in relocateItemDetails when selectedCurrentLocation changes
+    if (entryServiceMode === 'Relocate' && relocateItemDetails && selectedCurrentLocation) {
+      setRelocateItemDetails(prev => ({
+        ...prev,
+        currentLocation: selectedCurrentLocation.label || ''
+      }));
+    }
+  }, [selectedCurrentLocation, entryServiceMode]);
+  useEffect(() => {
+    if (!showToDropdown) {
+      setToSearchQuery('');
+    }
+    if (!showServiceStoreDropdown) {
+      setServiceStoreSearchQuery('');
+    }
+    if (!showFromDropdown) {
+      setFromSearchQuery('');
+    }
+    if (!showInchargeDropdown) {
+      setInchargeSearchQuery('');
+    }
+    if (!showCurrentLocationDropdown) {
+      setCurrentLocationSearchQuery('');
+    }
+    if (!showRelocateLocationDropdown) {
+      setRelocateLocationSearchQuery('');
+    }
+    if (!showRelocateItemIdDropdown) {
+      setRelocateItemIdSearchQuery('');
+    }
+  }, [showToDropdown, showServiceStoreDropdown, showFromDropdown, showInchargeDropdown, showCurrentLocationDropdown, showRelocateLocationDropdown, showRelocateItemIdDropdown]);
+  useEffect(() => {
+    if (items.length === 0) return;
+    const minSwipeDistance = 50;
+    const globalMouseMoveHandler = (e) => {
+      setSwipeStates(prev => {
+        let hasChanges = false;
+        const newState = { ...prev };
+        items.forEach(item => {
+          const state = prev[item.id];
+          if (!state) return;
+          const deltaX = e.clientX - state.startX;
+          const isExpanded = expandedItemId === item.id;
+          if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+            newState[item.id] = {
+              ...state,
+              currentX: e.clientX,
+              isSwiping: true
+            };
+            hasChanges = true;
+          }
+        });
+        return hasChanges ? newState : prev;
+      });
+    };
+    const globalMouseUpHandler = () => {
+      setSwipeStates(prev => {
+        let hasChanges = false;
+        const newState = { ...prev };
+        items.forEach(item => {
+          const state = prev[item.id];
+          if (!state) return;
+          const deltaX = state.currentX - state.startX;
+          const absDeltaX = Math.abs(deltaX);
+          if (absDeltaX >= minSwipeDistance) {
+            if (deltaX < 0) {
+              setExpandedItemId(item.id);
+            } else {
+              setExpandedItemId(null);
+            }
+          } else {
+            if (expandedItemId === item.id) {
+              setExpandedItemId(null);
+            }
+          }
+          delete newState[item.id];
+          hasChanges = true;
+        });
+        return hasChanges ? newState : prev;
+      });
+    };
+    document.addEventListener('mousemove', globalMouseMoveHandler);
+    document.addEventListener('mouseup', globalMouseUpHandler);
+    return () => {
+      document.removeEventListener('mousemove', globalMouseMoveHandler);
+      document.removeEventListener('mouseup', globalMouseUpHandler);
+    };
+  }, [items, expandedItemId]);
+  const normalizeSearchText = (text) => {
+    if (!text) return '';
+    return text
+      .toLowerCase()
+      .replace(/[-–—]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+  const getFilteredToOptions = () => {
+    const normalizedQuery = normalizeSearchText(toSearchQuery);
+    const filtered = toOptions.filter(option => {
+      const normalizedLabel = normalizeSearchText(option.label);
+      return normalizedLabel.includes(normalizedQuery);
+    });
+    return filtered.sort((a, b) => {
+      const aIsFavorite = toFavorites.includes(a.id);
+      const bIsFavorite = toFavorites.includes(b.id);
+      if (aIsFavorite && !bIsFavorite) return -1;
+      if (!aIsFavorite && bIsFavorite) return 1;
+      return a.label.localeCompare(b.label);
+    });
+  };
+  const handleToggleToFavorite = (e, optionId) => {
+    e.stopPropagation();
+    const newFavorites = toFavorites.includes(optionId)
+      ? toFavorites.filter(id => id !== optionId)
+      : [...toFavorites, optionId];
+    setToFavorites(newFavorites);
+    localStorage.setItem('favoriteToSites', JSON.stringify(newFavorites));
+  };
+  const getFilteredFromOptions = () => {
+    const normalizedQuery = normalizeSearchText(fromSearchQuery);
+    const filtered = fromOptions.filter(option => {
+      const normalizedLabel = normalizeSearchText(option.label);
+      return normalizedLabel.includes(normalizedQuery);
+    });
+    return filtered.sort((a, b) => {
+      const aIsFavorite = fromFavorites.includes(a.id);
+      const bIsFavorite = fromFavorites.includes(b.id);
+      if (aIsFavorite && !bIsFavorite) return -1;
+      if (!aIsFavorite && bIsFavorite) return 1;
+      return a.label.localeCompare(b.label);
+    });
+  };
+  const handleToggleFromFavorite = (e, optionId) => {
+    e.stopPropagation();
+    const newFavorites = fromFavorites.includes(optionId)
+      ? fromFavorites.filter(id => id !== optionId)
+      : [...fromFavorites, optionId];
+    setFromFavorites(newFavorites);
+    localStorage.setItem('favoriteFromSites', JSON.stringify(newFavorites));
+  };
+  const getFilteredInchargeOptions = () => {
+    const normalizedQuery = normalizeSearchText(inchargeSearchQuery);
+    const filtered = inchargeOptions.filter(option => {
+      const normalizedLabel = normalizeSearchText(option.label);
+      return normalizedLabel.includes(normalizedQuery);
+    });
+    return filtered.sort((a, b) => {
+      const aIsFavorite = inchargeFavorites.includes(a.id);
+      const bIsFavorite = inchargeFavorites.includes(b.id);
+      if (aIsFavorite && !bIsFavorite) return -1;
+      if (!aIsFavorite && bIsFavorite) return 1;
+      return a.label.localeCompare(b.label);
+    });
+  };
+  const handleToggleInchargeFavorite = (e, optionId) => {
+    e.stopPropagation();
+    const newFavorites = inchargeFavorites.includes(optionId)
+      ? inchargeFavorites.filter(id => id !== optionId)
+      : [...inchargeFavorites, optionId];
+    setInchargeFavorites(newFavorites);
+    localStorage.setItem('favoriteIncharges', JSON.stringify(newFavorites));
+  };
+  const getFilteredRelocateLocationOptions = () => {
+    const normalizedQuery = normalizeSearchText(relocateLocationSearchQuery);
+    const filtered = fromOptions.filter(option => {
+      const normalizedLabel = normalizeSearchText(option.label);
+      return normalizedLabel.includes(normalizedQuery);
+    });
+    return filtered.sort((a, b) => {
+      const aIsFavorite = relocateLocationFavorites.includes(a.id);
+      const bIsFavorite = relocateLocationFavorites.includes(b.id);
+      if (aIsFavorite && !bIsFavorite) return -1;
+      if (!aIsFavorite && bIsFavorite) return 1;
+      return a.label.localeCompare(b.label);
+    });
+  };
+  const handleToggleRelocateLocationFavorite = (e, optionId) => {
+    e.stopPropagation();
+    const newFavorites = relocateLocationFavorites.includes(optionId)
+      ? relocateLocationFavorites.filter(id => id !== optionId)
+      : [...relocateLocationFavorites, optionId];
+    setRelocateLocationFavorites(newFavorites);
+    localStorage.setItem('favoriteRelocateLocations', JSON.stringify(newFavorites));
+  };
+  const getFilteredCurrentLocationOptions = () => {
+    const normalizedQuery = normalizeSearchText(currentLocationSearchQuery);
+    const filtered = fromOptions.filter(option => {
+      const normalizedLabel = normalizeSearchText(option.label);
+      return normalizedLabel.includes(normalizedQuery);
+    });
+    return filtered.sort((a, b) => {
+      const aIsFavorite = currentLocationFavorites.includes(a.id);
+      const bIsFavorite = currentLocationFavorites.includes(b.id);
+      if (aIsFavorite && !bIsFavorite) return -1;
+      if (!aIsFavorite && bIsFavorite) return 1;
+      return a.label.localeCompare(b.label);
+    });
+  };
+  const handleToggleCurrentLocationFavorite = (e, optionId) => {
+    e.stopPropagation();
+    const newFavorites = currentLocationFavorites.includes(optionId)
+      ? currentLocationFavorites.filter(id => id !== optionId)
+      : [...currentLocationFavorites, optionId];
+    setCurrentLocationFavorites(newFavorites);
+    localStorage.setItem('favoriteCurrentLocations', JSON.stringify(newFavorites));
+  };
+  const getFilteredServiceStoreOptions = () => {
+    const normalizedQuery = normalizeSearchText(serviceStoreSearchQuery);
+    const filtered = serviceStoreOptions.filter(option => {
+      const normalizedLabel = normalizeSearchText(option.label);
+      return normalizedLabel.includes(normalizedQuery);
+    });
+    return filtered.sort((a, b) => {
+      const aIsFavorite = serviceStoreFavorites.includes(a.id);
+      const bIsFavorite = serviceStoreFavorites.includes(b.id);
+      if (aIsFavorite && !bIsFavorite) return -1;
+      if (!aIsFavorite && bIsFavorite) return 1;
+      return a.label.localeCompare(b.label);
+    });
+  };
+  const handleToggleServiceStoreFavorite = (e, optionId) => {
+    e.stopPropagation();
+    const newFavorites = serviceStoreFavorites.includes(optionId)
+      ? serviceStoreFavorites.filter(id => id !== optionId)
+      : [...serviceStoreFavorites, optionId];
+    setServiceStoreFavorites(newFavorites);
+    localStorage.setItem('favoriteServiceStores', JSON.stringify(newFavorites));
+  };
+  const getFilteredItemIdOptions = () => {
+    const normalizedQuery = normalizeSearchText(relocateItemIdSearchQuery);
+    const filtered = itemIdOptions.filter(option => {
+      const normalizedOption = normalizeSearchText(option);
+      return normalizedOption.includes(normalizedQuery);
+    });
+    return filtered.sort((a, b) => {
+      const aId = toolsItemIdFullData.find(i => (i?.item_id?.trim() ?? i?.itemId?.trim()) === a)?.id;
+      const bId = toolsItemIdFullData.find(i => (i?.item_id?.trim() ?? i?.itemId?.trim()) === b)?.id;
+      const aIsFavorite = aId && relocateItemIdFavorites.includes(aId);
+      const bIsFavorite = bId && relocateItemIdFavorites.includes(bId);
+      if (aIsFavorite && !bIsFavorite) return -1;
+      if (!aIsFavorite && bIsFavorite) return 1;
+      return a.localeCompare(b);
+    });
+  };
+  const handleToggleItemIdFavorite = (e, itemIdValue) => {
+    e.stopPropagation();
+    const itemIdObj = toolsItemIdFullData.find(i => (i?.item_id?.trim() ?? i?.itemId?.trim()) === itemIdValue);
+    if (!itemIdObj?.id) return;
+    const newFavorites = relocateItemIdFavorites.includes(itemIdObj.id)
+      ? relocateItemIdFavorites.filter(id => id !== itemIdObj.id)
+      : [...relocateItemIdFavorites, itemIdObj.id];
+    setRelocateItemIdFavorites(newFavorites);
+    localStorage.setItem('favoriteItemIds', JSON.stringify(newFavorites));
+  };
+  const normalizeDisplayDate = (dateValue) => {
+    const raw = String(dateValue || '').trim();
+    if (!raw) return '';
+
+    const ddMmYyyyMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (ddMmYyyyMatch) {
+      const day = ddMmYyyyMatch[1].padStart(2, '0');
+      const month = ddMmYyyyMatch[2].padStart(2, '0');
+      const year = ddMmYyyyMatch[3];
+      return `${day}/${month}/${year}`;
+    }
+
+    const isoDateMatch = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoDateMatch) {
+      const year = isoDateMatch[1];
+      const month = isoDateMatch[2].padStart(2, '0');
+      const day = isoDateMatch[3].padStart(2, '0');
+      return `${day}/${month}/${year}`;
+    }
+
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      const day = String(parsed.getDate()).padStart(2, '0');
+      const month = String(parsed.getMonth() + 1).padStart(2, '0');
+      const year = parsed.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+
+    return '';
+  };
+  const getApiDateTimeFromDisplayDate = (displayDate) => {
+    const normalized = normalizeDisplayDate(displayDate);
+    if (!normalized) return null;
+    const [day, month, year] = normalized.split('/');
+    return `${year}-${month}-${day}T00:00:00`;
+  };
+  // Format date for API as dd-mm-yyyy
+  const formatDateAsDdMmYyyy = (dateValue) => {
+    const normalized = normalizeDisplayDate(dateValue);
+    if (!normalized) return null;
+    return normalized.replace(/\//g, '-');
+  };
+  const areFieldsFilled = entryServiceMode === 'Entry'
+    ? (selectedFrom && selectedTo && selectedIncharge)
+    : entryServiceMode === 'Relocate'
+      ? (selectedRelocateItemId && selectedCurrentLocation && selectedRelocateLocation)
+      : entryServiceMode === 'Service' && serviceFlowMode === 'return'
+        ? (selectedServiceStore && selectedTo && selectedIncharge)
+        : (selectedFrom && selectedServiceStore && selectedIncharge);
+  const handleSwitchToEntry = () => {
+    if (isEditMode && originalEditData && (originalEditData.tools_entry_type === 'relocate' || originalEditData.tools_entry_type === 'Relocate')) {
+      return;
+    }
+    setEntryServiceMode('Entry');
+    setSelectedServiceStore(null);
+    setSelectedRelocateItemId(null);
+    setSelectedCurrentLocation(null);
+    setSelectedRelocateLocation(null);
+    setRelocateItemDetails(null);
+  };
+  const handleSwitchToService = () => {
+    if (isEditMode && originalEditData && ((originalEditData.tools_entry_type === 'entry' || originalEditData.tools_entry_type === 'Entry') || (originalEditData.tools_entry_type === 'relocate' || originalEditData.tools_entry_type === 'Relocate'))) {
+      return;
+    }
+    setEntryServiceMode('Service');
+    setServiceFlowMode('sent');
+    setIsServiceSwapIconToggled(false);
+    setSelectedTo(null);
+    setSelectedRelocateItemId(null);
+    setSelectedCurrentLocation(null);
+    setSelectedRelocateLocation(null);
+    setRelocateItemDetails(null);
+  };
+  const handleSwitchToRelocate = () => {
+    if (isEditMode && originalEditData && (originalEditData.tools_entry_type === 'entry' || originalEditData.tools_entry_type === 'Entry')) {
+      return;
+    }
+    setEntryServiceMode('Relocate');
+    setSelectedTo(null);
+    setSelectedServiceStore(null);
+    setSelectedFrom(null);
+    setRelocateLocationSearchQuery('');
+  };
+  const handleSwapFromTo = (overrideMode = null) => {
+    if (entryServiceMode !== 'Entry' && entryServiceMode !== 'Service') return;
+    const currentFrom = selectedFrom || null;
+    const modeToUse = overrideMode !== null ? overrideMode : serviceFlowMode;
+    if (entryServiceMode === 'Service' && modeToUse === 'sent') {
+      const currentServiceStore = selectedServiceStore || null;
+      setSelectedFrom(currentServiceStore);
+      setSelectedServiceStore(currentFrom);
+      setIsServiceSwapIconToggled(prev => !prev);
+    } else {
+      const currentTo = selectedTo || null;
+      setSelectedFrom(currentTo);
+      setSelectedTo(currentFrom);
+      setIsSwapIconToggled(prev => !prev);
+    }
+    setShowFromDropdown(false);
+    setShowToDropdown(false);
+    setShowServiceStoreDropdown(false);
+    setShowInchargeDropdown(false);
+  };
+  useEffect(() => {
+    if (entryServiceMode === 'Service') {
+      setIsServiceSwapIconToggled(false);
+    }
+  }, [entryServiceMode]);
+  useEffect(() => {
+    const fetchToolsItemNames = async () => {
+      try {
+        const response = await fetch(`${TOOLS_ITEM_NAME_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setToolsItemNameListData(Array.isArray(data) ? data : []);
+          const itemNameOpts = (Array.isArray(data) ? data : [])
+            .map(item => item?.item_name ?? item?.itemName)
+            .filter(Boolean);
+          setItemNameOptions(Array.from(new Set(itemNameOpts)));
+        }
+      } catch (error) {
+        console.error('Error fetching tools item names:', error);
+      }
+    };
+    fetchToolsItemNames();
+  }, []);
+  useEffect(() => {
+    const fetchToolsBrands = async () => {
+      try {
+        const response = await fetch(`${TOOLS_BRAND_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setToolsBrandFullData(Array.isArray(data) ? data : []);
+          const brandOpts = (Array.isArray(data) ? data : [])
+            .map(b => b?.tools_brand?.trim() ?? b?.toolsBrand?.trim())
+            .filter(b => b);
+          setBrandOptions(Array.from(new Set(brandOpts)));
+        }
+      } catch (error) {
+        console.error('Error fetching tools brands:', error);
+      }
+    };
+    fetchToolsBrands();
+  }, []);
+  useEffect(() => {
+    const fetchToolsItemIds = async () => {
+      try {
+        const response = await fetch(`${TOOLS_ITEM_ID_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setToolsItemIdFullData(Array.isArray(data) ? data : []);
+          const itemIdOpts = (Array.isArray(data) ? data : [])
+            .map(item => item?.item_id?.trim() ?? item?.itemId?.trim())
+            .filter(item => item)
+            .filter(item => !/^\d+$/.test(item));
+          setApiItemIdOptions(itemIdOpts);
+          setItemIdOptions(itemIdOpts);
+        }
+      } catch (error) {
+        console.error('Error fetching tools item IDs:', error);
+      }
+    };
+    fetchToolsItemIds();
+  }, []);
+  useEffect(() => {
+    const fetchStockManagement = async () => {
+      try {
+        const response = await fetch(`${TOOLS_STOCK_MANAGEMENT_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setStockManagementData(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        console.error('Error fetching stock management data:', error);
+      }
+    };
+    fetchStockManagement();
+  }, []);
+  useEffect(() => {
+    const fetchToolsTrackerManagement = async () => {
+      try {
+        const response = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setToolsTrackerManagementData(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        console.error('Error fetching tools tracker management data:', error);
+      }
+    };
+    fetchToolsTrackerManagement();
+  }, []);
+
+  // Fetch machine numbers (for resolving machine_number_id to display text)
+  useEffect(() => {
+    const fetchMachineNumbers = async () => {
+      try {
+        const response = await fetch(`${TOOLS_MACHINE_NUMBER_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setMachineNumbersList(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        console.error('Error fetching machine numbers:', error);
+      }
+    };
+    fetchMachineNumbers();
+  }, []);
+
+  // Fetch machine status data from the new API
+  useEffect(() => {
+    const fetchMachineStatus = async () => {
+      try {
+        const response = await fetch(`${TOOLS_MACHINE_STATUS_BASE_URL}/all`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setMachineStatusData(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        console.error('Error fetching machine status data:', error);
+      }
+    };
+    fetchMachineStatus();
+  }, []);
+  const formatDateTime = (timestamp) => {
+    if (!timestamp) return { date: '', time: '' };
+    try {
+      const date = new Date(timestamp);
+      const formattedDate = date.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+      const formattedTime = date.toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+      return { date: formattedDate, time: formattedTime };
+    } catch {
+      return { date: '', time: '' };
+    }
+  };
+  useEffect(() => {
+    if (fromOptions.length === 0 || inchargeOptions.length === 0 || toolsItemNameListData.length === 0) {
+      return;
+    }
+    const loadEditData = async () => {
+      try {
+        const editEntryId = localStorage.getItem('editingToolsTrackerEntryId');
+        const isCloneMode = localStorage.getItem('toolsTrackerCloneMode') === 'true';
+        const cloneItemIdsId = localStorage.getItem('toolsTrackerCloneItemIdsId') || '';
+        setCloneModeActive(isCloneMode);
+        setIsEditingTransferDetails(isCloneMode);
+        if (editEntryId) {
+          let editData = pendingEditPayloadRef.current;
+          if (!editData) {
+            try {
+              const storedEditEntry = localStorage.getItem('editingToolsTrackerEntry');
+              editData = storedEditEntry ? JSON.parse(storedEditEntry) : null;
+            } catch (parseError) {
+              console.error('Error parsing stored edit payload:', parseError);
+            }
+          }
+
+          if (!editData) {
+            const response = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/get/${editEntryId}`, {
+              method: 'GET',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' }
+            });
+            if (!response.ok) {
+              throw new Error('Failed to fetch entry data');
+            }
+            editData = await response.json();
+          }
+
+          pendingEditPayloadRef.current = null;
+          const entryType = editData.tools_entry_type || editData.toolsEntryType || 'entry';
+          const normalizedEntryType = String(entryType).toLowerCase();
+          if (isCloneMode) {
+            try {
+              let endpoint;
+              if (normalizedEntryType === 'service' || normalizedEntryType === 'service_return') {
+                endpoint = `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getServiceCount`;
+              } else if (normalizedEntryType === 'relocate') {
+                endpoint = `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getRelocationCount`;
+              } else {
+                endpoint = `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getEntryCount`;
+              }
+              const countResponse = await fetch(endpoint);
+              if (countResponse.ok) {
+                const countData = await countResponse.json();
+                setEntryNo(countData + 1);
+              }
+            } catch (enoError) {
+              console.error('Error fetching next entry number in clone mode:', enoError);
+            }
+          } else if (editData.eno) {
+            setEntryNo(editData.eno);
+          }
+          if (editData.created_date_time || editData.createdDateTime) {
+            const normalizedDate = normalizeDisplayDate(editData.created_date_time || editData.createdDateTime);
+            if (normalizedDate) {
+              setDate(normalizedDate);
+            }
+          }
+          if (normalizedEntryType === 'service' || normalizedEntryType === 'service_return') {
+            setEntryServiceMode('Service');
+            setServiceFlowMode(normalizedEntryType === 'service_return' ? 'return' : 'sent');
+          } else if (normalizedEntryType === 'relocate') {
+            setEntryServiceMode('Relocate');
+            setServiceFlowMode('sent');
+          } else {
+            setEntryServiceMode('Entry');
+            setServiceFlowMode('sent');
+          }
+          const resolveCloneFromIdFromApi = async (fallbackFromId) => {
+            if (!isCloneMode) return fallbackFromId;
+            const entryItems = editData.tools_tracker_item_name_table || editData.toolsTrackerItemNameTable || [];
+            const cloneTargetItem = (Array.isArray(entryItems) ? entryItems : []).find((it) =>
+              cloneItemIdsId && String(it.item_ids_id || it.itemIdsId || '') === String(cloneItemIdsId)
+            ) || (Array.isArray(entryItems) ? entryItems.find((it) => it.item_ids_id || it.itemIdsId) : null);
+            const targetItemIdsId = cloneTargetItem?.item_ids_id || cloneTargetItem?.itemIdsId || cloneItemIdsId || null;
+            if (!targetItemIdsId) return fallbackFromId;
+            try {
+              const allEntriesResponse = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getAll`, {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' }
+              });
+              if (!allEntriesResponse.ok) return fallbackFromId;
+              const allEntriesData = await allEntriesResponse.json();
+              const allEntries = Array.isArray(allEntriesData) ? allEntriesData : [];
+              let latestMovement = null;
+              const targetItemIdsIdStr = String(targetItemIdsId);
+              for (const entry of allEntries) {
+                const movementType = getEntryTypeNormalized(entry);
+                if (!isMovementEntryType(movementType)) continue;
+                const movementItem = findMatchingItemSetInEntry(entry, targetItemIdsIdStr, null, '');
+                if (!movementItem) continue;
+                const sortTime = getEntrySortTime(entry);
+                const movementId = Number(entry?.id || 0);
+                const latestId = Number(latestMovement?.entry?.id || 0);
+                const isMoreRecent = !latestMovement
+                  || sortTime > latestMovement.sortTime
+                  || (sortTime === latestMovement.sortTime && movementId > latestId);
+                if (isMoreRecent) {
+                  latestMovement = {
+                    entry,
+                    movementType,
+                    movementItem,
+                    sortTime
+                  };
+                }
+              }
+              if (!latestMovement) return fallbackFromId;
+              if (isRelocateEntryType(latestMovement.movementType)) {
+                const relocatedHomeLocationId = latestMovement.movementItem?.home_location_id || latestMovement.movementItem?.homeLocationId;
+                return relocatedHomeLocationId ? String(relocatedHomeLocationId) : fallbackFromId;
+              }
+              if (isServiceReturnEntryType(latestMovement.movementType)) {
+                const latestToProjectId = latestMovement.entry?.to_project_id || latestMovement.entry?.toProjectId;
+                return latestToProjectId ? String(latestToProjectId) : fallbackFromId;
+              }
+              if (isServiceEntryType(latestMovement.movementType)) {
+                const serviceStoreId = latestMovement.entry?.service_store_id || latestMovement.entry?.serviceStoreId;
+                return serviceStoreId ? String(serviceStoreId) : fallbackFromId;
+              }
+              const latestToProjectId = latestMovement.entry?.to_project_id || latestMovement.entry?.toProjectId;
+              return latestToProjectId ? String(latestToProjectId) : fallbackFromId;
+            } catch (resolveError) {
+              console.error('Error resolving clone from location from API:', resolveError);
+              return fallbackFromId;
+            }
+          };
+          const cloneFallbackFromId = editData.to_project_id || editData.toProjectId || '';
+          const resolvedCloneFromId = await resolveCloneFromIdFromApi(cloneFallbackFromId);
+          const loadItems = async () => {
+            const entryItems = editData.tools_tracker_item_name_table || editData.toolsTrackerItemNameTable || [];
+            const rawItems = entryItems.map((item, index) => {
+              const rawImages = isCloneMode ? [] : (item.tools_item_live_images || item.toolsItemLiveImages || []);
+              const processedImages = rawImages.map(img => {
+                if (img.tools_image || img.toolsImage) {
+                  const base64Data = img.tools_image || img.toolsImage;
+                  return `data:image/jpeg;base64,${base64Data}`;
+                }
+                if (img.tools_image_url || img.toolsImageUrl) {
+                  return img.tools_image_url || img.toolsImageUrl;
+                }
+                return null;
+              }).filter(Boolean);
+              const itemName = toolsItemNameListData.find(i => String(i?.id) === String(item?.item_name_id ?? item?.itemNameId))?.item_name ||
+                toolsItemNameListData.find(i => String(i?.id) === String(item?.item_name_id ?? item?.itemNameId))?.itemName || '';
+              const brand = toolsBrandFullData.find(b => String(b?.id) === String(item?.brand_id ?? item?.brandId))?.tools_brand ||
+                toolsBrandFullData.find(b => String(b?.id) === String(item?.brand_id ?? item?.brandId))?.toolsBrand || '';
+              const itemId = toolsItemIdFullData.find(i => String(i?.id) === String(item?.item_ids_id ?? item?.itemIdsId))?.item_id ||
+                toolsItemIdFullData.find(i => String(i?.id) === String(item?.item_ids_id ?? item?.itemIdsId))?.itemId || '';
+              return {
+                id: item.id || Date.now() + index,
+                timestamp: item.timestamp || new Date().toISOString().slice(0, 19),
+                item_name_id: item.item_name_id ? String(item.item_name_id) : null,
+                item_ids_id: item.item_ids_id ? String(item.item_ids_id) : null,
+                brand_id: item.brand_id ? String(item.brand_id) : null,
+                model: item.model || '',
+                machine_number: item.machine_number || item.machineNumber || '',
+                machine_number_id: item.machine_number_id || item.machineNumberId || '',
+                quantity: item.quantity || 0,
+                machine_status: isCloneMode ? 'Working' : (item.machine_status || item.machineStatus || 'Working'),
+                description: item.description || '',
+                tools_item_live_images: rawImages.map(img => ({
+                  tools_image: img.tools_image || img.toolsImage,
+                  tools_image_url: img.tools_image_url || img.toolsImageUrl
+                })).filter(img => img.tools_image || img.tools_image_url),
+                localImageUrls: processedImages,
+                itemName: itemName,
+                brand: brand,
+                itemId: itemId
+              };
+            });
+            if (isCloneMode) {
+              setItems(rawItems);
+              return;
+            }
+
+            const hasImagesInPayload = rawItems.every(
+              (baseItem) => Array.isArray(baseItem.tools_item_live_images) && baseItem.tools_item_live_images.length > 0
+            );
+            if (hasImagesInPayload) {
+              setItems(rawItems);
+              initialImageCountByItemIdRef.current = {};
+              rawItems.forEach((item) => {
+                initialImageCountByItemIdRef.current[String(item.id)] = (item.tools_item_live_images || []).length;
+              });
+              return;
+            }
+
+            const loadedItems = await Promise.all(rawItems.map(async (baseItem) => {
+              if (Array.isArray(baseItem.tools_item_live_images) && baseItem.tools_item_live_images.length > 0) {
+                return baseItem;
+              }
+              const itemTableId = baseItem.id;
+              if (!itemTableId) return baseItem;
+              try {
+                const res = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/items/${itemTableId}/images`, {
+                  method: 'GET',
+                  credentials: 'include',
+                  headers: { 'Content-Type': 'application/json' }
+                });
+                if (!res.ok) return baseItem;
+                const imgList = await res.json();
+                const arr = Array.isArray(imgList) ? imgList : [];
+                const urls = arr
+                  .map((img) => img?.tools_image_url ?? img?.toolsImageUrl ?? null)
+                  .filter(Boolean);
+                const toolsImages = arr.map(img => ({
+                  tools_image_url: img.tools_image_url ?? img.toolsImageUrl
+                })).filter(o => o.tools_image_url);
+                return {
+                  ...baseItem,
+                  localImageUrls: urls,
+                  tools_item_live_images: toolsImages.length > 0 ? toolsImages : baseItem.tools_item_live_images
+                };
+              } catch {
+                return baseItem;
+              }
+            }));
+            setItems(loadedItems);
+            initialImageCountByItemIdRef.current = {};
+            loadedItems.forEach((item) => {
+              initialImageCountByItemIdRef.current[String(item.id)] = (item.tools_item_live_images || []).length;
+            });
+          };
+          if (isCloneMode) {
+            initialImageCountByItemIdRef.current = {};
+          }
+          setIsEditMode(!isCloneMode);
+          setEditEntryId(isCloneMode ? null : editEntryId);
+          if (isCloneMode) {
+            setOriginalEditData(null);
+          } else {
+            setOriginalEditData({
+              from_project_id: editData.from_project_id || editData.fromProjectId,
+              to_project_id: editData.to_project_id || editData.toProjectId,
+              service_store_id: editData.service_store_id || editData.serviceStoreId,
+              project_incharge_id: editData.project_incharge_id || editData.projectInchargeId,
+              tools_entry_type: editData.tools_entry_type || editData.toolsEntryType,
+              created_date_time: normalizeDisplayDate(editData.created_date_time || editData.createdDateTime || ''),
+              items: (editData.tools_tracker_item_name_table || editData.toolsTrackerItemNameTable || []).map(it => ({
+                id: it.id,
+                item_name_id: it.item_name_id ? String(it.item_name_id) : null,
+                item_ids_id: it.item_ids_id ? String(it.item_ids_id) : null,
+                brand_id: it.brand_id ? String(it.brand_id) : null,
+                model: it.model || '',
+                machine_number: it.machine_number || it.machineNumber || '',
+                quantity: it.quantity || 0,
+                machine_status: it.machine_status || it.machineStatus || 'Working',
+                description: it.description || ''
+              }))
+            });
+          }
+          if (fromOptions.length > 0 && inchargeOptions.length > 0) {
+            const fromOption = fromOptions.find(opt => String(opt.id) === String(isCloneMode ? resolvedCloneFromId : (editData.from_project_id || editData.fromProjectId)));
+            if (fromOption) {
+              setSelectedFrom(fromOption);
+            } else if (isCloneMode) {
+              setSelectedFrom(null);
+            }
+            if (normalizedEntryType === 'service' || normalizedEntryType === 'service_return') {
+              if (isCloneMode) {
+                setSelectedServiceStore(null);
+                if (normalizedEntryType === 'service_return') {
+                  setSelectedTo(null);
+                }
+              } else {
+                const serviceStoreOption = serviceStoreOptions.find(opt => String(opt.id) === String(editData.service_store_id || editData.serviceStoreId));
+                if (serviceStoreOption) {
+                  setSelectedServiceStore(serviceStoreOption);
+                }
+                if (normalizedEntryType === 'service_return') {
+                  const toOption = toOptions.find(opt => String(opt.id) === String(editData.to_project_id || editData.toProjectId));
+                  if (toOption) {
+                    setSelectedTo(toOption);
+                  } else {
+                    setSelectedTo(null);
+                  }
+                } else {
+                  setSelectedTo(null);
+                }
+              }
+            } else if (normalizedEntryType === 'relocate') {
+              // For Relocate entries, set Relocate-specific fields
+              const entryItems = editData.tools_tracker_item_name_table || editData.toolsTrackerItemNameTable || [];
+              if (entryItems.length > 0 && toolsItemIdFullData.length > 0) {
+                const firstItem = entryItems[0];
+                const itemIdsId = firstItem.item_ids_id || firstItem.itemIdsId;
+                if (itemIdsId) {
+                  setSelectedRelocateItemId(String(itemIdsId));
+                  // Populate relocateItemDetails
+                  const itemIdObj = toolsItemIdFullData.find(i => String(i.id) === String(itemIdsId));
+                  if (itemIdObj) {
+                    const itemIdsIdStr = String(itemIdsId);
+                    const currentLocationInfo = getItemSetCurrentLocation(itemIdObj.id, null, '');
+                    const currentLocationId = currentLocationInfo?.locationId ? String(currentLocationInfo.locationId) : null;
+                    let locationOption = null;
+                    if (currentLocationId) {
+                      locationOption = toOptions.find(opt => String(opt.id) === currentLocationId);
+                    }
+                    const stockItem = stockManagementData.find(item => {
+                      const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+                      return String(itemIdsId) === itemIdsIdStr;
+                    });
+                    if (stockItem) {
+                      const itemNameId = stockItem.item_name_id || stockItem.itemNameId;
+                      const itemNameObj = toolsItemNameListData.find(i => String(i?.id) === String(itemNameId));
+                      const itemName = itemNameObj?.item_name || itemNameObj?.itemName || '';
+                      const purchaseStoreId = stockItem.purchase_store_id || stockItem.purchaseStoreId;
+                      const purchaseStore = purchaseStoreId
+                        ? vendorOptions.find(v => String(v.id) === String(purchaseStoreId))?.label || ''
+                        : '';
+                      const birthLocationId = stockItem.home_location_id || stockItem.homeLocationId;
+                      const birthLocation = birthLocationId
+                        ? toOptions.find(opt => String(opt.id) === String(birthLocationId))?.label || ''
+                        : '';
+                      const currentLocationLabel = locationOption?.label || '';
+                      const imageUrl = stockItem.file_url || stockItem.fileUrl || '';
+                      setRelocateItemDetails({
+                        itemName: itemName,
+                        birthLocation: birthLocation,
+                        currentLocation: currentLocationLabel,
+                        purchaseStore: purchaseStore,
+                        imageUrl: imageUrl
+                      });
+                    }
+                  }
+                }
+              }
+              // Current Location is from_project_id in Relocate
+              const currentLocationOption = toOptions.find(opt => String(opt.id) === String(editData.from_project_id || editData.fromProjectId));
+              if (currentLocationOption) {
+                setSelectedCurrentLocation(currentLocationOption);
+              }
+              // Relocate Location is home_location_id in Relocate
+              const relocateLocationOption = toOptions.find(opt => String(opt.id) === String(editData.home_location_id || editData.homeLocationId));
+              if (relocateLocationOption) {
+                setSelectedRelocateLocation(relocateLocationOption);
+              }
+            } else {
+              if (isCloneMode) {
+                setSelectedTo(null);
+              } else {
+                const toOption = toOptions.find(opt => String(opt.id) === String(editData.to_project_id || editData.toProjectId));
+                if (toOption) {
+                  setSelectedTo(toOption);
+                }
+              }
+            }
+            const inchargeOption = inchargeOptions.find(opt => String(opt.id) === String(editData.project_incharge_id || editData.projectInchargeId));
+            if (inchargeOption) {
+              setSelectedIncharge(inchargeOption);
+            }
+            setTimeout(() => {
+              loadItems();
+            }, 100);
+          } else {
+            const checkInterval = setInterval(() => {
+              if (fromOptions.length > 0 && inchargeOptions.length > 0) {
+                clearInterval(checkInterval);
+                const fromOption = fromOptions.find(opt => String(opt.id) === String(isCloneMode ? resolvedCloneFromId : (editData.from_project_id || editData.fromProjectId)));
+                if (fromOption) {
+                  setSelectedFrom(fromOption);
+                } else if (isCloneMode) {
+                  setSelectedFrom(null);
+                }
+                if (normalizedEntryType === 'service' || normalizedEntryType === 'service_return') {
+                  if (isCloneMode) {
+                    setSelectedServiceStore(null);
+                    if (normalizedEntryType === 'service_return') {
+                      setSelectedTo(null);
+                    }
+                  } else {
+                    const serviceStoreOption = serviceStoreOptions.find(opt => String(opt.id) === String(editData.service_store_id || editData.serviceStoreId));
+                    if (serviceStoreOption) {
+                      setSelectedServiceStore(serviceStoreOption);
+                    }
+                    if (normalizedEntryType === 'service_return') {
+                      const toOption = toOptions.find(opt => String(opt.id) === String(editData.to_project_id || editData.toProjectId));
+                      if (toOption) {
+                        setSelectedTo(toOption);
+                      } else {
+                        setSelectedTo(null);
+                      }
+                    } else {
+                      setSelectedTo(null);
+                    }
+                  }
+                } else if (normalizedEntryType === 'relocate') {
+                  // For Relocate entries, set Relocate-specific fields
+                  const entryItems = editData.tools_tracker_item_name_table || editData.toolsTrackerItemNameTable || [];
+                  if (entryItems.length > 0 && toolsItemIdFullData.length > 0) {
+                    const firstItem = entryItems[0];
+                    const itemIdsId = firstItem.item_ids_id || firstItem.itemIdsId;
+                    if (itemIdsId) {
+                      setSelectedRelocateItemId(String(itemIdsId));
+                      // Populate relocateItemDetails
+                      const itemIdObj = toolsItemIdFullData.find(i => String(i.id) === String(itemIdsId));
+                      if (itemIdObj) {
+                        const itemIdsIdStr = String(itemIdsId);
+                        const currentLocationInfo = getItemSetCurrentLocation(itemIdObj.id, null, '');
+                        const currentLocationId = currentLocationInfo?.locationId ? String(currentLocationInfo.locationId) : null;
+                        let locationOption = null;
+                        if (currentLocationId) {
+                          locationOption = toOptions.find(opt => String(opt.id) === currentLocationId);
+                        }
+                        const stockItem = stockManagementData.find(item => {
+                          const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+                          return String(itemIdsId) === itemIdsIdStr;
+                        });
+                        if (stockItem) {
+                          const itemNameId = stockItem.item_name_id || stockItem.itemNameId;
+                          const itemNameObj = toolsItemNameListData.find(i => String(i?.id) === String(itemNameId));
+                          const itemName = itemNameObj?.item_name || itemNameObj?.itemName || '';
+                          const purchaseStoreId = stockItem.purchase_store_id || stockItem.purchaseStoreId;
+                          const purchaseStore = purchaseStoreId
+                            ? vendorOptions.find(v => String(v.id) === String(purchaseStoreId))?.label || ''
+                            : '';
+                          const birthLocationId = stockItem.home_location_id || stockItem.homeLocationId;
+                          const birthLocation = birthLocationId
+                            ? toOptions.find(opt => String(opt.id) === String(birthLocationId))?.label || ''
+                            : '';
+                          const currentLocationLabel = locationOption?.label || '';
+                          const imageUrl = stockItem.file_url || stockItem.fileUrl || '';
+                          setRelocateItemDetails({
+                            itemName: itemName,
+                            birthLocation: birthLocation,
+                            currentLocation: currentLocationLabel,
+                            purchaseStore: purchaseStore,
+                            imageUrl: imageUrl
+                          });
+                        }
+                      }
+                    }
+                  }
+                  // Current Location is from_project_id in Relocate
+                  const currentLocationOption = toOptions.find(opt => String(opt.id) === String(editData.from_project_id || editData.fromProjectId));
+                  if (currentLocationOption) {
+                    setSelectedCurrentLocation(currentLocationOption);
+                  }
+                  // Relocate Location is home_location_id in Relocate
+                  const relocateLocationOption = toOptions.find(opt => String(opt.id) === String(editData.home_location_id || editData.homeLocationId));
+                  if (relocateLocationOption) {
+                    setSelectedRelocateLocation(relocateLocationOption);
+                  }
+                } else {
+                  if (isCloneMode) {
+                    setSelectedTo(null);
+                  } else {
+                    const toOption = toOptions.find(opt => String(opt.id) === String(editData.to_project_id || editData.toProjectId));
+                    if (toOption) {
+                      setSelectedTo(toOption);
+                    }
+                  }
+                }
+                const inchargeOption = inchargeOptions.find(opt => String(opt.id) === String(editData.project_incharge_id || editData.projectInchargeId));
+                if (inchargeOption) {
+                  setSelectedIncharge(inchargeOption);
+                }
+                loadItems();
+              }
+            }, 100);
+            setTimeout(() => clearInterval(checkInterval), 5000);
+          }
+          localStorage.removeItem('editingToolsTrackerEntryId');
+          localStorage.removeItem('editingToolsTrackerEntry');
+          localStorage.removeItem('toolsTrackerCloneMode');
+          localStorage.removeItem('toolsTrackerCloneItemIdsId');
+          localStorage.removeItem('toolsTrackerCloneBrandId');
+          localStorage.removeItem('toolsTrackerCloneMachineNumber');
+        } else {
+          setCloneModeActive(false);
+        }
+      } catch (error) {
+        console.error('Error loading edit data:', error);
+        localStorage.removeItem('editingToolsTrackerEntryId');
+        localStorage.removeItem('editingToolsTrackerEntry');
+        localStorage.removeItem('toolsTrackerCloneMode');
+        localStorage.removeItem('toolsTrackerCloneItemIdsId');
+        localStorage.removeItem('toolsTrackerCloneBrandId');
+        localStorage.removeItem('toolsTrackerCloneMachineNumber');
+        setCloneModeActive(false);
+      }
+    };
+    loadEditData();
+  }, [fromOptions, toOptions, serviceStoreOptions, inchargeOptions, toolsItemNameListData, toolsBrandFullData, toolsItemIdFullData, editLoadVersion]);
+  const handleAddItem = () => {
+    if (areFieldsFilled) {
+      setShowAddItemsModal(true);
+    }
+  };
+  const handleCloseAddItemsModal = () => {
+    setShowAddItemsModal(false);
+    setEditingItem(null);
+    setAddItemFormData({
+      itemName: '',
+      itemNameId: null,
+      brand: '',
+      brandId: null,
+      itemId: '',
+      itemIdDbId: null,
+      model: '',
+      quantity: '',
+      machineNumber: ''
+    });
+    setSelectedItemNameQuantity(0);
+    setSelectedItemMachineNumber('');
+  };
+
+  // Show available quantity at the selected FROM location for quantity-only items (no itemId).
+  useEffect(() => {
+    if (!showAddItemsModal) return;
+    if (!selectedFrom?.id) {
+      setSelectedItemNameQuantity(0);
+      return;
+    }
+    if (!addItemFormData.itemNameId) {
+      setSelectedItemNameQuantity(0);
+      return;
+    }
+    if (addItemFormData.itemIdDbId) {
+      setSelectedItemNameQuantity(0);
+      return;
+    }
+    const availableQty = getAvailableQuantityAtLocation(
+      addItemFormData.itemNameId,
+      addItemFormData.brandId,
+      String(selectedFrom.id)
+    );
+    setSelectedItemNameQuantity(availableQty);
+  }, [
+    showAddItemsModal,
+    selectedFrom,
+    addItemFormData.itemNameId,
+    addItemFormData.brandId,
+    addItemFormData.itemIdDbId,
+    stockManagementData,
+    toolsTrackerManagementData
+  ]);
+  const handleCloseUploadModal = () => {
+    setShowUploadModal(false);
+    setUploadFiles([]);
+    setIsUploading(false);
+    setUploadStatus('');
+    setUploadDescription('');
+  };
+  const validateDraftItemBeforeAdd = (draft) => {
+    if (!selectedFrom || !draft?.itemNameId) return true;
+
+    // Prevent duplicate item set: same item_ids_id + brand_id + machine_number already in cart
+    if (draft.itemIdDbId) {
+      const isDuplicate = items.some(
+        (it) =>
+          String(it.item_ids_id || '') === String(draft.itemIdDbId || '') &&
+          String(it.brand_id || '') === String(draft.brandId || '') &&
+          String((it.machine_number || '').trim()) === String((draft.machineNumber || '').trim())
+      );
+      if (isDuplicate) {
+        alert('This item set is already added to the transfer.');
+        return false;
+      }
+    } else {
+      // For quantity-based items: prevent duplicate item_name_id + brand_id
+      const isDuplicate = items.some(
+        (it) =>
+          String(it.item_name_id || '') === String(draft.itemNameId || '') &&
+          String(it.brand_id || '') === String(draft.brandId || '')
+      );
+      if (isDuplicate) {
+        alert('This item is already added to the transfer.');
+        return false;
+      }
+    }
+
+    if (draft.itemIdDbId) {
+      const itemSetValidation = validateItemSetAvailability(
+        draft.itemIdDbId,
+        draft.brandId,
+        draft.machineNumber,
+        draft.itemNameId,
+        draft.itemName,
+        selectedFrom.id
+      );
+      if (!itemSetValidation.isValid) {
+        alert(itemSetValidation.errorMessage);
+        return false;
+      }
+      return true;
+    }
+
+    const validation = validateItemLocation(
+      draft.itemNameId,
+      draft.itemName,
+      draft.brandId,
+      draft.quantity,
+      selectedFrom.id
+    );
+    if (!validation.isValid) {
+      alert(validation.errorMessage);
+      return false;
+    }
+    return true;
+  };
+  const handleAddItemSubmit = () => {
+    if (addItemFormData.itemName) {
+      // Quantity-only items must have a valid quantity
+      if (!addItemFormData.itemIdDbId) {
+        const q = parseInt(String(addItemFormData.quantity || '').trim(), 10);
+        if (!Number.isFinite(q) || q <= 0) {
+          alert('Please enter a valid quantity.');
+          return;
+        }
+      }
+      if (editingItem) {
+        const newItemNameId = addItemFormData.itemNameId ? String(addItemFormData.itemNameId) : editingItem.item_name_id;
+        const newItemIdDbId = addItemFormData.itemIdDbId ? String(addItemFormData.itemIdDbId) : editingItem.item_ids_id;
+        const newBrandId = addItemFormData.brandId ? String(addItemFormData.brandId) : editingItem.brand_id;
+        const newMachineNumber = addItemFormData.machineNumber || editingItem.machine_number || '';
+
+        // If itemId is selected, only check the full set (itemIdsId + brandId + machineNumber)
+        // Don't check itemNameId separately when itemId is selected
+        if (selectedFrom && newItemIdDbId) {
+          const isDuplicateSet = items.some(
+            (it) =>
+              it.id !== editingItem.id &&
+              String(it.item_ids_id || '') === String(newItemIdDbId || '') &&
+              String(it.brand_id || '') === String(newBrandId || '') &&
+              String((it.machine_number || '').trim()) === String((newMachineNumber || '').trim())
+          );
+          if (isDuplicateSet) {
+            alert('This item set is already added to the transfer.');
+            return;
+          }
+          const itemSetValidation = validateItemSetAvailability(
+            newItemIdDbId,
+            newBrandId,
+            newMachineNumber,
+            newItemNameId,
+            addItemFormData.itemName,
+            selectedFrom.id
+          );
+
+          if (!itemSetValidation.isValid) {
+            alert(itemSetValidation.errorMessage);
+            return;
+          }
+        } else if (selectedFrom && newItemNameId) {
+          // Only check itemNameId if itemId is NOT selected (for quantity-based transfers)
+          const newBrandIdForQty = addItemFormData.brandId ? String(addItemFormData.brandId) : editingItem.brand_id;
+          const isDuplicateQty = items.some(
+            (it) =>
+              it.id !== editingItem.id &&
+              String(it.item_name_id || '') === String(newItemNameId || '') &&
+              String(it.brand_id || '') === String(newBrandIdForQty || '')
+          );
+          if (isDuplicateQty) {
+            alert('This item is already added to the transfer.');
+            return;
+          }
+          const newQuantity = addItemFormData.quantity ? String(addItemFormData.quantity) : String(editingItem.quantity || 0);
+          const validation = validateItemLocation(
+            newItemNameId,
+            addItemFormData.itemName,
+            newBrandIdForQty,
+            newQuantity,
+            selectedFrom.id
+          );
+
+          if (!validation.isValid) {
+            alert(validation.errorMessage);
+            return;
+          }
+        }
+
+        const updatedItem = {
+          ...editingItem,
+          item_name_id: newItemNameId,
+          item_ids_id: addItemFormData.itemIdDbId ? String(addItemFormData.itemIdDbId) : editingItem.item_ids_id,
+          brand_id: addItemFormData.brandId ? String(addItemFormData.brandId) : editingItem.brand_id,
+          model: addItemFormData.model ?? editingItem.model ?? '',
+          machine_number: addItemFormData.machineNumber || '',
+          quantity: addItemFormData.quantity ? parseInt(addItemFormData.quantity, 10) : editingItem.quantity || 0,
+          itemName: addItemFormData.itemName,
+          brand: addItemFormData.brand,
+          itemId: addItemFormData.itemId
+        };
+        setItems(prev => prev.map(item =>
+          item.id === editingItem.id ? updatedItem : item
+        ));
+        setEditingItem(null);
+        handleCloseAddItemsModal();
+      } else {
+        const isValidToAdd = validateDraftItemBeforeAdd({
+          itemName: addItemFormData.itemName,
+          itemNameId: addItemFormData.itemNameId,
+          brandId: addItemFormData.brandId ? String(addItemFormData.brandId) : null,
+          itemIdDbId: addItemFormData.itemIdDbId ? String(addItemFormData.itemIdDbId) : null,
+          machineNumber: addItemFormData.machineNumber || '',
+          quantity: addItemFormData.quantity
+        });
+        if (!isValidToAdd) {
+          return;
+        }
+        setUploadStatus('');
+        setShowUploadModal(true);
+      }
+    }
+  };
+  // Begins pending upload before fetch; caller MUST call endPendingFileUpload() after applying returned URLs to state
+  // (otherwise waitForPendingFileUploads() resolves before React has server URLs in items — save would send blob: URLs).
+  const uploadFilesToBackend = async (files, { folder, fileNamePrefix } = {}) => {
+    beginPendingFileUpload();
+    try {
+      const formData = new FormData();
+      files.forEach((f) => formData.append('files', f));
+      formData.append('folder', folder || 'FileUpload / tools_item_live_images');
+      if (fileNamePrefix) formData.append('fileName', fileNamePrefix);
+
+      const res = await fetch(`${FILE_UPLOAD_BASE_URL}/upload`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `Upload failed: ${res.status} ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      const urls = Array.isArray(data?.urls) ? data.urls : [];
+      return urls;
+    } catch (error) {
+      endPendingFileUpload();
+      throw error;
+    }
+  };
+
+  const buildUploadFileNamePrefix = ({ itemName, itemId, quantity } = {}) => {
+    const safePart = (value) =>
+      String(value ?? '')
+        .trim()
+        .replace(/\s+/g, '_')
+        .replace(/[^a-zA-Z0-9_-]/g, '')
+        .slice(0, 80);
+
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    // dd-mm-yyyy_hh:mm:ss (12-hour time)
+    const hh12 = (() => {
+      const h = now.getHours() % 12;
+      return h === 0 ? 12 : h;
+    })();
+    const ts =
+      `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}_` +
+      `${pad(hh12)}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+    const namePart = safePart(itemName) || 'item';
+    const idPart = safePart(itemId) || safePart(quantity) || 'qty';
+    return `${namePart}_${idPart}_${ts}`;
+  };
+
+  const replaceUrlInItemImages = (itemUniqueId, oldUrl, newUrl) => {
+    if (!itemUniqueId) return;
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== itemUniqueId) return item;
+        const localImageUrls = (item.localImageUrls || []).map((u) => (u === oldUrl ? newUrl : u));
+        const tools_item_live_images = (item.tools_item_live_images || []).map((img) => {
+          const existingUrl = img?.tools_image_url ?? img?.toolsImageUrl ?? '';
+          if (existingUrl && existingUrl === oldUrl) return { ...img, tools_image_url: newUrl, toolsImageUrl: newUrl };
+          return img;
+        });
+        return { ...item, localImageUrls, tools_item_live_images };
+      })
+    );
+  };
+
+  const handleFileSelect = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    setIsUploading(true);
+    const fileEntries = files.map((file) => {
+      const fileId = Date.now() + Math.random();
+      const localPreviewUrl = URL.createObjectURL(file);
+      return {
+        id: fileId,
+        file,
+        name: file.name,
+        size: file.size,
+        progress: 10,
+        localUrl: localPreviewUrl,
+        uploadedUrl: null
+      };
+    });
+    setUploadFiles((prev) => [...prev, ...fileEntries]);
+
+    try {
+      // one request for the entire selection (backend supports multiple)
+      const urls = await uploadFilesToBackend(files, {
+        folder: 'FileUpload / Tools_Tracker_Images',
+        fileNamePrefix: buildUploadFileNamePrefix({
+          itemName: addItemFormData?.itemName,
+          itemId: addItemFormData?.itemId,
+          quantity: addItemFormData?.quantity
+        })
+      });
+
+      flushSync(() => {
+        setUploadFiles((prev) =>
+          prev.map((f) => {
+            const idx = fileEntries.findIndex((x) => x.id === f.id);
+            if (idx === -1) return f;
+            const uploadedUrl = urls[idx] || null;
+            return { ...f, progress: uploadedUrl ? 100 : 0, uploadedUrl };
+          })
+        );
+      });
+      endPendingFileUpload();
+    } catch (error) {
+      console.error('Error uploading file(s):', error);
+      // remove the just-added files on failure
+      setUploadFiles((prev) => prev.filter((f) => !fileEntries.some((x) => x.id === f.id)));
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setIsUploading(false);
+      e.target.value = '';
+    }
+  };
+  const normalizeMachineNumberValue = (value) => {
+    if (value === null || value === undefined) return '';
+    return String(value).trim();
+  };
+  const getMachineNumberCandidates = (machineNumber, machineNumberId) => {
+    const candidates = new Set();
+    const addCandidate = (value) => {
+      const normalized = normalizeMachineNumberValue(value);
+      if (normalized) candidates.add(normalized);
+    };
+
+    addCandidate(machineNumber);
+    addCandidate(machineNumberId);
+
+    const machineNumberNormalized = normalizeMachineNumberValue(machineNumber);
+    const machineNumberIdNormalized = normalizeMachineNumberValue(machineNumberId);
+
+    if (machineNumberNormalized) {
+      const byId = machineNumbersList.find((m) => String(m?.id ?? m?._id) === machineNumberNormalized);
+      if (byId) {
+        addCandidate(byId?.machine_number ?? byId?.machineNumber);
+        addCandidate(byId?.id ?? byId?._id);
+      }
+      const byNumber = machineNumbersList.find(
+        (m) => normalizeMachineNumberValue(m?.machine_number ?? m?.machineNumber) === machineNumberNormalized
+      );
+      if (byNumber) {
+        addCandidate(byNumber?.machine_number ?? byNumber?.machineNumber);
+        addCandidate(byNumber?.id ?? byNumber?._id);
+      }
+    }
+
+    if (machineNumberIdNormalized) {
+      const byId = machineNumbersList.find((m) => String(m?.id ?? m?._id) === machineNumberIdNormalized);
+      if (byId) {
+        addCandidate(byId?.machine_number ?? byId?.machineNumber);
+        addCandidate(byId?.id ?? byId?._id);
+      }
+    }
+
+    return candidates;
+  };
+  const isMachineNumberMatch = (sourceMachineNumber, sourceMachineNumberId, targetMachineNumber) => {
+    const targetNormalized = normalizeMachineNumberValue(targetMachineNumber);
+    if (!targetNormalized) return true;
+    const sourceCandidates = getMachineNumberCandidates(sourceMachineNumber, sourceMachineNumberId);
+    return sourceCandidates.has(targetNormalized);
+  };
+  const getLocationLabelById = (locationId) => {
+    const locationIdStr = String(locationId);
+    const projectOption =
+      toOptions.find(opt => String(opt.id) === locationIdStr) ||
+      fromOptions.find(opt => String(opt.id) === locationIdStr);
+    if (projectOption) return projectOption?.label || projectOption?.name || '';
+
+    const vendorOption = vendorOptions.find(opt => String(opt.id) === locationIdStr);
+    if (vendorOption) return vendorOption?.label || vendorOption?.name || '';
+
+    return '';
+  };
+  const getItemIdLabelById = (itemIdsId) => {
+    if (itemIdsId === null || itemIdsId === undefined || itemIdsId === '') return '';
+    const itemIdsIdStr = String(itemIdsId);
+    const itemIdObj = toolsItemIdFullData.find(item => String(item?.id) === itemIdsIdStr);
+    return itemIdObj?.item_id || itemIdObj?.itemId || '';
+  };
+  const getBrandLabelById = (brandId) => {
+    if (brandId === null || brandId === undefined || brandId === '') return '';
+    const brandIdStr = String(brandId);
+    const brandObj = toolsBrandFullData.find(brand => String(brand?.id) === brandIdStr);
+    return brandObj?.tools_brand || brandObj?.toolsBrand || '';
+  };
+  const getItemNameLabelById = (itemNameId) => {
+    if (itemNameId === null || itemNameId === undefined || itemNameId === '') return '';
+    const itemNameIdStr = String(itemNameId);
+    const itemNameObj = toolsItemNameListData.find(item => String(item?.id) === itemNameIdStr);
+    return itemNameObj?.item_name || itemNameObj?.itemName || '';
+  };
+  const getEntryTypeNormalized = (entry) => {
+    return String(entry?.tools_entry_type || entry?.toolsEntryType || '').toLowerCase();
+  };
+  const isRelocateEntryType = (entryType) => {
+    return entryType === 'relocate' || entryType === 'relocation';
+  };
+  const isServiceEntryType = (entryType) => {
+    return entryType === 'service';
+  };
+  const isServiceReturnEntryType = (entryType) => {
+    return entryType === 'service_return';
+  };
+  const isServiceMovementEntryType = (entryType) => {
+    return isServiceEntryType(entryType) || isServiceReturnEntryType(entryType);
+  };
+  const isMovementEntryType = (entryType) => {
+    return entryType === 'entry' || isRelocateEntryType(entryType) || isServiceMovementEntryType(entryType);
+  };
+  const getEntrySortTime = (entry) => {
+    const rawDate = entry?.created_date_time || entry?.createdDateTime || entry?.timestamp || '';
+    const rawString = String(rawDate || '').trim();
+
+    // Handle dd/MM/yyyy with optional time, which Date.parse may not parse reliably.
+    const ddMmYyyyMatch = rawString.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+    if (ddMmYyyyMatch) {
+      const day = Number(ddMmYyyyMatch[1]);
+      const month = Number(ddMmYyyyMatch[2]) - 1;
+      const year = Number(ddMmYyyyMatch[3]);
+      const hour = Number(ddMmYyyyMatch[4] || 0);
+      const minute = Number(ddMmYyyyMatch[5] || 0);
+      const second = Number(ddMmYyyyMatch[6] || 0);
+      const parsedDdMm = new Date(year, month, day, hour, minute, second).getTime();
+      if (!Number.isNaN(parsedDdMm)) return parsedDdMm;
+    }
+
+    const parsed = Date.parse(rawDate);
+    if (!Number.isNaN(parsed)) return parsed;
+    const numeric = Number(rawDate);
+    if (Number.isFinite(numeric)) return numeric;
+
+    // Fallback to id when date fields are unusable.
+    const entryId = Number(entry?.id);
+    return Number.isFinite(entryId) ? entryId : 0;
+  };
+  const findMatchingItemSetInEntry = (entry, itemIdsIdStr, brandIdStr, machineNumberStr) => {
+    const entryItems = entry?.tools_tracker_item_name_table || entry?.toolsTrackerItemNameTable || [];
+    return entryItems.find(entryItem => {
+      const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+      const entryBrandId = entryItem.brand_id || entryItem.brandId;
+      const entryMachineNumber = entryItem.machine_number || entryItem.machineNumber || '';
+      const entryMachineNumberId = entryItem.machine_number_id || entryItem.machineNumberId;
+
+      const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === itemIdsIdStr;
+      const brandMatch = !brandIdStr || (entryBrandId && String(entryBrandId) === brandIdStr);
+      const machineMatch = isMachineNumberMatch(entryMachineNumber, entryMachineNumberId, machineNumberStr);
+
+      return itemIdsMatch && brandMatch && machineMatch;
+    }) || null;
+  };
+  const getLatestItemSetMovement = (itemIdsIdStr, brandIdStr, machineNumberStr) => {
+    let latestMovement = null;
+
+    for (const entry of toolsTrackerManagementData) {
+      const entryType = getEntryTypeNormalized(entry);
+      if (!isMovementEntryType(entryType)) continue;
+
+      const matchingEntryItem = findMatchingItemSetInEntry(entry, itemIdsIdStr, brandIdStr, machineNumberStr);
+      if (!matchingEntryItem) continue;
+
+      const entrySortTime = getEntrySortTime(entry);
+      const entryId = Number(entry?.id || 0);
+      const latestId = Number(latestMovement?.entry?.id || 0);
+      const isMoreRecent = !latestMovement
+        || entrySortTime > latestMovement.entrySortTime
+        || (entrySortTime === latestMovement.entrySortTime && entryId > latestId);
+      if (isMoreRecent) {
+        latestMovement = {
+          entry,
+          entryType,
+          matchingEntryItem,
+          entrySortTime
+        };
+      }
+    }
+
+    return latestMovement;
+  };
+  const getLastEntryProjectInchargeForItemSet = (itemIdsId, brandId, machineNumber) => {
+    if (!itemIdsId) return null;
+    const movement = getLatestItemSetMovement(
+      String(itemIdsId),
+      brandId != null && brandId !== '' ? String(brandId) : '',
+      String(machineNumber ?? '').trim()
+    );
+    const entry = movement?.entry;
+    if (!entry) return null;
+    const inchargeId = entry.project_incharge_id ?? entry.projectInchargeId;
+    if (!inchargeId) return null;
+    const opt = inchargeOptions.find(i => String(i?.id) === String(inchargeId));
+    return opt?.label ?? null;
+  };
+  const getLastEntryDateAndInchargeForItemSet = (itemIdsId, brandId, machineNumber) => {
+    if (!itemIdsId) return { dateTime: null, inchargeName: null };
+    const movement = getLatestItemSetMovement(
+      String(itemIdsId),
+      brandId != null && brandId !== '' ? String(brandId) : '',
+      String(machineNumber ?? '').trim()
+    );
+    const entry = movement?.entry;
+    if (!entry) return { dateTime: null, inchargeName: null };
+    const ts = entry.created_date_time ?? entry.createdDateTime ?? entry.timestamp ?? '';
+    const inchargeId = entry.project_incharge_id ?? entry.projectInchargeId;
+    const inchargeName = inchargeId
+      ? (inchargeOptions.find(i => String(i?.id) === String(inchargeId))?.label ?? null)
+      : null;
+    const { date, time } = formatDateTime(ts);
+    const dateTime = date && time ? `${date} • ${time}` : null;
+    return { dateTime, inchargeName };
+  };
+  const getLatestItemSetMachineStatus = (itemIdsId, brandId, machineNumber, fallbackStatus = 'Working') => {
+    if (!itemIdsId) return String(fallbackStatus || 'Working').trim();
+    const movement = getLatestItemSetMovement(
+      String(itemIdsId),
+      brandId != null && brandId !== '' ? String(brandId) : '',
+      String(machineNumber ?? '').trim()
+    );
+    const movementStatus = movement?.matchingEntryItem?.machine_status ?? movement?.matchingEntryItem?.machineStatus;
+    if (String(movementStatus || '').trim()) {
+      return String(movementStatus).trim();
+    }
+    return String(fallbackStatus || 'Working').trim();
+  };
+  // Helper function to get current location of an item (quantity-based: itemNameId + brandId)
+  const getItemCurrentLocation = (itemNameId, brandId) => {
+    if (!itemNameId) return null;
+
+    const itemNameIdStr = String(itemNameId);
+    const brandIdStr = brandId ? String(brandId) : null;
+    let currentLocationId = null;
+    let locationType = null; // 'project' or 'home'
+
+    // First, check in tools_tracker_management entries (transfer history)
+    const matchesItem = (entryItem) => {
+      const entryItemNameId = entryItem.item_name_id || entryItem.itemNameId;
+      const entryBrandId = entryItem.brand_id || entryItem.brandId;
+      const itemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+      if (itemIdsId) return false; // Skip item-set items
+      const itemNameMatch = entryItemNameId && String(entryItemNameId) === itemNameIdStr;
+      const brandMatch = !brandIdStr || (entryBrandId && String(entryBrandId) === brandIdStr);
+      return itemNameMatch && brandMatch;
+    };
+
+    let mostRecentEntry = null;
+    let mostRecentDate = null;
+    for (const entry of toolsTrackerManagementData) {
+      const entryType = entry.tools_entry_type || entry.toolsEntryType || '';
+      if (entryType.toLowerCase() !== 'entry') continue;
+      const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
+      const hasItem = entryItems.some(matchesItem);
+      if (hasItem) {
+        const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
+        if (!mostRecentDate || entryDate > mostRecentDate) {
+          mostRecentDate = entryDate;
+          mostRecentEntry = entry;
+        }
+      }
+    }
+
+    if (mostRecentEntry) {
+      const entryToProjectId = mostRecentEntry.to_project_id || mostRecentEntry.toProjectId;
+      if (entryToProjectId) {
+        currentLocationId = String(entryToProjectId);
+        locationType = 'project';
+        return { locationId: currentLocationId, locationType };
+      }
+    }
+
+    const stockItem = stockManagementData.find(stock => {
+      const stockItemNameId = stock.item_name_id || stock.itemNameId;
+      const stockBrandId = stock.brand_name_id || stock.brandNameId;
+      const noItemIdsId = !stock.item_ids_id && !stock.itemIdsId;
+      const itemNameMatch = stockItemNameId && String(stockItemNameId) === itemNameIdStr;
+      const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
+      return itemNameMatch && brandMatch && noItemIdsId;
+    });
+
+    if (stockItem) {
+      const homeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
+      if (homeLocationId) {
+        currentLocationId = String(homeLocationId);
+        locationType = 'home';
+        return { locationId: currentLocationId, locationType };
+      }
+    }
+
+    return null;
+  };
+
+  // Helper function to check if a specific item set (itemIdsId + brandId + machineNumber) is available at a location
+  const isItemSetAvailableAtLocation = (itemIdsId, brandId, machineNumber, locationId) => {
+    if (!itemIdsId || !locationId) return false;
+
+    const itemIdsIdStr = String(itemIdsId);
+    const brandIdStr = brandId ? String(brandId) : null;
+    const machineNumberStr = machineNumber ? String(machineNumber).trim() : '';
+    const locationIdStr = String(locationId);
+
+    const latestMovement = getLatestItemSetMovement(itemIdsIdStr, brandIdStr, machineNumberStr);
+    if (latestMovement) {
+      if (isRelocateEntryType(latestMovement.entryType)) {
+        const relocatedHomeLocationId = latestMovement.matchingEntryItem?.home_location_id || latestMovement.matchingEntryItem?.homeLocationId;
+        return relocatedHomeLocationId && String(relocatedHomeLocationId) === locationIdStr;
+      }
+
+      if (isServiceReturnEntryType(latestMovement.entryType)) {
+        const returnedProjectId = latestMovement.entry?.to_project_id || latestMovement.entry?.toProjectId;
+        if (returnedProjectId) {
+          return String(returnedProjectId) === locationIdStr;
+        }
+      }
+
+      if (isServiceEntryType(latestMovement.entryType)) {
+        const serviceStoreId = latestMovement.entry?.service_store_id || latestMovement.entry?.serviceStoreId;
+        return serviceStoreId && String(serviceStoreId) === locationIdStr;
+      }
+
+      const entryToProjectId = latestMovement.entry?.to_project_id || latestMovement.entry?.toProjectId;
+      if (entryToProjectId) {
+        return String(entryToProjectId) === locationIdStr;
+      }
+
+      const movementHomeLocationId = latestMovement.matchingEntryItem?.home_location_id || latestMovement.matchingEntryItem?.homeLocationId;
+      if (movementHomeLocationId) {
+        return String(movementHomeLocationId) === locationIdStr;
+      }
+    }
+
+    // Fallback to stock management when no movement entry is found
+    const stockItem = stockManagementData.find(stock => {
+      const stockItemIdsId = stock.item_ids_id || stock.itemIdsId;
+      const stockBrandId = stock.brand_name_id || stock.brandNameId;
+      const stockMachineNumber = stock.machine_number || stock.machineNumber || '';
+      const stockMachineNumberId = stock.machine_number_id || stock.machineNumberId;
+
+      const itemIdsMatch = stockItemIdsId && String(stockItemIdsId) === itemIdsIdStr;
+      const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
+      const machineMatch = isMachineNumberMatch(stockMachineNumber, stockMachineNumberId, machineNumberStr);
+
+      return itemIdsMatch && brandMatch && machineMatch;
+    });
+
+    if (!stockItem) return false;
+    const homeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
+    return !!homeLocationId && String(homeLocationId) === locationIdStr;
+  };
+
+  // Helper function to get current location of an item set (itemIdsId + brandId + machineNumber)
+  const getItemSetCurrentLocation = (itemIdsId, brandId, machineNumber) => {
+    if (!itemIdsId) return null;
+
+    const itemIdsIdStr = String(itemIdsId);
+    const brandIdStr = brandId ? String(brandId) : null;
+    const machineNumberStr = machineNumber ? String(machineNumber).trim() : '';
+    let currentLocationId = null;
+    let locationType = null; // 'project', 'home', or 'service'
+
+    // First, check in tools_tracker_management entries (entry + relocate history)
+    const latestMovement = getLatestItemSetMovement(itemIdsIdStr, brandIdStr, machineNumberStr);
+    if (latestMovement) {
+      if (isRelocateEntryType(latestMovement.entryType)) {
+        const relocatedHomeLocationId = latestMovement.matchingEntryItem?.home_location_id || latestMovement.matchingEntryItem?.homeLocationId;
+        if (relocatedHomeLocationId) {
+          currentLocationId = String(relocatedHomeLocationId);
+          locationType = 'home';
+          return { locationId: currentLocationId, locationType };
+        }
+      }
+
+      if (isServiceReturnEntryType(latestMovement.entryType)) {
+        const returnedProjectId = latestMovement.entry?.to_project_id || latestMovement.entry?.toProjectId;
+        if (returnedProjectId) {
+          currentLocationId = String(returnedProjectId);
+          locationType = 'project';
+          return { locationId: currentLocationId, locationType };
+        }
+      }
+
+      if (isServiceEntryType(latestMovement.entryType)) {
+        const serviceStoreId = latestMovement.entry?.service_store_id || latestMovement.entry?.serviceStoreId;
+        if (serviceStoreId) {
+          currentLocationId = String(serviceStoreId);
+          locationType = 'service';
+          return { locationId: currentLocationId, locationType };
+        }
+      }
+
+      const entryToProjectId = latestMovement.entry?.to_project_id || latestMovement.entry?.toProjectId;
+      if (entryToProjectId) {
+        currentLocationId = String(entryToProjectId);
+        locationType = 'project';
+        return { locationId: currentLocationId, locationType };
+      }
+
+      const movementHomeLocationId = latestMovement.matchingEntryItem?.home_location_id || latestMovement.matchingEntryItem?.homeLocationId;
+      if (movementHomeLocationId) {
+        currentLocationId = String(movementHomeLocationId);
+        locationType = 'home';
+        return { locationId: currentLocationId, locationType };
+      }
+    }
+
+    // If no toProjectId found, check home_location_id from stock management
+    const stockItem = stockManagementData.find(stock => {
+      const stockItemIdsId = stock.item_ids_id || stock.itemIdsId;
+      const stockBrandId = stock.brand_name_id || stock.brandNameId;
+      const stockMachineNumber = stock.machine_number || stock.machineNumber || '';
+      const stockMachineNumberId = stock.machine_number_id || stock.machineNumberId;
+
+      const itemIdsMatch = stockItemIdsId && String(stockItemIdsId) === itemIdsIdStr;
+      const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
+      const machineMatch = isMachineNumberMatch(stockMachineNumber, stockMachineNumberId, machineNumberStr);
+
+      return itemIdsMatch && brandMatch && machineMatch;
+    });
+
+    if (stockItem) {
+      const homeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
+      if (homeLocationId) {
+        currentLocationId = String(homeLocationId);
+        locationType = 'home';
+        return { locationId: currentLocationId, locationType };
+      }
+    }
+
+    return null; // Item set location not found
+  };
+
+  // Helper function to calculate available quantity of itemNameId (with optional brandId) at a location
+  const getAvailableQuantityAtLocation = (itemNameId, brandId, locationId) => {
+    if (!itemNameId || !locationId) return 0;
+
+    const itemNameIdStr = String(itemNameId);
+    const brandIdStr = brandId ? String(brandId) : null;
+    const locationIdStr = String(locationId);
+    let availableQuantity = 0;
+
+    // Start with quantity from stock management (home location)
+    // Filter by itemNameId and optionally brandId
+    const stockItems = stockManagementData.filter(stock => {
+      const stockItemNameId = stock.item_name_id || stock.itemNameId;
+      const stockBrandId = stock.brand_name_id || stock.brandNameId;
+      const stockHomeLocationId = stock.home_location_id || stock.homeLocationId;
+
+      const itemNameMatch = stockItemNameId && String(stockItemNameId) === itemNameIdStr;
+      const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
+      const locationMatch = stockHomeLocationId && String(stockHomeLocationId) === locationIdStr;
+      // Only count items without itemIdsId (quantity-based items)
+      const noItemIdsId = !stock.item_ids_id && !stock.itemIdsId;
+
+      return itemNameMatch && brandMatch && locationMatch && noItemIdsId;
+    });
+
+    // Sum quantities from stock management
+    stockItems.forEach(stock => {
+      const qty = parseInt(stock.quantity || 0, 10);
+      availableQuantity += qty;
+    });
+
+    // Track transfers: add items transferred TO this location, subtract items transferred FROM this location
+    for (const entry of toolsTrackerManagementData) {
+      const entryType = entry.tools_entry_type || entry.toolsEntryType || '';
+      if (entryType.toLowerCase() !== 'entry') continue; // Only check Entry type, not Service
+
+      const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
+      const entryToProjectId = entry.to_project_id || entry.toProjectId;
+      const entryFromProjectId = entry.from_project_id || entry.fromProjectId;
+
+      for (const entryItem of entryItems) {
+        // Only count items without itemIdsId (quantity-based items)
+        const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+        if (entryItemIdsId) continue; // Skip items with itemIdsId
+
+        const entryItemNameId = entryItem.item_name_id || entryItem.itemNameId;
+        const entryBrandId = entryItem.brand_id || entryItem.brandId;
+
+        const itemNameMatch = entryItemNameId && String(entryItemNameId) === itemNameIdStr;
+        const brandMatch = !brandIdStr || (entryBrandId && String(entryBrandId) === brandIdStr);
+
+        if (itemNameMatch && brandMatch) {
+          const itemQuantity = parseInt(entryItem.quantity || 0, 10);
+
+          // If transferred TO this location, add to available quantity
+          if (entryToProjectId && String(entryToProjectId) === locationIdStr) {
+            availableQuantity += itemQuantity;
+          }
+
+          // If transferred FROM this location, subtract from available quantity
+          if (entryFromProjectId && String(entryFromProjectId) === locationIdStr) {
+            availableQuantity -= itemQuantity;
+          }
+        }
+      }
+    }
+
+    return Math.max(0, availableQuantity); // Ensure non-negative
+  };
+
+  // Helper to get all locations where item (itemNameId + brandId) has positive quantity
+  const getLocationsWithAvailableQuantity = (itemNameId, brandId) => {
+    if (!itemNameId) return [];
+    const itemNameIdStr = String(itemNameId);
+    const brandIdStr = brandId ? String(brandId) : null;
+    const locationIds = new Set();
+    stockManagementData.forEach(stock => {
+      const stockItemNameId = stock.item_name_id || stock.itemNameId;
+      const stockBrandId = stock.brand_name_id || stock.brandNameId;
+      const stockHomeLocationId = stock.home_location_id || stock.homeLocationId;
+      const noItemIdsId = !stock.item_ids_id && !stock.itemIdsId;
+      const itemNameMatch = stockItemNameId && String(stockItemNameId) === itemNameIdStr;
+      const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
+      if (itemNameMatch && brandMatch && noItemIdsId && stockHomeLocationId) {
+        locationIds.add(String(stockHomeLocationId));
+      }
+    });
+    toolsTrackerManagementData.forEach(entry => {
+      const entryType = entry.tools_entry_type || entry.toolsEntryType || '';
+      if (entryType.toLowerCase() !== 'entry') return;
+      const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
+      entryItems.forEach(entryItem => {
+        const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+        if (entryItemIdsId) return;
+        const entryItemNameId = entryItem.item_name_id || entryItem.itemNameId;
+        const entryBrandId = entryItem.brand_id || entryItem.brandId;
+        const itemNameMatch = entryItemNameId && String(entryItemNameId) === itemNameIdStr;
+        const brandMatch = !brandIdStr || (entryBrandId && String(entryBrandId) === brandIdStr);
+        if (itemNameMatch && brandMatch) {
+          const toId = entry.to_project_id || entry.toProjectId;
+          const fromId = entry.from_project_id || entry.fromProjectId;
+          if (toId) locationIds.add(String(toId));
+          if (fromId) locationIds.add(String(fromId));
+        }
+      });
+    });
+    return Array.from(locationIds)
+      .map(locId => ({ locationId: locId, quantity: getAvailableQuantityAtLocation(itemNameId, brandId, locId) }))
+      .filter(p => p.quantity > 0)
+      .map(p => {
+        const opt = fromOptions.find(o => String(o.id) === p.locationId) || toOptions.find(o => String(o.id) === p.locationId);
+        return { ...p, locationName: opt?.label || opt?.name || `ID: ${p.locationId}` };
+      });
+  };
+
+  // Validation function to check if item can be transferred from selected location (with quantity check)
+  const validateItemLocation = (itemNameId, itemName, brandId, quantity, fromProjectId) => {
+    if (!itemNameId || !fromProjectId) return { isValid: true };
+
+    const fromProjectIdStr = String(fromProjectId);
+    const requestedQuantity = parseInt(quantity || 0, 10);
+
+    // If quantity is specified, check available quantity
+    if (requestedQuantity > 0) {
+      const availableQuantity = getAvailableQuantityAtLocation(itemNameId, brandId, fromProjectIdStr);
+
+      if (availableQuantity < requestedQuantity) {
+        const projectOption = toOptions.find(opt => String(opt.id) === fromProjectIdStr);
+        const projectName = projectOption?.label || projectOption?.name || fromProjectIdStr;
+
+        const resolvedBrand = getBrandLabelById(brandId);
+        const resolvedItemName = itemName || getItemNameLabelById(itemNameId);
+        const itemDetails = [
+          resolvedItemName ? `Item Name: ${resolvedItemName}` : `Item Name ID: ${itemNameId}`,
+          brandId ? `Brand: ${resolvedBrand || brandId}` : null
+        ].filter(Boolean).join(', ');
+
+        const currentLocations = getLocationsWithAvailableQuantity(itemNameId, brandId);
+        const whereItIs = currentLocations.length > 0
+          ? ` Currently available at: ${currentLocations.map(l => `"${l.locationName}" (${l.quantity} unit(s))`).join(', ')}.`
+          : '';
+
+        return {
+          isValid: false,
+          errorMessage: `Cannot transfer item "${itemName}" (${itemDetails}). Only ${availableQuantity} unit(s) available at "${projectName}" (Project ID: ${fromProjectIdStr}), but ${requestedQuantity} unit(s) requested.${whereItIs}`
+        };
+      }
+    } else {
+      // If quantity isn't provided (or is 0), don't use single "current location".
+      // For quantity-based items, availability is split across locations, so just ensure
+      // there is some quantity at the selected FROM location.
+      const availableQuantity = getAvailableQuantityAtLocation(itemNameId, brandId, fromProjectIdStr);
+      if (availableQuantity <= 0) {
+        const projectOption = toOptions.find(opt => String(opt.id) === fromProjectIdStr);
+        const projectName = projectOption?.label || projectOption?.name || fromProjectIdStr;
+
+        const resolvedBrand = getBrandLabelById(brandId);
+        const resolvedItemName = itemName || getItemNameLabelById(itemNameId);
+        const itemDetails = [
+          resolvedItemName ? `Item Name: ${resolvedItemName}` : `Item Name ID: ${itemNameId}`,
+          brandId ? `Brand: ${resolvedBrand || brandId}` : null
+        ].filter(Boolean).join(', ');
+
+        const currentLocations = getLocationsWithAvailableQuantity(itemNameId, brandId);
+        const whereItIs = currentLocations.length > 0
+          ? ` Currently available at: ${currentLocations.map(l => `"${l.locationName}" (${l.quantity} unit(s))`).join(', ')}.`
+          : '';
+
+        return {
+          isValid: false,
+          errorMessage: `Cannot transfer item "${itemName}" (${itemDetails}). No quantity available at "${projectName}" (Project ID: ${fromProjectIdStr}).${whereItIs}`
+        };
+      }
+    }
+    return { isValid: true };
+  };
+  // Validation function to check if item set (itemIdsId + brandId + machineNumber) is available at location (before sending to backend)
+  const validateItemSetAvailability = (itemIdsId, brandId, machineNumber, itemNameId, itemName, fromProjectId) => {
+    if (!itemIdsId || !fromProjectId) return { isValid: true }; // If no itemId selected, skip check    
+    const fromProjectIdStr = String(fromProjectId);
+    const isAvailable = isItemSetAvailableAtLocation(itemIdsId, brandId, machineNumber, fromProjectIdStr);
+    if (!isAvailable) {
+      const projectOption = toOptions.find(opt => String(opt.id) === fromProjectIdStr);
+      const projectName = projectOption?.label || projectOption?.name || fromProjectIdStr;
+      // Find where the item set currently is (entry + relocate aware)
+      let currentLocation = null;
+      let currentLocationName = 'unknown location';
+      const currentLocationInfo = getItemSetCurrentLocation(itemIdsId, brandId, machineNumber);
+      if (currentLocationInfo?.locationId) {
+        currentLocation = String(currentLocationInfo.locationId);
+        currentLocationName = getLocationLabelById(currentLocation)
+          || (currentLocationInfo.locationType === 'home'
+            ? `Home Location (ID: ${currentLocation})`
+            : currentLocation);
+      }
+
+      const resolvedItemId = getItemIdLabelById(itemIdsId);
+      const resolvedBrand = getBrandLabelById(brandId);
+      const itemSetDetails = [
+        `Item ID: ${resolvedItemId || itemIdsId}`,
+        brandId ? `Brand: ${resolvedBrand || brandId}` : null,
+        machineNumber ? `Machine Number: ${machineNumber}` : null
+      ].filter(Boolean).join(', ');
+
+      const locationTypeLabel =
+        currentLocationInfo?.locationType === 'service'
+          ? 'in service store'
+          : currentLocationInfo?.locationType === 'home'
+            ? 'at home location'
+            : 'in project';
+
+      return {
+        isValid: false,
+        errorMessage: `Cannot transfer item "${itemName}" (${itemSetDetails}). This item set is currently ${locationTypeLabel} "${currentLocationName}", not at the selected "From" project "${projectName}".`
+      };
+    }
+
+    return { isValid: true };
+  };
+
+  const handleConfirmUpload = async () => {
+    await waitForPendingFileUploads();
+    if (!uploadStatus) {
+      alert('Please select the machine status before confirming.');
+      return;
+    }
+    // For Service tab, image upload is required
+    if (entryServiceMode === 'Service' && uploadFiles.length === 0) {
+      alert('Image should upload definitely.');
+      return;
+    }
+    // If itemId is selected, only check the full set (itemIdsId + brandId + machineNumber)
+    // Don't check itemNameId separately when itemId is selected
+    if (selectedFrom && addItemFormData.itemIdDbId) {
+      const itemSetValidation = validateItemSetAvailability(
+        addItemFormData.itemIdDbId,
+        addItemFormData.brandId,
+        addItemFormData.machineNumber,
+        addItemFormData.itemNameId,
+        addItemFormData.itemName,
+        selectedFrom.id
+      );
+
+      if (!itemSetValidation.isValid) {
+        alert(itemSetValidation.errorMessage);
+        return;
+      }
+    } else if (selectedFrom && addItemFormData.itemNameId) {
+      // Only check itemNameId if itemId is NOT selected (for quantity-based transfers)
+      // Check quantity availability with brandId if provided
+      const validation = validateItemLocation(
+        addItemFormData.itemNameId,
+        addItemFormData.itemName,
+        addItemFormData.brandId,
+        addItemFormData.quantity,
+        selectedFrom.id
+      );
+
+      if (!validation.isValid) {
+        alert(validation.errorMessage);
+        return;
+      }
+    }
+
+    const uploadedImages = uploadFiles
+      .filter((f) => f.uploadedUrl)
+      .map((f) => ({ tools_image_url: f.uploadedUrl }));
+    const localImageUrls = uploadFiles
+      .filter((f) => f.uploadedUrl)
+      .map((f) => f.uploadedUrl);
+    const newItem = {
+      id: Date.now(), // Temporary ID for UI
+      timestamp: new Date().toISOString().slice(0, 19), // LocalDateTime format
+      item_name_id: addItemFormData.itemNameId ? String(addItemFormData.itemNameId) : null,
+      item_ids_id: addItemFormData.itemIdDbId ? String(addItemFormData.itemIdDbId) : null,
+      brand_id: addItemFormData.brandId ? String(addItemFormData.brandId) : null,
+      model: addItemFormData.model || '',
+      machine_number: addItemFormData.machineNumber || '',
+      quantity: addItemFormData.quantity ? parseInt(addItemFormData.quantity, 10) : 0,
+      machine_status: uploadStatus,
+      description: uploadDescription,
+      tools_item_live_images: uploadedImages, // Send URLs only
+      localImageUrls: localImageUrls,
+      itemName: addItemFormData.itemName,
+      brand: addItemFormData.brand,
+      itemId: addItemFormData.itemId
+    };
+    setItems([...items, newItem]);
+    handleCloseUploadModal();
+    handleCloseAddItemsModal();
+  };
+  const hasEditChanges = () => {
+    if (!originalEditData) return true;
+    const orig = originalEditData;
+    if (normalizeDisplayDate(orig.created_date_time || '') !== normalizeDisplayDate(date || '')) return true;
+    const fromId = selectedFrom?.id ? String(selectedFrom.id) : null;
+    const toId = selectedTo?.id ? String(selectedTo.id) : null;
+    const storeId = selectedServiceStore?.id ? String(selectedServiceStore.id) : null;
+    const inchargeId = selectedIncharge?.id ? String(selectedIncharge.id) : null;
+    if (String(orig.from_project_id) !== String(fromId)) return true;
+    if (String(orig.to_project_id || '') !== String(toId || '')) return true;
+    if (String(orig.service_store_id || '') !== String(storeId || '')) return true;
+    if (String(orig.project_incharge_id || '') !== String(inchargeId || '')) return true;
+    if ((orig.items || []).length !== items.length) return true;
+    for (let i = 0; i < items.length; i++) {
+      const curr = items[i];
+      const origItem = (orig.items || [])[i];
+      if (!origItem) return true;
+      if (String(curr.item_name_id || '') !== String(origItem.item_name_id || '')) return true;
+      if (String(curr.item_ids_id || '') !== String(origItem.item_ids_id || '')) return true;
+      if (String(curr.brand_id || '') !== String(origItem.brand_id || '')) return true;
+      if (String(curr.machine_number || '') !== String(origItem.machine_number || '')) return true;
+      if (Number(curr.quantity) !== Number(origItem.quantity)) return true;
+      if (String(curr.machine_status || '') !== String(origItem.machine_status || '')) return true;
+      if (String(curr.description || '') !== String(origItem.description || '')) return true;
+      if (String(curr.model || '') !== String(origItem.model || '')) return true;
+      const currImageCount = (curr.tools_item_live_images || curr.localImageUrls || []).length;
+      const initialImageCount = initialImageCountByItemIdRef.current[String(curr.id)];
+      if (initialImageCount !== undefined && currImageCount !== initialImageCount) return true;
+    }
+    return false;
+  };
+  const handleUpdateTransfer = async () => {
+    if (!editEntryId || !originalEditData) return;
+    if (!canCreate) {
+      alert("You don't have permission to save Tools Tracker changes.");
+      return;
+    }
+    if (!selectedFrom || !selectedIncharge) {
+      alert('Please fill in all required fields (From and Project Incharge)');
+      return;
+    }
+    if (entryServiceMode === 'Entry' && !selectedTo) {
+      alert('Please select the "To" field');
+      return;
+    }
+    if (entryServiceMode === 'Service' && !selectedServiceStore) {
+      alert('Please select the Service Store');
+      return;
+    }
+    if (items.length === 0) {
+      alert('Please add at least one item');
+      return;
+    }
+    if (!hasEditChanges()) {
+      alert('No changes to save');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await waitForPendingFileUploads();
+      const statusItemsForApi = [];
+      const updatedItemRows = [];
+      for (const item of items) {
+        const origItemIds = (originalEditData?.items || []).map(it => it.id).filter(Boolean);
+        const isExistingItem = origItemIds.some(oid => String(oid) === String(item.id));
+        const itemRow = {
+          id: isExistingItem && item.id ? item.id : null,
+          timestamp: item.timestamp || new Date().toISOString().slice(0, 19),
+          item_name_id: item.item_name_id || null,
+          item_ids_id: item.item_ids_id || null,
+          brand_id: item.brand_id || null,
+          model: item.model || '',
+          quantity: item.quantity || 0,
+          machine_status: item.machine_status || 'Working',
+          description: item.description || '',
+          tools_item_live_images: item.tools_item_live_images || []
+        };
+
+        if (itemRow.item_ids_id) {
+          const machineNumberId = resolveMachineNumberIdForItemSet(
+            itemRow.item_ids_id,
+            itemRow.brand_id,
+            item.machine_number || ''
+          );
+          const hasMachineNumberIdConfigured = hasMachineNumberIdConfiguredForItemSet(
+            itemRow.item_ids_id,
+            itemRow.brand_id,
+            item.machine_number || ''
+          );
+          if (hasMachineNumberIdConfigured && !machineNumberId) {
+            const itemIdLabel = item.itemId || getItemIdLabelById(itemRow.item_ids_id) || itemRow.item_ids_id;
+            alert(`Machine Number ID is required for Item ID "${itemIdLabel}". Please select this item again and try.`);
+            setIsSaving(false);
+            return;
+          }
+          if (machineNumberId) {
+            itemRow.machine_number_id = String(machineNumberId);
+          }
+        }
+
+        updatedItemRows.push(itemRow);
+
+        if (itemRow.item_ids_id && item.machine_number) {
+          statusItemsForApi.push({
+            item_ids_id: itemRow.item_ids_id,
+            machine_number_id: itemRow.machine_number_id || null,
+            machine_status: itemRow.machine_status
+          });
+        }
+      }
+
+      const payload = {
+        from_project_id: selectedFrom?.id ? String(selectedFrom.id) : null,
+        to_project_id: entryServiceMode === 'Entry' && selectedTo?.id ? String(selectedTo.id) : null,
+        project_incharge_id: selectedIncharge?.id ? String(selectedIncharge.id) : null,
+        service_store_id: entryServiceMode === 'Service' && selectedServiceStore?.id ? String(selectedServiceStore.id) : null,
+        // Persist the user-selected/auto-selected date
+        date: formatDateAsDdMmYyyy(date),
+        created_date_time: getApiDateTimeFromDisplayDate(date),
+        tools_entry_type: entryServiceMode.toLowerCase(),
+        tools_tracker_item_name_table: updatedItemRows
+      };
+      const editedBy = user?.name || user?.username || 'mobile';
+      const response = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/edit/${editEntryId}?editedBy=${encodeURIComponent(editedBy)}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to update: ${response.status} ${response.statusText}`);
+      }
+      // Save machine_status to the new API for each item that has itemIdsId and machine_number_id
+      const machineStatusPromises = statusItemsForApi
+        .filter(item => item.item_ids_id && item.machine_number_id)
+        .map(async (item) => {
+          try {
+            const statusResponse = await fetch(`${TOOLS_MACHINE_STATUS_BASE_URL}/save`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                item_ids_id: String(item.item_ids_id),
+                machine_number_id: String(item.machine_number_id),
+                machine_status: item.machine_status || 'Working',
+                created_by: user?.name || user?.username || 'mobile'
+              })
+            });
+            if (!statusResponse.ok) {
+              console.error(`Failed to save machine status for item ${item.item_ids_id}, machineId ${item.machine_number_id}`);
+            }
+          } catch (error) {
+            console.error('Error saving machine status:', error);
+          }
+        });
+
+      // Wait for all machine status saves to complete (don't block on errors)
+      await Promise.allSettled(machineStatusPromises);
+
+      alert('Updated successfully!');
+      localStorage.removeItem('editingToolsTrackerEntryId');
+      setIsEditMode(false);
+      setEditEntryId(null);
+      setOriginalEditData(null);
+      initialImageCountByItemIdRef.current = {};
+      setSelectedFrom(null);
+      setSelectedTo(null);
+      setSelectedServiceStore(null);
+      setSelectedIncharge(null);
+      setItems([]);
+      const endpoint = entryServiceMode === 'Service'
+        ? `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getServiceCount`
+        : `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getEntryCount`;
+      const countRes = await fetch(endpoint);
+      if (countRes.ok) {
+        const data = await countRes.json();
+        setEntryNo(data + 1);
+      }
+      window.location.reload();
+    } catch (error) {
+      console.error('Error updating transfer:', error);
+      alert('Failed to update. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  const handleSaveTransfer = async () => {
+    if (!canCreate) {
+      alert("You don't have permission to save Tools Tracker transfers.");
+      return;
+    }
+    if (entryServiceMode === 'Relocate') {
+      if (!selectedRelocateItemId || !selectedCurrentLocation || !selectedRelocateLocation) {
+        alert('Please fill in all required fields (Item ID, Current Location, and Relocate Location)');
+        return;
+      }
+    } else {
+      const isServiceReturn = entryServiceMode === 'Service' && serviceFlowMode === 'return';
+      if (isServiceReturn) {
+        if (!selectedServiceStore || !selectedTo || !selectedIncharge) {
+          alert('Please fill in all required fields (Service Store, To, and Project Incharge)');
+          return;
+        }
+      } else if (!selectedFrom || !selectedIncharge) {
+        alert('Please fill in all required fields (From and Project Incharge)');
+        return;
+      }
+      if (entryServiceMode === 'Entry' && !selectedTo) {
+        alert('Please select the "To" field');
+        return;
+      }
+      if (entryServiceMode === 'Service') {
+        if (!selectedServiceStore) {
+          alert('Please select the Service Store');
+          return;
+        }
+        if (serviceFlowMode === 'return' && !selectedTo) {
+          alert('Please select the "To" field');
+          return;
+        }
+      }
+      if (items.length === 0) {
+        alert('Please add at least one item');
+        return;
+      }
+    }
+
+    // Validation: Check if items are available at fromProjectId (before sending to backend)
+    // Skip validation for Relocate mode as it uses different flow
+    if (entryServiceMode !== 'Relocate' && selectedFrom) {
+      const fromProjectId = String(selectedFrom.id);
+
+      for (const item of items) {
+        if (!item.item_name_id) continue;
+
+        // If itemId is selected, only check the full set (itemIdsId + brandId + machineNumber)
+        // Don't check itemNameId separately when itemId is selected
+        if (item.item_ids_id) {
+          const itemSetValidation = validateItemSetAvailability(
+            item.item_ids_id,
+            item.brand_id,
+            item.machine_number,
+            item.item_name_id,
+            item.itemName,
+            fromProjectId
+          );
+
+          if (!itemSetValidation.isValid) {
+            alert(itemSetValidation.errorMessage);
+            setIsSaving(false);
+            return;
+          }
+        } else {
+          // Only check itemNameId if itemId is NOT selected (for quantity-based transfers)
+          // Check quantity availability with brandId if provided
+          const validation = validateItemLocation(
+            item.item_name_id,
+            item.itemName,
+            item.brand_id,
+            item.quantity,
+            fromProjectId
+          );
+
+          if (!validation.isValid) {
+            alert(validation.errorMessage);
+            setIsSaving(false);
+            return;
+          }
+        }
+      }
+    }
+
+    // Additional validation: Check if items are currently in a different project (for Entry mode)
+    if (entryServiceMode === 'Entry' && selectedTo && selectedFrom) {
+      const targetProjectId = String(selectedTo.id);
+      const fromProjectId = String(selectedFrom.id);
+
+      for (const item of items) {
+        // If itemId is selected, check by full set (itemIdsId + brandId + machineNumber)
+        // Otherwise, check by itemNameId (for quantity-based transfers)
+        if (item.item_ids_id) {
+          // Check by full set
+          const locationInfo = getItemSetCurrentLocation(
+            item.item_ids_id,
+            item.brand_id,
+            item.machine_number
+          );
+          if (!locationInfo) continue; // Item set location not found - allow transfer
+
+          const { locationId, locationType } = locationInfo;
+
+          // If item set is in a project (not home), check if it's different from both FROM and TO
+          if (locationType === 'project') {
+            const currentProjectId = String(locationId);
+
+            // Allow transfer if we're transferring FROM the project where item set currently is
+            // Block if item set is in a different project than both FROM and TO
+            if (currentProjectId !== fromProjectId && currentProjectId !== targetProjectId) {
+              const projectOption = toOptions.find(opt => String(opt.id) === currentProjectId);
+              const projectName = projectOption?.label || projectOption?.name || currentProjectId;
+              const itemName = item.itemName || 'Unknown Item';
+              const resolvedItemId = item.itemId || getItemIdLabelById(item.item_ids_id) || item.item_ids_id;
+              const resolvedBrand = item.brand || getBrandLabelById(item.brand_id) || item.brand_id;
+              const itemSetDetails = [
+                `Item ID: ${resolvedItemId}`,
+                item.brand_id ? `Brand: ${resolvedBrand}` : null,
+                item.machine_number ? `Machine Number: ${item.machine_number}` : null
+              ].filter(Boolean).join(', ');
+              alert(`Cannot transfer item "${itemName}" (${itemSetDetails}). This item set is currently in project "${projectName}". Please return it to home location first or transfer it from the current project.`);
+              setIsSaving(false);
+              return;
+            }
+          }
+        } else if (item.item_name_id) {
+          // Quantity-based items can exist in multiple locations. Validate against FROM availability.
+          const itemName = item.itemName || 'Unknown Item';
+          const validation = validateItemLocation(
+            item.item_name_id,
+            itemName,
+            item.brand_id,
+            item.quantity,
+            fromProjectId
+          );
+          if (!validation.isValid) {
+            alert(validation.errorMessage);
+            setIsSaving(false);
+            return;
+          }
+        }
+      }
+    }
+
+    setIsSaving(true);
+    try {
+      await waitForPendingFileUploads();
+      let payload;
+      const statusItemsForApi = [];
+
+      if (entryServiceMode === 'Relocate') {
+        // For Relocate mode, get item details from stock management
+        const stockItem = stockManagementData.find(item => {
+          const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+          return String(itemIdsId) === String(selectedRelocateItemId);
+        });
+
+        if (!stockItem) {
+          alert('Item not found in stock management');
+          setIsSaving(false);
+          return;
+        }
+
+        const relocateMachineNumberId = resolveMachineNumberIdForItemSet(
+          selectedRelocateItemId,
+          stockItem.brand_id || stockItem.brandId || stockItem.brand_name_id || stockItem.brandNameId || null,
+          stockItem.machine_number || stockItem.machineNumber || ''
+        );
+        const relocateHasMachineNumberIdConfigured = hasMachineNumberIdConfiguredForItemSet(
+          selectedRelocateItemId,
+          stockItem.brand_id || stockItem.brandId || stockItem.brand_name_id || stockItem.brandNameId || null,
+          stockItem.machine_number || stockItem.machineNumber || ''
+        );
+        if (relocateHasMachineNumberIdConfigured && !relocateMachineNumberId) {
+          alert('Machine Number ID is required for this selected Item ID. Please reselect the item and try again.');
+          setIsSaving(false);
+          return;
+        }
+
+        const relocateItemRow = {
+          timestamp: new Date().toISOString().slice(0, 19),
+          item_name_id: stockItem.item_name_id || stockItem.itemNameId || null,
+          item_ids_id: String(selectedRelocateItemId),
+          brand_id: stockItem.brand_id || stockItem.brandId || stockItem.brand_name_id || stockItem.brandNameId || null,
+          model: stockItem.model || '',
+          quantity: stockItem.quantity || 0,
+          machine_status: stockItem.machine_status || stockItem.machineStatus || 'Working',
+          description: '',
+          home_location_id: selectedRelocateLocation?.id ? String(selectedRelocateLocation.id) : null,
+          tools_item_live_images: []
+        };
+        if (relocateMachineNumberId) {
+          relocateItemRow.machine_number_id = String(relocateMachineNumberId);
+        }
+
+        payload = {
+          from_project_id: selectedCurrentLocation?.id ? String(selectedCurrentLocation.id) : null,
+          to_project_id: null,
+          project_incharge_id: null,
+          service_store_id: null,
+          // Persist the user-selected/auto-selected date
+          date: formatDateAsDdMmYyyy(date),
+          created_date_time: getApiDateTimeFromDisplayDate(date),
+          created_by: user?.name || user?.username || 'mobile',
+          tools_entry_type: 'relocate',
+          eno: String(entryNo),
+          tools_tracker_item_name_table: [relocateItemRow]
+        };
+        if (relocateItemRow.item_ids_id && relocateItemRow.machine_number_id) {
+          statusItemsForApi.push({
+            item_ids_id: relocateItemRow.item_ids_id,
+            machine_number_id: relocateItemRow.machine_number_id,
+            machine_status: relocateItemRow.machine_status
+          });
+        }
+      } else {
+        const itemRows = [];
+        for (const item of items) {
+          const itemRow = {
+            item_name_id: item.item_name_id || null,
+            item_ids_id: item.item_ids_id || null,
+            brand_id: item.brand_id || null,
+            model: item.model || '',
+            quantity: item.quantity || 0,
+            machine_status: item.machine_status || 'Working',
+            description: item.description || '',
+            tools_item_live_images: item.tools_item_live_images || []
+          };
+
+          if (itemRow.item_ids_id) {
+            const machineNumberId = resolveMachineNumberIdForItemSet(
+              itemRow.item_ids_id,
+              itemRow.brand_id,
+              item.machine_number || ''
+            );
+            const hasMachineNumberIdConfigured = hasMachineNumberIdConfiguredForItemSet(
+              itemRow.item_ids_id,
+              itemRow.brand_id,
+              item.machine_number || ''
+            );
+            if (hasMachineNumberIdConfigured && !machineNumberId) {
+              const itemIdLabel = item.itemId || getItemIdLabelById(itemRow.item_ids_id) || itemRow.item_ids_id;
+              alert(`Machine Number ID is required for Item ID "${itemIdLabel}". Please select this item again and try.`);
+              setIsSaving(false);
+              return;
+            }
+            if (machineNumberId) {
+              itemRow.machine_number_id = String(machineNumberId);
+            }
+            if (item.machine_number) {
+              statusItemsForApi.push({
+                item_ids_id: itemRow.item_ids_id,
+                machine_number_id: itemRow.machine_number_id || null,
+                machine_status: itemRow.machine_status
+              });
+            }
+          }
+
+          itemRows.push(itemRow);
+        }
+
+        const isServiceReturn = entryServiceMode === 'Service' && serviceFlowMode === 'return';
+        payload = {
+          from_project_id: isServiceReturn ? null : (selectedFrom?.id ? String(selectedFrom.id) : null),
+          to_project_id: (entryServiceMode === 'Entry' || isServiceReturn) && selectedTo?.id ? String(selectedTo.id) : null,
+          project_incharge_id: selectedIncharge?.id ? String(selectedIncharge.id) : null,
+          service_store_id: entryServiceMode === 'Service' && selectedServiceStore?.id ? String(selectedServiceStore.id) : null,
+          created_by: user?.name || user?.username || 'mobile',
+          tools_entry_type: isServiceReturn ? 'service_return' : entryServiceMode.toLowerCase(),
+          eno: String(entryNo),
+          date: formatDateAsDdMmYyyy(date),
+          tools_tracker_item_name_table: itemRows
+        };
+      }
+      const response = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/save`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to save: ${response.status} ${response.statusText}`);
+      }
+      const result = await response.json();
+
+      // Save machine_status to the new API for each item that has itemIdsId and machine_number_id
+      const machineStatusPromises = statusItemsForApi
+        .filter(item => item.item_ids_id && item.machine_number_id)
+        .map(async (item) => {
+          try {
+            const statusResponse = await fetch(`${TOOLS_MACHINE_STATUS_BASE_URL}/save`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                item_ids_id: String(item.item_ids_id),
+                machine_number_id: String(item.machine_number_id),
+                machine_status: item.machine_status || 'Working',
+                created_by: user?.name || user?.username || 'mobile'
+              })
+            });
+            if (!statusResponse.ok) {
+              console.error(`Failed to save machine status for item ${item.item_ids_id}, machineId ${item.machine_number_id}`);
+            }
+          } catch (error) {
+            console.error('Error saving machine status:', error);
+          }
+        });
+      // Wait for all machine status saves to complete (don't block on errors)
+      await Promise.allSettled(machineStatusPromises);
+
+      alert('Transfer saved successfully!');
+      setSelectedFrom(null);
+      setSelectedTo(null);
+      setSelectedServiceStore(null);
+      setSelectedIncharge(null);
+      setSelectedRelocateItemId(null);
+      setSelectedCurrentLocation(null);
+      setSelectedRelocateLocation(null);
+      setRelocateItemDetails(null);
+      setItems([]);
+      setCloneModeActive(false);
+      const wasServiceReturn = entryServiceMode === 'Service' && serviceFlowMode === 'return';
+      if (wasServiceReturn) {
+        try {
+          const returnCountRes = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getServiceReturnCount`);
+          if (returnCountRes.ok) {
+            const returnData = await returnCountRes.json();
+            setEntryNo(returnData + 1);
+          } else {
+            const fallbackRes = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getServiceCount`);
+            if (fallbackRes.ok) {
+              const fallbackData = await fallbackRes.json();
+              setEntryNo(fallbackData + 1);
+            } else {
+              setEntryNo(prev => prev + 1);
+            }
+          }
+        } catch {
+          setEntryNo(prev => prev + 1);
+        }
+      } else {
+        setEntryNo(prev => prev + 1);
+      }
+      window.location.reload();
+    } catch (error) {
+      console.error('Error saving transfer:', error);
+      alert('Failed to save transfer. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  const handleRemoveItem = (itemId) => {
+    setItems(prev => prev.filter(item => item.id !== itemId));
+  };
+  const handleEditItem = (item) => {
+    setEditingItem(item);
+    setAddItemFormData({
+      itemName: item.itemName || '',
+      itemNameId: item.item_name_id ? String(item.item_name_id) : null,
+      brand: item.brand || '',
+      brandId: item.brand_id ? String(item.brand_id) : null,
+      itemId: item.itemId || '',
+      itemIdDbId: item.item_ids_id ? String(item.item_ids_id) : null,
+      model: item.model || '',
+      quantity: item.quantity ? String(item.quantity) : '',
+      machineNumber: item.machine_number || item.machineNumber || ''
+    });
+    setShowAddItemsModal(true);
+  };
+  const handleOpenImageViewer = (item, imageIndex = 0) => {
+    const images = item.localImageUrls || [];
+    setShowImageViewerStatusDropdown(false);
+    setImageViewerData({
+      images: images,
+      currentIndex: imageIndex,
+      itemName: item.itemName || 'Unknown Item',
+      itemId: item.itemId || '',
+      itemUniqueId: item.id, // Store the unique id for updating
+      toLocation: selectedTo?.label || selectedServiceStore?.label || '',
+      machineStatus: item.machine_status || 'Working'
+    });
+    setShowImageViewer(true);
+  };
+  const handleCloseImageViewer = () => {
+    setShowImageViewer(false);
+    setShowImageViewerStatusDropdown(false);
+  };
+  const handleUpdateImageViewerStatus = (status) => {
+    const currentItemId = imageViewerData.itemUniqueId;
+    if (!currentItemId) return;
+    setItems(prev => prev.map(item => {
+      if (item.id === currentItemId) {
+        return {
+          ...item,
+          machine_status: status
+        };
+      }
+      return item;
+    }));
+    setImageViewerData(prev => ({
+      ...prev,
+      machineStatus: status
+    }));
+    setShowImageViewerStatusDropdown(false);
+  };
+  const handlePrevImage = () => {
+    setImageViewerData(prev => ({
+      ...prev,
+      currentIndex: prev.currentIndex > 0 ? prev.currentIndex - 1 : prev.images.length - 1
+    }));
+  };
+  const handleNextImage = () => {
+    setImageViewerData(prev => ({
+      ...prev,
+      currentIndex: prev.currentIndex < prev.images.length - 1 ? prev.currentIndex + 1 : 0
+    }));
+  };
+  const handleDeleteViewerImage = (indexToDelete) => {
+    const currentItemId = imageViewerData.itemUniqueId;
+    if (!currentItemId) return;
+    setItems(prev => prev.map(item => {
+      if (item.id === currentItemId) {
+        const newLocalImages = [...(item.localImageUrls || [])];
+        const newToolsImages = [...(item.tools_item_live_images || [])];
+        newLocalImages.splice(indexToDelete, 1);
+        if (newToolsImages.length > indexToDelete) {
+          newToolsImages.splice(indexToDelete, 1);
+        }
+        return {
+          ...item,
+          localImageUrls: newLocalImages,
+          tools_item_live_images: newToolsImages
+        };
+      }
+      return item;
+    }));
+    setImageViewerData(prev => {
+      const newImages = [...prev.images];
+      newImages.splice(indexToDelete, 1);
+      if (newImages.length === 0) {
+        setShowImageViewer(false);
+        return prev;
+      }
+      let newIndex = prev.currentIndex;
+      if (newIndex >= newImages.length) {
+        newIndex = newImages.length - 1;
+      }
+      return {
+        ...prev,
+        images: newImages,
+        currentIndex: newIndex
+      };
+    });
+  };
+  const handleAddImageToViewer = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    const currentItemId = imageViewerData.itemUniqueId;
+    if (!currentItemId) return;
+    // Optimistic local previews, then replace with uploaded URLs
+    const tempUrls = files.map((file) => URL.createObjectURL(file));
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== currentItemId) return item;
+        const newLocal = [...(item.localImageUrls || []), ...tempUrls];
+        const newImgs = [
+          ...(item.tools_item_live_images || []),
+          ...tempUrls.map((u) => ({ tools_image_url: u }))
+        ];
+        return { ...item, localImageUrls: newLocal, tools_item_live_images: newImgs };
+      })
+    );
+    setImageViewerData((prev) => ({
+      ...prev,
+      images: [...prev.images, ...tempUrls],
+      currentIndex: prev.images.length
+    }));
+
+    try {
+      const urls = await uploadFilesToBackend(files, {
+        folder: 'FileUpload / Tools_Tracker_Images',
+        fileNamePrefix: buildUploadFileNamePrefix({
+          itemName: imageViewerData?.itemName,
+          itemId: imageViewerData?.itemId,
+          quantity: null
+        })
+      });
+      urls.forEach((remoteUrl, idx) => {
+        const temp = tempUrls[idx];
+        if (!remoteUrl || !temp) return;
+        flushSync(() => {
+          replaceUrlInItemImages(currentItemId, temp, remoteUrl);
+          setImageViewerData((prev) => ({
+            ...prev,
+            images: (prev.images || []).map((u) => (u === temp ? remoteUrl : u))
+          }));
+        });
+        try {
+          URL.revokeObjectURL(temp);
+        } catch {
+          // ignore
+        }
+      });
+      endPendingFileUpload();
+    } catch (error) {
+      console.error('Error uploading viewer image(s):', error);
+      alert('Failed to upload image. Please try again.');
+    }
+    e.target.value = '';
+  };
+  const handleDeleteUploadFile = (fileId) => {
+    setUploadFiles(prev => prev.filter(f => f.id !== fileId));
+  };
+  const handleOpenUniversalSearch = () => {
+    setUniversalSearchQuery('');
+    setShowUniversalSearchModal(true);
+  };
+  const handleCloseUniversalSearch = () => {
+    setShowUniversalSearchModal(false);
+    setUniversalSearchQuery('');
+  };
+
+  const getEffectiveFromLocationId = useCallback(() => {
+    if (entryServiceMode === 'Relocate') {
+      return selectedCurrentLocation?.id ? String(selectedCurrentLocation.id) : null;
+    }
+    if (entryServiceMode === 'Service' && serviceFlowMode === 'return') {
+      return selectedServiceStore?.id ? String(selectedServiceStore.id) : null;
+    }
+    return selectedFrom?.id ? String(selectedFrom.id) : null;
+  }, [entryServiceMode, selectedCurrentLocation, serviceFlowMode, selectedServiceStore, selectedFrom]);
+  const handleSelectSearchItem = (item) => {
+    const itemNameObj = toolsItemNameListData.find(
+      i => String(i?.id) === String(item?.item_name_id ?? item?.itemNameId)
+    );
+    const brandObj = toolsBrandFullData.find(
+      i => String(i?.id) === String(item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId)
+    );
+    const itemIdObj = toolsItemIdFullData.find(
+      i => String(i?.id) === String(item?.item_ids_id ?? item?.itemIdsId)
+    );
+    const itemIdsId = item?.item_ids_id ?? item?.itemIdsId ?? null;
+    if (itemIdsId) {
+      const isValidToAdd = validateDraftItemBeforeAdd({
+        itemName: itemNameObj?.item_name || itemNameObj?.itemName || 'Unknown Item',
+        itemNameId: item?.item_name_id ?? item?.itemNameId ?? null,
+        brandId: item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId ?? null,
+        itemIdDbId: itemIdsId,
+        machineNumber: resolveMachineNumFromStock(item),
+        quantity: 0
+      });
+      if (!isValidToAdd) return;
+
+      setSelectedSearchItem({ ...item, quantity: 0 });
+      setShowUniversalSearchModal(false);
+      setShowSearchConfirmModal(true);
+      return;
+    }
+
+    // Quantity-only: ask how many qty to transfer from selected FROM location
+    setPendingSearchItem(item);
+    setPendingSearchQty('');
+    setShowUniversalSearchModal(false);
+    setShowSearchQtyModal(true);
+  };
+
+  const handleCancelSearchQty = () => {
+    setShowSearchQtyModal(false);
+    setPendingSearchItem(null);
+    setPendingSearchQty('');
+  };
+
+  const handleConfirmSearchQty = () => {
+    if (!pendingSearchItem) return;
+    const qtyNum = parseInt(String(pendingSearchQty || '').trim(), 10);
+    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+      alert('Please enter a valid quantity.');
+      return;
+    }
+
+    const fromLocationId = getEffectiveFromLocationId();
+    if (!fromLocationId) {
+      alert('Please select From location first.');
+      return;
+    }
+
+    const itemNameObj = toolsItemNameListData.find(
+      i => String(i?.id) === String(pendingSearchItem?.item_name_id ?? pendingSearchItem?.itemNameId)
+    );
+    const brandObj = toolsBrandFullData.find(
+      i => String(i?.id) === String(pendingSearchItem?.brand_id ?? pendingSearchItem?.brandId ?? pendingSearchItem?.brand_name_id ?? pendingSearchItem?.brandNameId)
+    );
+
+    const itemName = itemNameObj?.item_name || itemNameObj?.itemName || 'Unknown Item';
+    const itemNameId = pendingSearchItem?.item_name_id ?? pendingSearchItem?.itemNameId ?? null;
+    const brandId = pendingSearchItem?.brand_id ?? pendingSearchItem?.brandId ?? pendingSearchItem?.brand_name_id ?? pendingSearchItem?.brandNameId ?? null;
+
+    const isValidToAdd = validateDraftItemBeforeAdd({
+      itemName,
+      itemNameId,
+      brandId,
+      itemIdDbId: null,
+      machineNumber: resolveMachineNumFromStock(pendingSearchItem),
+      quantity: String(qtyNum)
+    });
+    if (!isValidToAdd) return;
+
+    setShowSearchQtyModal(false);
+    setSelectedSearchItem({
+      ...pendingSearchItem,
+      quantity: qtyNum,
+      item_name: itemName,
+      brand: brandObj?.tools_brand || brandObj?.toolsBrand || pendingSearchItem?.brand || ''
+    });
+    setPendingSearchItem(null);
+    setPendingSearchQty('');
+    setShowSearchConfirmModal(true);
+  };
+  const handleConfirmSearchItem = () => {
+    setShowSearchConfirmModal(false);
+    setSearchUploadFiles([]);
+    setSearchUploadStatus('');
+    setSearchUploadDescription('');
+    setShowSearchUploadModal(true);
+  };
+  const handleCancelSearchConfirm = () => {
+    setShowSearchConfirmModal(false);
+    setSelectedSearchItem(null);
+  };
+  const handleCloseSearchUploadModal = () => {
+    setShowSearchUploadModal(false);
+    setSelectedSearchItem(null);
+    setSearchUploadFiles([]);
+    setSearchUploadStatus('');
+    setSearchUploadDescription('');
+  };
+  const handleSearchFileSelect = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    const validFiles = files;
+
+    const fileEntries = validFiles.map((file) => ({
+      id: Date.now() + Math.random(),
+      file,
+      name: file.name,
+      size: file.size,
+      progress: 10,
+      uploadedUrl: null
+    }));
+    setSearchUploadFiles((prev) => [...prev, ...fileEntries]);
+
+    setIsSearchUploading(true);
+    try {
+      const urls = await uploadFilesToBackend(validFiles, {
+        folder: 'FileUpload / Tools_Tracker_Images',
+        fileNamePrefix: buildUploadFileNamePrefix({
+          itemName: selectedSearchItem?.item_name || selectedSearchItem?.itemName || '',
+          itemId: selectedSearchItem?.item_id || selectedSearchItem?.itemId || '',
+          quantity: selectedSearchItem?.quantity || selectedSearchItem?.qty || ''
+        })
+      });
+      flushSync(() => {
+        setSearchUploadFiles((prev) =>
+          prev.map((f) => {
+            const idx = fileEntries.findIndex((x) => x.id === f.id);
+            if (idx === -1) return f;
+            const uploadedUrl = urls[idx] || null;
+            return { ...f, progress: uploadedUrl ? 100 : 0, uploadedUrl };
+          })
+        );
+      });
+      endPendingFileUpload();
+    } catch (error) {
+      console.error('Error uploading search file(s):', error);
+      setSearchUploadFiles((prev) => prev.filter((f) => !fileEntries.some((x) => x.id === f.id)));
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setIsSearchUploading(false);
+      e.target.value = '';
+    }
+  };
+  const handleDeleteSearchUploadFile = (fileId) => {
+    setSearchUploadFiles(prev => prev.filter(f => f.id !== fileId));
+  };
+  const handleConfirmSearchUpload = () => {
+    if (!searchUploadStatus) {
+      alert('Please select the machine status before confirming.');
+      return;
+    }
+    // For Service tab, image upload is required
+    if (entryServiceMode === 'Service' && searchUploadFiles.length === 0) {
+      alert('Image should upload definitely.');
+      return;
+    }
+    if (!selectedSearchItem) return;
+    const selectedItemNameId = selectedSearchItem?.item_name_id ?? selectedSearchItem?.itemNameId ?? null;
+    const selectedBrandId = selectedSearchItem?.brand_id ?? selectedSearchItem?.brandId ?? selectedSearchItem?.brand_name_id ?? selectedSearchItem?.brandNameId ?? null;
+    const selectedItemIdsId = selectedSearchItem?.item_ids_id ?? selectedSearchItem?.itemIdsId ?? null;
+    const resolvedMachineNumber = resolveMachineNumFromStock(selectedSearchItem);
+
+    const itemNameObj = toolsItemNameListData.find(
+      item => String(item?.id) === String(selectedItemNameId)
+    );
+    const brandObj = toolsBrandFullData.find(
+      item => String(item?.id) === String(selectedBrandId)
+    );
+    const itemIdObj = toolsItemIdFullData.find(
+      item => String(item?.id) === String(selectedItemIdsId)
+    );
+    const uploadedImages = searchUploadFiles
+      .filter((f) => f.uploadedUrl)
+      .map((f) => ({ tools_image_url: f.uploadedUrl }));
+
+    const newItem = {
+      id: Date.now(),
+      timestamp: new Date().toISOString().slice(0, 19),
+      item_name_id: selectedItemNameId ? String(selectedItemNameId) : null,
+      item_ids_id: selectedItemIdsId ? String(selectedItemIdsId) : null,
+      brand_id: selectedBrandId ? String(selectedBrandId) : null,
+      model: selectedSearchItem?.model || '',
+      machine_number: resolvedMachineNumber || '',
+      quantity: selectedItemIdsId ? 0 : (selectedSearchItem?.quantity || 1),
+      machine_status: searchUploadStatus,
+      description: searchUploadDescription,
+      tools_item_live_images: uploadedImages,
+      itemName: itemNameObj?.item_name || itemNameObj?.itemName || selectedSearchItem?.item_name || selectedSearchItem?.itemName || 'Unknown',
+      brand: brandObj?.tools_brand || brandObj?.toolsBrand || selectedSearchItem?.brand || '',
+      itemId: itemIdObj?.item_id || itemIdObj?.itemId || selectedSearchItem?.item_id || selectedSearchItem?.itemId || '',
+      localImageUrls: searchUploadFiles.filter((f) => f.uploadedUrl).map((f) => f.uploadedUrl)
+    };
+    setItems(prev => [...prev, newItem]);
+    handleCloseSearchUploadModal();
+  };
+  const getFilteredSearchItems = () => {
+    const searchTerms = universalSearchQuery.trim().split(/\s+/).map(s => s.toLowerCase()).filter(Boolean);
+    const matchesSearch = (itemName, itemIdName, brandName, machineNumber, modelStr, statusStr) => {
+      if (searchTerms.length === 0) return true;
+      return searchTerms.every(term =>
+        (itemName && itemName.toLowerCase().includes(term)) ||
+        (itemIdName && itemIdName.toLowerCase().includes(term)) ||
+        (brandName && brandName.toLowerCase().includes(term)) ||
+        (machineNumber && machineNumber.toLowerCase().includes(term)) ||
+        (modelStr && modelStr.toLowerCase().includes(term)) ||
+        (statusStr && statusStr.toLowerCase().includes(term))
+      );
+    };
+    // Special handling for Service Return: pull items from service store using movement history
+    if (entryServiceMode === 'Service' && serviceFlowMode === 'return' && selectedServiceStore) {
+      const serviceStoreIdStr = String(selectedServiceStore.id);
+
+      const results = [];
+
+      toolsTrackerManagementData.forEach((entry) => {
+        const entryTypeNorm = getEntryTypeNormalized(entry);
+        if (!isServiceEntryType(entryTypeNorm)) return;
+
+        const entryServiceStoreId = entry?.service_store_id ?? entry?.serviceStoreId;
+        if (!entryServiceStoreId || String(entryServiceStoreId) !== serviceStoreIdStr) return;
+
+        const entryItems = entry?.tools_tracker_item_name_table ?? entry?.toolsTrackerItemNameTable ?? [];
+
+        entryItems.forEach((entryItem) => {
+          const itemIdsId = entryItem?.item_ids_id ?? entryItem?.itemIdsId ?? null;
+          const itemNameId = entryItem?.item_name_id ?? entryItem?.itemNameId ?? null;
+          const brandId = entryItem?.brand_id ?? entryItem?.brandId ?? entryItem?.brand_name_id ?? entryItem?.brandNameId ?? null;
+
+          // For item sets, ensure the current location is still this service store
+          if (itemIdsId) {
+            const resolvedMachineNumber = resolveMachineNumberText(
+              entryItem?.machine_number_id ??
+              entryItem?.machineNumberId ??
+              entryItem?.machine_number ??
+              entryItem?.machineNumber ??
+              ''
+            );
+
+            if (!isItemSetAvailableAtLocation(itemIdsId, brandId, resolvedMachineNumber, serviceStoreIdStr)) {
+              return;
+            }
+          }
+
+          const itemNameObj = toolsItemNameListData.find(
+            i => String(i?.id) === String(itemNameId)
+          );
+          const itemIdObj = toolsItemIdFullData.find(
+            i => String(i?.id) === String(itemIdsId)
+          );
+          const brandObj = toolsBrandFullData.find(
+            i => String(i?.id) === String(brandId)
+          );
+
+          const itemName = itemNameObj?.item_name || itemNameObj?.itemName || '';
+          const itemIdName = itemIdObj?.item_id || itemIdObj?.itemId || '';
+          const brandName = brandObj?.tools_brand || brandObj?.toolsBrand || '';
+          const machineNumberDisplay = resolveMachineNumberText(
+            entryItem?.machine_number_id ??
+            entryItem?.machineNumberId ??
+            entryItem?.machine_number ??
+            entryItem?.machineNumber ??
+            ''
+          );
+
+          const modelDisplay = (entryItem?.model ?? '').trim();
+          const statusDisplay = (entryItem?.machine_status ?? entryItem?.machineStatus ?? 'Working').trim();
+          if (!matchesSearch(itemName, itemIdName, brandName, machineNumberDisplay, modelDisplay, statusDisplay)) {
+            return;
+          }
+
+          results.push({
+            ...entryItem,
+            item_name_id: itemNameId,
+            item_ids_id: itemIdsId,
+            brand_id: brandId,
+            itemName,
+            itemId: itemIdName,
+            brand: brandName,
+            machine_number: machineNumberDisplay
+          });
+        });
+      });
+
+      return results;
+    }
+
+    if (!stockManagementData || stockManagementData.length === 0) return [];
+
+    // Resolve "From" location for all other flows
+    const fromLocationId = entryServiceMode === 'Relocate'
+      ? (selectedCurrentLocation?.id ? String(selectedCurrentLocation.id) : null)
+      : (selectedFrom?.id ? String(selectedFrom.id) : null);
+
+    // Require From to be selected - cannot determine availability without it
+    if (!fromLocationId) return [];
+
+    return stockManagementData.filter(item => {
+      const itemNameId = item?.item_name_id ?? item?.itemNameId;
+      const brandId = item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId;
+      const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+
+      // Filter by "From" location: only show items available at the selected From
+      if (fromLocationId) {
+        if (itemIdsId) {
+          // Item set (unique machine): check if available at location
+          const machineNumber = resolveMachineNumFromStock(item) || (item?.machine_number ?? item?.machineNumber ?? '').trim();
+          if (!isItemSetAvailableAtLocation(itemIdsId, brandId, machineNumber, fromLocationId)) {
+            return false;
+          }
+        } else {
+          // Quantity-based item: check if any quantity available at location
+          const availableQty = getAvailableQuantityAtLocation(itemNameId, brandId, fromLocationId);
+          if (availableQty <= 0) {
+            return false;
+          }
+        }
+      }
+
+      const itemNameObj = toolsItemNameListData.find(
+        i => String(i?.id) === String(itemNameId)
+      );
+      const itemIdObj = toolsItemIdFullData.find(
+        i => String(i?.id) === String(itemIdsId)
+      );
+      const brandObj = toolsBrandFullData.find(
+        i => String(i?.id) === String(brandId)
+      );
+      const itemName = itemNameObj?.item_name || itemNameObj?.itemName || '';
+      const itemIdName = itemIdObj?.item_id || itemIdObj?.itemId || '';
+      const brandName = brandObj?.tools_brand || brandObj?.toolsBrand || '';
+      const machineNumber = resolveMachineNumFromStock(item) || (item?.machine_number ?? item?.machineNumber ?? '');
+      const modelStr = (item?.model ?? '').trim();
+      const statusStr = itemIdsId
+        ? getLatestItemSetMachineStatus(itemIdsId, brandId, machineNumber, item?.machine_status ?? item?.machineStatus ?? 'Working')
+        : String(item?.machine_status ?? item?.machineStatus ?? 'Working').trim();
+      return matchesSearch(itemName, itemIdName, brandName, machineNumber, modelStr, statusStr);
+    });
+  };
+  const formatSearchItemDate = (timestamp) => {
+    if (!timestamp) return '';
+    try {
+      const date = new Date(timestamp);
+      const formattedDate = date.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+      const formattedTime = date.toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+      return `${formattedDate} • ${formattedTime}`;
+    } catch {
+      return '';
+    }
+  };
+  const resolveMachineNumberText = (machineNumberOrId) => {
+    if (machineNumberOrId === null || machineNumberOrId === undefined || machineNumberOrId === '') return '';
+    const value = String(machineNumberOrId).trim();
+    if (!value) return '';
+
+    const byId = machineNumbersList.find((m) => String(m?.id ?? m?._id) === value);
+    if (byId) {
+      return (byId?.machine_number ?? byId?.machineNumber ?? '').trim();
+    }
+
+    const byNumber = machineNumbersList.find(
+      (m) => String(m?.machine_number ?? m?.machineNumber ?? '').trim() === value
+    );
+    if (byNumber) {
+      return (byNumber?.machine_number ?? byNumber?.machineNumber ?? '').trim();
+    }
+    return value;
+  };
+  const resolveMachineNumFromStock = (item) => {
+    if (!item) return '';
+    const machineNumberId = item?.machine_number_id ?? item?.machineNumberId;
+    if (machineNumberId) {
+      const resolved = resolveMachineNumberText(machineNumberId);
+      if (resolved) return resolved;
+    }
+    return resolveMachineNumberText(item?.machine_number ?? item?.machineNumber ?? '');
+  };
+  const resolveMachineNumberId = (machineNumberOrId) => {
+    if (machineNumberOrId === null || machineNumberOrId === undefined || machineNumberOrId === '') return null;
+    const value = String(machineNumberOrId).trim();
+    if (!value) return null;
+
+    const byId = machineNumbersList.find((m) => String(m?.id ?? m?._id) === value);
+    if (byId) return String(byId?.id ?? byId?._id);
+
+    const byNumber = machineNumbersList.find(
+      (m) => String(m?.machine_number ?? m?.machineNumber ?? '').trim() === value
+    );
+    if (byNumber) return String(byNumber?.id ?? byNumber?._id);
+
+    return null;
+  };
+  const hasMachineNumberIdConfiguredForItemSet = (itemIdsId, brandId, machineNumber) => {
+    if (!itemIdsId) return false;
+
+    const itemIdsIdStr = String(itemIdsId);
+    const brandIdStr = brandId ? String(brandId) : null;
+    const machineNumberStr = machineNumber ? String(machineNumber).trim() : '';
+
+    const matchingStockRows = stockManagementData.filter(stock => {
+      const stockItemIdsId = stock?.item_ids_id ?? stock?.itemIdsId;
+      const stockBrandId = stock?.brand_id ?? stock?.brandId ?? stock?.brand_name_id ?? stock?.brandNameId;
+      const stockMachineNumber = stock?.machine_number ?? stock?.machineNumber ?? '';
+      const stockMachineNumberId = stock?.machine_number_id ?? stock?.machineNumberId;
+      const itemIdsMatch = stockItemIdsId && String(stockItemIdsId) === itemIdsIdStr;
+      const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
+      const machineMatch = !machineNumberStr || isMachineNumberMatch(stockMachineNumber, stockMachineNumberId, machineNumberStr);
+      return itemIdsMatch && brandMatch && machineMatch;
+    });
+
+    if (matchingStockRows.length > 0) {
+      return matchingStockRows.some(stock => (stock?.machine_number_id ?? stock?.machineNumberId));
+    }
+
+    return !!resolveMachineNumberId(machineNumber);
+  };
+  const resolveMachineNumberIdForItemSet = (itemIdsId, brandId, machineNumber) => {
+    if (!itemIdsId) return null;
+
+    const itemIdsIdStr = String(itemIdsId);
+    const brandIdStr = brandId ? String(brandId) : null;
+    const machineNumberStr = machineNumber ? String(machineNumber).trim() : '';
+
+    const exactStock = stockManagementData.find(stock => {
+      const stockItemIdsId = stock?.item_ids_id ?? stock?.itemIdsId;
+      const stockBrandId = stock?.brand_id ?? stock?.brandId ?? stock?.brand_name_id ?? stock?.brandNameId;
+      const stockMachineNumber = stock?.machine_number ?? stock?.machineNumber ?? '';
+      const stockMachineNumberId = stock?.machine_number_id ?? stock?.machineNumberId;
+      const itemIdsMatch = stockItemIdsId && String(stockItemIdsId) === itemIdsIdStr;
+      const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
+      const machineMatch = !machineNumberStr || isMachineNumberMatch(stockMachineNumber, stockMachineNumberId, machineNumberStr);
+      return itemIdsMatch && brandMatch && machineMatch;
+    });
+    const exactStockMachineNumberId = exactStock?.machine_number_id ?? exactStock?.machineNumberId;
+    if (exactStockMachineNumberId) return String(exactStockMachineNumberId);
+
+    const fallbackStock = stockManagementData.find(stock => {
+      const stockItemIdsId = stock?.item_ids_id ?? stock?.itemIdsId;
+      const stockBrandId = stock?.brand_id ?? stock?.brandId ?? stock?.brand_name_id ?? stock?.brandNameId;
+      const itemIdsMatch = stockItemIdsId && String(stockItemIdsId) === itemIdsIdStr;
+      const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
+      return itemIdsMatch && brandMatch;
+    });
+    const fallbackStockMachineNumberId = fallbackStock?.machine_number_id ?? fallbackStock?.machineNumberId;
+    if (fallbackStockMachineNumberId) return String(fallbackStockMachineNumberId);
+
+    return resolveMachineNumberId(machineNumber);
+  };
+  const getItemCountByNameAndBrand = (itemNameId, brandId) => {
+    if (!itemNameId) return 0;
+    const itemNameIdStr = String(itemNameId);
+    const brandIdStr = brandId ? String(brandId) : null;
+
+    const quantityBasedStock = stockManagementData.filter(item => {
+      const stockItemNameId = item?.item_name_id ?? item?.itemNameId;
+      const stockItemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+      const stockBrandId = item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId;
+      const itemNameMatch = String(stockItemNameId) === itemNameIdStr;
+      const noItemIdsId = !stockItemIdsId;
+      const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
+      return itemNameMatch && noItemIdsId && brandMatch;
+    });
+
+    const itemSetStock = stockManagementData.filter(item => {
+      const stockItemNameId = item?.item_name_id ?? item?.itemNameId;
+      const stockItemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+      const stockBrandId = item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId;
+      const itemNameMatch = String(stockItemNameId) === itemNameIdStr;
+      const hasItemIdsId = !!stockItemIdsId;
+      const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
+      return itemNameMatch && hasItemIdsId && brandMatch;
+    });
+
+    const quantitySum = quantityBasedStock.reduce((sum, item) => sum + parseInt(item?.quantity || 0, 10), 0);
+    return quantitySum + itemSetStock.length;
+  };
+  const getLinkedBrandOptionsForItemName = (itemNameId) => {
+    if (!itemNameId) return brandOptions;
+    const itemNameIdStr = String(itemNameId);
+    const linkedBrandIds = new Set();
+
+    const itemNameObj = toolsItemNameListData.find((item) => String(item?.id) === itemNameIdStr);
+    const toolsDetails = Array.isArray(itemNameObj?.tools_details)
+      ? itemNameObj.tools_details
+      : Array.isArray(itemNameObj?.toolsDetails)
+        ? itemNameObj.toolsDetails
+        : [];
+    toolsDetails.forEach((detail) => {
+      const brandId = detail?.brand_id ?? detail?.brandId;
+      if (brandId) linkedBrandIds.add(String(brandId));
+    });
+
+    stockManagementData.forEach((item) => {
+      const stockItemNameId = item?.item_name_id ?? item?.itemNameId;
+      if (String(stockItemNameId) !== itemNameIdStr) return;
+      const stockBrandId = item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId;
+      if (stockBrandId) linkedBrandIds.add(String(stockBrandId));
+    });
+
+    if (linkedBrandIds.size === 0) return [];
+    return toolsBrandFullData
+      .filter((brand) => linkedBrandIds.has(String(brand?.id)))
+      .map((brand) => brand?.tools_brand?.trim() ?? brand?.toolsBrand?.trim())
+      .filter(Boolean);
+  };
+  const getLinkedItemIdOptions = (itemNameId, brandId) => {
+    if (!itemNameId) return itemIdOptions;
+    const itemNameIdStr = String(itemNameId);
+    const brandIdStr = brandId ? String(brandId) : null;
+    const linkedItemIds = new Set();
+
+    const itemNameObj = toolsItemNameListData.find((item) => String(item?.id) === itemNameIdStr);
+    const toolsDetails = Array.isArray(itemNameObj?.tools_details)
+      ? itemNameObj.tools_details
+      : Array.isArray(itemNameObj?.toolsDetails)
+        ? itemNameObj.toolsDetails
+        : [];
+    toolsDetails.forEach((detail) => {
+      const detailBrandId = detail?.brand_id ?? detail?.brandId;
+      const detailItemId = detail?.item_ids_id ?? detail?.itemIdsId;
+      const brandMatch = !brandIdStr || (detailBrandId && String(detailBrandId) === brandIdStr);
+      if (brandMatch && detailItemId) linkedItemIds.add(String(detailItemId));
+    });
+
+    stockManagementData.forEach((item) => {
+      const stockItemNameId = item?.item_name_id ?? item?.itemNameId;
+      const stockBrandId = item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId;
+      const stockItemId = item?.item_ids_id ?? item?.itemIdsId;
+      const itemNameMatch = String(stockItemNameId) === itemNameIdStr;
+      const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
+      if (itemNameMatch && brandMatch && stockItemId) linkedItemIds.add(String(stockItemId));
+    });
+
+    if (linkedItemIds.size === 0) return [];
+    return toolsItemIdFullData
+      .filter((itemId) => linkedItemIds.has(String(itemId?.id)))
+      .map((itemId) => itemId?.item_id?.trim() ?? itemId?.itemId?.trim())
+      .filter(Boolean);
+  };
+  const filteredAddModalBrandOptions = React.useMemo(
+    () => getLinkedBrandOptionsForItemName(addItemFormData.itemNameId),
+    [addItemFormData.itemNameId, brandOptions, toolsItemNameListData, toolsBrandFullData, stockManagementData]
+  );
+  const filteredAddModalItemIdOptions = React.useMemo(
+    () => getLinkedItemIdOptions(addItemFormData.itemNameId, addItemFormData.brandId),
+    [addItemFormData.itemNameId, addItemFormData.brandId, itemIdOptions, toolsItemNameListData, toolsItemIdFullData, stockManagementData]
+  );
+  const handleFieldChange = (field, value) => {
+    setAddItemFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      if (field === 'itemId' && value) {
+        updated.quantity = '';
+        setSelectedItemNameQuantity(0);
+      } else if (field === 'quantity' && value && value.trim() !== '') {
+        updated.itemId = '';
+        updated.itemIdDbId = null;
+        updated.machineNumber = '';
+        updated.model = '';
+        setSelectedItemMachineNumber('');
+      }
+      if (field === 'itemName' && value) {
+        const itemNameObj = toolsItemNameListData.find(
+          item => (item?.item_name ?? item?.itemName) === value
+        );
+        updated.itemNameId = itemNameObj?.id ?? null;
+        // Changing item name invalidates previously selected brand/item-id/model.
+        updated.brand = '';
+        updated.brandId = null;
+        updated.itemId = '';
+        updated.itemIdDbId = null;
+        updated.machineNumber = '';
+        updated.model = '';
+        const toolsDetails = Array.isArray(itemNameObj?.tools_details)
+          ? itemNameObj.tools_details
+          : Array.isArray(itemNameObj?.toolsDetails)
+            ? itemNameObj.toolsDetails
+            : [];
+        const brandIdToUse = updated.brandId ?? prev.brandId;
+        const quantityBasedStock = stockManagementData.filter(item => {
+          const itemNameId = item?.item_name_id ?? item?.itemNameId;
+          const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+          const brandId = item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId;
+          const itemNameMatch = String(itemNameId) === String(itemNameObj?.id);
+          const noItemIdsId = !itemIdsId;
+          const brandMatch = !brandIdToUse || (brandId && String(brandId) === String(brandIdToUse));
+          return itemNameMatch && noItemIdsId && brandMatch;
+        });
+        const itemSetStock = stockManagementData.filter(item => {
+          const itemNameId = item?.item_name_id ?? item?.itemNameId;
+          const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+          const brandId = item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId;
+          const itemNameMatch = String(itemNameId) === String(itemNameObj?.id);
+          const hasItemIdsId = !!itemIdsId;
+          const brandMatch = !brandIdToUse || (brandId && String(brandId) === String(brandIdToUse));
+          return itemNameMatch && hasItemIdsId && brandMatch;
+        });
+        const quantitySum = quantityBasedStock.reduce((sum, item) => sum + parseInt(item?.quantity || 0, 10), 0);
+        const itemSetCount = itemSetStock.length;
+        const totalCount = quantitySum + itemSetCount;
+        setSelectedItemNameQuantity(totalCount);
+      } else if (field === 'itemName' && !value) {
+        updated.itemNameId = null;
+        updated.brand = '';
+        updated.brandId = null;
+        updated.itemId = '';
+        updated.itemIdDbId = null;
+        updated.machineNumber = '';
+        updated.model = '';
+        setSelectedItemNameQuantity(0);
+      }
+      if (field === 'brand' && value) {
+        const brandObj = toolsBrandFullData.find(
+          b => (b?.tools_brand?.trim() ?? b?.toolsBrand?.trim()) === value
+        );
+        updated.brandId = brandObj?.id ?? null;
+        // Brand change invalidates previously selected item-id/model.
+        updated.itemId = '';
+        updated.itemIdDbId = null;
+        updated.machineNumber = '';
+        updated.model = '';
+        setSelectedItemMachineNumber('');
+        if (updated.itemNameId && updated.itemName) {
+          const itemNameObj = toolsItemNameListData.find(
+            i => String(i?.id) === String(updated.itemNameId)
+          );
+          const brandIdToUse = updated.brandId;
+          const quantityBasedStock = stockManagementData.filter(item => {
+            const itemNameId = item?.item_name_id ?? item?.itemNameId;
+            const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+            const brandId = item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId;
+            const itemNameMatch = String(itemNameId) === String(itemNameObj?.id);
+            const noItemIdsId = !itemIdsId;
+            const brandMatch = !brandIdToUse || (brandId && String(brandId) === String(brandIdToUse));
+            return itemNameMatch && noItemIdsId && brandMatch;
+          });
+          const itemSetStock = stockManagementData.filter(item => {
+            const itemNameId = item?.item_name_id ?? item?.itemNameId;
+            const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+            const brandId = item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId;
+            const itemNameMatch = String(itemNameId) === String(itemNameObj?.id);
+            const hasItemIdsId = !!itemIdsId;
+            const brandMatch = !brandIdToUse || (brandId && String(brandId) === String(brandIdToUse));
+            return itemNameMatch && hasItemIdsId && brandMatch;
+          });
+          const quantitySum = quantityBasedStock.reduce((sum, item) => sum + parseInt(item?.quantity || 0, 10), 0);
+          const itemSetCount = itemSetStock.length;
+          const totalCount = quantitySum + itemSetCount;
+          setSelectedItemNameQuantity(totalCount);
+        }
+      } else if (field === 'brand' && !value) {
+        updated.brandId = null;
+        updated.itemId = '';
+        updated.itemIdDbId = null;
+        updated.machineNumber = '';
+        updated.model = '';
+        setSelectedItemMachineNumber('');
+        if (updated.itemNameId && updated.itemName) {
+          const itemNameObj = toolsItemNameListData.find(
+            i => String(i?.id) === String(updated.itemNameId)
+          );
+          const quantityBasedStock = stockManagementData.filter(item => {
+            const itemNameId = item?.item_name_id ?? item?.itemNameId;
+            const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+            const itemNameMatch = String(itemNameId) === String(itemNameObj?.id);
+            const noItemIdsId = !itemIdsId;
+            return itemNameMatch && noItemIdsId;
+          });
+          const itemSetStock = stockManagementData.filter(item => {
+            const itemNameId = item?.item_name_id ?? item?.itemNameId;
+            const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+            const itemNameMatch = String(itemNameId) === String(itemNameObj?.id);
+            const hasItemIdsId = !!itemIdsId;
+            return itemNameMatch && hasItemIdsId;
+          });
+          const quantitySum = quantityBasedStock.reduce((sum, item) => sum + parseInt(item?.quantity || 0, 10), 0);
+          const itemSetCount = itemSetStock.length;
+          const totalCount = quantitySum + itemSetCount;
+          setSelectedItemNameQuantity(totalCount);
+        }
+      }
+      if (field === 'itemId' && value) {
+        const itemIdObj = toolsItemIdFullData.find(
+          item => (item?.item_id?.trim() ?? item?.itemId?.trim()) === value
+        );
+        updated.itemIdDbId = itemIdObj?.id ?? null;
+
+        if (itemIdObj?.id) {
+          const itemIdsIdStr = String(itemIdObj.id);
+
+          // Find all entries with this item_ids_id from both stockManagementData and toolsTrackerManagementData
+          const allEntries = [];
+
+          // Get from stockManagementData
+          stockManagementData.forEach(item => {
+            const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+            if (String(itemIdsId) === itemIdsIdStr) {
+              allEntries.push({
+                id: item?.id ?? item?._id ?? 0,
+                timestamp: item?.timestamp || item?.created_date_time || item?.createdDateTime || '',
+                item_name_id: item?.item_name_id ?? item?.itemNameId,
+                brand_id: item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId,
+                model: item?.model || '',
+                machine_number: resolveMachineNumFromStock(item)
+              });
+            }
+          });
+
+          // Get from toolsTrackerManagementData
+          toolsTrackerManagementData.forEach(entry => {
+            const entryItems = entry?.tools_tracker_item_name_table ?? entry?.toolsTrackerItemNameTable ?? [];
+            entryItems.forEach(item => {
+              const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+              if (String(itemIdsId) === itemIdsIdStr) {
+                allEntries.push({
+                  id: entry?.id ?? entry?._id ?? 0,
+                  timestamp: entry?.created_date_time ?? entry?.createdDateTime ?? entry?.timestamp ?? '',
+                  item_name_id: item?.item_name_id ?? item?.itemNameId,
+                  brand_id: item?.brand_id ?? item?.brandId,
+                  model: item?.model || '',
+                  machine_number: resolveMachineNumberText(
+                    item?.machine_number_id ??
+                    item?.machineNumberId ??
+                    item?.machine_number ??
+                    item?.machineNumber ??
+                    ''
+                  )
+                });
+              }
+            });
+          });
+
+          // Sort by id descending (highest id = most recent) or timestamp descending
+          allEntries.sort((a, b) => {
+            // First try to sort by id (numeric comparison)
+            const idA = parseInt(a.id) || 0;
+            const idB = parseInt(b.id) || 0;
+            if (idB !== idA) {
+              return idB - idA;
+            }
+            // If ids are equal or both 0, sort by timestamp
+            if (a.timestamp && b.timestamp) {
+              return new Date(b.timestamp) - new Date(a.timestamp);
+            }
+            return 0;
+          });
+
+          // Get the last (most recent) entry
+          const lastEntry = allEntries.length > 0 ? allEntries[0] : null;
+          let countItemNameId = null;
+          let countBrandId = null;
+
+          if (lastEntry) {
+            // Set Item Name from the last entry
+            if (lastEntry.item_name_id) {
+              const itemNameObj = toolsItemNameListData.find(
+                item => String(item?.id) === String(lastEntry.item_name_id)
+              );
+              if (itemNameObj) {
+                updated.itemName = itemNameObj?.item_name ?? itemNameObj?.itemName ?? '';
+                updated.itemNameId = itemNameObj?.id ?? null;
+                countItemNameId = itemNameObj?.id ?? null;
+              }
+            }
+
+            // Set Brand from the last entry
+            if (lastEntry.brand_id) {
+              const brandObj = toolsBrandFullData.find(
+                b => String(b?.id) === String(lastEntry.brand_id)
+              );
+              if (brandObj) {
+                updated.brand = brandObj?.tools_brand ?? brandObj?.toolsBrand ?? '';
+                updated.brandId = brandObj?.id ?? null;
+                countBrandId = brandObj?.id ?? null;
+              }
+            }
+            updated.model = lastEntry.model || '';
+
+            // Get latest machine number from new API that doesn't have "Machine Dead" status
+            const machineStatusesForItemId = Array.isArray(machineStatusData)
+              ? machineStatusData.filter(status => {
+                const statusItemIdsId = String(status.item_ids_id || status.itemIdsId || '');
+                return statusItemIdsId === itemIdsIdStr;
+              })
+              : [];
+
+            // Group by machine number and get latest status for each
+            const machineStatusMap = new Map();
+            machineStatusesForItemId.forEach(status => {
+              const machineNum = resolveMachineNumberText(
+                status.machine_number_id ||
+                status.machineNumberId ||
+                status.machine_number ||
+                status.machineNumber ||
+                ''
+              );
+              if (machineNum) {
+                const existing = machineStatusMap.get(machineNum);
+                if (!existing || (status.id || 0) > (existing.id || 0)) {
+                  machineStatusMap.set(machineNum, status);
+                }
+              }
+            });
+
+            // Find the latest machine number that isn't marked as "Machine Dead"
+            let latestMachineNumber = null;
+            let latestStatusId = 0;
+
+            machineStatusMap.forEach((status, machineNum) => {
+              const machineStatus = (status.machine_status || status.machineStatus || '').trim();
+              const machineStatusLower = machineStatus.toLowerCase();
+              // Include all statuses except "Machine Dead"
+              if (machineStatusLower !== 'machine dead') {
+                const statusId = status.id || 0;
+                if (statusId > latestStatusId) {
+                  latestStatusId = statusId;
+                  latestMachineNumber = machineNum;
+                }
+              }
+            });
+
+            // If found in new API, use it
+            if (latestMachineNumber) {
+              updated.machineNumber = latestMachineNumber;
+              setSelectedItemMachineNumber(latestMachineNumber);
+            } else {
+              // Check if lastEntry.machine_number is NOT dead before using it as fallback
+              const lastEntryMachineNum = lastEntry.machine_number ? String(lastEntry.machine_number).trim() : '';
+              if (lastEntryMachineNum) {
+                const lastEntryStatus = machineStatusMap.get(lastEntryMachineNum);
+                if (lastEntryStatus) {
+                  // Machine number exists in new API - check its status
+                  const lastEntryMachineStatus = (lastEntryStatus.machine_status || lastEntryStatus.machineStatus || '').trim();
+                  const lastEntryMachineStatusLower = lastEntryMachineStatus.toLowerCase();
+                  // Only skip fallback when status is "Machine Dead"
+                  if (lastEntryMachineStatusLower !== 'machine dead' &&
+                    lastEntryMachineStatus !== 'Machine Dead') {
+                    updated.machineNumber = lastEntryMachineNum;
+                    setSelectedItemMachineNumber(lastEntryMachineNum);
+                  } else {
+                    // Last entry machine is "Machine Dead", don't use it
+                    updated.machineNumber = '';
+                    setSelectedItemMachineNumber('');
+                  }
+                } else {
+                  // No status found in new API for last entry machine - safe to use it
+                  // (It's probably a new machine or status hasn't been set yet)
+                  updated.machineNumber = lastEntryMachineNum;
+                  setSelectedItemMachineNumber(lastEntryMachineNum);
+                }
+              } else {
+                updated.machineNumber = '';
+                setSelectedItemMachineNumber('');
+              }
+            }
+            if (!countItemNameId) {
+              countItemNameId = lastEntry.item_name_id ?? null;
+            }
+            if (!countBrandId) {
+              countBrandId = lastEntry.brand_id ?? null;
+            }
+          } else {
+            // If no entry found, try to get itemName from stockManagementData (fallback)
+            const stockItem = stockManagementData.find(item => {
+              const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+              return String(itemIdsId) === itemIdsIdStr;
+            });
+
+            if (stockItem?.item_name_id) {
+              const itemNameObj = toolsItemNameListData.find(
+                item => String(item?.id) === String(stockItem.item_name_id)
+              );
+              if (itemNameObj) {
+                updated.itemName = itemNameObj?.item_name ?? itemNameObj?.itemName ?? '';
+                updated.itemNameId = itemNameObj?.id ?? null;
+                countItemNameId = itemNameObj?.id ?? null;
+              }
+            }
+            countBrandId = stockItem?.brand_id ?? stockItem?.brandId ?? stockItem?.brand_name_id ?? stockItem?.brandNameId ?? null;
+            updated.model = stockItem?.model || '';
+
+            // Get latest machine number from new API that doesn't have "Machine Dead" status
+            const machineStatusesForItemId = Array.isArray(machineStatusData)
+              ? machineStatusData.filter(status => {
+                const statusItemIdsId = String(status.item_ids_id || status.itemIdsId || '');
+                return statusItemIdsId === itemIdsIdStr;
+              })
+              : [];
+
+            // Group by machine number and get latest status for each
+            const machineStatusMap = new Map();
+            machineStatusesForItemId.forEach(status => {
+              const machineNum = resolveMachineNumberText(
+                status.machine_number_id ||
+                status.machineNumberId ||
+                status.machine_number ||
+                status.machineNumber ||
+                ''
+              );
+              if (machineNum) {
+                const existing = machineStatusMap.get(machineNum);
+                if (!existing || (status.id || 0) > (existing.id || 0)) {
+                  machineStatusMap.set(machineNum, status);
+                }
+              }
+            });
+
+            // Find the latest machine number that isn't marked as "Machine Dead"
+            let latestMachineNumber = null;
+            let latestStatusId = 0;
+
+            machineStatusMap.forEach((status, machineNum) => {
+              const machineStatus = (status.machine_status || status.machineStatus || '').trim();
+              const machineStatusLower = machineStatus.toLowerCase();
+              // Include all statuses except "Machine Dead"
+              if (machineStatusLower !== 'machine dead') {
+                const statusId = status.id || 0;
+                if (statusId > latestStatusId) {
+                  latestStatusId = statusId;
+                  latestMachineNumber = machineNum;
+                }
+              }
+            });
+
+            // If found in new API, use it
+            if (latestMachineNumber) {
+              updated.machineNumber = latestMachineNumber;
+              setSelectedItemMachineNumber(latestMachineNumber);
+            } else {
+              // Check if stockItem.machine_number is NOT dead before using it as fallback
+              const stockMachineNum = resolveMachineNumFromStock(stockItem);
+              const stockMachineNumStr = stockMachineNum ? String(stockMachineNum).trim() : '';
+              if (stockMachineNumStr) {
+                const stockMachineStatus = machineStatusMap.get(stockMachineNumStr);
+                if (stockMachineStatus) {
+                  // Machine number exists in new API - check its status
+                  const stockMachineStatusValue = (stockMachineStatus.machine_status || stockMachineStatus.machineStatus || '').trim();
+                  const stockMachineStatusLower = stockMachineStatusValue.toLowerCase();
+                  // Only skip fallback when status is "Machine Dead"
+                  if (stockMachineStatusLower !== 'machine dead' &&
+                    stockMachineStatusValue !== 'Machine Dead') {
+                    updated.machineNumber = stockMachineNumStr;
+                    setSelectedItemMachineNumber(stockMachineNumStr);
+                  } else {
+                    // Stock machine is "Machine Dead", don't use it
+                    updated.machineNumber = '';
+                    setSelectedItemMachineNumber('');
+                  }
+                } else {
+                  updated.machineNumber = stockMachineNumStr;
+                  setSelectedItemMachineNumber(stockMachineNumStr);
+                }
+              } else {
+                updated.machineNumber = '';
+                setSelectedItemMachineNumber('');
+              }
+            }
+          }
+          // Keep UI badge in sync even if a branch above didn't call setter.
+          setSelectedItemMachineNumber(updated.machineNumber || '');
+          const finalItemNameId = countItemNameId ?? updated.itemNameId;
+          const finalBrandId = countBrandId ?? updated.brandId;
+          setSelectedItemNameQuantity(getItemCountByNameAndBrand(finalItemNameId, finalBrandId));
+        }
+      } else if (field === 'itemId' && !value) {
+        updated.itemIdDbId = null;
+        updated.itemName = '';
+        updated.itemNameId = null;
+        updated.brand = '';
+        updated.brandId = null;
+        updated.machineNumber = '';
+        updated.model = '';
+        setSelectedItemNameQuantity(0);
+        setSelectedItemMachineNumber('');
+      }
+      return updated;
+    });
+  };
+  const handleAddNewItemName = async (newItemName) => {
+    if (!newItemName || !newItemName.trim()) {
+      return;
+    }
+    if (!canCreate) {
+      alert("You don't have permission to create Tools Tracker master data.");
+      return;
+    }
+    const trimmedName = newItemName.trim();
+    if (itemNameOptions.some(name => name.toLowerCase() === trimmedName.toLowerCase())) {
+      handleFieldChange('itemName', trimmedName);
+      return;
+    }
+    try {
+      const payload = {
+        category_id: selectedCategory?.id ?? null,
+        item_name: trimmedName,
+        tools_details: []
+      };
+      const res = await fetch(`${TOOLS_ITEM_NAME_BASE_URL}/save`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to save: ${res.status} ${res.statusText}`);
+      }
+      // Try to get ID from response first
+      let savedItemId = null;
+      try {
+        const responseText = await res.clone().text();
+        if (responseText) {
+          const responseData = JSON.parse(responseText);
+          savedItemId = responseData?.id ?? responseData?._id ?? null;
+        }
+      } catch {
+        // If response doesn't have JSON, continue to refresh
+      }
+      const refreshed = await fetch(`${TOOLS_ITEM_NAME_BASE_URL}/getAll`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (refreshed.ok) {
+        const data = await refreshed.json();
+        setToolsItemNameListData(Array.isArray(data) ? data : []);
+        const names = (Array.isArray(data) ? data : [])
+          .map(item => item?.item_name ?? item?.itemName)
+          .filter(Boolean);
+        setItemNameOptions(Array.from(new Set(names)));
+        // Find the ID from refreshed data if not in response
+        if (!savedItemId) {
+          const newItem = (Array.isArray(data) ? data : []).find(
+            item => (item?.item_name ?? item?.itemName) === trimmedName
+          );
+          savedItemId = newItem?.id ?? newItem?._id ?? null;
+        }
+        // Set both itemName and itemNameId
+        setAddItemFormData(prev => ({
+          ...prev,
+          itemName: trimmedName,
+          itemNameId: savedItemId
+        }));
+      }
+    } catch (e) {
+      console.error('Error saving new Item Name:', e);
+      alert('Failed to save new Item Name. Please try again.');
+    }
+  };
+  const handleAddNewBrand = async (newBrand) => {
+    if (!newBrand || !newBrand.trim()) {
+      return;
+    }
+    if (!canCreate) {
+      alert("You don't have permission to create Tools Tracker master data.");
+      return;
+    }
+    const trimmedBrand = newBrand.trim();
+    if (brandOptions.some(b => b.toLowerCase() === trimmedBrand.toLowerCase())) {
+      handleFieldChange('brand', trimmedBrand);
+      return;
+    }
+    try {
+      const payload = {
+        tools_brand: trimmedBrand
+      };
+      const res = await fetch(`${TOOLS_BRAND_BASE_URL}/save`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to save: ${res.status} ${res.statusText}`);
+      }
+      // Try to get ID from response first
+      let savedBrandId = null;
+      try {
+        const responseText = await res.clone().text();
+        if (responseText) {
+          const responseData = JSON.parse(responseText);
+          savedBrandId = responseData?.id ?? responseData?._id ?? null;
+        }
+      } catch {
+        // If response doesn't have JSON, continue to refresh
+      }
+      const refreshed = await fetch(`${TOOLS_BRAND_BASE_URL}/getAll`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (refreshed.ok) {
+        const data = await refreshed.json();
+        setToolsBrandFullData(Array.isArray(data) ? data : []);
+        const brandOpts = (Array.isArray(data) ? data : [])
+          .map(b => b?.tools_brand?.trim() ?? b?.toolsBrand?.trim())
+          .filter(b => b);
+        setBrandOptions(Array.from(new Set(brandOpts)));
+        // Find the ID from refreshed data if not in response
+        if (!savedBrandId) {
+          const newBrand = (Array.isArray(data) ? data : []).find(
+            b => (b?.tools_brand?.trim() ?? b?.toolsBrand?.trim()) === trimmedBrand
+          );
+          savedBrandId = newBrand?.id ?? newBrand?._id ?? null;
+        }
+        // Set both brand and brandId
+        setAddItemFormData(prev => ({
+          ...prev,
+          brand: trimmedBrand,
+          brandId: savedBrandId
+        }));
+      }
+    } catch (e) {
+      console.error('Error saving new Brand:', e);
+      alert('Failed to save new Brand. Please try again.');
+    }
+  };
+  const handleAddNewItemId = async (newItemId) => {
+    if (!newItemId || !newItemId.trim()) {
+      return;
+    }
+    if (!canCreate) {
+      alert("You don't have permission to create Tools Tracker master data.");
+      return;
+    }
+    const trimmedItemId = newItemId.trim();
+    if (itemIdOptions.some(id => id.toLowerCase() === trimmedItemId.toLowerCase())) {
+      handleFieldChange('itemId', trimmedItemId);
+      return;
+    }
+    try {
+      const payload = {
+        item_id: trimmedItemId
+      };
+      const res = await fetch(`${TOOLS_ITEM_ID_BASE_URL}/save`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to save: ${res.status} ${res.statusText}`);
+      }
+      // Try to get ID from response first
+      let savedItemIdDbId = null;
+      try {
+        const responseText = await res.clone().text();
+        if (responseText) {
+          const responseData = JSON.parse(responseText);
+          savedItemIdDbId = responseData?.id ?? responseData?._id ?? null;
+        }
+      } catch {
+        // If response doesn't have JSON, continue to refresh
+      }
+
+      const refreshed = await fetch(`${TOOLS_ITEM_ID_BASE_URL}/getAll`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (refreshed.ok) {
+        const data = await refreshed.json();
+        setToolsItemIdFullData(Array.isArray(data) ? data : []);
+        const itemIdOpts = (Array.isArray(data) ? data : [])
+          .map(item => item?.item_id?.trim() ?? item?.itemId?.trim())
+          .filter(item => item)
+          .filter(item => !/^\d+$/.test(item));
+        setApiItemIdOptions(itemIdOpts);
+        setItemIdOptions(itemIdOpts);
+
+        // Find the ID from refreshed data if not in response
+        if (!savedItemIdDbId) {
+          const newItemId = (Array.isArray(data) ? data : []).find(
+            item => (item?.item_id?.trim() ?? item?.itemId?.trim()) === trimmedItemId
+          );
+          savedItemIdDbId = newItemId?.id ?? newItemId?._id ?? null;
+        }
+
+        // Set both itemId and itemIdDbId
+        setAddItemFormData(prev => ({
+          ...prev,
+          itemId: trimmedItemId,
+          itemIdDbId: savedItemIdDbId
+        }));
+      }
+    } catch (e) {
+      console.error('Error saving new Item ID:', e);
+      alert('Failed to save new Item ID. Please try again.');
+    }
+  };
+  return (
+    <div className="flex flex-col h-[calc(100vh-90px-80px)] min-h-0 overflow-hidden bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
+      <div className="sticky top-0 bg-white z-10 flex-shrink-0">
+        <div className="flex-shrink-0 flex mb-[8px] items-center border-b border-[#E0E0E0] justify-between pb-[8px]">
+          <div className="flex items-center  gap-[8px] ">
+            <p className="text-[12px] font-semibold text-black leading-normal">
+              #{entryNo || 'NO'}
+            </p>
+            <button type="button" onClick={() => setShowDatePicker(true)} className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline">
+              {date}
+            </button>
+          </div>
+          <div className='flex gap-[12px] items-center'>
+            {isEditMode ? (
+              <>
+                <button
+                  onClick={handleUpdateTransfer}
+                  disabled={!canCreate || isSaving || !areFieldsFilled || items.length === 0}
+                  className="text-[12px] font-semibold leading-normal text-black"
+                >
+                  {isSaving ? 'Updating...' : 'Update'}
+                </button>
+                <button
+                  onClick={() => setIsEditingTransferDetails(!isEditingTransferDetails)}
+                  className={items.length > 0 ? '' : 'invisible'}
+                >
+                  <img src={Edit} alt="Edit" className="w-[12px] h-[12px]" />
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setShowConfirmModal(true)}
+                  disabled={!canCreate || isSaving || !areFieldsFilled || (entryServiceMode !== 'Relocate' && items.length === 0)}
+                  className={`flex items-center gap-[4px] text-[12px] font-medium ${
+                    !canCreate || isSaving || !areFieldsFilled || (entryServiceMode !== 'Relocate' && items.length === 0)
+                      ? 'text-gray-400'
+                      : 'text-black'
+                  } ${(cloneModeActive || ((items.length > 0 && areFieldsFilled) || (entryServiceMode === 'Relocate' && areFieldsFilled))) ? '' : 'invisible'}`}
+                >
+                  {isSaving ? (
+                    <span className="text-gray-500">...</span>
+                  ) : (
+                    <span>{entryServiceMode === 'Service' ? (serviceFlowMode === 'return' ? 'Return from Service' : 'Sent to service') : entryServiceMode === 'Relocate' ? 'Relocate' : 'Transfer'}</span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setIsEditingTransferDetails(!isEditingTransferDetails)}
+                  className={items.length > 0 ? '' : 'invisible'}
+                >
+                  <img src={Edit} alt="Edit" className="w-[14px] h-[14px]" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="flex-shrink-0 pb-[8px]">
+          <div className="flex bg-[#F2F4F7] items-center h-[32px] rounded-md">
+            <button
+              onClick={handleSwitchToEntry}
+              disabled={isEditMode && originalEditData && (originalEditData.tools_entry_type === 'relocate' || originalEditData.tools_entry_type === 'Relocate')}
+              className={`flex-1 ml-0.5 h-[28px] rounded text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${entryServiceMode === 'Entry'
+                ? 'bg-white text-black'
+                : 'bg-transparent text-[#848484]'
+                } ${isEditMode && originalEditData && (originalEditData.tools_entry_type === 'relocate' || originalEditData.tools_entry_type === 'Relocate') ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              Entry
+            </button>
+            <button
+              onClick={handleSwitchToService}
+              disabled={isEditMode && originalEditData && ((originalEditData.tools_entry_type === 'entry' || originalEditData.tools_entry_type === 'Entry') || (originalEditData.tools_entry_type === 'relocate' || originalEditData.tools_entry_type === 'Relocate'))}
+              className={`flex-1 h-[28px] rounded text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${entryServiceMode === 'Service'
+                ? 'bg-white text-black'
+                : 'bg-transparent text-[#848484]'
+                } ${isEditMode && originalEditData && ((originalEditData.tools_entry_type === 'entry' || originalEditData.tools_entry_type === 'Entry') || (originalEditData.tools_entry_type === 'relocate' || originalEditData.tools_entry_type === 'Relocate')) ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              Service
+            </button>
+            <button
+              onClick={handleSwitchToRelocate}
+              disabled={isEditMode && originalEditData && (originalEditData.tools_entry_type === 'entry' || originalEditData.tools_entry_type === 'Entry')}
+              className={`flex-1 h-[28px] rounded mr-0.5 text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${entryServiceMode === 'Relocate'
+                ? 'bg-white text-black'
+                : 'bg-transparent text-[#848484]'
+                } ${isEditMode && originalEditData && (originalEditData.tools_entry_type === 'entry' || originalEditData.tools_entry_type === 'Entry') ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              Relocate
+            </button>
+          </div>
+        </div>
+      </div>
+      {items.length > 0 && !isEditingTransferDetails && entryServiceMode !== 'Relocate' && (
+        <div className="flex-shrink-0">
+          <div className="border border-gray-200 rounded-lg px-[16px] py-[12px]">
+            <div className="space-y-1">
+              {!(entryServiceMode === 'Service' && serviceFlowMode === 'return') && (
+                <div className="flex items-center">
+                  <span className="text-[12px] text-gray-500 w-[100px]">From</span>
+                  <span className="text-[12px] text-gray-500 mx-2">:</span>
+                  <span className="text-[12px] text-gray-700">{selectedFrom?.label || '-'}</span>
+                </div>
+              )}
+              <div className="flex items-center">
+                <span className="text-[12px] text-gray-500 w-[100px]">
+                  {entryServiceMode === 'Entry'
+                    ? 'To'
+                    : (serviceFlowMode === 'return' ? 'From' : 'To')}
+                </span>
+                <span className="text-[12px] text-gray-500 mx-2">:</span>
+                <span className="text-[12px] text-gray-700">
+                  {entryServiceMode === 'Entry' ? (selectedTo?.label || '-') : (selectedServiceStore?.label || '-')}
+                </span>
+              </div>
+              {(entryServiceMode === 'Service' && serviceFlowMode === 'return') && (
+                <div className="flex items-center">
+                  <span className="text-[12px] text-gray-500 w-[100px]">To</span>
+                  <span className="text-[12px] text-gray-500 mx-2">:</span>
+                  <span className="text-[12px] text-gray-700">{selectedTo?.label || '-'}</span>
+                </div>
+              )}
+              <div className="flex items-center">
+                <span className="text-[12px] text-gray-500 w-[100px]">Project Incharge</span>
+                <span className="text-[12px] text-gray-500 mx-2">:</span>
+                <span className="text-[12px] text-gray-700">{selectedIncharge?.label || '-'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {(items.length === 0 || isEditingTransferDetails) && entryServiceMode !== 'Relocate' && (
+        <div className="flex-shrink-0 space-y-[6px]">
+          {!(entryServiceMode === 'Service' && serviceFlowMode === 'return') && (
+            <>
+              <div className="relative dropdown-container">
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                  From<span className="text-[#E4572E]">*</span>
+                </p>
+                <div className="relative">
+                  <div
+                    onClick={() => {
+                      setShowFromDropdown(!showFromDropdown);
+                      setShowToDropdown(false);
+                      setShowInchargeDropdown(false);
+                    }}
+                    className="w-[360px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    style={{
+                      color: selectedFrom ? '#000' : '#9E9E9E',
+                      boxSizing: 'border-box',
+                      paddingRight: selectedFrom ? '40px' : '40px'
+                    }}
+                  >
+                    {selectedFrom ? selectedFrom.label : 'Select'}
+                  </div>
+                  {selectedFrom && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFrom(null);
+                      }}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 w-[20px] h-[24px] flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                      <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                    </button>
+                  )}
+                  {!selectedFrom && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {showFromDropdown && entryServiceMode !== 'Relocate' && !(entryServiceMode === 'Service' && serviceFlowMode === 'return') && (
+                <div
+                  className="fixed inset-0 bg-black bg-opacity-50 z-50 -top-[16px] flex items-center justify-center p-[16px]"
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget) {
+                      setShowFromDropdown(false);
+                    }
+                  }}
+                  style={{ fontFamily: "'Manrope', sans-serif" }}
+                >
+                  <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                    <div className="flex justify-between items-center px-[24px] pt-[24px]">
+                      <p className="text-[16px] font-semibold text-black">Select From</p>
+                      <button type="button" onClick={() => setShowFromDropdown(false)} className="text-[#E4572E] text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                        <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+                      </button>
+                    </div>
+                    <div className="px-[24px] pt-[4px] pb-[6px]">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={fromSearchQuery}
+                          onChange={(e) => setFromSearchQuery(e.target.value)}
+                          placeholder="Search"
+                          className="w-full h-[32px] pl-[30px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                          autoFocus
+                        />
+                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                          <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-[24px] min-h-[65vh]">
+                      <div className="shadow-md rounded-lg overflow-hidden">
+                        {getFilteredFromOptions().length > 0 ? (
+                          <div className="space-y-0">
+                            {getFilteredFromOptions().map((option) => {
+                              const isFavorite = fromFavorites.includes(option.id);
+                              const isSelected = selectedFrom?.id === option.id;
+                              // Helper function to split option text at first hyphen
+                              const splitOptionText = (text) => {
+                                if (!text) return { firstLine: '', secondLine: '' };
+                                const firstHyphenIndex = text.indexOf(' - ');
+                                if (firstHyphenIndex === -1) {
+                                  return { firstLine: text, secondLine: '' };
+                                }
+                                return {
+                                  firstLine: text.substring(0, firstHyphenIndex),
+                                  secondLine: text.substring(firstHyphenIndex + 3) // +3 to skip ' - '
+                                };
+                              };
+                              const { firstLine, secondLine } = splitOptionText(option.label);
+                              return (
+                                <button
+                                  type="button"
+                                  key={option.id}
+                                  onClick={() => {
+                                    // Validate existing items before changing "From" project
+                                    if (items.length > 0) {
+                                      const invalidItems = [];
+                                      for (const item of items) {
+                                        if (!item.item_name_id) continue;
+                                        // If itemId is selected, only check the full set (itemIdsId + brandId + machineNumber)
+                                        // Don't check itemNameId separately when itemId is selected
+                                        if (item.item_ids_id) {
+                                          const itemSetValidation = validateItemSetAvailability(
+                                            item.item_ids_id,
+                                            item.brand_id,
+                                            item.machine_number,
+                                            item.item_name_id,
+                                            item.itemName,
+                                            option.id
+                                          );
+                                          if (!itemSetValidation.isValid) {
+                                            invalidItems.push({
+                                              name: item.itemName || 'Unknown Item',
+                                              error: itemSetValidation.errorMessage
+                                            });
+                                          }
+                                        } else {
+                                          // Only check itemNameId if itemId is NOT selected (for quantity-based transfers)
+                                          // Check quantity availability with brandId if provided
+                                          const validation = validateItemLocation(
+                                            item.item_name_id,
+                                            item.itemName,
+                                            item.brand_id,
+                                            item.quantity,
+                                            option.id
+                                          );
+                                          if (!validation.isValid) {
+                                            invalidItems.push({
+                                              name: item.itemName || 'Unknown Item',
+                                              error: validation.errorMessage
+                                            });
+                                          }
+                                        }
+                                      }
+                                      if (invalidItems.length > 0) {
+                                        const errorMessage = invalidItems
+                                          .map(inv => inv.error)
+                                          .join('\n\n');
+                                        alert(`Cannot change "From" project. The following items are not in the selected location:\n\n${errorMessage}`);
+                                        setShowFromDropdown(false);
+                                        return;
+                                      }
+                                    }
+                                    setSelectedFrom(option);
+                                    setShowFromDropdown(false);
+                                    setIsEditingTransferDetails(false);
+                                  }}
+                                  className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                                    }`}
+                                  style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                                >
+                                  <button type="button" onClick={(e) => handleToggleFromFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                                    {isFavorite ? (
+                                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                      </svg>
+                                    ) : (
+                                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                      </svg>
+                                    )}
+                                  </button>
+                                  <div className="flex flex-col flex-1 min-w-0 text-left">
+                                    <p className="text-[12px] font-semibold text-black truncate whitespace-nowrap text-left">{firstLine}</p>
+                                    {secondLine && (
+                                      <p className="text-[11px] font-medium text-[#777777] truncate whitespace-nowrap text-left">{secondLine}</p>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-[16px]">
+                            <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                              {fromSearchQuery ? 'No options found' : 'No options available'}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          {entryServiceMode === 'Service' && (
+            <div className=" relative dropdown-container">
+              <div className="flex items-center justify-between">
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                  {(serviceFlowMode === 'return' ? 'From' : 'To')}<span className="text-[#E4572E]">*</span>
+                </p>
+                {serviceFlowMode === 'sent' && (
+                  <button onClick={() => {
+                    setIsServiceSwapIconToggled(prev => !prev);
+                    setSelectedServiceStore(null);
+                    setShowFromDropdown(false);
+                    setShowToDropdown(false);
+                    setShowServiceStoreDropdown(false);
+                    setShowInchargeDropdown(false);
+                    setServiceFlowMode('return');
+                  }} className="flex items-center justify-center">
+                    <img
+                      src={isServiceSwapIconToggled ? Swap1 : Swap}
+                      alt="change"
+                      className="w-[16px] h-[16px]"
+                    />
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <div
+                  onClick={() => {
+                    setShowServiceStoreDropdown(!showServiceStoreDropdown);
+                    setShowFromDropdown(false);
+                    setShowToDropdown(false);
+                    setShowInchargeDropdown(false);
+                  }}
+                  className="w-[360px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  style={{
+                    color: selectedServiceStore ? '#000' : '#9E9E9E',
+                    boxSizing: 'border-box',
+                    paddingRight: selectedServiceStore ? '40px' : '40px'
+                  }}
+                >
+                  {selectedServiceStore ? selectedServiceStore.label : 'Select Service Store'}
+                </div>
+                {selectedServiceStore && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedServiceStore(null);
+                    }}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 w-[20px] h-[24px] flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                  </button>
+                )}
+                {!selectedServiceStore && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {(entryServiceMode === 'Entry' || (entryServiceMode === 'Service' && serviceFlowMode === 'return')) && (
+            <div className="relative dropdown-container">
+              <div className="flex items-center justify-between">
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                  To<span className="text-[#E4572E]">*</span>
+                </p>
+                {entryServiceMode === 'Entry' && (
+                  <button onClick={() => handleSwapFromTo()} className="flex items-center justify-center">
+                    <img
+                      src={isSwapIconToggled ? Swap1 : Swap}
+                      alt="change"
+                      className="w-[16px] h-[16px]"
+                    />
+                  </button>
+                )}
+                {entryServiceMode === 'Service' && (
+                  <button onClick={() => {
+                    setIsServiceSwapIconToggled(prev => !prev);
+                    setSelectedTo(null);
+                    setServiceFlowMode('sent');
+                    setShowFromDropdown(false);
+                    setShowToDropdown(false);
+                    setShowServiceStoreDropdown(false);
+                    setShowInchargeDropdown(false);
+                  }} className="flex items-center justify-center">
+                    <img
+                      src={isServiceSwapIconToggled ? Swap1 : Swap}
+                      alt="change"
+                      className="w-[16px] h-[16px]"
+                    />
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <div
+                  onClick={() => {
+                    setShowToDropdown(!showToDropdown);
+                    setShowFromDropdown(false);
+                    setShowServiceStoreDropdown(false);
+                    setShowInchargeDropdown(false);
+                  }}
+                  className="w-[360px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  style={{
+                    color: selectedTo ? '#000' : '#9E9E9E',
+                    boxSizing: 'border-box',
+                    paddingRight: selectedTo ? '40px' : '40px'
+                  }}
+                >
+                  {selectedTo ? selectedTo.label : 'Select'}
+                </div>
+                {selectedTo && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedTo(null);
+                    }}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 w-[20px] h-[24px] flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                  </button>
+                )}
+                {!selectedTo && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {showToDropdown && (
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 -top-[16px] z-50 flex items-center justify-center p-[16px]"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                  setShowToDropdown(false);
+                }
+              }}
+              style={{ fontFamily: "'Manrope', sans-serif" }}
+            >
+              <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center px-[24px] pt-[24px]">
+                  <p className="text-[16px] font-semibold text-black">Select To</p>
+                  <button type="button" onClick={() => setShowToDropdown(false)} className="text-[#E4572E] text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                    <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+                  </button>
+                </div>
+                <div className="px-[24px] pt-[4px] pb-[6px]">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={toSearchQuery}
+                      onChange={(e) => setToSearchQuery(e.target.value)}
+                      placeholder="Search"
+                      className="w-full h-[32px] pl-[30px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                      autoFocus
+                    />
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                      <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-[24px] min-h-[65vh]">
+                  <div className="shadow-md rounded-lg overflow-hidden">
+                    {getFilteredToOptions().length > 0 ? (
+                      <div className="space-y-0">
+                        {getFilteredToOptions().map((option) => {
+                          const isFavorite = toFavorites.includes(option.id);
+                          const isSelected = selectedTo?.id === option.id;
+                          // Helper function to split option text at first hyphen
+                          const splitOptionText = (text) => {
+                            if (!text) return { firstLine: '', secondLine: '' };
+                            const firstHyphenIndex = text.indexOf(' - ');
+                            if (firstHyphenIndex === -1) {
+                              return { firstLine: text, secondLine: '' };
+                            }
+                            return {
+                              firstLine: text.substring(0, firstHyphenIndex),
+                              secondLine: text.substring(firstHyphenIndex + 3) // +3 to skip ' - '
+                            };
+                          };
+                          const { firstLine, secondLine } = splitOptionText(option.label);
+                          return (
+                            <button
+                              type="button"
+                              key={option.id}
+                              onClick={() => {
+                                setSelectedTo(option);
+                                setShowToDropdown(false);
+                                setIsEditingTransferDetails(false);
+                              }}
+                              className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                                }`}
+                              style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                            >
+                              <button type="button" onClick={(e) => handleToggleToFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                                {isFavorite ? (
+                                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                ) : (
+                                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                )}
+                              </button>
+                              <div className="flex flex-col flex-1 min-w-0 text-left">
+                                <p className="text-[12px] font-semibold text-black truncate whitespace-nowrap text-left">{firstLine}</p>
+                                {secondLine && (
+                                  <p className="text-[11px] font-medium text-[#777777] truncate whitespace-nowrap text-left">{secondLine}</p>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-[16px]">
+                        <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                          {toSearchQuery ? 'No options found' : 'No options available'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {showServiceStoreDropdown && (
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 -top-[16px] z-50 flex items-center justify-center p-[16px]"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                  setShowServiceStoreDropdown(false);
+                }
+              }}
+              style={{ fontFamily: "'Manrope', sans-serif" }}
+            >
+              <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center px-[24px] pt-[24px]">
+                  <p className="text-[16px] font-semibold text-black">Select Service Store</p>
+                  <button onClick={() => setShowServiceStoreDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                    <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+                  </button>
+                </div>
+                <div className="px-[24px] pt-[4px] pb-[6px]">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={serviceStoreSearchQuery}
+                      onChange={(e) => setServiceStoreSearchQuery(e.target.value)}
+                      placeholder="Search"
+                      className="w-full h-[32px] pl-[30px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                      autoFocus
+                    />
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                      <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-[24px] min-h-[65vh]">
+                  <div className="shadow-md rounded-lg overflow-hidden">
+                    {serviceStoreSearchQuery.trim() && !serviceStoreOptions.some(opt => {
+                      const normalizedOpt = normalizeSearchText(opt.label);
+                      const normalizedQuery = normalizeSearchText(serviceStoreSearchQuery.trim());
+                      return normalizedOpt === normalizedQuery;
+                    }) && (
+                        <button onClick={() => { }} className="w-full h-[36px] px-[24px] flex items-center bg-gray-100 gap-[8px] hover:bg-[#F5F5F5] transition-colors">
+                          <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
+                            </svg>
+                          </div>
+                          <p className="text-[14px] text-gray-600 font-normal text-left truncate">"{serviceStoreSearchQuery.trim()}"</p>
+                        </button>
+                      )}
+                    {getFilteredServiceStoreOptions().length > 0 ? (
+                      <div className="space-y-0">
+                        {getFilteredServiceStoreOptions().map((option) => {
+                          const isFavorite = serviceStoreFavorites.includes(option.id);
+                          const isSelected = selectedServiceStore?.id === option.id;
+                          // Helper function to split option text at first hyphen
+                          const splitOptionText = (text) => {
+                            if (!text) return { firstLine: '', secondLine: '' };
+                            const firstHyphenIndex = text.indexOf(' - ');
+                            if (firstHyphenIndex === -1) {
+                              return { firstLine: text, secondLine: '' };
+                            }
+                            return {
+                              firstLine: text.substring(0, firstHyphenIndex),
+                              secondLine: text.substring(firstHyphenIndex + 3) // +3 to skip ' - '
+                            };
+                          };
+                          const { firstLine, secondLine } = splitOptionText(option.label);
+                          return (
+                            <button
+                              key={option.id}
+                              onClick={() => {
+                                setSelectedServiceStore(option);
+                                setShowServiceStoreDropdown(false);
+                                setIsEditingTransferDetails(false);
+                              }}
+                              className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                                }`}
+                              style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                            >
+                              <button onClick={(e) => handleToggleServiceStoreFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                                {isFavorite ? (
+                                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                ) : (
+                                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                )}
+                              </button>
+                              <div className="flex flex-col flex-1 min-w-0 text-left">
+                                <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left">{firstLine}</p>
+                                {secondLine && (
+                                  <p className="text-[11px] font-medium text-[#777777] truncate whitespace-nowrap text-left">{secondLine}</p>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-[16px]">
+                        <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                          {serviceStoreSearchQuery ? 'No options found' : 'No options available'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="relative dropdown-container">
+            <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+              Project Incharge<span className="text-[#E4572E]">*</span>
+            </p>
+            <div className="relative">
+              <div
+                onClick={() => {
+                  setShowInchargeDropdown(!showInchargeDropdown);
+                  setShowFromDropdown(false);
+                  setShowToDropdown(false);
+                  setShowServiceStoreDropdown(false);
+                }}
+                className="w-[360px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                style={{
+                  color: selectedIncharge ? '#000' : '#9E9E9E',
+                  boxSizing: 'border-box',
+                  paddingRight: selectedIncharge ? '40px' : '40px'
+                }}
+              >
+                {selectedIncharge ? selectedIncharge.label : 'Select Incharge'}
+              </div>
+              {selectedIncharge && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedIncharge(null);
+                  }}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-[20px] h-[24px] flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                </button>
+              )}
+              {!selectedIncharge && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              )}
+            </div>
+          </div>
+          {showInchargeDropdown && (
+            <div className="fixed inset-0 bg-black -top-[16px] bg-opacity-50 z-50 flex items-center justify-center p-[16px]"
+              onClick={(e) => { if (e.target === e.currentTarget) { setShowInchargeDropdown(false); } }} style={{ fontFamily: "'Manrope', sans-serif" }}
+            >
+              <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center px-[24px] pt-[24px]">
+                  <p className="text-[16px] font-semibold text-black">Select Project Incharge</p>
+                  <button onClick={() => setShowInchargeDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity" >
+                    <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+                  </button>
+                </div>
+                <div className="px-[24px] pt-[4px] pb-[6px]">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={inchargeSearchQuery}
+                      onChange={(e) => setInchargeSearchQuery(e.target.value)}
+                      placeholder="Search"
+                      className="w-full h-[32px] pl-[30px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                      autoFocus
+                    />
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                      <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-[24px] min-h-[65vh]">
+                  <div className="shadow-md rounded-lg overflow-hidden">
+                    {inchargeSearchQuery.trim() && !inchargeOptions.some(opt => {
+                      const normalizedOpt = normalizeSearchText(opt.label);
+                      const normalizedQuery = normalizeSearchText(inchargeSearchQuery.trim());
+                      return normalizedOpt === normalizedQuery;
+                    }) && (
+                        <button
+                          onClick={() => {
+                          }}
+                          className="w-full h-[36px] px-[24px] flex items-center bg-gray-100 gap-[8px] hover:bg-[#F5F5F5] transition-colors"
+                        >
+                          <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
+                            </svg>
+                          </div>
+                          <p className="text-[14px] text-gray-600 font-normal text-left truncate">"{inchargeSearchQuery.trim()}"</p>
+                        </button>
+                      )}
+                    {getFilteredInchargeOptions().length > 0 ? (
+                      <div className="space-y-0">
+                        {getFilteredInchargeOptions().map((option) => {
+                          const isFavorite = inchargeFavorites.includes(option.id);
+                          const isSelected = selectedIncharge?.id === option.id;
+                          return (
+                            <button
+                              key={option.id}
+                              onClick={() => {
+                                setSelectedIncharge(option);
+                                setShowInchargeDropdown(false);
+                                setIsEditingTransferDetails(false);
+                              }}
+                              className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                                }`}
+                              style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                            >
+                              <button onClick={(e) => handleToggleInchargeFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0" >
+                                {isFavorite ? (
+                                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                ) : (
+                                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                )}
+                              </button>
+                              <div className="flex flex-col flex-1 min-w-0 text-left">
+                                <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left">{option.label}</p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-[16px]">
+                        <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                          {inchargeSearchQuery ? 'No options found' : 'No options available'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {items.length > 0 && !isEditingTransferDetails && entryServiceMode === 'Relocate' && (
+        <div className="flex-shrink-0 px-[16px]">
+          <div className="border border-gray-200 rounded-lg p-[12px]">
+            <div className="space-y-1">
+              <div className="flex items-center">
+                <span className="text-[12px] text-gray-500 w-[120px]">Item ID</span>
+                <span className="text-[12px] text-gray-500 mx-2">:</span>
+                <span className="text-[12px] text-gray-700">
+                  {selectedRelocateItemId ? (toolsItemIdFullData.find(i => String(i?.id) === String(selectedRelocateItemId))?.item_id || toolsItemIdFullData.find(i => String(i?.id) === String(selectedRelocateItemId))?.itemId || '-') : '-'}
+                </span>
+              </div>
+              <div className="flex items-center">
+                <span className="text-[12px] text-gray-500 w-[120px]">Current Location</span>
+                <span className="text-[12px] text-gray-500 mx-2">:</span>
+                <span className="text-[12px] text-gray-700">{selectedCurrentLocation?.label || '-'}</span>
+              </div>
+              <div className="flex items-center">
+                <span className="text-[12px] text-gray-500 w-[120px]">Relocate Location</span>
+                <span className="text-[12px] text-gray-500 mx-2">:</span>
+                <span className="text-[12px] text-gray-700">{selectedRelocateLocation?.label || '-'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {(items.length === 0 || isEditingTransferDetails) && entryServiceMode === 'Relocate' && (
+        <div className="flex-shrink-0 space-y-[6px]">
+          <div className="relative dropdown-container">
+            <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+              Item ID<span className="text-[#E4572E]">*</span>
+            </p>
+            <div className="relative">
+              <div
+                onClick={() => {
+                  setShowRelocateItemIdDropdown(true);
+                  setShowCurrentLocationDropdown(false);
+                  setShowRelocateLocationDropdown(false);
+                }}
+                className="w-[360px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                style={{
+                  color: selectedRelocateItemId ? '#000' : '#9E9E9E',
+                  boxSizing: 'border-box',
+                  paddingRight: selectedRelocateItemId ? '40px' : '40px'
+                }}
+              >
+                {selectedRelocateItemId ? (toolsItemIdFullData.find(i => String(i?.id) === String(selectedRelocateItemId))?.item_id || toolsItemIdFullData.find(i => String(i?.id) === String(selectedRelocateItemId))?.itemId || '') : 'Select Item ID'}
+              </div>
+              {selectedRelocateItemId && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedRelocateItemId(null);
+                    setSelectedCurrentLocation(null);
+                    setRelocateItemDetails(null);
+                  }}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-[20px] h-[24px] flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                </button>
+              )}
+              {!selectedRelocateItemId && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              )}
+            </div>
+            {showRelocateItemIdDropdown && (
+              <div
+                className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-[16px]"
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) {
+                    setShowRelocateItemIdDropdown(false);
+                  }
+                }}
+                style={{ fontFamily: "'Manrope', sans-serif" }}
+              >
+                <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                  <div className="flex justify-between items-center px-[24px] pt-[24px]">
+                    <p className="text-[16px] font-semibold text-black">Select Item ID</p>
+                    <button onClick={() => setShowRelocateItemIdDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                      <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+                    </button>
+                  </div>
+                  <div className="px-[24px] pt-[4px] pb-[6px]">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={relocateItemIdSearchQuery}
+                        onChange={(e) => setRelocateItemIdSearchQuery(e.target.value)}
+                        placeholder="Search"
+                        className="w-full h-[32px] pl-[30px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                        autoFocus
+                      />
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-[24px] min-h-[65vh] [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                    <div className="shadow-md rounded-lg overflow-hidden">
+                      {relocateItemIdSearchQuery.trim() && !itemIdOptions.some(opt => {
+                        const normalizedOpt = normalizeSearchText(opt);
+                        const normalizedQuery = normalizeSearchText(relocateItemIdSearchQuery.trim());
+                        return normalizedOpt === normalizedQuery;
+                      }) && (
+                          <button
+                            onClick={() => {
+                              handleAddNewItemId(relocateItemIdSearchQuery.trim());
+                            }}
+                            className="w-full h-[36px] px-[24px] flex items-center bg-gray-100 gap-[8px] hover:bg-[#F5F5F5] transition-colors"
+                          >
+                            <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
+                              </svg>
+                            </div>
+                            <p className="text-[14px] text-gray-600 font-normal text-left truncate">New Item ID</p>
+                          </button>
+                        )}
+                      {getFilteredItemIdOptions().length > 0 ? (
+                        <div className="space-y-0">
+                          {getFilteredItemIdOptions().map((option) => {
+                            const itemIdObj = toolsItemIdFullData.find(i => (i?.item_id?.trim() ?? i?.itemId?.trim()) === option);
+                            const itemIdDbId = itemIdObj?.id;
+                            const isFavorite = itemIdDbId && relocateItemIdFavorites.includes(itemIdDbId);
+                            const isSelected = selectedRelocateItemId && String(selectedRelocateItemId) === String(itemIdDbId);
+                            // Helper function to split option text at first hyphen
+                            const splitOptionText = (text) => {
+                              if (!text) return { firstLine: '', secondLine: '' };
+                              const firstHyphenIndex = text.indexOf(' - ');
+                              if (firstHyphenIndex === -1) {
+                                return { firstLine: text, secondLine: '' };
+                              }
+                              return {
+                                firstLine: text.substring(0, firstHyphenIndex),
+                                secondLine: text.substring(firstHyphenIndex + 3) // +3 to skip ' - '
+                              };
+                            };
+                            const { firstLine, secondLine } = splitOptionText(option);
+                            return (
+                              <button
+                                key={option}
+                                onClick={() => {
+                                  const value = option;
+                                  const itemIdObj = toolsItemIdFullData.find(
+                                    item => (item?.item_id?.trim() ?? item?.itemId?.trim()) === value
+                                  );
+                                  if (itemIdObj) {
+                                    setSelectedRelocateItemId(itemIdObj.id);
+                                    const itemIdsIdStr = String(itemIdObj.id);
+                                    const latestMovement = getLatestItemSetMovement(itemIdsIdStr, null, '');
+                                    const currentLocationInfo = getItemSetCurrentLocation(itemIdObj.id, null, '');
+                                    const currentLocationId = currentLocationInfo?.locationId ? String(currentLocationInfo.locationId) : null;
+
+                                    // Set the current location
+                                    let locationOption = null;
+                                    if (currentLocationId) {
+                                      locationOption = toOptions.find(opt => String(opt.id) === currentLocationId);
+                                      if (locationOption) {
+                                        setSelectedCurrentLocation(locationOption);
+                                      }
+                                    }
+
+                                    // Get item details from stock management
+                                    const stockItem = stockManagementData.find(item => {
+                                      const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+                                      return String(itemIdsId) === itemIdsIdStr;
+                                    });
+
+                                    if (stockItem) {
+                                      // Get item name
+                                      const itemNameId = stockItem.item_name_id || stockItem.itemNameId;
+                                      const itemNameObj = toolsItemNameListData.find(i => String(i?.id) === String(itemNameId));
+                                      const itemName = itemNameObj?.item_name || itemNameObj?.itemName || '';
+
+                                      // Get purchase store name
+                                      const purchaseStoreId = stockItem.purchase_store_id || stockItem.purchaseStoreId;
+                                      const purchaseStore = purchaseStoreId
+                                        ? vendorOptions.find(v => String(v.id) === String(purchaseStoreId))?.label || ''
+                                        : '';
+
+                                      // Get birth location (original home location)
+                                      const birthLocationId = stockItem.home_location_id || stockItem.homeLocationId;
+                                      const birthLocation = birthLocationId
+                                        ? toOptions.find(opt => String(opt.id) === String(birthLocationId))?.label || ''
+                                        : '';
+
+                                      // Get current location label
+                                      const currentLocationLabel = locationOption?.label || '';
+
+                                      // Get last updated image from transfer history
+                                      let lastImageUrl = '';
+                                      if (latestMovement?.matchingEntryItem) {
+                                        const images = latestMovement.matchingEntryItem.tools_item_live_images || latestMovement.matchingEntryItem.toolsItemLiveImages || [];
+                                        if (images.length > 0) {
+                                          // Get the last image (most recent)
+                                          const lastImage = images[images.length - 1];
+                                          if (lastImage.tools_image || lastImage.toolsImage) {
+                                            const base64Data = lastImage.tools_image || lastImage.toolsImage;
+                                            lastImageUrl = `data:image/jpeg;base64,${base64Data}`;
+                                          } else if (lastImage.tools_image_url || lastImage.toolsImageUrl) {
+                                            lastImageUrl = lastImage.tools_image_url || lastImage.toolsImageUrl;
+                                          }
+                                        }
+                                      }
+
+                                      // Fallback to stock management image if no transfer history image found
+                                      const imageUrl = lastImageUrl || stockItem.file_url || stockItem.fileUrl || '';
+
+                                      // Set item details for display
+                                      setRelocateItemDetails({
+                                        itemName: itemName,
+                                        birthLocation: birthLocation,
+                                        currentLocation: currentLocationLabel,
+                                        purchaseStore: purchaseStore,
+                                        imageUrl: imageUrl
+                                      });
+                                    } else {
+                                      setRelocateItemDetails(null);
+                                    }
+                                    setShowRelocateItemIdDropdown(false);
+                                  } else {
+                                    setSelectedRelocateItemId(null);
+                                    setSelectedCurrentLocation(null);
+                                    setRelocateItemDetails(null);
+                                  }
+                                }}
+                                className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                                  }`}
+                                style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                              >
+                                <button onClick={(e) => handleToggleItemIdFavorite(e, option)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                                  {isFavorite ? (
+                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                  ) : (
+                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                  )}
+                                </button>
+                                <div className="flex flex-col flex-1 min-w-0 text-left">
+                                  <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left">{firstLine}</p>
+                                  {secondLine && (
+                                    <p className="text-[11px] font-medium text-[#777777] truncate whitespace-nowrap text-left">{secondLine}</p>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-[16px]">
+                          <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                            {relocateItemIdSearchQuery ? 'No options found' : 'No options available'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="relative dropdown-container">
+            <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+              Current Location<span className="text-[#E4572E]">*</span>
+            </p>
+            <div className="relative">
+              <div
+                onClick={() => {
+                  setShowCurrentLocationDropdown(!showCurrentLocationDropdown);
+                  setShowFromDropdown(false);
+                  setShowToDropdown(false);
+                  setShowServiceStoreDropdown(false);
+                  setShowInchargeDropdown(false);
+                  setShowRelocateLocationDropdown(false);
+                }}
+                className="w-[360px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                style={{
+                  color: selectedCurrentLocation ? '#000' : '#9E9E9E',
+                  boxSizing: 'border-box',
+                  paddingRight: selectedCurrentLocation ? '40px' : '40px'
+                }}
+              >
+                {selectedCurrentLocation ? selectedCurrentLocation.label : 'Select'}
+              </div>
+              {selectedCurrentLocation && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedCurrentLocation(null);
+                    setRelocateItemDetails(null);
+                  }}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-[20px] h-[24px] flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                </button>
+              )}
+              {!selectedCurrentLocation && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="mb-2 relative dropdown-container">
+            <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+              Relocate Location<span className="text-[#E4572E]">*</span>
+            </p>
+            <div className="relative">
+              <div
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowRelocateLocationDropdown(true);
+                  setShowFromDropdown(false);
+                  setShowToDropdown(false);
+                  setShowServiceStoreDropdown(false);
+                  setShowInchargeDropdown(false);
+                  setShowCurrentLocationDropdown(false);
+                }}
+                className="w-[360px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                style={{
+                  color: selectedRelocateLocation ? '#000' : '#9E9E9E',
+                  boxSizing: 'border-box',
+                  paddingRight: '40px'
+                }}
+              >
+                {selectedRelocateLocation ? selectedRelocateLocation.label : 'Select'}
+              </div>
+              {selectedRelocateLocation && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedRelocateLocation(null);
+                  }}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-[20px] h-[24px] flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                </button>
+              )}
+              {!selectedRelocateLocation && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              )}
+            </div>
+          </div>
+          {selectedRelocateItemId && relocateItemDetails && (
+            <div className="pt-[4px] pb-[8px]">
+
+              <p className="text-[12px] leading-normal font-semibold text-black mb-2">Product Detail</p>
+              <div className="border border-[#BDBDBD] rounded-[8px] bg-white p-[12px]">
+                <div className="space-y-1">
+                  <div className="flex items-start text-[12px] leading-normal ">
+                    <span className="w-[102px] text-black">Item Name</span>
+                    <span className="mx-2">:</span>
+                    <span className="flex-1 truncate text-[#4F4F4F]">{relocateItemDetails.itemName || '-'}</span>
+                  </div>
+                  <div className="flex items-start text-[12px] leading-normal ">
+                    <span className="w-[102px] text-black">Home Location</span>
+                    <span className="mx-2">:</span>
+                    <span className="flex-1 truncate text-[#4F4F4F]">{relocateItemDetails.birthLocation || '-'}</span>
+                  </div>
+                  <div className="flex items-start text-[12px] leading-normal ">
+                    <span className="w-[102px] text-black">Current Location</span>
+                    <span className="mx-2">:</span>
+                    <span className="flex-1 truncate text-[#4F4F4F]">{relocateItemDetails.currentLocation || selectedCurrentLocation?.label || '-'}</span>
+                  </div>
+                  <div className="flex items-start text-[12px] leading-normal ">
+                    <span className="w-[102px] text-black">Purchase Store</span>
+                    <span className="mx-2">:</span>
+                    <span className="flex-1 truncate text-[#4F4F4F]">{relocateItemDetails.purchaseStore || '-'}</span>
+                  </div>
+                </div>
+              </div>
+              {relocateItemDetails.imageUrl && (
+                <div className="mt-2">
+                  <img
+                    src={relocateItemDetails.imageUrl}
+                    alt="Product"
+                    className="w-full rounded-[10px] object-cover"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {showRelocateLocationDropdown && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-[16px]"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowRelocateLocationDropdown(false);
+            }
+          }}
+          style={{ fontFamily: "'Manrope', sans-serif", zIndex: 9999 }}
+        >
+          <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-[24px] pt-[24px]">
+              <p className="text-[16px] font-semibold text-black">Select Relocate Location</p>
+              <button onClick={() => {
+                setShowRelocateLocationDropdown(false);
+                setRelocateLocationSearchQuery('');
+              }} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+              </button>
+            </div>
+            <div className="px-[24px] pt-[4px] pb-[6px]">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={relocateLocationSearchQuery}
+                  onChange={(e) => setRelocateLocationSearchQuery(e.target.value)}
+                  placeholder="Search"
+                  className="w-full h-[32px] pl-[30px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                  autoFocus
+                />
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-[24px] min-h-[65vh]">
+              <div className="shadow-md rounded-lg overflow-hidden">
+                {getFilteredRelocateLocationOptions().length > 0 ? (
+                  <div className="space-y-0">
+                    {getFilteredRelocateLocationOptions().map((option) => {
+                      const isFavorite = relocateLocationFavorites.includes(option.id);
+                      const isSelected = selectedRelocateLocation?.id === option.id;
+                      // Helper function to split option text at first hyphen
+                      const splitOptionText = (text) => {
+                        if (!text) return { firstLine: '', secondLine: '' };
+                        const firstHyphenIndex = text.indexOf(' - ');
+                        if (firstHyphenIndex === -1) {
+                          return { firstLine: text, secondLine: '' };
+                        }
+                        return {
+                          firstLine: text.substring(0, firstHyphenIndex),
+                          secondLine: text.substring(firstHyphenIndex + 3) // +3 to skip ' - '
+                        };
+                      };
+                      const { firstLine, secondLine } = splitOptionText(option.label);
+                      return (
+                        <button
+                          key={option.id}
+                          onClick={() => {
+                            setSelectedRelocateLocation(option);
+                            setShowRelocateLocationDropdown(false);
+                            setRelocateLocationSearchQuery('');
+                            setIsEditingTransferDetails(false);
+                          }}
+                          className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                            }`}
+                          style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                        >
+                          <button onClick={(e) => handleToggleRelocateLocationFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                            {isFavorite ? (
+                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            ) : (
+                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                          </button>
+                          <div className="flex flex-col flex-1 min-w-0 text-left">
+                            <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left">{firstLine}</p>
+                            {secondLine && (
+                              <p className="text-[11px] font-medium text-[#777777] truncate whitespace-nowrap text-left">{secondLine}</p>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-[16px]">
+                    <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                      {relocateLocationSearchQuery ? 'No options found' : 'No options available'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {showCurrentLocationDropdown && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-[16px]"
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowCurrentLocationDropdown(false); } }}
+          style={{ fontFamily: "'Manrope', sans-serif", zIndex: 9999 }}
+        >
+          <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-[24px] pt-[24px]">
+              <p className="text-[16px] font-semibold text-black">Select Current Location</p>
+              <button onClick={() => { setShowCurrentLocationDropdown(false); setCurrentLocationSearchQuery(''); }} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+              </button>
+            </div>
+            <div className="px-[24px] pt-[4px] pb-[6px]">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={currentLocationSearchQuery}
+                  onChange={(e) => setCurrentLocationSearchQuery(e.target.value)}
+                  placeholder="Search"
+                  className="w-full h-[32px] pl-[30px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                  autoFocus
+                />
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-[24px] min-h-[65vh]">
+              <div className="shadow-md rounded-lg overflow-hidden">
+                {getFilteredCurrentLocationOptions().length > 0 ? (
+                  <div className="space-y-0">
+                    {getFilteredCurrentLocationOptions().map((option) => {
+                      const isFavorite = currentLocationFavorites.includes(option.id);
+                      const isSelected = selectedCurrentLocation?.id === option.id;
+                      // Helper function to split option text at first hyphen
+                      const splitOptionText = (text) => {
+                        if (!text) return { firstLine: '', secondLine: '' };
+                        const firstHyphenIndex = text.indexOf(' - ');
+                        if (firstHyphenIndex === -1) {
+                          return { firstLine: text, secondLine: '' };
+                        }
+                        return {
+                          firstLine: text.substring(0, firstHyphenIndex),
+                          secondLine: text.substring(firstHyphenIndex + 3) // +3 to skip ' - '
+                        };
+                      };
+                      const { firstLine, secondLine } = splitOptionText(option.label);
+                      return (
+                        <button
+                          key={option.id}
+                          onClick={() => {
+                            setSelectedCurrentLocation(option);
+                            setShowCurrentLocationDropdown(false);
+                            setCurrentLocationSearchQuery('');
+                            setIsEditingTransferDetails(false);
+                          }}
+                          className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                            }`}
+                          style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                        >
+                          <button onClick={(e) => handleToggleCurrentLocationFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                            {isFavorite ? (
+                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            ) : (
+                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                          </button>
+                          <div className="flex flex-col flex-1 min-w-0 text-left">
+                            <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left">{firstLine}</p>
+                            {secondLine && (
+                              <p className="text-[11px] font-medium text-[#777777] truncate whitespace-nowrap text-left">{secondLine}</p>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-[16px]">
+                    <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                      {currentLocationSearchQuery ? 'No options found' : 'No options available'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {entryServiceMode !== 'Relocate' && (
+        <div className="flex-shrink-0 pt-[10px]">
+          <div className="flex items-center justify-between pb-[8px] border-b border-gray-200">
+            <div className="flex items-center gap-[8px]">
+              <p className="text-[12px] font-semibold text-black leading-normal">Items</p>
+              <div className="w-[20px] h-[20px] rounded-full bg-[#E0E0E0] flex items-center justify-center">
+                <span className="text-[10px] font-medium text-black">{items.length}</span>
+              </div>
+            </div>
+            {areFieldsFilled && (
+              <div className="cursor-pointer" onClick={handleOpenUniversalSearch}>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="9" cy="9" r="6" stroke="#000" strokeWidth="1.5" />
+                  <path d="M13.5 13.5L17 17" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {items.length > 0 && (
+        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar scrollbar-none pt-[8px] pb-[24px]" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="shadow-md rounded-lg space-y-2">
+            {items.map((item, index) => {
+              const itemId = item.id;
+              const minSwipeDistance = 50;
+              const buttonWidth = 96;
+              const swipeState = swipeStates[itemId];
+              const isExpanded = expandedItemId === itemId;
+              const swipeOffset =
+                swipeState && swipeState.isSwiping
+                  ? Math.max(-buttonWidth, swipeState.currentX - swipeState.startX)
+                  : isExpanded
+                    ? -buttonWidth
+                    : 0;
+              const handleTouchStart = (e) => {
+                const touch = e.touches ? e.touches[0] : { clientX: e.clientX, clientY: e.clientY };
+                setSwipeStates(prev => ({
+                  ...prev,
+                  [itemId]: {
+                    startX: touch.clientX,
+                    currentX: touch.clientX,
+                    startY: touch.clientY ?? 0,
+                    currentY: touch.clientY ?? 0,
+                    isSwiping: false
+                  }
+                }));
+              };
+              const handleTouchMove = (e) => {
+                const touch = e.touches ? e.touches[0] : { clientX: e.clientX, clientY: e.clientY };
+                setSwipeStates(prev => {
+                  const state = prev[itemId];
+                  if (!state) return prev;
+                  const deltaX = touch.clientX - state.startX;
+                  const deltaY = (touch.clientY ?? state.currentY ?? state.startY ?? 0) - (state.startY ?? 0);
+                  const absDeltaX = Math.abs(deltaX);
+                  const absDeltaY = Math.abs(deltaY);
+                  const isHorizontalSwipe = absDeltaX > 10 && absDeltaX > absDeltaY;
+                  if (isHorizontalSwipe && (deltaX < 0 || (isExpanded && deltaX > 0))) {
+                    return {
+                      ...prev,
+                      [itemId]: {
+                        ...state,
+                        currentX: touch.clientX,
+                        currentY: touch.clientY ?? state.currentY ?? state.startY ?? 0,
+                        isSwiping: true
+                      }
+                    };
+                  }
+                  return prev;
+                });
+              };
+              const handleTouchEnd = () => {
+                setSwipeStates(prev => {
+                  const state = prev[itemId];
+                  if (!state) return prev;
+                  const deltaX = state.currentX - state.startX;
+                  const absDeltaX = Math.abs(deltaX);
+                  if (absDeltaX >= minSwipeDistance) {
+                    if (deltaX < 0) {
+                      setExpandedItemId(itemId);
+                    } else {
+                      setExpandedItemId(null);
+                    }
+                  } else {
+                    if (isExpanded) {
+                      setExpandedItemId(null);
+                    }
+                  }
+                  const newState = { ...prev };
+                  delete newState[itemId];
+                  return newState;
+                });
+              };
+              const handleMouseDown = (e) => {
+                if (e.button !== 0) return;
+                const syntheticEvent = {
+                  touches: [{ clientX: e.clientX }],
+                  preventDefault: () => e.preventDefault()
+                };
+                handleTouchStart(syntheticEvent);
+              };
+              const handleCardClick = (e) => {
+                if (e.target.closest('.action-button')) {
+                  return;
+                }
+                if (isExpanded) {
+                  setExpandedItemId(null);
+                }
+              };
+              const resolvedBrandText = item.brand || getBrandLabelById(item.brand_id || item.brandId || item.brand_name_id || item.brandNameId) || '';
+              const resolvedModelText = (item.model || '').trim();
+              const brandModelText = resolvedBrandText && resolvedModelText
+                ? `${resolvedBrandText}, ${resolvedModelText}`
+                : (resolvedBrandText || resolvedModelText);
+              const machineStatus = item.machine_status || item.machineStatus || '';
+              return (
+                <div key={itemId} className="relative overflow-hidden">
+                  <div
+                    className="bg-white border-2 border-[#E0E0E0] rounded-[8px] px-[12px] py-[8px] min-h-[66px] cursor-pointer transition-transform duration-300 ease-out select-none"
+                    style={{
+                      transform: `translateX(${swipeOffset}px)`,
+                      touchAction: 'pan-y',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none'
+                    }}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    onMouseDown={handleMouseDown}
+                    onClick={handleCardClick}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-black leading-snug truncate">
+                          {item.itemName || getItemNameLabelById(item.item_name_id || item.itemNameId) || 'Unknown Item'}
+                        </p>
+                        <div className="mt-1 space-y-1 min-h-[32px]">
+                          {item.machine_number || item.machineNumber || resolveMachineNumberText(item.machine_number_id || item.machineNumberId) ? (
+                            <p className="text-[11px] font-medium text-[#777777] leading-snug truncate">
+                              {item.machine_number || item.machineNumber || resolveMachineNumberText(item.machine_number_id || item.machineNumberId)}
+                            </p>
+                          ) : null}
+                          {brandModelText && (
+                            <p className="text-[11px] font-medium text-[#9E9E9E] leading-snug truncate">
+                              {brandModelText}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-[6px] flex-shrink-0">
+                        {item.localImageUrls?.length > 0 && (
+                          <div className="flex items-center gap-[4px] text-[#E4572E] cursor-pointer" onClick={(e) => { e.stopPropagation(); handleOpenImageViewer(item, 0); }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2" />
+                              <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="2" />
+                              <polyline points="21,15 16,10 5,21" stroke="currentColor" strokeWidth="2" />
+                            </svg>
+                            <span className="text-[10px] font-medium">Image</span>
+                          </div>
+                        )}
+                        <p className={`text-[12px] font-semibold text-black leading-snug ${item.localImageUrls?.length > 0 ? '' : 'cursor-pointer'}`}
+                          onClick={(e) => { if (item.localImageUrls?.length > 0) return; e.stopPropagation(); handleOpenImageViewer(item, 0); }}
+                        >
+                          {item.itemId || getItemIdLabelById(item.item_ids_id || item.itemIdsId) || (item.quantity > 0 ? `${item.quantity} Qty` : '')}
+                        </p>
+                        {machineStatus && (
+                          <div className="flex items-center justify-end gap-[4px] w-full">
+                            <span className={`w-1.5 h-1.5 rounded-full ${machineStatus === 'Working' ? 'bg-[#4CAF50]' :
+                              machineStatus === 'Not Working' ? 'bg-[#F44336]' :
+                                machineStatus === 'Under Repair' ? 'bg-[#FF9800]' :
+                                  machineStatus === 'Machine Dead' ? 'bg-[#616161]' :
+                                    'bg-[#9E9E9E]'
+                              }`}></span>
+                            <p className={`text-[10px] font-medium ${machineStatus === 'Working' ? 'text-[#4CAF50]' :
+                              machineStatus === 'Not Working' ? 'text-[#F44336]' :
+                                machineStatus === 'Under Repair' ? 'text-[#FF9800]' :
+                                  machineStatus === 'Machine Dead' ? 'text-[#616161]' :
+                                    'text-[#9E9E9E]'
+                              }`}>
+                              {machineStatus}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    className="absolute right-0 top-[0px] bottom-0 flex gap-[8px] flex-shrink-0 z-0"
+                    style={{
+                      opacity:
+                        isExpanded ||
+                          (swipeState && swipeState.isSwiping && swipeOffset < -20)
+                          ? 1
+                          : 0,
+                      transition: 'opacity 0.2s ease-out',
+                      pointerEvents: isExpanded ? 'auto' : 'none'
+                    }}
+                  >
+                    <button onClick={(e) => { e.stopPropagation(); setExpandedItemId(null); handleEditItem(item); }}
+                      className="action-button w-[40px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center gap-[6px] hover:bg-[#22a882] transition-colors shadow-sm"
+                    >
+                      <img src={EditIcon} alt="Edit" className="w-[18px] h-[18px]" />
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); setExpandedItemId(null); handleRemoveItem(item.id); }}
+                      className="action-button w-[40px] h-full bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-[6px] hover:bg-[#cc4d26] transition-colors shadow-sm"
+                    >
+                      <img src={DeleteIcon} alt="Delete" className="w-[18px] h-[18px]" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {entryServiceMode !== 'Relocate' && (
+        <div className="fixed bottom-[110px] right-1 lg:right-[calc(50%-164px)] z-30 cursor-pointer" onClick={areFieldsFilled ? handleAddItem : undefined}>
+          <div className="w-[80px] h-[80px] rounded-full flex items-center justify-center">
+            <img src={areFieldsFilled ? FlottingButton : FlottingButtonWhite} alt="+" className="w-[80px] h-[80px]" />
+          </div>
+        </div>
+      )}
+      {showAddItemsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif", overflow: 'hidden', overscrollBehavior: 'contain' }} onClick={handleCloseAddItemsModal} >
+          <div className="bg-white w-full rounded-tl-[16px] rounded-tr-[16px] relative z-[101]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-[24px] pt-[20px] pb-[16px]">
+              <p className="text-[16px] font-medium text-black leading-normal">
+                {editingItem ? 'Edit Item' : 'Add Items'}
+              </p>
+            </div>
+            <div className="px-[24px] pb-[24px]">
+              <div className="flex gap-[12px] mb-[10px]">
+                <div className="flex-1 relative">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[13px] font-medium text-black leading-normal">
+                      Item Name<span className="text-[#E4572E]">*</span>
+                    </p>
+                    {selectedItemNameQuantity > 0 && (
+                      <span className="text-[13px] font-semibold text-[#e06256]">{selectedItemNameQuantity}</span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => !addItemFormData.itemId && setShowAddModalItemNameModal(true)}
+                      disabled={!!addItemFormData.itemId}
+                      className={`w-full h-[32px] px-[12px] border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium flex items-center justify-between focus:outline-none ${addItemFormData.itemId ? 'bg-gray-100 cursor-not-allowed text-gray-400' : 'bg-white text-black'}`}
+                      style={{ paddingRight: addItemFormData.itemName ? '32px' : '12px', boxSizing: 'border-box' }}
+                    >
+                      <span className={addItemFormData.itemName ? 'text-black' : 'text-[#9E9E9E]'}>{addItemFormData.itemName || 'Select ...'}</span>
+                      {!addItemFormData.itemName && !addItemFormData.itemId && (
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M1 1L6 6L11 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      )}
+                    </button>
+                    {addItemFormData.itemName && !addItemFormData.itemId && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleFieldChange('itemName', ''); }}
+                        className="absolute top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full z-10"
+                        style={{ right: '8px' }}
+                      >
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="w-[80px] relative">
+                  <p className="text-[13px] font-medium text-black mb-1 leading-normal">
+                    Quantity
+                  </p>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={addItemFormData.quantity}
+                      onChange={(e) => handleFieldChange('quantity', e.target.value)}
+                      disabled={!!addItemFormData.itemId}
+                      className={`w-full h-[32px] border border-[#d6d6d6] rounded px-[12px] pr-[28px] text-[12px] font-medium focus:outline-none text-black ${addItemFormData.itemId ? 'bg-gray-100 cursor-not-allowed text-gray-400' : 'bg-white'
+                        }`}
+                      placeholder="Enter"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="mb-[10px] relative">
+                <p className="text-[13px] font-medium text-black mb-1 leading-normal">
+                  Brand
+                </p>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModalBrandModal(true)}
+                    className="w-full h-[32px] px-[12px] border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium bg-white flex items-center justify-between focus:outline-none"
+                    style={{ paddingRight: addItemFormData.brand ? '32px' : '12px', boxSizing: 'border-box' }}
+                  >
+                    <span className={addItemFormData.brand ? 'text-black' : 'text-[#9E9E9E]'}>{addItemFormData.brand || 'Select ...'}</span>
+                    {!addItemFormData.brand && (
+                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    )}
+                  </button>
+                  {addItemFormData.brand && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleFieldChange('brand', ''); }}
+                      className="absolute top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full z-10"
+                      style={{ right: '8px' }}
+                    >
+                      <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="mb-6 relative">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[13px] font-medium text-black leading-normal">
+                    Item ID
+                  </p>
+                  {selectedItemMachineNumber && (
+                    <span className="text-[13px] font-semibold text-[#e06256]">{selectedItemMachineNumber}</span>
+                  )}
+                </div>
+                <div className={addItemFormData.quantity && addItemFormData.quantity.trim() !== '' ? 'opacity-50 pointer-events-none' : ''}>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddModalItemIdModal(true)}
+                      className="w-full h-[32px] px-[12px] border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium bg-white flex items-center justify-between focus:outline-none"
+                      style={{ paddingRight: addItemFormData.itemId ? '32px' : '12px', boxSizing: 'border-box' }}
+                    >
+                      <span className={addItemFormData.itemId ? 'text-black' : 'text-[#9E9E9E]'}>{addItemFormData.itemId || 'Select ...'}</span>
+                      {!addItemFormData.itemId && (
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      )}
+                    </button>
+                    {addItemFormData.itemId && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleFieldChange('itemId', ''); }}
+                        className="absolute top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full z-10"
+                        style={{ right: '8px' }}
+                      >
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-[16px]">
+                <button onClick={handleCloseAddItemsModal} className="flex-1 h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddItemSubmit}
+                  disabled={!addItemFormData.itemName}
+                  className={`flex-1 h-[40px] border border-[#f4ede2] rounded-[8px] text-[14px] font-bold leading-normal ${addItemFormData.itemName
+                    ? 'bg-black text-white'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    }`}
+                >
+                  {editingItem ? 'Save' : 'Add'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <SelectVendorModal
+        isOpen={showAddModalItemNameModal}
+        onClose={() => setShowAddModalItemNameModal(false)}
+        onSelect={(value) => { handleFieldChange('itemName', value); setShowAddModalItemNameModal(false); }}
+        selectedValue={addItemFormData.itemName}
+        options={itemNameOptions}
+        fieldName="Item Name"
+        onAddNew={handleAddNewItemName}
+      />
+      <SelectVendorModal
+        isOpen={showAddModalBrandModal}
+        onClose={() => setShowAddModalBrandModal(false)}
+        onSelect={(value) => { handleFieldChange('brand', value); setShowAddModalBrandModal(false); }}
+        selectedValue={addItemFormData.brand}
+        options={filteredAddModalBrandOptions}
+        fieldName="Brand"
+        onAddNew={handleAddNewBrand}
+      />
+      <SelectVendorModal
+        isOpen={showAddModalItemIdModal}
+        onClose={() => setShowAddModalItemIdModal(false)}
+        onSelect={(value) => { handleFieldChange('itemId', value); setShowAddModalItemIdModal(false); }}
+        selectedValue={addItemFormData.itemId}
+        options={filteredAddModalItemIdOptions}
+        fieldName="Item ID"
+        onAddNew={handleAddNewItemId}
+      />
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[110] flex items-center justify-center p-[16px]" onClick={handleCloseUploadModal} style={{ fontFamily: "'Manrope', sans-serif" }}>
+          <div className="bg-white w-full max-w-[360px] rounded-[16px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className='flex justify-end mr-[20px] mt-[14px]'>
+              <button onClick={handleCloseUploadModal} className="text-[#e06256] text-xl font-bold">
+                <img src={Close} alt="Close" className="w-[14px] h-[14px]" />
+              </button>
+            </div>
+            <div className="flex items-center justify-center px-[24px] pb-[8px] gap-[2px] flex-shrink-0">
+              <div className="items-center">
+                <p className="text-[16px] font-semibold text-black">Upload and Attach files</p>
+                <p className="text-[10px] text-gray-500 ml-[8px]">Attachments will be of this Transfer</p>
+              </div>
+            </div>
+            <div className={`flex-1 min-h-0 no-scrollbar scrollbar-none ${showStatusDropdown ? 'overflow-visible relative z-[1]' : 'overflow-y-auto'}`}>
+              <div className="px-[24px] py-[8px]">
+                <label htmlFor="file-upload-input"
+                  className="flex flex-col items-center justify-center w-full h-[120px] border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  <svg width="40" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M17 8L12 3L7 8" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M12 3V15" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <p className="text-[14px] font-medium text-[#E4572E] mt-[4px]">Click to Upload</p>
+                  <p className="text-[10px] text-gray-400">Files will be compressed on upload</p>
+                </label>
+                <input
+                  id="file-upload-input"
+                  type="file"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                  accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,image/*,application/pdf"
+                  multiple
+                />
+              </div>
+              {uploadFiles.length > 0 && (
+                <div className="px-[24px] pb-[8px]">
+                  <p className="text-[12px] font-medium text-black mb-[4px]">File Uploading</p>
+                  <div className="space-y-2 max-h-[150px] overflow-y-auto no-scrollbar scrollbar-none">
+                    {uploadFiles.map((fileItem) => (
+                      <div key={fileItem.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-[12px]">
+                        <div className="flex items-center gap-[12px] flex-1 min-w-0">
+                          <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            {fileItem.name.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i) ? (
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                <circle cx="8.5" cy="8.5" r="1.5" stroke="#E4572E" strokeWidth="2" />
+                                <polyline points="21,15 16,10 5,21" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            ) : (
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[12px] font-medium text-black truncate">{fileItem.name}</p>
+                            <p className="text-[10px] text-gray-500">{(fileItem.size / (1024 * 1024)).toFixed(2)} MB</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-[12px]">
+                          <button onClick={() => handleDeleteUploadFile(fileItem.id)} className="text-red-500 hover:text-red-700">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M3 6H5H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              <path d="M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </button>
+                          <span className="text-[12px] font-semibold text-black w-[40px] text-right">{fileItem.progress}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="px-[24px] pb-[8px]">
+                <p className="text-[12px] font-medium text-black mb-[2px]">Status</p>
+                <div className="relative">
+                  <div onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                    className="w-full h-[40px] border border-gray-300 rounded-lg px-[16px] flex items-center justify-between cursor-pointer bg-white"
+                  >
+                    <span className="text-[14px] text-black">{uploadStatus || 'Select'}</span>
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  {showStatusDropdown && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[200] max-h-[200px] overflow-y-auto">
+                      {(entryServiceMode === 'Service' && serviceFlowMode === 'sent' ? filteredStatusOptions : statusOptions).map((status) => (
+                        <button
+                          key={status}
+                          onClick={() => {
+                            setUploadStatus(status);
+                            setShowStatusDropdown(false);
+                          }}
+                          className={`w-full px-[16px] py-[8px] text-left text-[14px] hover:bg-gray-100 ${uploadStatus === status ? 'bg-gray-50 font-semibold' : ''
+                            }`}
+                        >
+                          {status}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="px-[24px] pb-[16px]">
+                <p className="text-[12px] font-medium text-black mb-[2px]">Description</p>
+                <textarea
+                  value={uploadDescription}
+                  onChange={(e) => setUploadDescription(e.target.value)}
+                  placeholder="Enter"
+                  className="w-full h-[80px] border border-gray-300 rounded-lg px-[16px] py-[12px] text-[14px] text-black placeholder-gray-400 resize-none focus:outline-none focus:border-gray-400"
+                />
+              </div>
+            </div>
+            <div className="px-[24px] pb-[24px] flex-shrink-0 relative z-0">
+              <button
+                onClick={handleConfirmUpload}
+                disabled={isUploading || !uploadStatus || (entryServiceMode === 'Service' && uploadFiles.length === 0)}
+                className={`w-full h-[48px] rounded-lg text-[16px] font-bold text-white ${isUploading || !uploadStatus || (entryServiceMode === 'Service' && uploadFiles.length === 0)
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-black'
+                  }`}
+              >
+                {isUploading ? 'Uploading...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showImageViewer && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex flex-col" style={{ fontFamily: "'Manrope', sans-serif" }}>
+          <div className="flex items-center justify-between px-[16px] py-[12px] bg-black bg-opacity-60">
+            <div className="flex-1 min-w-0">
+              <p className="text-[14px] font-semibold text-white truncate">
+                #{items.findIndex(item => item.itemName === imageViewerData.itemName) + 1}. {imageViewerData.itemName}
+              </p>
+            </div>
+            <div className="flex items-center gap-[12px]">
+              {imageViewerData.itemId && (
+                <span className="text-[12px] font-medium text-white">{imageViewerData.itemId}</span>
+              )}
+              <button onClick={handleCloseImageViewer} className="w-8 h-8 flex items-center justify-center text-[#E4572E]">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 relative overflow-hidden">
+            <div className="absolute inset-0 flex items-center justify-center">
+              {imageViewerData.images[imageViewerData.currentIndex] && (
+                <img
+                  src={imageViewerData.images[imageViewerData.currentIndex]}
+                  alt={`${imageViewerData.itemName} - ${imageViewerData.currentIndex + 1}`}
+                  className="max-w-full max-h-full object-contain"
+                />
+              )}
+            </div>
+            {imageViewerData.images.length > 1 && (
+              <>
+                <button onClick={handlePrevImage}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-black bg-opacity-50 rounded-full text-white"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <button onClick={handleNextImage}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-black bg-opacity-50 rounded-full text-white"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </>
+            )}
+            {imageViewerData.images.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black bg-opacity-50 px-[12px] py-[4px] rounded-full">
+                <span className="text-[12px] text-white">
+                  {imageViewerData.currentIndex + 1} / {imageViewerData.images.length}
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="px-[16px] py-[12px] bg-black bg-opacity-60">
+            <div className="flex items-center justify-between">
+              <p className="text-[12px] text-white">
+                To - {imageViewerData.toLocation || 'N/A'}
+              </p>
+              <div className="relative">
+                <button
+                  onClick={() => setShowImageViewerStatusDropdown(prev => !prev)}
+                  className={`text-[11px] font-medium px-[8px] py-[4px] rounded flex items-center gap-[4px] ${imageViewerData.machineStatus === 'Working' ? 'bg-green-500 text-white' :
+                    imageViewerData.machineStatus === 'Not Working' ? 'bg-red-500 text-white' :
+                      imageViewerData.machineStatus === 'Under Repair' ? 'bg-yellow-500 text-white' :
+                        'bg-gray-500 text-white'
+                    }`}
+                >
+                  <span>• {imageViewerData.machineStatus}</span>
+                  <svg width="10" height="6" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L6 6L11 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                {showImageViewerStatusDropdown && (
+                  <div className="absolute right-0 bottom-full mb-2 w-[130px] bg-white border border-gray-300 rounded-lg shadow-lg z-10 overflow-hidden">
+                    {statusOptions.map((status) => (
+                      <button key={status} onClick={() => handleUpdateImageViewerStatus(status)}
+                        className={`w-full px-[12px] py-[8px] text-left text-[12px] text-black hover:bg-gray-100 ${imageViewerData.machineStatus === status ? 'bg-gray-50 font-semibold' : ''
+                          }`}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="px-[16px] py-[8px] bg-black bg-opacity-60 overflow-x-auto">
+            <div className="flex gap-[8px] items-center">
+              {imageViewerData.images.map((img, index) => (
+                <div key={index} className="relative flex-shrink-0">
+                  <div onClick={() => setImageViewerData(prev => ({ ...prev, currentIndex: index }))}
+                    className={`w-[50px] h-[50px] rounded-lg overflow-hidden cursor-pointer border-2 ${index === imageViewerData.currentIndex ? 'border-[#E4572E]' : 'border-transparent'
+                      }`}
+                  >
+                    <img
+                      src={img}
+                      alt={`Thumbnail ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  {index === imageViewerData.currentIndex && (
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteViewerImage(index); }}
+                      className="absolute -top-[4px] -right-1 w-[18px] h-[18px] bg-[#E4572E] rounded-full flex items-center justify-center shadow-md"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              ))}
+              <label className="w-[50px] h-[50px] rounded-lg border-2 border-dashed border-[#E4572E] flex-shrink-0 cursor-pointer flex items-center justify-center bg-transparent hover:bg-[#E4572E] hover:bg-opacity-10 transition-colors">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleAddImageToViewer}
+                  className="hidden"
+                />
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 5V19M5 12H19" stroke="#E4572E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-[16px]" onClick={() => setShowConfirmModal(false)}
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          <div className="bg-white w-full max-w-[320px] rounded-[16px] p-[24px] shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-center mb-4">
+              <div className="w-[60px] h-[60px] rounded-full bg-[#FFF3E0] flex items-center justify-center">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#F5A623" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            </div>
+            <h3 className="text-[18px] font-semibold text-black text-center mb-2">
+              Please Confirm ?
+            </h3>
+            <p className="text-[13px] text-[#666666] text-center mb-6 leading-relaxed">
+              Please check that all the machines you take are in proper running condition before taking them.
+            </p>
+            <div className="flex gap-[12px]">
+              <button onClick={() => setShowConfirmModal(false)}
+                className="flex-1 h-[44px] border border-gray-300 rounded-[8px] text-[14px] font-semibold text-black bg-white hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { setShowConfirmModal(false); handleSaveTransfer(); }}
+                disabled={!canCreate || isSaving}
+                className="flex-1 h-[44px] bg-black rounded-[8px] text-[14px] font-semibold text-white hover:bg-gray-800 transition-colors disabled:bg-gray-400"
+              >
+                {isSaving ? 'Saving...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <DatePickerModal
+        isOpen={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        onConfirm={(formattedDate) => {
+          setDate(formattedDate);
+          setShowDatePicker(false);
+        }}
+        initialDate={date}
+      />
+      {showUniversalSearchModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-end justify-center" onClick={handleCloseUniversalSearch} style={{ fontFamily: "'Manrope', sans-serif" }}>
+          <div className="bg-white w-full rounded-tl-[16px] rounded-tr-[16px] h-[92vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-[16px] pt-[16px] mb-[6px] flex-shrink-0">
+              <p className="text-[16px] font-semibold text-black">Search Items</p>
+              <button onClick={handleCloseUniversalSearch} className="text-[#E4572E] text-xl font-bold">
+                <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+              </button>
+            </div>
+            <div className="px-[16px] pb-[12px] flex-shrink-0">
+              <div className="relative">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                >
+                  <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                <input
+                  type="text"
+                  value={universalSearchQuery}
+                  onChange={(e) => setUniversalSearchQuery(e.target.value)}
+                  placeholder="Search"
+                  className="w-full h-[40px] border border-gray-300 rounded-full pl-[36px] pr-[16px] text-[14px] text-black placeholder-gray-400 focus:outline-none focus:border-gray-400"
+                />
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none px-[16px] pb-[16px]">
+              {(() => {
+                const fromLocationId = entryServiceMode === 'Relocate'
+                  ? (selectedCurrentLocation?.id ? String(selectedCurrentLocation.id) : null)
+                  : (entryServiceMode === 'Service' && serviceFlowMode === 'return'
+                    ? (selectedServiceStore?.id ? String(selectedServiceStore.id) : null)
+                    : (selectedFrom?.id ? String(selectedFrom.id) : null));
+                const filtered = getFilteredSearchItems();
+                if (!fromLocationId) {
+                  return (
+                    <div className="flex items-center justify-center py-[32px]">
+                      <p className="text-[12px] text-gray-500">Please select From location first</p>
+                    </div>
+                  );
+                }
+                if (filtered.length === 0) {
+                  return (
+                    <div className="flex items-center justify-center py-[32px]">
+                      <p className="text-[12px] text-gray-500">No items found</p>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="" key="search-results">
+                    {filtered.map((item, index, entry) => {
+                      const itemNameObj = toolsItemNameListData.find(
+                        i => String(i?.id) === String(item?.item_name_id ?? item?.itemNameId)
+                      );
+                      const itemIdObj = toolsItemIdFullData.find(
+                        i => String(i?.id) === String(item?.item_ids_id ?? item?.itemIdsId)
+                      );
+                      const brandObj = toolsBrandFullData.find(
+                        i => String(i?.id) === String(item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId)
+                      );
+                      const categoryObj = categoryOptions.find(
+                        i => String(i?.id) === String(item?.category_id ?? item?.categoryId)
+                      );
+                      const itemName = itemNameObj?.item_name || itemNameObj?.itemName || 'Unknown';
+                      const itemIdName = itemIdObj?.item_id || itemIdObj?.itemId || '';
+                      const brandName = brandObj?.tools_brand || brandObj?.toolsBrand || '';
+                      const modelName = (item?.model || '').trim();
+                      const brandModelText = brandName && modelName
+                        ? `${brandName}, ${modelName}`
+                        : (brandName || modelName || '');
+                      const machineNumber = resolveMachineNumFromStock(item);
+                      const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+                      const brandIdForEntry = item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId;
+                      const machineStatus = itemIdsId
+                        ? getLatestItemSetMachineStatus(itemIdsId, brandIdForEntry, machineNumber, item?.machine_status ?? item?.machineStatus ?? 'Working')
+                        : (item?.machine_status ?? item?.machineStatus ?? 'Working');
+                      const lastEntry = itemIdsId ? getLastEntryDateAndInchargeForItemSet(itemIdsId, brandIdForEntry, machineNumber) : { dateTime: null, inchargeName: null };
+                      const inchargeObj = inchargeOptions.find(
+                        i => String(i?.id) === String(item?.project_incharge_id ?? item?.projectInchargeId)
+                      );
+                      const inchargeName = lastEntry.inchargeName ?? inchargeObj?.label ?? '';
+                      const displayDateTime = lastEntry.dateTime ?? (() => {
+                        const { date, time } = formatDateTime(item?.created_date_time || item?.createdDateTime || item?.timestamp || '');
+                        return date && time ? `${date} • ${time}` : '';
+                      })();
+                      const categoryName = categoryObj?.value || categoryObj?.label || (item?.category_name || item?.categoryName || '');
+                      const itemNameId = item?.item_name_id ?? item?.itemNameId ?? null;
+                      const brandId = item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId ?? null;
+                      const availableQtyAtFrom = !itemIdsId && itemNameId
+                        ? getAvailableQuantityAtLocation(itemNameId, brandId, fromLocationId)
+                        : null;
+                      return (
+                        <div key={item.id || index} className="bg-white border border-gray-200 rounded-lg px-[16px] py-[6px] cursor-pointer hover:shadow-md transition-shadow mb-1.5" onClick={() => handleSelectSearchItem(item)}>
+                          <div className="flex flex-col">
+                            <div className="flex justify-between items-start mb-0.5">
+                              <p className="text-[14px] font-semibold text-black flex-1 min-w-0 pr-2">{itemName}</p>
+                              {itemIdName
+                                ? <p className="text-[13px] font-medium text-black flex-shrink-0">{itemIdName}</p>
+                                : (
+                                  <p className="text-[13px] font-semibold text-black flex-shrink-0">
+                                    {(availableQtyAtFrom ?? 0)} Qty
+                                  </p>
+                                )}
+                            </div>
+                            <div className="flex justify-between items-start mb-0.5">
+                              <p className="text-[12px] text-[#575757] flex-1 min-w-0 pr-2">{machineNumber || '-'}</p>
+                              <p className={`text-[12px] font-medium flex-shrink-0 ${machineStatus === 'Working' ? 'text-[#007233]' :
+                                machineStatus === 'Not Working' ? 'text-[#E4572E]' :
+                                  'text-[#FF9800]'
+                                }`}>
+                                • {machineStatus}
+                              </p>
+                            </div>
+                            <div className="flex justify-between items-start mb-0.5">
+                              <p className="text-[13px] text-black flex-1 font-medium min-w-0 pr-2">{brandModelText}</p>
+                            </div>
+                            {(displayDateTime || inchargeName) ? (
+                              <div className="flex justify-between items-center gap-2">
+                                <p className="text-[11px] text-[#575757] leading-snug truncate flex-1 min-w-0">{displayDateTime}</p>
+                                {inchargeName ? <p className="text-[11px] font-medium text-black flex-shrink-0">{inchargeName}</p> : null}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+      {showSearchConfirmModal && selectedSearchItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-[16px]" onClick={handleCancelSearchConfirm}
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          <div className="bg-white w-full max-w-[320px] rounded-[16px] p-[24px] shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-center mb-4">
+              <div className="w-[60px] h-[60px] rounded-full bg-[#E8F5E9] flex items-center justify-center">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#4CAF50" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            </div>
+            <h3 className="text-[18px] font-semibold text-black text-center mb-2">
+              Confirm Cart?
+            </h3>
+            <p className="text-[13px] text-[#666666] text-center mb-6 leading-relaxed">
+              Do you Want to Confirm Move the machine please upload Image
+            </p>
+            <div className="flex gap-[12px]">
+              <button onClick={handleCancelSearchConfirm}
+                className="flex-1 h-[44px] border border-gray-300 rounded-[8px] text-[14px] font-semibold text-black bg-white hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button onClick={handleConfirmSearchItem}
+                className="flex-1 h-[44px] bg-black rounded-[8px] text-[14px] font-semibold text-white hover:bg-gray-800 transition-colors"
+              >
+                Yes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showSearchQtyModal && pendingSearchItem && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-[120] flex items-center justify-center p-[16px]"
+          onClick={handleCancelSearchQty}
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          <div className="bg-white w-full max-w-[340px] rounded-[16px] p-[20px] shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[16px] font-semibold text-black mb-2">Enter Quantity</h3>
+            <p className="text-[12px] text-[#666666] mb-4">
+              How many quantity do you want to transfer from the selected From location?
+            </p>
+            <div className="mb-4">
+              <input
+                type="number"
+                inputMode="numeric"
+                min="1"
+                value={pendingSearchQty}
+                onChange={(e) => setPendingSearchQty(e.target.value)}
+                placeholder="Enter qty"
+                className="w-full h-[40px] border border-gray-300 rounded-[10px] px-[12px] text-[14px] font-medium text-black focus:outline-none"
+              />
+            </div>
+            <div className="flex gap-[12px]">
+              <button
+                onClick={handleCancelSearchQty}
+                className="flex-1 h-[42px] border border-gray-300 rounded-[10px] text-[14px] font-semibold text-black bg-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmSearchQty}
+                className="flex-1 h-[42px] bg-black rounded-[10px] text-[14px] font-semibold text-white"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showSearchUploadModal && selectedSearchItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[110] flex items-center justify-center p-[16px]" onClick={handleCloseSearchUploadModal}
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          <div className="bg-white w-full max-w-[360px] rounded-[16px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className='flex justify-end mr-[20px] mt-[14px]'>
+              <button onClick={handleCloseSearchUploadModal} className="text-[#e06256] text-xl font-bold">
+                <img src={Close} alt="Close" className="w-[14px] h-[14px]" />
+              </button>
+            </div>
+            <div className="flex items-center justify-center px-[24px] pb-[8px] gap-[2px] flex-shrink-0">
+              <div className="items-center">
+                <p className="text-[16px] font-semibold text-black">Upload and Attach files</p>
+                <p className="text-[10px] text-gray-500 ml-[8px]">Attachments will be of this Transfer</p>
+              </div>
+            </div>
+            <div className={`flex-1 min-h-0 no-scrollbar scrollbar-none ${showSearchStatusDropdown ? 'overflow-visible relative z-[1]' : 'overflow-y-auto'}`}>
+              <div className="px-[24px] py-[8px]">
+                <label htmlFor="search-file-upload-input"
+                  className="flex flex-col items-center justify-center w-full h-[100px] border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  <svg width="40" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M17 8L12 3L7 8" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M12 3V15" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <p className="text-[14px] font-medium text-[#E4572E] mt-[4px]">Click to Upload</p>
+                  <p className="text-[10px] text-gray-400">Files will be compressed on upload</p>
+                </label>
+                <input
+                  id="search-file-upload-input"
+                  type="file"
+                  className="hidden"
+                  onChange={handleSearchFileSelect}
+                  accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,image/*,application/pdf"
+                  multiple
+                />
+              </div>
+              {searchUploadFiles.length > 0 && (
+                <div className="px-[24px] pb-[8px]">
+                  <p className="text-[12px] font-medium text-black mb-[4px]">File Uploading</p>
+                  <div className="space-y-2 max-h-[150px] overflow-y-auto no-scrollbar scrollbar-none">
+                    {searchUploadFiles.map((fileItem) => (
+                      <div key={fileItem.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-[12px]">
+                        <div className="flex items-center gap-[12px] flex-1 min-w-0">
+                          <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              <circle cx="8.5" cy="8.5" r="1.5" stroke="#E4572E" strokeWidth="2" />
+                              <polyline points="21,15 16,10 5,21" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[12px] font-medium text-black truncate">{fileItem.name}</p>
+                            <p className="text-[10px] text-gray-500">{(fileItem.size / (1024 * 1024)).toFixed(2)} MB</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-[12px]">
+                          <button onClick={() => handleDeleteSearchUploadFile(fileItem.id)} className="text-red-500 hover:text-red-700">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M3 6H5H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              <path d="M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </button>
+                          <span className="text-[12px] font-semibold text-black w-[40px] text-right">{fileItem.progress}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="px-[24px] pb-[8px]">
+                <p className="text-[12px] font-medium text-black mb-2">Status</p>
+                <div className="relative">
+                  <div onClick={() => setShowSearchStatusDropdown(!showSearchStatusDropdown)}
+                    className="w-full h-[40px] border border-gray-300 rounded-lg px-[16px] flex items-center justify-between cursor-pointer bg-white"
+                  >
+                    <span className="text-[14px] text-black">{searchUploadStatus || 'Select'}</span>
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  {showSearchStatusDropdown && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[200] max-h-[200px] overflow-y-auto">
+                      {(entryServiceMode === 'Service' && serviceFlowMode === 'sent' ? filteredStatusOptions : statusOptions).map((status) => (
+                        <button
+                          key={status}
+                          onClick={() => {
+                            setSearchUploadStatus(status);
+                            setShowSearchStatusDropdown(false);
+                          }}
+                          className={`w-full px-[16px] py-[8px] text-left text-[14px] hover:bg-gray-100 ${searchUploadStatus === status ? 'bg-gray-50 font-semibold' : ''
+                            }`}
+                        >
+                          {status}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="px-[24px] pb-[16px]">
+                <p className="text-[12px] font-medium text-black mb-[2px]">Description</p>
+                <textarea
+                  value={searchUploadDescription}
+                  onChange={(e) => setSearchUploadDescription(e.target.value)}
+                  placeholder="Enter"
+                  className="w-full h-[80px] border border-gray-300 rounded-lg px-[16px] py-[12px] text-[14px] text-black placeholder-gray-400 resize-none focus:outline-none focus:border-gray-400"
+                />
+              </div>
+            </div>
+            <div className="px-[24px] pb-[24px] flex-shrink-0 relative z-0">
+              <button
+                onClick={handleConfirmSearchUpload}
+                disabled={
+                  isSearchUploading ||
+                  !searchUploadStatus ||
+                  (entryServiceMode === 'Service' && searchUploadFiles.length === 0)
+                }
+                className={`w-full h-[48px] rounded-lg text-[16px] font-bold text-white ${
+                  isSearchUploading ||
+                  !searchUploadStatus ||
+                  (entryServiceMode === 'Service' && searchUploadFiles.length === 0)
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-black'
+                }`}
+              >
+                {isSearchUploading ? 'Uploading...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {customAlert.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[120] flex items-center justify-center p-[16px]" onClick={closeCustomAlert} style={{ fontFamily: "'Manrope', sans-serif" }}>
+          <div className="bg-white w-full max-w-[360px] rounded-[16px] p-[20px] shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-[12px] mb-3">
+              <div className="w-10 h-10 rounded-full bg-[#FFF4F0] flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <h3 className="text-[16px] font-semibold text-black">Notice</h3>
+            </div>
+            <p className="text-[13px] text-[#333333] leading-relaxed whitespace-pre-line">
+              {customAlert.message}
+            </p>
+            <div className="mt-5 flex justify-end">
+              <button onClick={closeCustomAlert}
+                className="min-w-[88px] h-[38px] px-[20px] rounded-full bg-[#8A4B2D] text-white text-[14px] font-semibold hover:opacity-90 transition-opacity"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+export default Transfer;

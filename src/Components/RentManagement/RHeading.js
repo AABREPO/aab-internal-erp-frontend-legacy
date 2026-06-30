@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import Form from './Form';
 import Table from './Table';
 import Dashboard from './Dashboard';
@@ -10,110 +11,187 @@ import RentDatabase from './RentDatabase';
 import MonthlyReport from './MonthlyReport';
 import Ebno from './Ebno';
 
+const RENT_MODULE_TABS = [
+  'form',
+  'table',
+  'database',
+  'dashboard',
+  'inputdata',
+  'summary',
+  'rentalagreement',
+  'tenant',
+  'monthlyReport',
+  'ebno',
+];
+const RENT_DEFAULT_TAB = 'form';
+
+const getInitialRentTab = (username) => {
+  const isAdmin = username === 'Mahalingam M' || username === 'Admin';
+  const allowedTabs = isAdmin
+    ? RENT_MODULE_TABS
+    : RENT_MODULE_TABS.filter((tab) => tab !== 'database');
+  const savedTab = sessionStorage.getItem('activeTab');
+  if (savedTab && allowedTabs.includes(savedTab)) {
+    return savedTab;
+  }
+  return RENT_DEFAULT_TAB;
+};
+
 const RHeading = ({ username, userRoles = [] }) => {
-  const [activeTab, setActiveTab] = useState(() => {
-    return sessionStorage.getItem('activeTab') || 'form';
-  });
+  const isAdminRent = username === 'Mahalingam M' || username === 'Admin';
+
+  const allowedTabs = isAdminRent
+    ? RENT_MODULE_TABS
+    : RENT_MODULE_TABS.filter((tab) => tab !== 'database');
+
+  const initialTab = getInitialRentTab(username);
+
+  const [activeTab, setActiveTab] = useState(() => initialTab);
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set([initialTab]));
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const bumpRefresh = () => setRefreshNonce((n) => n + 1);
 
   useEffect(() => {
-    sessionStorage.setItem('activeTab', activeTab);
+    setVisitedTabs((prev) => new Set(prev).add(activeTab));
   }, [activeTab]);
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'form':
-        return <Form username={username} userRoles={userRoles} />;
-      case 'table':
-        return <Table username={username} userRoles={userRoles} />;
-      case 'database':
-        return <RentDatabase username={username} userRoles={userRoles} />;
-      case 'dashboard':
-        return <Dashboard username={username} userRoles={userRoles} />;
-      case 'inputdata':
-        return <InputData username={username} userRoles={userRoles} />;
-      case 'summary':
-        return <Summary username={username} userRoles={userRoles} />;
-      case 'rentalagreement':
-        return <RentalAgreement username={username} userRoles={userRoles} />;
-      case 'tenant':
-        return <Tenant username={username} userRoles={userRoles} />;
-      case 'monthlyReport':
-        return <MonthlyReport />;
-      case 'ebno':
-        return <Ebno />;
-      default:
-        return <Form />;
+  useEffect(() => {
+    if (activeTab === 'database' && !isAdminRent) {
+      setActiveTab('form');
+    } else {
+      sessionStorage.setItem('activeTab', activeTab);
     }
+  }, [activeTab, isAdminRent]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    bumpRefresh();
   };
 
   return (
-    <div className="bg-[#FAF6ED]">
-      {/* Top Navigation Tabs */}
-      <div className="topbar-title w-[350px] sm:w-[580px] lg:w-[1470px] overflow-x-auto no-scrollbar py-3">
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'form' ? 'active' : ''}`}
-          onClick={() => setActiveTab('form')}
+    <ModuleHeadingWrapper>
+      <ModuleHeadingBar>
+        <ModuleHeadingTab
+          active={activeTab === 'form'}
+          onClick={() => handleTabChange('form')}
         >
           Form
-        </h2>
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'table' ? 'active' : ''}`}
-          onClick={() => setActiveTab('table')}
+        </ModuleHeadingTab>
+        <ModuleHeadingTab
+          active={activeTab === 'table'}
+          onClick={() => handleTabChange('table')}
         >
           Table View
-        </h2>
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'database' ? 'active' : ''}`}
-          onClick={() => setActiveTab('database')}
-        >
-          Database
-        </h2>
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('dashboard')}
+        </ModuleHeadingTab>
+        {isAdminRent && (
+          <ModuleHeadingTab
+            active={activeTab === 'database'}
+            onClick={() => handleTabChange('database')}
+          >
+            Database
+          </ModuleHeadingTab>
+        )}
+        <ModuleHeadingTab
+          active={activeTab === 'dashboard'}
+          onClick={() => handleTabChange('dashboard')}
         >
           Dashboard
-        </h2>
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'inputdata' ? 'active' : ''}`}
-          onClick={() => setActiveTab('inputdata')}
+        </ModuleHeadingTab>
+        <ModuleHeadingTab
+          active={activeTab === 'inputdata'}
+          onClick={() => handleTabChange('inputdata')}
         >
           Input Data
-        </h2>
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'summary' ? 'active' : ''}`}
-          onClick={() => setActiveTab('summary')}
+        </ModuleHeadingTab>
+        <ModuleHeadingTab
+          active={activeTab === 'summary'}
+          onClick={() => handleTabChange('summary')}
         >
           Summary
-        </h2>
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'rentalagreement' ? 'active' : ''}`}
-          onClick={() => setActiveTab('rentalagreement')}
+        </ModuleHeadingTab>
+        <ModuleHeadingTab
+          active={activeTab === 'rentalagreement'}
+          onClick={() => handleTabChange('rentalagreement')}
         >
           Rental Agreement
-        </h2>
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'tenant' ? 'active' : ''}`}
-          onClick={() => setActiveTab('tenant')}
+        </ModuleHeadingTab>
+        <ModuleHeadingTab
+          active={activeTab === 'tenant'}
+          onClick={() => handleTabChange('tenant')}
         >
           Tenant
-        </h2>
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'monthlyReport' ? 'active' : ''}`}
-          onClick={() => setActiveTab('monthlyReport')}
+        </ModuleHeadingTab>
+        <ModuleHeadingTab
+          active={activeTab === 'monthlyReport'}
+          onClick={() => handleTabChange('monthlyReport')}
         >
           Monthly Report
-        </h2>
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'ebno' ? 'active' : ''}`}
-          onClick={() => setActiveTab('ebno')}
+        </ModuleHeadingTab>
+        <ModuleHeadingTab
+          active={activeTab === 'ebno'}
+          onClick={() => handleTabChange('ebno')}
         >
           EB No
-        </h2>
+        </ModuleHeadingTab>
+      </ModuleHeadingBar>
+      <div className="content">
+        {visitedTabs.has('form') && (
+          <div className={activeTab === 'form' ? '' : 'hidden'}>
+            <Form username={username} userRoles={userRoles} refreshSignal={refreshNonce} isActive={activeTab === 'form'} />
+          </div>
+        )}
+        {visitedTabs.has('table') && (
+          <div className={activeTab === 'table' ? '' : 'hidden'}>
+            <Table username={username} userRoles={userRoles} refreshSignal={refreshNonce} isActive={activeTab === 'table'} />
+          </div>
+        )}
+        {isAdminRent && visitedTabs.has('database') && (
+          <div className={activeTab === 'database' ? '' : 'hidden'}>
+            <RentDatabase username={username} userRoles={userRoles} refreshSignal={refreshNonce} isActive={activeTab === 'database'} />
+          </div>
+        )}
+        {visitedTabs.has('dashboard') && (
+          <div className={activeTab === 'dashboard' ? '' : 'hidden'}>
+            <Dashboard
+              username={username}
+              userRoles={userRoles}
+              refreshSignal={refreshNonce}
+              isActive={activeTab === 'dashboard'}
+            />
+          </div>
+        )}
+        {visitedTabs.has('inputdata') && (
+          <div className={activeTab === 'inputdata' ? '' : 'hidden'}>
+            <InputData username={username} userRoles={userRoles} />
+          </div>
+        )}
+        {visitedTabs.has('summary') && (
+          <div className={activeTab === 'summary' ? '' : 'hidden'}>
+            <Summary username={username} userRoles={userRoles} />
+          </div>
+        )}
+        {visitedTabs.has('rentalagreement') && (
+          <div className={activeTab === 'rentalagreement' ? '' : 'hidden'}>
+            <RentalAgreement username={username} userRoles={userRoles} />
+          </div>
+        )}
+        {visitedTabs.has('tenant') && (
+          <div className={activeTab === 'tenant' ? '' : 'hidden'}>
+            <Tenant username={username} userRoles={userRoles} />
+          </div>
+        )}
+        {visitedTabs.has('monthlyReport') && (
+          <div className={activeTab === 'monthlyReport' ? '' : 'hidden'}>
+            <MonthlyReport />
+          </div>
+        )}
+        {visitedTabs.has('ebno') && (
+          <div className={activeTab === 'ebno' ? '' : 'hidden'}>
+            <Ebno />
+          </div>
+        )}
       </div>
-      {/* Dynamic Content Area */}
-      <div className="content">{renderContent()}</div>
-    </div>
+    </ModuleHeadingWrapper>
   );
 };
 

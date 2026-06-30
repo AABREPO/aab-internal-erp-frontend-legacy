@@ -109,7 +109,7 @@ const ExpenseTableView = () => {
     }, []);
     useEffect(() => {
         axios
-            .get('https://backendaab.in/aabuilderDash/expenses_form/get_form')
+            .get('https://backendaab.in/demoAabuilderDash/expenses_form/get_form')
             .then((response) => {
                 const sortedExpenses = response.data.sort((a, b) => {
                     const enoA = parseInt(a.eno, 10);
@@ -232,7 +232,7 @@ const ExpenseTableView = () => {
                         <span className=' text-[#BF9853] mr-9 font-semibold hover:underline'>Print</span>
                     </div>
                 </div>
-                <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg overflow-x-auto">
+                <div className="w-full max-w-[1860px] ml-10 p-4 bg-white overflow-x-auto">
                     <div
                         className={`text-left flex ${selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools
                             ? 'flex-col sm:flex-row sm:justify-between'
@@ -315,7 +315,7 @@ const ExpenseTableView = () => {
                     <div>
                         <div
                             ref={scrollRef}
-                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[760px] overflow-scroll select-none"
+                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[685px] overflow-scroll select-none"
                             onMouseDown={handleMouseDown}
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}
@@ -500,7 +500,7 @@ const ExpenseTableView = () => {
                                             </th>
                                             <th></th>
                                             <th className="text-base text-left pl-2 font-bold">
-                                                ₹{Number(totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                ₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </th>
                                             <th></th>
                                             <th className="px-2">
@@ -667,7 +667,7 @@ const ExpenseTableView = () => {
                                             <td className=" text-sm text-left font-semibold">{expense.contractor}</td>
                                             <td className=" text-sm text-left font-semibold">{expense.quantity}</td>
                                             <td className="text-sm text-left pl-2 font-semibold">
-                                                ₹{Number(expense.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
                                             <td className=" text-sm text-left font-semibold">{expense.comments}</td>
                                             <td className=" text-sm text-left font-semibold">{expense.category}</td>
@@ -702,7 +702,7 @@ const ExpenseTableView = () => {
 export default ExpenseTableView;
 const formatDate = (dateString) => {
     const date = new Date(dateString);
-    date.setMinutes(date.getMinutes() + 330);
+    date.setMinutes(date.getMinutes());
 
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');

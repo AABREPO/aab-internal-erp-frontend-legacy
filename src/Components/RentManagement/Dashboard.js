@@ -1,12 +1,17 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import axios from 'axios';
 import Edit from '../Images/Edit.svg'
 import Select from 'react-select';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import RentForm from './Form';
+import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
+
+const DASHBOARD_REFRESH_MS = 60_000;
 
 const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const Dashboard = () => {
+const Dashboard = ({ refreshSignal, isActive = true }) => {
     const getCurrentMonth = () => {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}`;
@@ -14,22 +19,36 @@ const Dashboard = () => {
     const [totalMonthlyRent, setTotalMonthlyRent] = useState(0);
     const [rentForms, setRentForms] = useState([]);
     const [tenantShopData, setTenantShopData] = useState([]);
+    const [shopNoIdToShopNoMap, setShopNoIdToShopNoMap] = useState({});
+    const [tenantNameIdToTenantNameMap, setTenantNameIdToTenantNameMap] = useState({});
     const [editAdvance, setEditAdvance] = useState('');
     const [editRent, setEditRent] = useState('');
+    const [editStartingMonth, setEditStartingMonth] = useState('');
     const [tableData, setTableData] = useState([]);
+    const [vacatedTableData, setVacatedTableData] = useState([]);
     const [selectedShop, setSelectedShop] = useState(null);
     const [showConfirm, setShowConfirm] = useState(false);
     const [showEditPopup, setShowEditPopup] = useState(false);
-    const [properties, setProperties] = useState([]);
+    const [projects, setProjects] = useState([]);
     const [showVacantPopup, setShowVacantPopup] = useState(false);
-    const [sortField, setSortField] = useState('tenantName'); // or 'shopNo'
+    const [sortField, setSortField] = useState('shopNo');
     const [sortOrder, setSortOrder] = useState('asc'); // or 'desc'
     const [selectedShopNo, setSelectedShopNo] = useState('');
     const [selectedTenantName, setSelectedTenantName] = useState('');
     const [selectedDoorNo, setSelectedDoorNo] = useState('');
     const [paymentStatus, setPaymentStatus] = useState('');
     const [selectedProperty, setSelectedProperty] = useState(null);
+    const [selectedOccupancyStatus, setSelectedOccupancyStatus] = useState('');
     const [selectedMonthYear, setSelectedMonthYear] = useState(getCurrentMonth());
+    const [showRentFormPopup, setShowRentFormPopup] = useState(false);
+    const [tableHeight, setTableHeight] = useState(400); // Default height in pixels
+    const scrollRef = useRef(null);
+    const isDragging = useRef(false);
+    const start = useRef({ x: 0, y: 0 });
+    const scroll = useRef({ left: 0, top: 0 });
+    const velocity = useRef({ x: 0, y: 0 });
+    const animationFrame = useRef(null);
+    const lastMove = useRef({ time: 0, x: 0, y: 0 });
     const selectedYear = selectedMonthYear ? parseInt(selectedMonthYear.split('-')[0]) : '';
     const selectedMonth = selectedMonthYear ? parseInt(selectedMonthYear.split('-')[1]) - 1 : '';
     useEffect(() => {
@@ -38,12 +57,14 @@ const Dashboard = () => {
         const savedSelectedDoorNo = sessionStorage.getItem('selectedDoorNo');
         const savedTenantName = sessionStorage.getItem('selectedTenantName');
         const savedSelectedProperty = sessionStorage.getItem('selectedProperty');
+        const savedOccupancyStatus = sessionStorage.getItem('selectedOccupancyStatus');
         try {
             if (savedPaymentStatus) setPaymentStatus(JSON.parse(savedPaymentStatus));
             if (savedShopNo) setSelectedShopNo(JSON.parse(savedShopNo));
             if (savedTenantName) setSelectedTenantName(JSON.parse(savedTenantName));
             if (savedSelectedDoorNo) setSelectedDoorNo(JSON.parse(savedSelectedDoorNo));
             if (savedSelectedProperty) setSelectedProperty(JSON.parse(savedSelectedProperty));
+            if (savedOccupancyStatus) setSelectedOccupancyStatus(JSON.parse(savedOccupancyStatus));
         } catch (error) {
             console.error("Error parsing sessionStorage data:", error);
         }
@@ -58,6 +79,7 @@ const Dashboard = () => {
         sessionStorage.removeItem('selectedDoorNo');
         sessionStorage.removeItem('selectedTenantName');
         sessionStorage.removeItem('selectedProperty');
+        sessionStorage.removeItem('selectedOccupancyStatus');
     };
     useEffect(() => {
         if (paymentStatus) sessionStorage.setItem('paymentStatus', JSON.stringify(paymentStatus));
@@ -65,89 +87,146 @@ const Dashboard = () => {
         if (selectedDoorNo) sessionStorage.setItem('selectedDoorNo', JSON.stringify(selectedDoorNo));
         if (selectedTenantName) sessionStorage.setItem('selectedTenantName', JSON.stringify(selectedTenantName));
         if (selectedProperty) sessionStorage.setItem('selectedProperty', JSON.stringify(selectedProperty));
-    }, [paymentStatus, selectedShopNo, selectedDoorNo, selectedTenantName, selectedProperty]);
-
+        if (selectedOccupancyStatus) sessionStorage.setItem('selectedOccupancyStatus', JSON.stringify(selectedOccupancyStatus));
+    }, [paymentStatus, selectedShopNo, selectedDoorNo, selectedTenantName, selectedProperty, selectedOccupancyStatus]);
     const handleSort = (field) => {
         if (sortField === field) {
-            // Toggle the sort order
             setSortOrder((prevOrder) => (prevOrder === 'asc' ? 'desc' : 'asc'));
         } else {
             setSortField(field);
             setSortOrder('asc');
         }
     };
-    [...tableData].sort((a, b) => {
-        let valA = a[sortField]?.toString().toLowerCase() || '';
-        let valB = b[sortField]?.toString().toLowerCase() || '';
-
-        if (sortField === 'shopNo') {
-            // Sort by first character (alphabetical)
-            valA = valA.charAt(0);
-            valB = valB.charAt(0);
+    const handleMouseDown = (e) => {
+        isDragging.current = true;
+        start.current = { x: e.clientX, y: e.clientY };
+        scroll.current = {
+            left: scrollRef.current.scrollLeft,
+            top: scrollRef.current.scrollTop,
+        };
+        lastMove.current = {
+            time: Date.now(),
+            x: e.clientX,
+            y: e.clientY,
+        };
+        scrollRef.current.style.cursor = 'grabbing';
+        scrollRef.current.style.userSelect = 'none';
+        cancelMomentum();
+    };
+    const handleMouseMove = (e) => {
+        if (!isDragging.current) return;
+        const dx = e.clientX - start.current.x;
+        const dy = e.clientY - start.current.y;
+        const now = Date.now();
+        const dt = now - lastMove.current.time || 16;
+        velocity.current = {
+            x: (e.clientX - lastMove.current.x) / dt,
+            y: (e.clientY - lastMove.current.y) / dt,
+        };
+        scrollRef.current.scrollLeft = scroll.current.left - dx;
+        scrollRef.current.scrollTop = scroll.current.top - dy;
+        lastMove.current = {
+            time: now,
+            x: e.clientX,
+            y: e.clientY,
+        };
+    };
+    const handleMouseUp = () => {
+        if (!isDragging.current) return;
+        isDragging.current = false;
+        scrollRef.current.style.cursor = '';
+        scrollRef.current.style.userSelect = '';
+        applyMomentum();
+    };
+    const cancelMomentum = () => {
+        if (animationFrame.current) {
+            cancelAnimationFrame(animationFrame.current);
+            animationFrame.current = null;
         }
-
-        if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-        if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-        return 0;
-    });
-
-
-    const vacantShops = useMemo(() => {
-        return tableData.filter(shop =>
-            shop.tenantName === "Vacant" || !shop.advance
-        );
-    }, [tableData]);
+    };
+    const applyMomentum = () => {
+        const friction = 0.95;
+        const minVelocity = 0.1;
+        const step = () => {
+            const { x, y } = velocity.current;
+            if (Math.abs(x) > minVelocity || Math.abs(y) > minVelocity) {
+                scrollRef.current.scrollLeft -= x * 20;
+                scrollRef.current.scrollTop -= y * 20;
+                velocity.current.x *= friction;
+                velocity.current.y *= friction;
+                animationFrame.current = requestAnimationFrame(step);
+            } else {
+                cancelMomentum();
+            }
+        };
+        animationFrame.current = requestAnimationFrame(step);
+    };
     useEffect(() => {
-        fetchProperties();
+        fetchProjects();
     }, []);
-    const fetchProperties = async () => {
+    const fetchProjects = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/properties/all');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
-                setProperties(data);
-                // Extract property names
+                const ownProjects = Array.isArray(data)
+                    ? data.filter(p => (p.projectCategory || '').toLowerCase() === 'own project')
+                    : [];
+                setProjects(ownProjects);
             } else {
-                console.log('Error fetching properties.');
+                console.log('Error fetching projects.');
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching properties.');
         }
     };
-    useEffect(() => {
-        axios
-            .get('https://backendaab.in/aabuildersDash/api/rental_forms/getAll')
-            .then((response) => {
-                const sortedForms = response.data.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-                setRentForms(sortedForms);
-            })
-            .catch((error) => {
-                console.error('Error fetching rental data:', error);
-            });
-    }, []);
-    useEffect(() => {
-        fetchTenants();
-    }, []);
-    const fetchTenants = async () => {
+    const loadRentForms = useCallback(async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/tenantShop/getAll');
+            const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll');
+            const list = Array.isArray(response.data) ? response.data : [];
+            const sortedForms = list.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            setRentForms(sortedForms);
+        } catch (error) {
+            console.error('Error fetching rental data:', error);
+        }
+    }, []);
+    const loadTenants = useCallback(async (projectList = projects) => {
+        if (!Array.isArray(projectList) || projectList.length === 0) return;
+        try {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
-                console.log(data);
-                //get the total actual rent
-                let total = 0;
-                data.forEach(tenant => {
-                    tenant.property?.forEach(property => {
-                        property.shops?.forEach(shop => {
-                            if (shop.active && shop.monthlyRent) {
-                                total += parseFloat(shop.monthlyRent) || 0;
+                const shopNoIdToShopNoMap = {};
+                projectList
+                    .filter(project => project.projectReferenceName)
+                    .forEach(project => {
+                        const propertyDetailsArray = Array.isArray(project.propertyDetails)
+                            ? project.propertyDetails
+                            : Array.from(project.propertyDetails || []);
+
+                        propertyDetailsArray.forEach(detail => {
+                            if (detail.shopNo && detail.id) {
+                                shopNoIdToShopNoMap[detail.id] = detail.shopNo;
                             }
                         });
                     });
+                setShopNoIdToShopNoMap(shopNoIdToShopNoMap);
+                const tenantNameIdMap = {};
+                data.forEach(tenant => {
+                    if (tenant.id && tenant.tenantName) {
+                        tenantNameIdMap[tenant.id] = tenant.tenantName;
+                    }
                 });
-                console.log(total);
+                setTenantNameIdToTenantNameMap(tenantNameIdMap);
+                let total = 0;
+                data.forEach(tenant => {
+                    tenant.shopNos?.forEach(shop => {
+                        if (!shop.shopClosureDate && shop.monthlyRent) {
+                            total += parseFloat(shop.monthlyRent) || 0;
+                        }
+                    });
+                });
                 setTotalMonthlyRent(total);
             } else {
                 console.error('Error fetching tenants.');
@@ -155,164 +234,440 @@ const Dashboard = () => {
         } catch (error) {
             console.error('Error:', error);
         }
+    }, [projects]);
+    const refreshDashboardData = useCallback(async () => {
+        await Promise.all([loadRentForms(), loadTenants()]);
+    }, [loadRentForms, loadTenants]);
+    useEffect(() => {
+        loadRentForms();
+    }, [loadRentForms]);
+    useEffect(() => {
+        if (projects.length > 0) {
+            loadTenants(projects);
+        }
+    }, [projects, loadTenants]);
+    useOrbitPageSync('rent', refreshDashboardData, [refreshDashboardData]);
+    useTabRefreshSignal(refreshSignal, isActive, refreshDashboardData);
+    useEffect(() => {
+        if (!isActive) return undefined;
+        refreshDashboardData();
+        const intervalId = window.setInterval(() => {
+            refreshDashboardData();
+        }, DASHBOARD_REFRESH_MS);
+        return () => window.clearInterval(intervalId);
+    }, [isActive, refreshDashboardData]);
+
+    const openRentFormPopupForUnpaidMonth = (shop, monthIdx) => {
+        if (!shop || monthIdx == null) return;
+        const monthStr = `${selectedYear}-${String(monthIdx + 1).padStart(2, '0')}`;
+        const monthlyRent =
+            shopInfoMap?.[shop.shopNo]?.monthlyRent ??
+            shop.monthlyRent ??
+            '';
+        try {
+            sessionStorage.setItem('selectedRentType', JSON.stringify('Rent'));
+            sessionStorage.setItem('selectedMonth', JSON.stringify(monthStr));
+            sessionStorage.setItem('formShopNo', JSON.stringify(shop.shopNo));
+            sessionStorage.setItem('formTenantName', JSON.stringify(shop.tenantName));
+            sessionStorage.setItem('amount', JSON.stringify(String(monthlyRent || '')));
+            sessionStorage.setItem('calculatedRent', JSON.stringify(String(monthlyRent || '')));
+            sessionStorage.setItem('paidOnDate', JSON.stringify(new Date().toISOString().split('T')[0]));
+            sessionStorage.setItem('formPaymentMode', JSON.stringify(''));
+            sessionStorage.setItem('closureDate', JSON.stringify(''));
+        } catch (e) {
+            console.error('Failed to set rent form prefill', e);
+        }
+        setShowRentFormPopup(true);
     };
-    const shopInfoMap = {};
-    tenantShopData.forEach(tenant => {
-        tenant.property?.forEach(property => {
-            property.shops?.forEach(shop => {
-                if (shop.shopNo) {
-                    shopInfoMap[shop.shopNo] = {
-                        doorNo: shop.doorNo || '',
-                        propertyName: property.propertyName || '',
-                        advanceAmount: shop.advanceAmount || '',
-                        monthlyRent: shop.monthlyRent || '',
-                        tenantId: tenant.id,     // ← Add tenant ID
-                        shopId: shop.id,          // ← Add shop ID
-                        startingDate: shop.startingDate,
-                        shouldCollectAdvance: shop.shouldCollectAdvance
-                    };
+    const formatDateOnly = (dateString) => {
+        if (!dateString) return '';
+        if (dateString.includes('-') && dateString.split('-')[0].length === 2) {
+            return dateString.replace(/-/g, '/');
+        }
+        if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
+            const parts = dateString.split('-');
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+        const date = new Date(dateString);
+        if (!isNaN(date.getTime())) {
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+        return dateString;
+    };
+    const shopInfoMap = useMemo(() => {
+        const map = {};
+        tenantShopData.forEach(tenant => {
+            tenant.shopNos?.forEach(shop => {
+                if (shop.shopNoId) {
+                    const shopNo = shopNoIdToShopNoMap[shop.shopNoId] || '';
+                    if (shopNo) {
+                        let doorNo = '';
+                        let projectReferenceName = '';
+                        projects
+                            .filter(project => project.projectReferenceName)
+                            .forEach(project => {
+                                const propertyDetailsArray = Array.isArray(project.propertyDetails)
+                                    ? project.propertyDetails
+                                    : Array.from(project.propertyDetails || []);
+                                propertyDetailsArray.forEach(detail => {
+                                    if (detail.id === shop.shopNoId) {
+                                        doorNo = detail.doorNo || '';
+                                        projectReferenceName = project.projectReferenceName || '';
+                                    }
+                                });
+                            });
+                        map[shopNo] = {
+                            doorNo: doorNo,
+                            projectReferenceName: projectReferenceName,
+                            advanceAmount: shop.advanceAmount || '',
+                            monthlyRent: shop.monthlyRent || '',
+                            tenantId: tenant.id,
+                            shopId: shop.shopNoId,
+                            startingDate: shop.startingDate,
+                            shopClosureDate: shop.shopClosureDate,
+                            shouldCollectAdvance: shop.shouldCollectAdvance
+                        };
+                    }
                 }
             });
         });
-    });
-    const formatDateOnly = (dateString) => {
-        const date = new Date(dateString);
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
+        return map;
+    }, [tenantShopData, shopNoIdToShopNoMap, projects]);
+    const parseAmountOrZero = (value) => {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric : 0;
     };
     useEffect(() => {
+        const buildTenantKey = (shopNo, tenantId, tenantName) => {
+            const normalizedShop = shopNo || 'unknown';
+            const tenantIdentifier = tenantId
+                ? `id:${tenantId}`
+                : tenantName
+                    ? `name:${tenantName}`
+                    : 'vacant';
+            return `${normalizedShop}||${tenantIdentifier}`;
+        };
+        const getTenantKeyFromForm = (entry) => {
+            const resolvedShopNo = entry.shopNoId
+                ? (shopNoIdToShopNoMap[entry.shopNoId] || entry.shopNo || '')
+                : (entry.shopNo || '');
+            if (!resolvedShopNo) return null;
+            const tenantIdentifier = entry.tenantNameId
+                ? `id:${entry.tenantNameId}`
+                : entry.tenantName
+                    ? `name:${entry.tenantName}`
+                    : 'vacant';
+            return `${resolvedShopNo}||${tenantIdentifier}`;
+        };
+        const createMonthBuckets = () => Array(12).fill(null).map(() => []);
+        const doesFormBelongToShop = (entry, shop) => {
+            const shopMatches = entry.shopNoId
+                ? (shop.shopNoId && entry.shopNoId === shop.shopNoId)
+                : (entry.shopNo === shop.shopNo);
+            if (!shopMatches) return false;
+            if (entry.tenantNameId) {
+                return shop.tenantId && entry.tenantNameId === shop.tenantId;
+            }
+            if (entry.tenantName && shop.tenantName) {
+                return entry.tenantName === shop.tenantName;
+            }
+            return !entry.tenantName && !shop.tenantName;
+        };
         const allShops = [];
-        // 1. Collect all shop data from properties
-        properties.forEach(property => {
-            property.propertyDetailsList?.forEach(shop => {
-                if (shop.shopNo) {
-                    allShops.push({
-                        shopNo: shop.shopNo,
-                        doorNo: shop.doorNo || '',
-                        propertyName: property.propertyName || '',
-                        advance: null,
-                        tenantName: null,
-                        tenantId: null,
-                        shopId: shop.id,
-                        active: false
-                    });
-                }
-            });
-        });
-        // 2. Merge tenant data (excluding advance)
-        tenantShopData.forEach(tenant => {
-            tenant.property?.forEach(property => {
-                property.shops?.forEach(shop => {
-                    const shopEntryIndex = allShops.findIndex(s => s.shopNo === shop.shopNo);
-                    if (shopEntryIndex !== -1) {
-                        allShops[shopEntryIndex] = {
-                            ...allShops[shopEntryIndex],
-                            tenantName: tenant.tenantName || '',
-                            tenantId: tenant.id,
-                            active: shop.active ?? true
-                        };
+        projects
+            .filter(project => project.projectReferenceName)
+            .forEach(project => {
+                const propertyDetailsArray = Array.isArray(project.propertyDetails) 
+                    ? project.propertyDetails 
+                    : Array.from(project.propertyDetails || []);
+                
+                propertyDetailsArray.forEach(shop => {
+                    if (shop.shopNo) {
+                        allShops.push({
+                            shopNo: shop.shopNo,
+                            doorNo: shop.doorNo || '',
+                            propertyName: project.projectReferenceName || '',
+                            advance: null,
+                            tenantName: null,
+                            tenantId: null,
+                            shopId: shop.id,
+                            shopNoId: shop.id,
+                            active: false,
+                            tenantKey: buildTenantKey(shop.shopNo, null, null),
+                            isBase: true,
+                            hasTenant: false,
+                            startingDate: null,
+                            shopClosureDate: null,
+                            shouldCollectAdvance: true
+                        });
                     }
                 });
             });
+        tenantShopData.forEach(tenant => {
+            tenant.shopNos?.forEach(shop => {
+                if (!shop?.shopNoId) return;
+                const shopNo = shopNoIdToShopNoMap[shop.shopNoId] || '';
+                if (!shopNo) return;
+                const shopEntryIndex = allShops.findIndex(s => s.shopNo === shopNo && s.isBase);
+                if (shopEntryIndex !== -1) {
+                    allShops[shopEntryIndex].hasTenant = true;
+                }
+                const baseEntry = shopEntryIndex !== -1 ? allShops[shopEntryIndex] : null;
+                const tenantEntry = {
+                    shopNo,
+                    doorNo: baseEntry?.doorNo || '',
+                    propertyName: baseEntry?.propertyName || '',
+                    advance: null,
+                    tenantName: tenant.tenantName || '',
+                    tenantId: tenant.id,
+                    shopId: shop.id || shop.shopNoId,
+                    shopNoId: shop.shopNoId,
+                    active: !shop.shopClosureDate,
+                    tenantKey: buildTenantKey(shopNo, tenant.id, tenant.tenantName),
+                    isBase: false,
+                    startingDate: shop.startingDate || null,
+                    shopClosureDate: shop.shopClosureDate || null,
+                    shouldCollectAdvance: shop.shouldCollectAdvance ?? true
+                };
+                allShops.push(tenantEntry);
+            });
         });
+        const shopsForTable = allShops.filter(shop => !(shop.isBase && shop.hasTenant));
         // 3. Filter rent data for selected year
         const filteredForms = rentForms.filter(entry => {
             const date = new Date(entry.forTheMonthOf);
             return (entry.formType === 'Rent' || entry.formType === 'Pending Rent') &&
                 date.getFullYear() === parseInt(selectedYear);
         });
-        // 4. Group rents and collect detailed history
+        // 4. Group rents and collect detailed history using shopNoId
         const groupedRentals = {};
         const rentHistoryMap = {};
         filteredForms.forEach(entry => {
             const month = new Date(entry.forTheMonthOf).getMonth();
-            const shopKey = entry.shopNo;
+            const key = getTenantKeyFromForm(entry);
+            if (!key) return;
             const amount = parseFloat(entry.amount || 0);
             const paidOn = formatDateOnly(entry.paidOnDate) || '';
-            if (!groupedRentals[shopKey]) {
-                groupedRentals[shopKey] = Array(12).fill(null).map(() => []);
+            if (!groupedRentals[key]) {
+                groupedRentals[key] = createMonthBuckets();
             }
-            if (!rentHistoryMap[shopKey]) {
-                rentHistoryMap[shopKey] = Array(12).fill(null).map(() => []);
+            if (!rentHistoryMap[key]) {
+                rentHistoryMap[key] = createMonthBuckets();
             }
-            groupedRentals[shopKey][month].push(amount);
-            rentHistoryMap[shopKey][month].push(`${paidOn} - ₹${amount.toLocaleString()}`);
+            groupedRentals[key][month].push(amount);
+            rentHistoryMap[key][month].push(`${paidOn} - ₹${amount.toLocaleString()}`);
         });
-        // 5. Advance map and history
+        // 5. Advance map and history using shopNoId
         const advanceMap = {};
         const advanceDetailsMap = {};
+        const advanceAdjustmentDetailsMap = {};
+        const shopClosureDetailsMap = {};
+        const refundDetailsMap = {};
         rentForms.forEach(entry => {
-            if (entry.formType === 'Advance' && entry.shopNo) {
+            const key = getTenantKeyFromForm(entry);
+            if (!key) return;
+            
+            if (entry.formType === 'Advance') {
                 const amount = parseFloat(entry.amount || 0);
                 const paidOn = formatDateOnly(entry.paidOnDate) || '';
-                const shopKey = entry.shopNo;
-                if (!advanceMap[shopKey]) {
-                    advanceMap[shopKey] = 0;
-                    advanceDetailsMap[shopKey] = [];
+                if (!advanceMap[key]) {
+                    advanceMap[key] = 0;
+                    advanceDetailsMap[key] = [];
+                    advanceAdjustmentDetailsMap[key] = [];
+                    shopClosureDetailsMap[key] = [];
+                    refundDetailsMap[key] = [];
                 }
-                advanceMap[shopKey] += amount;
-                advanceDetailsMap[shopKey].push(`${paidOn} - ₹${amount.toLocaleString()}`);
+                advanceMap[key] += amount;
+                advanceDetailsMap[key].push(`${paidOn} - ₹${amount.toLocaleString()}`);
+            } else if ((entry.formType === 'Rent' || entry.formType === 'Pending Rent') && entry.paymentMode?.trim() === 'Advance Adjustment') {
+                const amount = parseFloat(entry.amount || 0);
+                const paidOn = formatDateOnly(entry.paidOnDate) || '';
+                if (!advanceAdjustmentDetailsMap[key]) {
+                    advanceAdjustmentDetailsMap[key] = [];
+                }
+                advanceAdjustmentDetailsMap[key].push(`${paidOn} - ₹${amount.toLocaleString()}`);
+            } else if (entry.formType === 'Shop Closure') {
+                const amount = parseAmountOrZero(entry.refundAmount ?? entry.amount);
+                const paidOn = formatDateOnly(entry.paidOnDate) || '';
+                if (!shopClosureDetailsMap[key]) {
+                    shopClosureDetailsMap[key] = [];
+                }
+                shopClosureDetailsMap[key].push(`${paidOn} - ₹${amount.toLocaleString()}`);
+            } else if (entry.formType === 'Refund') {
+                const amount = parseFloat(entry.refundAmount || entry.amount || 0);
+                const paidOn = formatDateOnly(entry.paidOnDate) || '';
+                if (!refundDetailsMap[key]) {
+                    refundDetailsMap[key] = [];
+                }
+                refundDetailsMap[key].push(`${paidOn} - ₹${amount.toLocaleString()}`);
             }
         });
-        // 6. Final table data
-        const finalTableData = [];
-        allShops.forEach((shop) => {
-            const months = groupedRentals[shop.shopNo] || Array(12).fill(null).map(() => []);
-            const rentDetails = rentHistoryMap[shop.shopNo] || Array(12).fill([]);
-            const advanceAmount = advanceMap[shop.shopNo] || 0;
-            const advanceDetails = advanceDetailsMap[shop.shopNo] || [];
+        const shopOrder = allShops
+            .filter(s => s.isBase)
+            .map(s => s.shopNo)
+            .filter(Boolean);
+        const seenOrder = new Set();
+        const orderedShopNos = shopOrder.filter(no => {
+            if (seenOrder.has(no)) return false;
+            seenOrder.add(no);
+            return true;
+        });
+
+        const activeRowByShopNo = {};
+        const latestVacatedRowByShopNo = {};
+        const allVacatedRowsByShopNo = {};
+        const vacantRowByShopNo = {};
+
+        const getRowClosureTime = (row) => {
+            if (!row?.shopClosureDate) return -1;
+            const d = new Date(row.shopClosureDate);
+            const t = d.getTime();
+            return Number.isFinite(t) ? t : -1;
+        };
+
+        shopsForTable.forEach((shop) => {
+            const months = groupedRentals[shop.tenantKey] || createMonthBuckets();
+            const rentDetails = rentHistoryMap[shop.tenantKey] || createMonthBuckets();
+            const advanceAmount = advanceMap[shop.tenantKey] || 0;
+            const advanceDetails = advanceDetailsMap[shop.tenantKey] || [];
+            const advanceAdjustmentDetails = advanceAdjustmentDetailsMap[shop.tenantKey] || [];
+            const shopClosureDetails = shopClosureDetailsMap[shop.tenantKey] || [];
+            const refundDetails = refundDetailsMap[shop.tenantKey] || [];
             const totalRentPaid = rentForms
-                .filter(entry =>
-                    entry.shopNo === shop.shopNo &&
-                    (entry.formType === 'Rent' || entry.formType === 'Pending Rent') &&
-                    entry.paymentMode === 'Advance Adjustment' &&
-                    new Date(entry.forTheMonthOf).getFullYear() === parseInt(selectedYear)
-                )
+                .filter(entry => {
+                    return doesFormBelongToShop(entry, shop) &&
+                        (entry.formType === 'Rent' || entry.formType === 'Pending Rent') &&
+                        entry.paymentMode?.trim() === 'Advance Adjustment';
+                })
                 .reduce((sum, entry) => sum + parseFloat(entry.amount || 0), 0);
-            const remainingAdvance = advanceAmount - totalRentPaid;
-            const wasActiveThisYear = months.some(monthArr => monthArr.length > 0);
+            const totalShopClosurePaid = rentForms
+                .filter(entry => {
+                    return doesFormBelongToShop(entry, shop) && entry.formType === 'Shop Closure';
+                })
+                .reduce((sum, entry) => sum + parseAmountOrZero(entry.refundAmount ?? entry.amount), 0);
+            const totalRefundPaid = rentForms
+                .filter(entry => {
+                    return doesFormBelongToShop(entry, shop) && entry.formType === 'Refund';
+                })
+                .reduce((sum, entry) => sum + parseFloat(entry.refundAmount || entry.amount || 0), 0);
+            const remainingAdvance = Math.max(0, advanceAmount - totalRentPaid - totalShopClosurePaid - totalRefundPaid);
+            const hadRentPaymentsThisYear = months.some(monthArr => monthArr.length > 0);
+            const shopClosureDate = shop.shopClosureDate || shopInfoMap[shop.shopNo]?.shopClosureDate;
+            let vacatedThisYear = false;
+            if (shopClosureDate && !shop.active) {
+                const closureDate = new Date(shopClosureDate);
+                const closureYear = closureDate.getFullYear();
+                vacatedThisYear = closureYear === parseInt(selectedYear);
+            }
+            const wasActiveThisYear = hadRentPaymentsThisYear || vacatedThisYear;
             const row = {
-                shNo: finalTableData.length + 1,
                 shopNo: shop.shopNo,
                 tenantName: shop.active ? shop.tenantName : "Vacant",
                 doorNo: shop.doorNo,
                 advance: shop.active ? remainingAdvance : null,
                 advanceDetails: shop.active ? advanceDetails : [],
+                advanceAdjustmentDetails: shop.active ? advanceAdjustmentDetails : [],
+                shopClosureDetails: shop.active ? shopClosureDetails : [],
+                refundDetails: shop.active ? refundDetails : [],
                 months,
                 rentDetails,
                 propertyName: shop.propertyName,
                 vacated: !shop.active && wasActiveThisYear,
-                startingDate: shop.active ? shopInfoMap[shop.shopNo]?.startingDate : null,
-                shouldCollectAdvance: shopInfoMap[shop.shopNo]?.shouldCollectAdvance ?? true
+                startingDate: shop.startingDate || shopInfoMap[shop.shopNo]?.startingDate || null,
+                shopClosureDate: shop.active ? null : shopClosureDate || null,
+                shouldCollectAdvance: shop.shouldCollectAdvance ?? (shopInfoMap[shop.shopNo]?.shouldCollectAdvance ?? true)
             };
-            if (!shop.active && wasActiveThisYear) {
-                const hasAnotherActiveTenant = allShops.some(
-                    s => s.shopNo === shop.shopNo && s.active
-                );
-                finalTableData.push({
+
+            if (shop.active) {
+                // Only keep one active tenant row per shopNo
+                if (!activeRowByShopNo[shop.shopNo]) {
+                    activeRowByShopNo[shop.shopNo] = row;
+                }
+                return;
+            }
+
+            if (wasActiveThisYear) {
+                // Keep only the latest vacated tenant per shopNo (prevents duplicates)
+                const vacatedRow = {
                     ...row,
                     tenantName: shop.tenantName || 'Vacated',
-                    vacated: true
-                });
-                if (!hasAnotherActiveTenant) {
-                    finalTableData.push({
-                        ...row,
-                        tenantName: 'Vacant',
-                        advance: null,
-                        advanceDetails: [],
-                        months: Array(12).fill([]),
-                        rentDetails: Array(12).fill([]),
-                        vacated: false
-                    });
+                    vacated: true,
+                    advance: remainingAdvance,
+                    advanceDetails: advanceDetails,
+                    advanceAdjustmentDetails: advanceAdjustmentDetails,
+                    shopClosureDetails: shopClosureDetails,
+                    refundDetails: refundDetails
+                };
+                if (!allVacatedRowsByShopNo[shop.shopNo]) {
+                    allVacatedRowsByShopNo[shop.shopNo] = [];
                 }
-            } else {
-                finalTableData.push(row);
+                allVacatedRowsByShopNo[shop.shopNo].push(vacatedRow);
+                const existing = latestVacatedRowByShopNo[shop.shopNo];
+                const existingTime = getRowClosureTime(existing);
+                const candidateTime = getRowClosureTime(vacatedRow);
+                if (!existing || candidateTime > existingTime) {
+                    latestVacatedRowByShopNo[shop.shopNo] = vacatedRow;
+                }
+            }
+
+            // Prepare a single vacant row per shopNo (shown only when there is no active tenant)
+            if (!vacantRowByShopNo[shop.shopNo]) {
+                vacantRowByShopNo[shop.shopNo] = {
+                    ...row,
+                    tenantName: 'Vacant',
+                    advance: null,
+                    advanceDetails: [],
+                    advanceAdjustmentDetails: [],
+                    shopClosureDetails: [],
+                    refundDetails: [],
+                    months: createMonthBuckets(),
+                    rentDetails: createMonthBuckets(),
+                    vacated: false,
+                    shopClosureDate: null
+                };
             }
         });
-        setTableData(finalTableData);
-    }, [rentForms, tenantShopData, properties, selectedYear]);
+
+        const finalTableData = [];
+        const allShopNos = orderedShopNos.length
+            ? orderedShopNos
+            : Array.from(new Set(shopsForTable.map(s => s.shopNo).filter(Boolean)));
+
+        allShopNos.forEach((shopNo) => {
+            const activeRow = activeRowByShopNo[shopNo];
+            if (activeRow) {
+                finalTableData.push(activeRow);
+                return;
+            }
+            const vacatedRow = latestVacatedRowByShopNo[shopNo];
+            if (vacatedRow) {
+                finalTableData.push(vacatedRow);
+            }
+            const vacantRow = vacantRowByShopNo[shopNo];
+            if (vacantRow) {
+                finalTableData.push(vacantRow);
+            }
+        });
+
+        // Add S.No after final assembly
+        setTableData(finalTableData.map((r, idx) => ({ ...r, shNo: idx + 1 })));
+
+        // For "Vacated Shop" filter, show ALL vacated tenants per shop (no de-dupe)
+        const vacatedOnly = [];
+        allShopNos.forEach((shopNo) => {
+            const rows = allVacatedRowsByShopNo[shopNo] || [];
+            if (!rows.length) return;
+            // Show latest vacated first within the shop
+            rows
+                .slice()
+                .sort((a, b) => getRowClosureTime(b) - getRowClosureTime(a))
+                .forEach(r => vacatedOnly.push(r));
+        });
+        setVacatedTableData(vacatedOnly.map((r, idx) => ({ ...r, shNo: idx + 1 })));
+    }, [rentForms, tenantShopData, projects, selectedYear, shopNoIdToShopNoMap]);
     const formatINR = (value) => {
         const numericValue = value.replace(/[^0-9]/g, '');
         if (!numericValue) return '';
@@ -322,11 +677,10 @@ const Dashboard = () => {
             maximumFractionDigits: 0,
         }).format(Number(numericValue));
     };
-
     const handleSaveRentAdvance = async () => {
         const { tenantId, shopId } = selectedShop;
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/tenantShop/update/${tenantId}/shop/${shopId}`, {
+            const updateResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/update/${tenantId}/shopNo/${shopId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
@@ -336,52 +690,93 @@ const Dashboard = () => {
                     advanceAmount: editAdvance || null
                 })
             });
-            if (response.ok) {
-                await fetchTenants();  // Refresh data
+            if (updateResponse.ok) {
+                if (editRent && editStartingMonth) {
+                    const rentHistoryData = {
+                        shopNoId: shopId,
+                        rentAmount: editRent,
+                        startingMonthForThisRent: editStartingMonth
+                    };
+                    const historyResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/rent-history/save', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(rentHistoryData)
+                    });
+                    if (!historyResponse.ok) {
+                        console.error('Failed to save rent history');
+                        alert('Rent/Advance updated but failed to save rent history');
+                    }
+                }
+                await loadTenants();
                 setShowEditPopup(false);
                 setSelectedShop(null);
+                setEditRent('');
+                setEditAdvance('');
+                setEditStartingMonth('');
             } else {
                 console.error('Failed to update rent/advance');
+                alert('Failed to update rent/advance');
             }
         } catch (error) {
             console.error('Error:', error);
+            alert('An error occurred while saving data');
         }
     };
     const filteredTableData = useMemo(() => {
-        return tableData.filter((shop) => {
+        const sourceData = selectedOccupancyStatus === 'vacated' ? vacatedTableData : tableData;
+        return sourceData.filter((shop) => {
             const matchesShopNo = selectedShopNo ? shop.shopNo === selectedShopNo : true;
             const matchesTenantName = selectedTenantName ? shop.tenantName === selectedTenantName : true;
             const matchesDoorNo = selectedDoorNo ? shop.doorNo === selectedDoorNo : true;
             const matchesProperty = selectedProperty ? shop.propertyName === selectedProperty.value : true;
             const isVacant = shop.tenantName === 'Vacant';
+            const isVacated = shop.vacated;
+            const isOccupied = !isVacant && !isVacated;
+
+            // When filtering by Paid/Unpaid, do not include vacated tenants.
+            // Vacated entries have a closure date and shouldn't be considered for month payment status filters/reports.
+            if (paymentStatus !== '' && isVacated) return false;
+
+            let matchesOccupancyStatus = true;
+            if (selectedOccupancyStatus) {
+                if (selectedOccupancyStatus === 'vacant') {
+                    matchesOccupancyStatus = isVacant;
+                } else if (selectedOccupancyStatus === 'occupied') {
+                    matchesOccupancyStatus = isOccupied;
+                } else if (selectedOccupancyStatus === 'vacated') {
+                    matchesOccupancyStatus = isVacated;
+                }
+            }
             let matchesMonthStatus = true;
             if (selectedMonth !== '' && paymentStatus !== '') {
                 const monthPayments = shop.months?.[selectedMonth] || [];
                 const totalAmount = monthPayments.reduce((a, b) => a + b, 0);
-
                 if (paymentStatus === 'paid') {
                     matchesMonthStatus = totalAmount > 0;
                 } else if (paymentStatus === 'unpaid') {
                     const startingDate = shop.startingDate ? new Date(shop.startingDate) : null;
                     const selectedMonthDate = new Date(parseInt(selectedYear), parseInt(selectedMonth), 1);
-
-                    const hasStarted = startingDate ? startingDate <= selectedMonthDate : true;
-
+                    // If startingDate is missing, we don't consider any month "started"
+                    // (so we shouldn't show/filter unpaid "0" months for that tenant).
+                    const hasStarted = startingDate ? startingDate <= selectedMonthDate : false;
                     matchesMonthStatus = totalAmount === 0 && hasStarted;
                 }
             }
-            return matchesShopNo && matchesTenantName && matchesDoorNo && matchesProperty && (!isVacant || paymentStatus === '') && matchesMonthStatus;
+            return matchesShopNo && matchesTenantName && matchesDoorNo && matchesProperty && matchesOccupancyStatus && (!isVacant || paymentStatus === '') && matchesMonthStatus;
         });
     }, [
         tableData,
+        vacatedTableData,
         selectedShopNo,
         selectedTenantName,
         selectedDoorNo,
         selectedMonth,
         paymentStatus,
-        selectedProperty, // ✅ Include here
+        selectedProperty,
+        selectedOccupancyStatus,
     ]);
-
     const sortedTableData = useMemo(() => {
         return [...filteredTableData].sort((a, b) => {
             const normalize = (val) =>
@@ -389,20 +784,25 @@ const Dashboard = () => {
             const valA = normalize(a[sortField]?.split(',')[0]);
             const valB = normalize(b[sortField]?.split(',')[0]);
             if (sortField === 'shopNo') {
-                // Match prefix (letters), number, and optional suffix
-                const regex = /^([A-Z]+)?(\d+)?([A-Z]*)?$/;
-                const [, prefixA = '', numA = '', suffixA = ''] =
-                    valA.match(regex) || [];
-                const [, prefixB = '', numB = '', suffixB = ''] =
-                    valB.match(regex) || [];
-                if (prefixA < prefixB) return sortOrder === 'asc' ? -1 : 1;
-                if (prefixA > prefixB) return sortOrder === 'asc' ? 1 : -1;
-                const num1 = parseInt(numA, 10) || 0;
-                const num2 = parseInt(numB, 10) || 0;
-                if (num1 < num2) return sortOrder === 'asc' ? -1 : 1;
-                if (num1 > num2) return sortOrder === 'asc' ? 1 : -1;
-                if (suffixA < suffixB) return sortOrder === 'asc' ? -1 : 1;
-                if (suffixA > suffixB) return sortOrder === 'asc' ? 1 : -1;
+                // Parse shop number: extract first two letters and numeric part
+                const parseShopNo = (str) => {
+                    if (!str) return { letters: '', number: 0 };
+                    // Extract first two letters (or one if only one exists)
+                    const letterMatch = str.match(/^([A-Z]{1,2})/);
+                    const letters = letterMatch ? letterMatch[1] : '';
+                    // Extract numeric part
+                    const numberMatch = str.match(/(\d+)/);
+                    const number = numberMatch ? parseInt(numberMatch[1], 10) : 0;
+                    return { letters, number };
+                };                
+                const parsedA = parseShopNo(valA);
+                const parsedB = parseShopNo(valB);                
+                // Compare letters first
+                if (parsedA.letters < parsedB.letters) return sortOrder === 'asc' ? -1 : 1;
+                if (parsedA.letters > parsedB.letters) return sortOrder === 'asc' ? 1 : -1;                
+                // If letters are same, compare numbers numerically
+                if (parsedA.number < parsedB.number) return sortOrder === 'asc' ? -1 : 1;
+                if (parsedA.number > parsedB.number) return sortOrder === 'asc' ? 1 : -1;                
                 return 0;
             }
             // Default sorting for other fields
@@ -411,12 +811,12 @@ const Dashboard = () => {
             return 0;
         });
     }, [filteredTableData, sortField, sortOrder]);
-
-    const options = properties.map((property) => ({
-        value: property.propertyName,
-        label: property.propertyName,
-    }));
-
+    const options = projects
+        .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+        .map((project) => ({
+            value: project.projectReferenceName,
+            label: project.projectReferenceName,
+        }));
     const shopOptions = [...new Set(tableData.map(shop => shop.shopNo))].map(no => ({ value: no, label: no }));
     const filteredByShop = selectedShopNo
         ? tableData.filter(shop => shop.shopNo === selectedShopNo)
@@ -426,13 +826,29 @@ const Dashboard = () => {
         ? filteredByShop.filter(shop => shop.tenantName === selectedTenantName)
         : filteredByShop;
     const doorOptions = [...new Set(filteredByTenant.map(shop => shop.doorNo))].map(door => ({ value: door, label: door }));
-
     const handleExportPDF = () => {
         const doc = new jsPDF('landscape');
-        const reportTitle =
-            paymentStatus?.trim().toLowerCase() === 'unpaid'
-                ? `Unpaid Shops Rent Report ${monthNames[selectedMonth]} ${selectedYear}`
-                : `Shop Rent Report ${monthNames[selectedMonth]} ${selectedYear}`;
+        const monthYearSuffix = `${monthNames[selectedMonth]} ${selectedYear}`;
+        const occ = (selectedOccupancyStatus || '').trim().toLowerCase();
+        const pay = (paymentStatus || '').trim().toLowerCase();
+
+        let reportTitle;
+        if (pay === 'unpaid' && occ === 'occupied') {
+            reportTitle = `Unpaid Occupied Shop Report ${monthYearSuffix}`;
+        } else if (pay === 'unpaid' && occ === 'vacated') {
+            reportTitle = `Unpaid Vacated Shop Report ${monthYearSuffix}`;
+        } else if (occ === 'occupied') {
+            reportTitle = `Occupied Shop Report ${monthYearSuffix}`;
+        } else if (occ === 'vacated') {
+            reportTitle = `Vacated Shop Report ${monthYearSuffix}`;
+        } else if (pay === 'unpaid') {
+            reportTitle = `Unpaid Shops Rent Report ${monthYearSuffix}`;
+        } else if (pay === 'paid') {
+            reportTitle = `Paid Shops Rent Report ${monthYearSuffix}`;
+        } else {
+            reportTitle = `Shop Rent Report ${monthYearSuffix}`;
+        }
+
         const tableColumn = [
             "S.No",
             "Shop No",
@@ -456,14 +872,21 @@ const Dashboard = () => {
                     selectedYear > now.getFullYear() ||
                     (selectedYear === now.getFullYear() && i >= now.getMonth());
                 const shopStartDate = shop.startingDate ? new Date(shop.startingDate) : null;
+                const hasKnownStart = !!shopStartDate;
+                const shopClosureDate = shop.shopClosureDate ? new Date(shop.shopClosureDate) : null;
                 const isBeforeStart = shopStartDate
                     ? (selectedYear < shopStartDate.getFullYear() ||
                         (selectedYear === shopStartDate.getFullYear() && i < shopStartDate.getMonth()))
                     : false;
+                const isAfterClosure = shopClosureDate && isVacated
+                    ? (selectedYear > shopClosureDate.getFullYear() ||
+                        (selectedYear === shopClosureDate.getFullYear() && i > shopClosureDate.getMonth()))
+                    : false;
                 const totalAmount = amounts.reduce((a, b) => a + b, 0);
-                if (isVacant || isBeforeStart) return "-";
+                if (isVacant || isBeforeStart || isAfterClosure) return "-";
                 if (totalAmount > 0) return totalAmount.toLocaleString();
                 if (isFutureMonth) return "-";
+                if (!hasKnownStart) return "-";
                 return "0";
             });
             const unpaidCount = isVacant
@@ -478,11 +901,18 @@ const Dashboard = () => {
                     const total = arr.reduce((a, b) => a + b, 0);
                     return isPastMonth && total === 0 && !isBeforeStart;
                 }).length.toString().padStart(2, '0');
+            const tenantDisplay = isVacant
+                ? "Vacant"
+                : isVacated
+                    ? (shop.tenantName && shop.tenantName !== 'Vacated'
+                        ? `${shop.tenantName} - Vacated`
+                        : 'Vacated')
+                    : shop.tenantName;
             return {
                 rowData: [
                     index + 1,
                     shop.shopNo,
-                    isVacant ? "Vacant" : shop.tenantName,
+                    tenantDisplay,
                     shop.doorNo || "-",
                     advance,
                     ...monthValues,
@@ -503,7 +933,7 @@ const Dashboard = () => {
                 overflow: 'linebreak',
                 lineColor: [0, 0, 0],
                 lineWidth: 0.1,
-                textColor: [0, 0, 0], 
+                textColor: [0, 0, 0],
             },
             headStyles: {
                 fillColor: false,
@@ -516,22 +946,18 @@ const Dashboard = () => {
             },
             theme: 'grid'
         });
-        const fileName =
-            paymentStatus?.trim().toLowerCase() === 'unpaid'
-                ? `Unpaid Shops Rent Report - ${selectedMonthYear}.pdf`
-                : `Shop-Rent-${selectedMonthYear}.pdf`;
-
+        const fileName = `${reportTitle.replace(/\s+/g, '-')}.pdf`;
         doc.save(fileName);
     };
     const handleExportVacantPDF = () => {
         const doc = new jsPDF();
-        const tableColumn = ["Shop No", "Door No", "Property Name"];
-        const tableRows = filteredVacantShops.map(shop => [
+        const tableColumn = ["S.No", "Shop No", "Door No", "Project Reference Name"];
+        const tableRows = portfolioVacantShopsList.map((shop, index) => [
+            index + 1,
             shop.shopNo,
             shop.doorNo || 'N/A',
             shop.propertyName || 'N/A'
         ]);
-
         doc.text("Vacant Shop Details", 14, 10);
         doc.autoTable({
             head: [tableColumn],
@@ -560,16 +986,26 @@ const Dashboard = () => {
 
         doc.save("Vacant-Shops.pdf");
     };
-    const filteredVacantShops = useMemo(() => {
-        return filteredTableData.filter(shop => {
+    /** Same rules as table occupancy filter; based on full tableData like other summary totals. */
+    const portfolioOccupiedCount = useMemo(
+        () => tableData.filter((shop) => shop.tenantName !== 'Vacant' && !shop.vacated).length,
+        [tableData]
+    );
+    const portfolioVacantShopsList = useMemo(() => {
+        const vacantShopsList = tableData.filter((shop) => {
             const shopInfo = shopInfoMap[shop.shopNo];
-            const isVacant = shop.tenantName === "Vacant" || !shop.advance;
+            const isVacant = shop.tenantName === 'Vacant';
             const shouldInclude = !shopInfo || shopInfo.shouldCollectAdvance !== false;
             return isVacant && shouldInclude;
         });
-    }, [filteredTableData]);
-    const occupiedCount = sortedTableData.length - filteredVacantShops.length;
-
+        return vacantShopsList.reduce((acc, current) => {
+            const existingShop = acc.find((shop) => shop.shopNo === current.shopNo);
+            if (!existingShop) {
+                acc.push(current);
+            }
+            return acc;
+        }, []);
+    }, [tableData, shopInfoMap]);
     const totalMonthlyRents = useMemo(() => {
         if (selectedMonth === '' || selectedYear === '') return 0;
         const selectedMonthIndex = parseInt(selectedMonth); // 0-based
@@ -605,7 +1041,6 @@ const Dashboard = () => {
             return sum + rent; // Full rent
         }, 0);
     }, [tableData, shopInfoMap, selectedMonth, selectedYear]);
-
     const totalForSelectedMonth = useMemo(() => {
         if (selectedMonth === '' || selectedYear === '') return 0;
         return tableData.reduce((sum, shop) => {
@@ -619,277 +1054,292 @@ const Dashboard = () => {
             return sum + totalAmount;
         }, 0);
     }, [filteredTableData, selectedMonth, selectedYear]);
-
     return (
-        <div>
-            <div className='mx-auto lg:w-[1750px] p-4 lg:pl-8 bg-white lg:ml-12 lg:mr-6 rounded-md text-left flex'>
-                <div>
-                    <h1 className='font-semibold mb-3'>Select Year</h1>
-                    <input
-                        type="month"
-                        value={selectedMonthYear}
-                        onChange={(e) => setSelectedMonthYear(e.target.value)}
-                        className="border-2 border-[#BF9853] rounded-lg p-2 w-[180px] h-[45px] focus:outline-none"
-                    />
-                </div>
-                <div className="flex gap-4 mt-9 ml-3.5 w-full flex-wrap">
-                    <div className="min-w-[200px]">
-                        <Select
-                            options={shopOptions}
-                            isClearable
-                            placeholder="Select Shop No"
-                            value={shopOptions.find(o => o.value === selectedShopNo) || null}
-                            onChange={(option) => {
-                                const value = option?.value || '';
-                                setSelectedShopNo(value);
-                                setSelectedTenantName('');
-                                setSelectedDoorNo('');
-                                if (value) {
-                                    sessionStorage.setItem('selectedShopNo', JSON.stringify(value));
-                                } else {
-                                    sessionStorage.removeItem('selectedShopNo');
-                                }
-                                sessionStorage.removeItem('selectedTenantName');
-                                sessionStorage.removeItem('selectedDoorNo');
-                            }}
-                            styles={{
-                                control: (provided, state) => ({
-                                    ...provided,
-                                    height: '45px',
-                                    minHeight: '45px',
-                                    backgroundColor: 'transparent',
-                                    borderWidth: '2px',
-                                    borderColor: state.isFocused
-                                        ? 'rgba(191, 152, 83, 1)'
-                                        : 'rgba(191, 152, 83, 1)',
-                                    borderRadius: '8px',
-                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
-                                    '&:hover': {
-                                        borderColor: 'rgba(191, 152, 83, 1)',
-                                    },
-                                }),
-                                placeholder: (provided) => ({
-                                    ...provided,
-                                    color: '#999',
-                                }),
-                                singleValue: (provided) => ({
-                                    ...provided,
-                                    color: 'black',
-                                }),
-                            }}
+        <div className="">
+            <div className='mx-auto lg:w-[1750px] p-4 lg:pl-4 bg-white lg:ml-12 lg:mr-6 rounded-md text-left'>
+                <div className="flex flex-col lg:flex-row lg:items-end gap-4 lg:gap-3 p-4">
+                    <div className="flex-shrink-0 mr-3">
+                        <h1 className='font-semibold mb-2'>Select Year</h1>
+                        <input
+                            type="month"
+                            value={selectedMonthYear}
+                            onChange={(e) => setSelectedMonthYear(e.target.value)}
+                            className="border-2 border-[#BF9853] rounded-lg p-2 w-full lg:w-[180px] h-[45px] focus:outline-none"
                         />
                     </div>
-                    <div className="min-w-[200px]">
-                        <Select
-                            options={tenantOptions}
-                            isClearable
-                            placeholder="Select Tenant Name"
-                            value={tenantOptions.find(o => o.value === selectedTenantName) || null}
-                            onChange={(option) => {
-                                const value = option?.value || '';
-                                setSelectedTenantName(value);
-                                if (value) {
-                                    sessionStorage.setItem('selectedTenantName', JSON.stringify(value));
-                                } else {
+                    <div className="flex  sm:flex-row w-full flex-wrap">
+                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <label className="block font-semibold mb-2 text-sm sm:text-base">Shop No</label>
+                            <Select
+                                options={shopOptions}
+                                isClearable
+                                placeholder="Select"
+                                className="w-full lg:w-[180px]"
+                                value={shopOptions.find(o => o.value === selectedShopNo) || null}
+                                onChange={(option) => {
+                                    const value = option?.value || '';
+                                    setSelectedShopNo(value);
+                                    setSelectedTenantName('');
+                                    setSelectedDoorNo('');
+                                    if (value) {
+                                        sessionStorage.setItem('selectedShopNo', JSON.stringify(value));
+                                    } else {
+                                        sessionStorage.removeItem('selectedShopNo');
+                                    }
                                     sessionStorage.removeItem('selectedTenantName');
-                                }
-                                setSelectedDoorNo('');
-                                sessionStorage.removeItem('selectedDoorNo');
-                            }}
-                            isDisabled={!filteredByShop.length}
-                            styles={{
-                                control: (provided, state) => ({
-                                    ...provided,
-                                    height: '45px',
-                                    minHeight: '45px',
-                                    backgroundColor: 'transparent',
-                                    borderWidth: '2px',
-                                    borderColor: state.isFocused
-                                        ? 'rgba(191, 152, 83, 1)'
-                                        : 'rgba(191, 152, 83, 1)',
-                                    borderRadius: '8px',
-                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
-                                    '&:hover': {
-                                        borderColor: 'rgba(191, 152, 83, 1)',
-                                    },
-                                }),
-                                placeholder: (provided) => ({
-                                    ...provided,
-                                    color: '#999',
-                                }),
-                                singleValue: (provided) => ({
-                                    ...provided,
-                                    color: 'black',
-                                }),
-                            }}
-                        />
-                    </div>
-                    <div className="min-w-[200px]">
-                        <Select
-                            options={doorOptions}
-                            placeholder="Select Door No"
-                            isClearable
-                            value={doorOptions.find(o => o.value === selectedDoorNo) || null}
-                            onChange={(option) => {
-                                const value = option?.value || '';
-                                setSelectedDoorNo(value);
-
-                                if (value) {
-                                    sessionStorage.setItem('selectedDoorNo', JSON.stringify(value));
-                                } else {
                                     sessionStorage.removeItem('selectedDoorNo');
-                                }
-                            }}
-                            isDisabled={!filteredByTenant.length}
-                            styles={{
-                                control: (provided, state) => ({
-                                    ...provided,
-                                    height: '45px',
-                                    minHeight: '45px',
-                                    backgroundColor: 'transparent',
-                                    borderWidth: '2px',
-                                    borderColor: state.isFocused
-                                        ? 'rgba(191, 152, 83, 1)'
-                                        : 'rgba(191, 152, 83, 1)',
-                                    borderRadius: '8px',
-                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
-                                    '&:hover': {
-                                        borderColor: 'rgba(191, 152, 83, 1)',
-                                    },
-                                }),
-                                placeholder: (provided) => ({
-                                    ...provided,
-                                    color: '#999',
-                                }),
-                                singleValue: (provided) => ({
-                                    ...provided,
-                                    color: 'black',
-                                }),
-                            }}
-                        />
+                                }}
+                                styles={{
+                                    control: (provided, state) => ({
+                                        ...provided,
+                                        height: '45px',
+                                        minHeight: '45px',
+                                        backgroundColor: 'transparent',
+                                        borderWidth: '2px',
+                                        borderColor: state.isFocused
+                                            ? 'rgba(191, 152, 83, 1)'
+                                            : 'rgba(191, 152, 83, 1)',
+                                        borderRadius: '8px',
+                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
+                                        '&:hover': {
+                                            borderColor: 'rgba(191, 152, 83, 1)',
+                                        },
+                                    }),
+                                    placeholder: (provided) => ({
+                                        ...provided,
+                                        color: '#999',
+                                    }),
+                                    singleValue: (provided) => ({
+                                        ...provided,
+                                        color: 'black',
+                                    }),
+                                }}
+                            />
+                        </div>
+                        <div className="w-full sm:w-auto sm:min-w-[200px] mr-5">
+                            <label className="block font-semibold mb-2 text-sm sm:text-base">Tenant Name</label>
+                            <Select
+                                options={tenantOptions}
+                                isClearable
+                                placeholder="Select"
+                                value={tenantOptions.find(o => o.value === selectedTenantName) || null}
+                                onChange={(option) => {
+                                    const value = option?.value || '';
+                                    setSelectedTenantName(value);
+                                    if (value) {
+                                        sessionStorage.setItem('selectedTenantName', JSON.stringify(value));
+                                    } else {
+                                        sessionStorage.removeItem('selectedTenantName');
+                                    }
+                                    setSelectedDoorNo('');
+                                    sessionStorage.removeItem('selectedDoorNo');
+                                }}
+                                isDisabled={!filteredByShop.length}
+                                styles={{
+                                    control: (provided, state) => ({
+                                        ...provided,
+                                        height: '45px',
+                                        minHeight: '45px',
+                                        backgroundColor: 'transparent',
+                                        borderWidth: '2px',
+                                        borderColor: state.isFocused
+                                            ? 'rgba(191, 152, 83, 1)'
+                                            : 'rgba(191, 152, 83, 1)',
+                                        borderRadius: '8px',
+                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
+                                        '&:hover': {
+                                            borderColor: 'rgba(191, 152, 83, 1)',
+                                        },
+                                    }),
+                                    placeholder: (provided) => ({
+                                        ...provided,
+                                        color: '#999',
+                                    }),
+                                    singleValue: (provided) => ({
+                                        ...provided,
+                                        color: 'black',
+                                    }),
+                                }}
+                            />
+                        </div>
+                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <label className="block font-semibold mb-2 text-sm sm:text-base">Door No</label>
+                            <Select
+                                options={doorOptions}
+                                placeholder="Select"
+                                isClearable
+                                className="w-full lg:w-[180px]"
+                                value={doorOptions.find(o => o.value === selectedDoorNo) || null}
+                                onChange={(option) => {
+                                    const value = option?.value || '';
+                                    setSelectedDoorNo(value);
+                                    if (value) {
+                                        sessionStorage.setItem('selectedDoorNo', JSON.stringify(value));
+                                    } else {
+                                        sessionStorage.removeItem('selectedDoorNo');
+                                    }
+                                }}
+                                isDisabled={!filteredByTenant.length}
+                                styles={{
+                                    control: (provided, state) => ({
+                                        ...provided,
+                                        height: '45px',
+                                        minHeight: '45px',
+                                        backgroundColor: 'transparent',
+                                        borderWidth: '2px',
+                                        borderColor: state.isFocused
+                                            ? 'rgba(191, 152, 83, 1)'
+                                            : 'rgba(191, 152, 83, 1)',
+                                        borderRadius: '8px',
+                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
+                                        '&:hover': {
+                                            borderColor: 'rgba(191, 152, 83, 1)',
+                                        },
+                                    }),
+                                    placeholder: (provided) => ({
+                                        ...provided,
+                                        color: '#999',
+                                    }),
+                                    singleValue: (provided) => ({
+                                        ...provided,
+                                        color: 'black',
+                                    }),
+                                }}
+                            />
+                        </div>
+                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <label className="block font-semibold mb-2 text-sm sm:text-base">Payment Status</label>
+                            <select
+                                className='w-full lg:w-[180px] h-[45px] border-2 border-[#BF9853] rounded-lg pl-3 focus:outline-none'
+                                value={paymentStatus}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setPaymentStatus(value);
+                                    if (value) {
+                                        sessionStorage.setItem('paymentStatus', JSON.stringify(value));
+                                    } else {
+                                        sessionStorage.removeItem('paymentStatus');
+                                    }
+                                }}
+                            >
+                                <option value="">Select</option>
+                                <option value="paid">Paid</option>
+                                <option value="unpaid">Unpaid</option>
+                            </select>
+                        </div>
+                        <div className="w-full sm:w-auto sm:min-w-[200px] mr-5">
+                            <label className="block font-semibold mb-2 text-sm sm:text-base">Project Reference Name</label>
+                            <Select
+                                options={options}
+                                value={selectedProperty}
+                                isClearable
+                                onChange={(option) => {
+                                    setSelectedProperty(option);
+                                    if (option) {
+                                        sessionStorage.setItem('selectedProperty', JSON.stringify(option));
+                                    } else {
+                                        sessionStorage.removeItem('selectedProperty');
+                                    }
+                                }}
+                                placeholder="Select"
+                                isSearchable
+                                styles={{
+                                    control: (provided, state) => ({
+                                        ...provided,
+                                        height: '45px',
+                                        minHeight: '45px',
+                                        backgroundColor: 'transparent',
+                                        borderWidth: '2px',
+                                        borderColor: state.isFocused
+                                            ? 'rgba(191, 152, 83, 1)'
+                                            : 'rgba(191, 152, 83, 1)',
+                                        borderRadius: '8px',
+                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
+                                        '&:hover': {
+                                            borderColor: 'rgba(191, 152, 83, 1)',
+                                        },
+                                    }),
+                                    placeholder: (provided) => ({
+                                        ...provided,
+                                        color: '#999',
+                                    }),
+                                    singleValue: (provided) => ({
+                                        ...provided,
+                                        color: 'black',
+                                    }),
+                                }}
+                            />
+                        </div>
+                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <label className="block font-semibold mb-2 text-sm sm:text-base">Occupancy Status</label>
+                            <select
+                                className='w-full lg:w-[180px] h-[45px] border-2 border-[#BF9853] rounded-lg pl-3 focus:outline-none'
+                                value={selectedOccupancyStatus}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setSelectedOccupancyStatus(value);
+                                    if (value) {
+                                        sessionStorage.setItem('selectedOccupancyStatus', JSON.stringify(value));
+                                    } else {
+                                        sessionStorage.removeItem('selectedOccupancyStatus');
+                                    }
+                                }}
+                            >
+                                <option value="">Select</option>
+                                <option value="occupied">Occupied Shop</option>
+                                <option value="vacant">Vacant Shop</option>
+                                <option value="vacated">Vacated Shop</option>
+                            </select>
+                        </div>
                     </div>
-                    <div className="min-w-[200px]">
-                        <select
-                            className='w-full h-[45px] border-2 border-[#BF9853] rounded-lg pl-3 focus:outline-none'
-                            value={paymentStatus}
-                            onChange={(e) => {
-                                const value = e.target.value;
-                                setPaymentStatus(value);
-
-                                if (value) {
-                                    sessionStorage.setItem('paymentStatus', JSON.stringify(value));
-                                } else {
-                                    sessionStorage.removeItem('paymentStatus');
-                                }
-                            }}
-                        >
-                            <option value="">Select Status</option>
-                            <option value="paid">Paid</option>
-                            <option value="unpaid">Unpaid</option>
-                        </select>
-                    </div>
-                    <div className="min-w-[200px]">
-                        <Select
-                            className="w-[300px]"
-                            options={options}
-                            value={selectedProperty}
-                            isClearable
-                            onChange={(option) => {
-                                setSelectedProperty(option);
-                                if (option) {
-                                    sessionStorage.setItem('selectedProperty', JSON.stringify(option));
-                                } else {
-                                    sessionStorage.removeItem('selectedProperty');
-                                }
-                            }}
-                            placeholder="Select"
-                            isSearchable
-                            styles={{
-                                control: (provided, state) => ({
-                                    ...provided,
-                                    height: '45px',
-                                    minHeight: '45px',
-                                    backgroundColor: 'transparent',
-                                    borderWidth: '2px',
-                                    borderColor: state.isFocused
-                                        ? 'rgba(191, 152, 83, 1)'
-                                        : 'rgba(191, 152, 83, 1)',
-                                    borderRadius: '8px',
-                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
-                                    '&:hover': {
-                                        borderColor: 'rgba(191, 152, 83, 1)',
-                                    },
-                                }),
-                                placeholder: (provided) => ({
-                                    ...provided,
-                                    color: '#999',
-                                }),
-                                singleValue: (provided) => ({
-                                    ...provided,
-                                    color: 'black',
-                                }),
-                            }}
-                        />
-                    </div>
-
                 </div>
             </div>
             {/* Rent Table */}
-            <div className='mx-auto lg:w-[1750px] p-4 lg:pl-8 mt-6 bg-white lg:ml-12 mr-6 rounded-md'>
-                <div className='flex justify-end gap-10 items-center mb-3'>
-                    <div className=" font-semibold flex gap-2">
-                        <h1>Total Monthly Rent:</h1>
-                        <h1 className='font-bold cursor-pointer text-[#E4572E]'> ₹{totalMonthlyRents.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</h1>
+            <div className='mx-auto lg:w-[1750px] p-4 lg:pl-8 mt-5 bg-white lg:ml-12 mr-6 rounded-md'>
+                <div className='flex flex-col lg:flex-row lg:justify-end gap-4 lg:gap-10 items-start lg:items-center mb-3'>
+                    <div className="font-semibold flex flex-col sm:flex-row gap-1 sm:gap-2">
+                        <span>Total Monthly Rent:</span>
+                        <span className='font-bold cursor-pointer text-[#E4572E]'>₹{totalMonthlyRents.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
                     </div>
-                    <div className="text-right font-semibold text-base">
-                        Total Collected for {monthNames[selectedMonth]} {selectedYear}:&nbsp;
-                        <span className="text-green-600">
+                    <div className="font-semibold text-sm sm:text-base">
+                        <span className="block sm:inline">Total Collected for {monthNames[selectedMonth]} {selectedYear}:</span>
+                        <span className="text-green-600 ml-0 sm:ml-1">
                             ₹{totalForSelectedMonth.toLocaleString("en-IN")}
                         </span>
                     </div>
-                    <div className="text-right font-semibold text-base">
-                        Balance Rent to Collect for {monthNames[selectedMonth]} {selectedYear}:&nbsp;
-                        <span className="text-red-600">
+                    <div className="font-semibold text-sm sm:text-base">
+                        <span className="block sm:inline">Balance Rent to Collect for {monthNames[selectedMonth]} {selectedYear}:</span>
+                        <span className="text-red-600 ml-0 sm:ml-1">
                             ₹{(totalMonthlyRents - totalForSelectedMonth).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                         </span>
                     </div>
                     <div className="font-semibold flex gap-2">
-                        <h1>Total Occupied Shops:</h1>
-                        <h1 className='font-bold cursor-pointer text-[#E4572E]'>
-                            {occupiedCount}
-                        </h1>
+                        <span>Total Occupied Shops:</span>
+                        <span className='font-bold cursor-pointer text-[#E4572E]'>
+                            {portfolioOccupiedCount}
+                        </span>
                     </div>
                     <div className="font-semibold flex gap-2">
-                        <h1>Total Shop Vacancy :</h1>
-                        <h1
-                            className='font-bold cursor-pointer text-[#E4572E]'
-                            onClick={() => setShowVacantPopup(true)}
-                        >
-                            {filteredVacantShops.length}
-                        </h1>
+                        <span>Total Shop Vacancy:</span>
+                        <span className='font-bold cursor-pointer text-[#E4572E]' onClick={() => setShowVacantPopup(true)}>
+                            {portfolioVacantShopsList.length}
+                        </span>
                     </div>
-                    <h1
-                        className='font-bold text-sm text-[#E4572E] cursor-pointer hover:underline'
-                        onClick={handleExportPDF}
-                    >
+                    <button className='font-bold text-sm text-[#E4572E] cursor-pointer hover:underline text-left lg:text-right' onClick={handleExportPDF}>
                         Export PDF
-                    </h1>
+                    </button>
                 </div>
-                <div className="rounded-lg border-l-8 border-[#BF9853] overflow-x-auto no-scrollbar">
-                    <table className="border-collapse w-full text-left">
-                        <thead>
+                <div ref={scrollRef} className="rounded-lg border-l-8 border-[#BF9853] overflow-scroll select-none" style={{ height: `${550}px` }}
+                    onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
+                >
+                    <table className="border-collapse w-full text-left min-w-[1165px]">
+                        <thead className="sticky top-0">
                             <tr className="bg-[#FAF6ED]">
                                 <th className="px-2 py-2 font-semibold cursor-pointer">S.No</th>
-                                <th
-                                    className="px-4 py-2 font-semibold cursor-pointer"
-                                    onClick={() => handleSort('shopNo')}
-                                >
+                                <th className="px-4 py-2 font-semibold cursor-pointer" onClick={() => handleSort('shopNo')} >
                                     Sh.No {sortField === 'shopNo' && (sortOrder === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th
-                                    className="px-4 py-2 font-semibold cursor-pointer"
-                                    onClick={() => handleSort('tenantName')}
-                                >
+                                <th className="px-4 py-2 font-semibold cursor-pointer" onClick={() => handleSort('tenantName')} >
                                     Shop Name {sortField === 'tenantName' && (sortOrder === 'asc' ? '↑' : '↓')}
                                 </th>
                                 <th className="px-4 py-2 font-semibold">D.No</th>
@@ -933,7 +1383,35 @@ const Dashboard = () => {
                                         <td className="pr-2 pl-4 py-2">
                                             {shop.doorNo || '-'}
                                         </td>
-                                        <td className="px-4 py-2" title={(shop.advanceDetails || []).join('\n')}>
+                                        <td className="px-4 py-2" title={(() => {
+                                            const advanceDetails = shop.advanceDetails || [];
+                                            const adjustmentDetails = shop.advanceAdjustmentDetails || [];
+                                            const shopClosureDetails = shop.shopClosureDetails || [];
+                                            const refundDetails = shop.refundDetails || [];                                            
+                                            let tooltip = [];                                            
+                                            // Add advance payments
+                                            advanceDetails.forEach(detail => {
+                                                tooltip.push(detail);
+                                            });                                            
+                                            // Add advance adjustments with clear labeling
+                                            adjustmentDetails.forEach(detail => {
+                                                tooltip.push(detail + ' (Advance Adjustment)');
+                                            });                                            
+                                            // Add shop closure payments with clear labeling
+                                            shopClosureDetails.forEach(detail => {
+                                                tooltip.push(detail + ' (Shop Closure)');
+                                            });
+                                            
+                                            // Add refund payments with clear labeling
+                                            refundDetails.forEach(detail => {
+                                                tooltip.push(detail + ' (Refund)');
+                                            });                                            
+                                            // Add note for vacated shops
+                                            if (shop.vacated && shop.advance > 0) {
+                                                tooltip.push('Balance to be returned to tenant');
+                                            }                                            
+                                            return tooltip.join('\n');
+                                        })()}>
                                             {shop.advance != null && shop.shouldCollectAdvance !== false
                                                 ? Number(shop.advance).toLocaleString("en-IN", {
                                                     style: "currency",
@@ -952,20 +1430,34 @@ const Dashboard = () => {
                                             const totalAmount = amounts.reduce((a, b) => a + b, 0);
                                             const hoverText = shop.rentDetails?.[i]?.join('\n') || "";
                                             const shopStartDate = shop.startingDate ? new Date(shop.startingDate) : null;
+                                            const hasKnownStart = !!shopStartDate;
+                                            const shopClosureDate = shop.shopClosureDate ? new Date(shop.shopClosureDate) : null;
                                             const isBeforeStart = shopStartDate
                                                 ? (selectedYear < shopStartDate.getFullYear() ||
                                                     (selectedYear === shopStartDate.getFullYear() && i < shopStartDate.getMonth()))
                                                 : false;
+                                            const isAfterClosure = shopClosureDate && shop.vacated
+                                                ? (selectedYear > shopClosureDate.getFullYear() ||
+                                                    (selectedYear === shopClosureDate.getFullYear() && i > shopClosureDate.getMonth()))
+                                                : false;
                                             return (
                                                 <td key={i} className="px-4 py-2 text-center" title={hoverText}>
-                                                    {isVacant || isBeforeStart ? (
+                                                    {isVacant || isBeforeStart || isAfterClosure ? (
                                                         <span className="text-gray-400 font-medium">-</span>
                                                     ) : totalAmount > 0 ? (
                                                         <span className="text-green-600 font-semibold">{totalAmount.toLocaleString()}</span>
                                                     ) : isFutureMonth ? (
                                                         <span className="text-gray-400 font-medium">-</span>
+                                                    ) : !hasKnownStart ? (
+                                                        <span className="text-gray-400 font-medium">-</span>
                                                     ) : (
-                                                        <span className="text-[#E4572E] font-medium">0</span>
+                                                        <button
+                                                            type="button"
+                                                            className="text-[#E4572E] font-medium hover:underline"
+                                                            onClick={() => openRentFormPopupForUnpaidMonth(shop, i)}
+                                                        >
+                                                            0
+                                                        </button>
                                                     )}
                                                 </td>
                                             );
@@ -980,9 +1472,10 @@ const Dashboard = () => {
                                                         (selectedYear === now.getFullYear() && i < now.getMonth());
                                                     const total = arr.reduce((a, b) => a + b, 0);
                                                     const shopStartDate = shop.startingDate ? new Date(shop.startingDate) : null;
+                                                    const hasKnownStart = !!shopStartDate;
                                                     const currentMonthDate = new Date(`${selectedYear}-${String(i + 1).padStart(2, '0')}-01`);
                                                     const isBeforeStart = shopStartDate ? currentMonthDate < shopStartDate : false;
-                                                    return isPastMonth && total === 0 && !isBeforeStart;
+                                                    return isPastMonth && total === 0 && hasKnownStart && !isBeforeStart;
                                                 }).length.toString().padStart(2, '0')}
                                         </td>
                                         <td className="px-4 py-2 items-center text-center ">
@@ -1011,24 +1504,25 @@ const Dashboard = () => {
                 </div>
             </div>
             {showConfirm && selectedShop && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-                    <div className="bg-white p-6 rounded-lg shadow-lg w-[480px] h-[200px]">
-                        <p className="text-[22px] font-semibold mb-2 text-center">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
+                    <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md">
+                        <p className="text-lg sm:text-xl font-semibold mb-2 text-center">
                             Are you sure you want to edit
                         </p>
-                        <div className="text-[22px] font-semibold mb-4 text-center">
-                            <span className="text-[#BF9853] ">{selectedShop.tenantName}</span>?
+                        <div className="text-lg sm:text-xl font-semibold mb-6 text-center">
+                            <span className="text-[#BF9853]">{selectedShop.tenantName}</span>?
                         </div>
-                        <div className="flex justify-end gap-4">
-                            <button className="bg-gray-300 px-4 py-2 rounded-md mt-8" onClick={() => { setShowConfirm(false); setSelectedShop(null); }}>
+                        <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
+                            <button className="bg-gray-300 px-4 py-2 rounded-md text-sm sm:text-base" onClick={() => { setShowConfirm(false); setSelectedShop(null); }}>
                                 Cancel
                             </button>
                             <button
-                                className="bg-[#BF9853] text-white px-4 py-2 rounded-md mt-8"
+                                className="bg-[#BF9853] text-white px-4 py-2 rounded-md text-sm sm:text-base"
                                 onClick={() => {
                                     const info = shopInfoMap[selectedShop.shopNo] || {};
                                     setEditAdvance(info.advanceAmount || '');
                                     setEditRent(info.monthlyRent || '');
+                                    setEditStartingMonth('');
                                     setSelectedShop(prev => ({
                                         ...prev,
                                         tenantId: info.tenantId,
@@ -1044,38 +1538,50 @@ const Dashboard = () => {
                 </div>
             )}
             {showEditPopup && selectedShop && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-                    <div className="bg-white p-6 rounded-lg shadow-lg w-[500px] relative">
-                        <div className="text-left left-2 text-lg text-[#E4572E] font-bold">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
+                    <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md relative max-h-[90vh] overflow-y-auto">
+                        <div className="text-left text-base sm:text-lg text-[#E4572E] font-bold mb-4">
                             {selectedShop.tenantName} - {shopInfoMap[selectedShop.shopNo]?.doorNo || ''}
                         </div>
-                        <div className="mt-5 text-left">
+                        <div className="text-left space-y-4">
                             <div>
-                                <label className="font-semibold block">Rent</label>
+                                <label className="font-semibold block text-sm sm:text-base mb-1">Rent</label>
                                 <input
                                     type="text"
                                     placeholder="Rent"
                                     value={formatINR(editRent)}
                                     onChange={(e) => setEditRent(e.target.value.replace(/[^0-9]/g, ''))}
-                                    className="w-full border px-3 py-2 rounded-md focus:outline-none"
+                                    className="w-full border px-3 py-2 rounded-md focus:outline-none text-sm sm:text-base"
                                 />
                             </div>
-                            <div className=" mt-3">
-                                <label className="font-semibold block">Advance</label>
+                            <div>
+                                <label className="font-semibold block text-sm sm:text-base mb-1">Advance</label>
                                 <input
                                     type="text"
                                     placeholder="Advance"
                                     value={formatINR(editAdvance)}
                                     onChange={(e) => setEditAdvance(e.target.value.replace(/[^0-9]/g, ''))}
-                                    className="w-full border px-3 py-2 rounded-md focus:outline-none"
+                                    className="w-full border px-3 py-2 rounded-md focus:outline-none text-sm sm:text-base"
+                                />
+                            </div>
+                            <div>
+                                <label className="font-semibold block text-sm sm:text-base mb-1">Starting Month for This Rent</label>
+                                <input
+                                    type="month"
+                                    value={editStartingMonth}
+                                    onChange={(e) => setEditStartingMonth(e.target.value)}
+                                    className="w-full border px-3 py-2 rounded-md focus:outline-none text-sm sm:text-base"
                                 />
                             </div>
                         </div>
-                        <div className="flex justify-end mt-6 gap-4">
-                            <button className="bg-gray-300 px-4 py-2 rounded-md" onClick={() => { setShowEditPopup(false); setSelectedShop(null); }}>
+                        <div className="flex flex-col sm:flex-row justify-end mt-6 gap-3 sm:gap-4">
+                            <button 
+                                className="bg-gray-300 px-4 py-2 rounded-md text-sm sm:text-base" 
+                                onClick={() => { setShowEditPopup(false); setSelectedShop(null); setEditRent(''); setEditAdvance(''); setEditStartingMonth(''); }}
+                            >
                                 Close
                             </button>
-                            <button className="bg-[#BF9853] text-white px-4 py-2 rounded-md" onClick={handleSaveRentAdvance}>
+                            <button className="bg-[#BF9853] text-white px-4 py-2 rounded-md text-sm sm:text-base" onClick={handleSaveRentAdvance}>
                                 Save
                             </button>
                         </div>
@@ -1083,44 +1589,73 @@ const Dashboard = () => {
                 </div>
             )}
             {showVacantPopup && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-auto">
-                    <div className="bg-white rounded-xl p-6 w-full h-[350px] max-w-lg shadow-xl">
-                        <div className="flex justify-between items-center mb-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-auto p-4">
+                    <div className="bg-white rounded-xl p-4 sm:p-6 w-full max-w-4xl max-h-[90vh] shadow-xl">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
                             <div>
-                                <h2 className="text-lg font-semibold">Vacant Shop Details</h2>
+                                <h2 className="text-lg sm:text-xl font-semibold">Vacant Shop Details</h2>
                             </div>
-                            <div className="flex items-center gap-7">
-                                <h2 className="text-[#E4572E] font-semibold text-sm cursor-pointer" onClick={handleExportVacantPDF}>
+                            <div className="flex items-center gap-4 sm:gap-7">
+                                <button className="text-[#E4572E] font-semibold text-sm cursor-pointer hover:underline" onClick={handleExportVacantPDF}>
                                     Export PDF
-                                </h2>
-                                <button onClick={() => setShowVacantPopup(false)} className="text-gray-500 hover:text-black">
+                                </button>
+                                <button onClick={() => setShowVacantPopup(false)} className="text-gray-500 hover:text-black text-lg sm:text-xl">
                                     ✕
                                 </button>
                             </div>
                         </div>
-                        <div className="border-l-8 border-[#BF9853] rounded-lg h-[250px] overflow-y-auto">
-                            <table className="w-full  text-sm ">
-                                <thead className="bg-[#FAF6ED]">
-                                    <tr>
-                                        <th className="px-2 py-1 ">Shop No</th>
-                                        <th className="px-2 py-1 ">Door No</th>
-                                        <th className="px-2 py-1 ">Property Name</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredVacantShops.map((shop) => (
-                                        <tr key={shop.shopNo}>
-                                            <td className="px-2 py-1 ">{shop.shopNo}</td>
-                                            <td className="px-2 py-1 ">{shop.doorNo || 'N/A'}</td>
-                                            <td className="px-2 py-1 ">{shop.propertyName || 'N/A'}</td>
+                        <div className="border-l-8 border-[#BF9853] rounded-lg max-h-[60vh] overflow-y-auto">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs sm:text-sm min-w-[400px]">
+                                    <thead className="bg-[#FAF6ED] sticky top-0">
+                                        <tr>
+                                            <th className="px-2 py-2 text-left">S.No</th>
+                                            <th className="px-2 py-2 text-left">Shop No</th>
+                                            <th className="px-2 py-2 text-left">Door No</th>
+                                            <th className="px-2 py-2 text-left">Project Reference Name</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {portfolioVacantShopsList.map((shop, index) => (
+                                            <tr key={shop.shopNo} className="border-b border-gray-200">
+                                                <td className="px-2 py-2">{index + 1}</td>
+                                                <td className="px-2 py-2 font-medium">{shop.shopNo}</td>
+                                                <td className="px-2 py-2">{shop.doorNo || 'N/A'}</td>
+                                                <td className="px-2 py-2">{shop.propertyName || 'N/A'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
+            {showRentFormPopup ? (
+                <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg w-full max-w-[1824px] max-h-[92vh] overflow-y-auto shadow-lg relative">
+                        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                            <p className="text-sm font-semibold text-[#202020]">Rent Entry</p>
+                            <button
+                                type="button"
+                                onClick={() => setShowRentFormPopup(false)}
+                                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="p-3">
+                            <RentForm
+                                embedded
+                                onSuccess={async () => {
+                                    setShowRentFormPopup(false);
+                                    await refreshDashboardData();
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 };

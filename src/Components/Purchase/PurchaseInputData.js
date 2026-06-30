@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import CreatableSelect from 'react-select/creatable';
 import search from '../Images/search.png';
 import imports from '../Images/Import.svg';
@@ -7,6 +7,9 @@ import edit from '../Images/Edit.svg';
 import Select from "react-select";
 const PurchaseInputData = () => {
   const [isShowModal, setIsShowModal] = useState(false);
+  const [hoveredModelName, setHoveredModelName] = useState(null);
+  const [hoveredBrandName, setHoveredBrandName] = useState(null);
+  const [hoveredTypeColor, setHoveredTypeColor] = useState(null);
   const [siteOptions, setSiteOptions] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [category, setCategory] = useState("");
@@ -70,6 +73,36 @@ const PurchaseInputData = () => {
   const [poItemNameId, setPoItemNameId] = useState('');
   const [siteInchargeId, setSiteInchargeId] = useState('');
   const [isItemNameEditPopupOpen, setIsItemNameEditPopupOpen] = useState(false);
+  const [expandedTables, setExpandedTables] = useState({
+    itemName: false,
+    model: false,
+    brand: false,
+    type: false,
+    category: false,
+    siteIncharge: false,
+    groupName: false
+  });
+  const [openSearchFields, setOpenSearchFields] = useState({
+    itemName: false,
+    model: false,
+    brand: false,
+    type: false,
+    category: false,
+    siteIncharge: false,
+    groupName: false
+  });
+  const toggleTable = (tableName) => {
+    setExpandedTables(prev => ({
+      ...prev,
+      [tableName]: !prev[tableName]
+    }));
+  };
+  const toggleSearchField = (fieldName) => {
+    setOpenSearchFields(prev => ({
+      ...prev,
+      [fieldName]: !prev[fieldName]
+    }));
+  };
   const closeModelUpload = () => setIsModelUploadOpens(false);
   const openModelUpload = () => setIsModelUploadOpens(true);
   const closeBrandUpload = () => setIsBrandUploadOpens(false);
@@ -334,7 +367,7 @@ const PurchaseInputData = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuildersDash/api/po_model/model_bulkUpload", {
+      const response = await fetch("https://backendaab.in/demoAabuildersDash/api/po_model/model_bulkUpload", {
         method: "POST",
         body: formData,
       });
@@ -354,7 +387,7 @@ const PurchaseInputData = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuildersDash/api/po_brand/bulkUpload", {
+      const response = await fetch("https://backendaab.in/demoAabuildersDash/api/po_brand/bulkUpload", {
         method: "POST",
         body: formData,
       });
@@ -374,7 +407,7 @@ const PurchaseInputData = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuildersDash/api/po_type/bulkUpload", {
+      const response = await fetch("https://backendaab.in/demoAabuildersDash/api/po_type/bulkUpload", {
         method: "POST",
         body: formData,
       });
@@ -394,7 +427,7 @@ const PurchaseInputData = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("http://localhost:8081/api/po_itemNames/upload/csv", {
+      const response = await fetch("https://backendaab.in/demoAabuildersDash/api/po_itemNames/upload/csv", {
         method: "POST",
         body: formData,
       });
@@ -409,7 +442,7 @@ const PurchaseInputData = () => {
   const handleSubmitEditCategory = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/po_category/edit/${selectedCategoryId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/po_category/edit/${selectedCategoryId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -429,7 +462,7 @@ const PurchaseInputData = () => {
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -455,7 +488,7 @@ const PurchaseInputData = () => {
   const handleSubmitEditModel = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/po_model/edit/${selectedModelId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/po_model/edit/${selectedModelId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -478,7 +511,7 @@ const PurchaseInputData = () => {
   const handleSubmitEditBrand = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/po_brand/edit/${selectedBrandId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/po_brand/edit/${selectedBrandId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -498,7 +531,7 @@ const PurchaseInputData = () => {
   const handleSubmitEditType = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/po_type/edit/${selectedTypeId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/po_type/edit/${selectedTypeId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -518,7 +551,7 @@ const PurchaseInputData = () => {
   const handleSubmitEditItemName = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/po_itemNames/edit/${poItemNameId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/po_itemNames/edit/${poItemNameId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -540,7 +573,7 @@ const PurchaseInputData = () => {
   const handleSubmitEditSiteIncharge = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/site_incharge/edit/${siteInchargeId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/site_incharge/edit/${siteInchargeId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -562,7 +595,7 @@ const PurchaseInputData = () => {
   const handleSubmitEditGroupName = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/group_name/edit/${groupNameId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/group_name/edit/${groupNameId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -583,7 +616,7 @@ const PurchaseInputData = () => {
     const confirmed = window.confirm("Are you sure you want to delete This Category?");
     if (confirmed) {
       try {
-        const response = await fetch(`https://backendaab.in/aabuildersDash/api/po_category/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/po_category/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -605,7 +638,7 @@ const PurchaseInputData = () => {
     const confirmed = window.confirm("Are you sure you want to delete This Model?");
     if (confirmed) {
       try {
-        const response = await fetch(`https://backendaab.in/aabuildersDash/api/po_model/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/po_model/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -627,7 +660,7 @@ const PurchaseInputData = () => {
     const confirmed = window.confirm("Are you sure you want to delete This Item Name?");
     if (confirmed) {
       try {
-        const response = await fetch(`https://backendaab.in/aabuildersDash/api/po_itemNames/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/po_itemNames/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -649,7 +682,7 @@ const PurchaseInputData = () => {
     const confirmed = window.confirm("Are you sure you want to delete This Brand?");
     if (confirmed) {
       try {
-        const response = await fetch(`https://backendaab.in/aabuildersDash/api/po_brand/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/po_brand/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -671,7 +704,7 @@ const PurchaseInputData = () => {
     const confirmed = window.confirm("Are you sure you want to delete This Type?");
     if (confirmed) {
       try {
-        const response = await fetch(`https://backendaab.in/aabuildersDash/api/po_type/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/po_type/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -693,7 +726,7 @@ const PurchaseInputData = () => {
     const confirmed = window.confirm("Are you sure you want to delete This Type?");
     if (confirmed) {
       try {
-        const response = await fetch(`https://backendaab.in/aabuildersDash/api/group_name/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/group_name/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -716,7 +749,7 @@ const PurchaseInputData = () => {
     const confirmed = window.confirm("Are you sure you want to delete This Site Incharge?");
     if (confirmed) {
       try {
-        const response = await fetch(`https://backendaab.in/aabuildersDash/api/site_incharge/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/site_incharge/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -739,7 +772,7 @@ const PurchaseInputData = () => {
     e.preventDefault();
     const newAccountType = { category };
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/save', {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -765,7 +798,7 @@ const PurchaseInputData = () => {
       category: selectedModelCategory?.value || null,
     };
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/save', {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_model/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -788,7 +821,7 @@ const PurchaseInputData = () => {
     e.preventDefault();
     const newBrandData = { brand, category: selectedBrandcategory?.value || null };
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_brand/save', {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_brand/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -811,7 +844,7 @@ const PurchaseInputData = () => {
     e.preventDefault();
     const newTypeData = { typeColor, category: selectedTypeCategory?.value || null };
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/save', {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_type/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -834,7 +867,7 @@ const PurchaseInputData = () => {
     e.preventDefault();
     const newAccountType = { groupName };
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/group_name/save', {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/group_name/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -858,7 +891,7 @@ const PurchaseInputData = () => {
   }, []);
   const fetchPoCategory = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoCategory(data);
@@ -880,7 +913,7 @@ const PurchaseInputData = () => {
   }, []);
   const fetchPoModel = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_model/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoModel(data);
@@ -898,13 +931,12 @@ const PurchaseInputData = () => {
   }, []);
   const fetchPoBrand = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_brand/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_brand/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoBrand(data);
       } else {
         setBrandOptions([]);
-        console.log('Error fetching tile area names.');
       }
     } catch (error) {
       console.error('Error:', error);
@@ -916,11 +948,10 @@ const PurchaseInputData = () => {
   }, []);
   const fetchPoType = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_type/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoType(data);
-        //setTypeColorOptions([]);
       } else {
         console.log('Error fetching tile area names.');
       }
@@ -934,7 +965,7 @@ const PurchaseInputData = () => {
   }, []);
   const fetchPoItemName = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_itemNames/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoItemName(data);
@@ -951,7 +982,7 @@ const PurchaseInputData = () => {
   }, []);
   const fetchSiteIncharge = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/site_incharge/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/site_incharge/getAll');
       if (response.ok) {
         const data = await response.json();
         setSiteIncharge(data);
@@ -968,7 +999,7 @@ const PurchaseInputData = () => {
   }, []);
   const fetchGroupNameList = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/group_name/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/group_name/getAll');
       if (response.ok) {
         const data = await response.json();
         setGroupNameList(data);
@@ -1045,28 +1076,95 @@ const PurchaseInputData = () => {
     updatedFields.splice(index, 1);
     setFields(updatedFields);
   };
-  const filteredPocategory = poCategory.filter((item) =>
-    item.category.toLowerCase().includes(poCategorySearch.toLowerCase())
-  );
-  const filteredPoModel = poModel.filter((item) =>
-    item.model.toLowerCase().includes(poModelSearch.toLowerCase())
-  );
-  const filteredPoBrand = poBrand.filter((item) =>
-    item.brand.toLowerCase().includes(poBrandSearch.toLowerCase())
-  );
-  const filteredPoTypeColor = poType.filter((item) =>
-    (item.typeColor ?? '').toLowerCase().includes((poTypeSearch ?? '').toLowerCase())
-  );
-  const filteredPoItemName = poItemName.filter((item) =>
-    (item.itemName ?? '').toLowerCase().includes((poItemNameSearch ?? '').toLowerCase()) &&
-    (!selectedCategory || item.category === selectedCategory.value)
-  );
-  const filteredSiteIncharge = siteIncharge.filter((item) =>
-    item.siteEngineer.toLowerCase().includes(siteInchargeSearch.toLowerCase())
-  );
-  const filteredGroupName = groupNameList.filter((item) =>
-    item.groupName.toLowerCase().includes(groupNameSearch.toLowerCase())
-  );
+  // Performance: avoid O(n^2) work during table renders by memoizing derived data.
+  const filteredPocategory = useMemo(() => {
+    const q = (poCategorySearch ?? '').toLowerCase();
+    if (!q) return poCategory;
+    return poCategory.filter((item) => (item.category ?? '').toLowerCase().includes(q));
+  }, [poCategory, poCategorySearch]);
+
+  const filteredPoModel = useMemo(() => {
+    const q = (poModelSearch ?? '').toLowerCase();
+    if (!q) return poModel;
+    return poModel.filter((item) => (item.model ?? '').toLowerCase().includes(q));
+  }, [poModel, poModelSearch]);
+
+  const filteredPoBrand = useMemo(() => {
+    const q = (poBrandSearch ?? '').toLowerCase();
+    if (!q) return poBrand;
+    return poBrand.filter((item) => (item.brand ?? '').toLowerCase().includes(q));
+  }, [poBrand, poBrandSearch]);
+
+  const filteredPoTypeColor = useMemo(() => {
+    const q = (poTypeSearch ?? '').toLowerCase();
+    if (!q) return poType;
+    return poType.filter((item) => (item.typeColor ?? '').toLowerCase().includes(q));
+  }, [poType, poTypeSearch]);
+
+  const filteredPoItemName = useMemo(() => {
+    const q = (poItemNameSearch ?? '').toLowerCase();
+    const selectedCat = selectedCategory?.value;
+    return poItemName.filter((item) => {
+      const nameOk = (item.itemName ?? '').toLowerCase().includes(q);
+      const catOk = !selectedCat || item.category === selectedCat;
+      return nameOk && catOk;
+    });
+  }, [poItemName, poItemNameSearch, selectedCategory]);
+
+  const filteredSiteIncharge = useMemo(() => {
+    const q = (siteInchargeSearch ?? '').toLowerCase();
+    if (!q) return siteIncharge;
+    return siteIncharge.filter((item) => (item.siteEngineer ?? '').toLowerCase().includes(q));
+  }, [siteIncharge, siteInchargeSearch]);
+
+  const filteredGroupName = useMemo(() => {
+    const q = (groupNameSearch ?? '').toLowerCase();
+    if (!q) return groupNameList;
+    return groupNameList.filter((item) => (item.groupName ?? '').toLowerCase().includes(q));
+  }, [groupNameList, groupNameSearch]);
+
+  const sNoByPoItemNameId = useMemo(() => {
+    const map = new Map();
+    for (let i = 0; i < poItemName.length; i++) map.set(poItemName[i]?.id, i + 1);
+    return map;
+  }, [poItemName]);
+
+  const sNoByPoModelId = useMemo(() => {
+    const map = new Map();
+    for (let i = 0; i < poModel.length; i++) map.set(poModel[i]?.id, i + 1);
+    return map;
+  }, [poModel]);
+
+  const sNoByPoBrandId = useMemo(() => {
+    const map = new Map();
+    for (let i = 0; i < poBrand.length; i++) map.set(poBrand[i]?.id, i + 1);
+    return map;
+  }, [poBrand]);
+
+  const sNoByPoTypeId = useMemo(() => {
+    const map = new Map();
+    for (let i = 0; i < poType.length; i++) map.set(poType[i]?.id, i + 1);
+    return map;
+  }, [poType]);
+
+  // Build once: modelName -> [itemName, ...] for quick hover popover.
+  const itemNamesByModelName = useMemo(() => {
+    const map = new Map();
+    for (const item of poItemName) {
+      const itemName = item?.itemName;
+      if (!itemName) continue;
+      const list = item?.otherPOEntityList;
+      if (!Array.isArray(list) || list.length === 0) continue;
+      for (const entry of list) {
+        const modelName = entry?.modelName;
+        if (!modelName) continue;
+        const existing = map.get(modelName);
+        if (existing) existing.push(itemName);
+        else map.set(modelName, [itemName]);
+      }
+    }
+    return map;
+  }, [poItemName]);
 
   const handleSubmitSiteIncharge = async () => {
     // Basic validation
@@ -1075,7 +1173,7 @@ const PurchaseInputData = () => {
       return;
     }
     try {
-      const response = await fetch("https://backendaab.in/aabuildersDash/api/site_incharge/save", {
+      const response = await fetch("https://backendaab.in/demoAabuildersDash/api/site_incharge/save", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1116,7 +1214,7 @@ const PurchaseInputData = () => {
       otherPOEntityList: poItemList.otherPOEntityList,
     };
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/save', {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_itemNames/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1127,7 +1225,6 @@ const PurchaseInputData = () => {
       if (!response.ok) {
         throw new Error('Failed to submit data');
       }
-
       const data = await response.json();
       window.location.reload();
       // Optionally show success message or close popup
@@ -1137,7 +1234,6 @@ const PurchaseInputData = () => {
       alert('Failed to submit the form.');
     }
   };
-
   const customSelectStyles = {
     control: (provided, state) => ({
       ...provided,
@@ -1156,16 +1252,14 @@ const PurchaseInputData = () => {
       display: 'none',
     }),
   };
-
   const fetchMappedCategories = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/mapped/category/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/mapped/category/getAll');
       if (response.ok) {
         const data = await response.json();
         const selected = data.map(d => d.mappedCategory);
         setSelectedOptions(selected);
         setOriginalSelectedOptions(selected);
-
         // Map category to its DB id for deletion
         const idMap = {};
         data.forEach(item => {
@@ -1177,7 +1271,6 @@ const PurchaseInputData = () => {
       console.error('Error fetching mapped categories:', error);
     }
   };
-
   const handleSave = async () => {
     // Categories the user just selected
     const toAdd = selectedOptions.filter(opt => !originalSelectedOptions.includes(opt));
@@ -1186,7 +1279,7 @@ const PurchaseInputData = () => {
     try {
       // 1️⃣ Add new selections
       for (const category of toAdd) {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/mapped/category/save", {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/mapped/category/save", {
           method: "POST",
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mappedCategory: category }),
@@ -1201,7 +1294,7 @@ const PurchaseInputData = () => {
       for (const category of toRemove) {
         const id = mappedCategoryMap[category];
         if (id) {
-          const deleteResponse = await fetch(`https://backendaab.in/aabuildersDash/api/mapped/category/delete/${id}`, {
+          const deleteResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/mapped/category/delete/${id}`, {
             method: "DELETE",
           });
           if (!deleteResponse.ok) {
@@ -1223,7 +1316,7 @@ const PurchaseInputData = () => {
   };
   return (
     <div className="p-4 bg-white ml-6 mr-8">
-      <div className='flex justify-between'>
+      <div className='lg:flex justify-between items-center text-left'>
         <div className="text-left">
           <h4 className=" font-semibold mb-2 ">Category</h4>
           <Select
@@ -1236,7 +1329,7 @@ const PurchaseInputData = () => {
             isClearable
           />
         </div>
-        <div className='mt-[42px]'>
+        <div className=' lg:mt-0 mt-4'>
           <button
             onClick={() => {
               fetchMappedCategories();
@@ -1254,8 +1347,8 @@ const PurchaseInputData = () => {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}>
-        <div>
-          <div className="flex items-center mb-2">
+        <div className='lg:ml-0 ml-2 lg:mb-0 mb-4'>
+          <div className="lg:flex hidden items-center mb-2">
             <input
               type="text"
               className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-[250px] h-12 focus:outline-none"
@@ -1273,30 +1366,102 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button onClick={openItemNameUpload} className="text-[#E4572E] -mb-4 flex ">
+          <button onClick={openItemNameUpload} className="text-[#E4572E] lg:flex hidden mb-6">
             <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
             <h1 className='mt-1.5 text-sm'>Import file</h1>
           </button>
-          <button>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[23rem] ml-[15rem]' />
+          <button className="lg:block hidden">
+            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[20rem] ml-[15rem]' />
           </button>
           <div className="rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]">
             <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-[355px] w-72">
+              <table className="table-auto lg:w-[355px] w-full">
                 <thead className="bg-[#FAF6ED]">
                   <tr className="border-b">
-                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left w-72 text-xl font-bold">Item Name</th>
+                    <th className="p-2 text-left w-16 text-xl font-bold lg:table-cell hidden">S.No</th>
+                    <th className="p-2 text-left w-72 text-xl font-bold lg:cursor-default">
+                      {openSearchFields.itemName ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            className="border border-[#FAF6ED] border-r-2 bg-transparent border-l-2 border-b-2 border-t-2 rounded-lg p-1.5 flex-1 h-10 focus:outline-none text-sm"
+                            placeholder="Search Item Name.."
+                            value={poItemNameSearch}
+                            onChange={(e) => setPoItemNameSearch(e.target.value)}
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => toggleSearchField('itemName')}
+                            className="text-gray-500"
+                          >
+                            <img src={search} alt='search' className='w-4 h-4' />
+                          </button>
+                          <button 
+                            onClick={() => toggleTable('itemName')} 
+                            className="text-gray-700 lg:hidden"
+                          >
+                            <span className="text-xl font-bold">
+                              {expandedTables.itemName ? '↑' : '↓'}
+                            </span>
+                          </button>
+                          <button onClick={() => { setIsPopupOpen(true) }} className="text-black font-bold text-xl lg:hidden" >
+                            +
+                          </button>
+                          <button
+                            onClick={() => { setIsPopupOpen(true) }}
+                            className="text-black font-bold px-1 border-dashed border-b-2 border-[#BF9853] text-sm lg:block hidden"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span 
+                            className="cursor-pointer lg:cursor-default"
+                            onClick={() => toggleSearchField('itemName')}
+                          >
+                            Item Name
+                          </span>
+                          <div className="flex items-center gap-2 lg:hidden">
+                            <button 
+                              onClick={() => toggleSearchField('itemName')}
+                              className="text-gray-500"
+                            >
+                              <img src={search} alt='search' className='w-4 h-4' />
+                            </button>
+                            <button onClick={() => toggleTable('itemName')} className="text-gray-700">
+                              <span className="text-xl font-bold">
+                                {expandedTables.itemName ? '↑' : '↓'}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => { setIsPopupOpen(true) }}
+                              className="text-black font-bold text-xl"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                    <th className="p-2 text-right lg:hidden">
+                      {!openSearchFields.itemName && (
+                        <div className="flex items-center justify-end gap-2">
+                        </div>
+                      )}
+                    </th>
                   </tr>
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-96 w-72">
+            <div className={`overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 lg:block ${expandedTables.itemName ? 'block' : 'hidden'}`}>
+              <table className="table-auto w-full">
                 <tbody>
                   {filteredPoItemName.map((item, index) => (
                     <tr className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(poItemName.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                      <td className="p-2 text-left font-semibold lg:table-cell hidden">
+                        {(sNoByPoItemNameId.get(item.id) ?? 0).toString().padStart(2, '0')}
+                      </td>
                       <td className="p-2 group flex justify-between items-center font-semibold">
                         {item.itemName}
                         <div className="flex flex-grow">
@@ -1304,10 +1469,7 @@ const PurchaseInputData = () => {
                           </button>
                         </div>
                         <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                          <button
-                            type="button"
-                            onClick={() => { openEditItemName(item) }}
-                          >
+                          <button type="button" onClick={() => { openEditItemName(item) }} >
                             <img src={edit} alt="edit" className="w-4 h-4" />
                           </button>
                           <button >
@@ -1322,8 +1484,8 @@ const PurchaseInputData = () => {
             </div>
           </div>
         </div>
-        <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
+        <div className='lg:ml-0 ml-2 lg:mb-0 mb-4'>
+          <div className="lg:flex hidden items-center mb-2 lg:mt-0 mt-3">
             <input
               type="text"
               className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
@@ -1334,56 +1496,125 @@ const PurchaseInputData = () => {
             <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
               <img src={search} alt='search' className=' w-5 h-5' />
             </button>
-            <button
-              onClick={() => setIsPopupOpen1(true)}
-              className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-            >
+            <button onClick={() => setIsPopupOpen1(true)} className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]">
               + Add
             </button>
           </div>
-          <button onClick={openModelUpload} className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
-          <button>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[19rem] ml-[12rem]' />
+          <button onClick={openModelUpload} className="text-[#E4572E] lg:flex hidden mb-6">
+            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
+            <h1 className='mt-1.5 text-sm'>Import file</h1>
+            </button>
+          <button className="lg:block hidden">
+            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[15rem] ml-[12rem]' />
           </button>
           <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
             <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-[249px] w-64">
+              <table className="table-auto lg:w-[249px] w-full">
                 <thead className='bg-[#FAF6ED]'>
                   <tr className="border-b">
-                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left w-72 text-xl font-bold">Model</th>
+                    <th className="p-2 text-left w-16 text-xl font-bold lg:table-cell hidden">S.No</th>
+                    <th className="p-2 text-left w-72 text-xl font-bold lg:cursor-default">
+                      {openSearchFields.model ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            className="border border-[#FAF6ED] border-r-2 border-l-2 border-b-2 border-t-2 bg-transparent rounded-lg p-1.5 flex-1 h-10 focus:outline-none text-sm"
+                            placeholder="Search Model.."
+                            value={poModelSearch}
+                            onChange={(e) => setPoModelSearch(e.target.value)}
+                            autoFocus
+                          />
+                          <button onClick={() => toggleSearchField('model')} className="text-gray-500" >
+                            <img src={search} alt='search' className='w-4 h-4' />
+                          </button>
+                          <button onClick={() => toggleTable('model')} className="text-gray-700 lg:hidden">
+                            <span className="text-xl font-bold">
+                              {expandedTables.model ? '↑' : '↓'}
+                            </span>
+                          </button>
+                          <button onClick={() => setIsPopupOpen1(true)} className="text-black font-bold text-xl lg:hidden" >
+                            +
+                          </button>
+                          <button onClick={() => setIsPopupOpen1(true)} className="text-black font-bold px-1 border-dashed border-b-2 border-[#BF9853] text-sm lg:block hidden">
+                            + Add
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span className="cursor-pointer lg:cursor-default" onClick={() => toggleSearchField('model')} >
+                            Model
+                          </span>
+                          <div className="flex items-center gap-2 lg:hidden">
+                            <button onClick={() => toggleSearchField('model')} className="text-gray-500" >
+                              <img src={search} alt='search' className='w-4 h-4' />
+                            </button>
+                            <button onClick={() => toggleTable('model')} className="text-gray-700">
+                              <span className="text-xl font-bold">
+                                {expandedTables.model ? '↑' : '↓'}
+                              </span>
+                            </button>
+                            <button onClick={() => setIsPopupOpen1(true)} className="text-black font-bold text-xl" >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                    <th className="p-2 text-right lg:hidden">
+                      {!openSearchFields.model && (
+                        <div className="flex items-center justify-end gap-2">
+                        </div>
+                      )}
+                    </th>
                   </tr>
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-80 w-64">
+            <div className={`overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 lg:block ${expandedTables.model ? 'block' : 'hidden'}`}>
+              <table className="table-auto w-full">
                 <tbody>
-                  {filteredPoModel.map((item, index) => (
-                    <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(poModel.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
-                      <td className="p-2 text-left group flex font-semibold">
-                        <div className="flex flex-grow">
-                          {item.model}
-                        </div>
-                        <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                          <button type="button" >
-                            <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditModel(item)} />
-                          </button>
-                          <button >
-                            <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleModelDelete(item.id)} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredPoModel.map((modelItem, index) => {
+                    const itemNamesForThisModel = itemNamesByModelName.get(modelItem.model) || [];
+                    return (
+                      <tr
+                        key={modelItem.id}
+                        className="border-b odd:bg-white even:bg-[#FAF6ED]"
+                        onMouseEnter={() => setHoveredModelName(modelItem.model)}
+                        onMouseLeave={() => setHoveredModelName(null)}
+                      >
+                        <td className="p-2 text-left font-semibold lg:table-cell hidden">
+                          {(sNoByPoModelId.get(modelItem.id) ?? 0).toString().padStart(2, '0')}
+                        </td>
+                        <td className="p-2 text-left group flex font-semibold relative">
+                          <div className="flex flex-grow">{modelItem.model}</div>
+                          <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <button type="button">
+                              <img src={edit} alt="edit" className="w-4 h-4" onClick={() => openEditModel(modelItem)} />
+                            </button>
+                            <button>
+                              <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleModelDelete(modelItem.id)} />
+                            </button>
+                          </div>
+                          {hoveredModelName === modelItem.model && itemNamesForThisModel.length > 0 && (
+                            <div className="absolute top-8 left-0 z-10 bg-white border border-gray-300 rounded shadow-md p-2 w-48 text-sm">
+                              <ul className="list-disc ml-4">
+                                {itemNamesForThisModel.map((name, idx) => (
+                                  <li key={idx}>{name}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
         </div>
-        <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
+        <div className='lg:ml-0 ml-2 lg:mb-0 mb-4'>
+          <div className="lg:flex hidden items-center mb-2 lg:mt-0 mt-3">
             <input
               type="text"
               className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
@@ -1401,27 +1632,105 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button onClick={openBrandUpload} className="text-[#E4572E] -mb-4 flex "><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
-          <button>
+          <button onClick={openBrandUpload} className="text-[#E4572E] lg:flex hidden mb-6">
+            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
+            <h1 className='mt-1.5 text-sm'>Import file</h1>
+            </button>
+          <button className="lg:block hidden">
             <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[17rem]' />
           </button>
           <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
             <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-[323px] w-80">
+              <table className="table-auto lg:w-[323px] w-full">
                 <thead className='bg-[#FAF6ED]'>
                   <tr className="border-b">
-                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left w-72 text-xl font-bold">Brand</th>
+                    <th className="p-2 text-left w-16 text-xl font-bold lg:table-cell hidden">S.No</th>
+                    <th className="p-2 text-left w-72 text-xl font-bold lg:cursor-default">
+                      {openSearchFields.brand ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            className="border border-[#FAF6ED] border-r-2 border-l-2 border-b-2 border-t-2 bg-transparent rounded-lg p-1.5 flex-1 h-10 focus:outline-none text-sm"
+                            placeholder="Search Brand.."
+                            value={poBrandSearch}
+                            onChange={(e) => setPoBrandSearch(e.target.value)}
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => toggleSearchField('brand')}
+                            className="text-gray-500"
+                          >
+                            <img src={search} alt='search' className='w-4 h-4' />
+                          </button>
+                          <button 
+                            onClick={() => toggleTable('brand')} 
+                            className="text-gray-700 lg:hidden"
+                          >
+                            <span className="text-xl font-bold">
+                              {expandedTables.brand ? '↑' : '↓'}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setIsPopupOpen2(true)}
+                            className="text-black font-bold text-xl lg:hidden"
+                          >
+                            +
+                          </button>
+                          <button
+                            onClick={() => setIsPopupOpen2(true)}
+                            className="text-black font-bold px-1 border-dashed border-b-2 border-[#BF9853] text-sm lg:block hidden"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span 
+                            className="cursor-pointer lg:cursor-default"
+                            onClick={() => toggleSearchField('brand')}
+                          >
+                            Brand
+                          </span>
+                          <div className="flex items-center gap-2 lg:hidden">
+                            <button 
+                              onClick={() => toggleSearchField('brand')}
+                              className="text-gray-500"
+                            >
+                              <img src={search} alt='search' className='w-4 h-4' />
+                            </button>
+                            <button onClick={() => toggleTable('brand')} className="text-gray-700">
+                              <span className="text-xl font-bold">
+                                {expandedTables.brand ? '↑' : '↓'}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => setIsPopupOpen2(true)}
+                              className="text-black font-bold text-xl"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                    <th className="p-2 text-right lg:hidden">
+                      {!openSearchFields.brand && (
+                        <div className="flex items-center justify-end gap-2">
+                        </div>
+                      )}
+                    </th>
                   </tr>
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-80 w-80">
+            <div className={`overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 lg:block ${expandedTables.brand ? 'block' : 'hidden'}`}>
+              <table className="table-auto w-full">
                 <tbody>
                   {filteredPoBrand.map((item, index) => (
                     <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(poBrand.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                      <td className="p-2 text-left font-semibold lg:table-cell hidden">
+                        {(sNoByPoBrandId.get(item.id) ?? 0).toString().padStart(2, '0')}
+                      </td>
                       <td className="p-2 text-left group flex font-semibold">
                         <div className="flex flex-grow">
                           {item.brand}
@@ -1442,8 +1751,8 @@ const PurchaseInputData = () => {
             </div>
           </div>
         </div>
-        <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
+        <div className='lg:ml-0 ml-2 lg:mb-0 mb-4'>
+          <div className="lg:flex hidden items-center mb-2 lg:mt-0 mt-3">
             <input
               type="text"
               className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none "
@@ -1461,27 +1770,105 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button onClick={openTypeUpload} className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
-          <button>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[15rem]' />
+          <button onClick={openTypeUpload} className="text-[#E4572E] lg:flex hidden mb-6">
+            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
+            <h1 className='mt-1.5 text-sm'>Import file</h1>
+            </button>
+          <button className="lg:block hidden">
+            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[13rem]' />
           </button>
           <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
             <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-[249px] w-72">
+              <table className="table-auto lg:w-[249px] w-full">
                 <thead className='bg-[#FAF6ED]'>
                   <tr className="border-b">
-                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left w-auto text-xl font-bold">Type</th>
+                    <th className="p-2 text-left w-16 text-xl font-bold lg:table-cell hidden">S.No</th>
+                    <th className="p-2 text-left w-72 text-xl font-bold lg:cursor-default">
+                      {openSearchFields.type ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            className="border border-[#FAF6ED] border-r-2 border-l-2 border-b-2 border-t-2 bg-transparent rounded-lg p-1.5 flex-1 h-10 focus:outline-none text-sm"
+                            placeholder="Search Type.."
+                            value={poTypeSearch}
+                            onChange={(e) => setPoTypeSearch(e.target.value)}
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => toggleSearchField('type')}
+                            className="text-gray-500"
+                          >
+                            <img src={search} alt='search' className='w-4 h-4' />
+                          </button>
+                          <button 
+                            onClick={() => toggleTable('type')} 
+                            className="text-gray-700 lg:hidden"
+                          >
+                            <span className="text-xl font-bold">
+                              {expandedTables.type ? '↑' : '↓'}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setIsPopupOpen3(true)}
+                            className="text-black font-bold text-xl lg:hidden"
+                          >
+                            +
+                          </button>
+                          <button
+                            onClick={() => setIsPopupOpen3(true)}
+                            className="text-black font-bold px-1 border-dashed border-b-2 border-[#BF9853] text-sm lg:block hidden"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span 
+                            className="cursor-pointer lg:cursor-default"
+                            onClick={() => toggleSearchField('type')}
+                          >
+                            Type
+                          </span>
+                          <div className="flex items-center gap-2 lg:hidden">
+                            <button 
+                              onClick={() => toggleSearchField('type')}
+                              className="text-gray-500"
+                            >
+                              <img src={search} alt='search' className='w-4 h-4' />
+                            </button>
+                            <button onClick={() => toggleTable('type')} className="text-gray-700">
+                              <span className="text-xl font-bold">
+                                {expandedTables.type ? '↑' : '↓'}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => setIsPopupOpen3(true)}
+                              className="text-black font-bold text-xl"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                    <th className="p-2 text-right lg:hidden">
+                      {!openSearchFields.type && (
+                        <div className="flex items-center justify-end gap-2">
+                        </div>
+                      )}
+                    </th>
                   </tr>
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-72 w-72">
+            <div className={`overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 lg:block ${expandedTables.type ? 'block' : 'hidden'}`}>
+              <table className="table-auto w-full">
                 <tbody>
                   {filteredPoTypeColor.map((item, index) => (
                     <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(poType.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                      <td className="p-2 text-left font-semibold lg:table-cell hidden">
+                        {(sNoByPoTypeId.get(item.id) ?? 0).toString().padStart(2, '0')}
+                      </td>
                       <td className="p-2 text-left group flex font-semibold">
                         <div className="flex flex-grow">
                           {item.typeColor}
@@ -1502,8 +1889,8 @@ const PurchaseInputData = () => {
             </div>
           </div>
         </div>
-        <div>
-          <div className="flex items-center mb-2">
+        <div className='lg:ml-0 ml-2 lg:mb-0 mb-4'>
+          <div className="lg:flex hidden items-center mb-2 lg:mt-0 mt-3">
             <input
               type="text"
               className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-[250px] h-12 focus:outline-none"
@@ -1521,30 +1908,103 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button className="text-[#E4572E] -mb-4 flex ">
-            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
+          <button className="text-[#E4572E] lg:flex hidden ">
+            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1 mb-6' />
             <h1 className='mt-1.5 text-sm'>Import file</h1>
           </button>
-          <button>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[23rem] ml-[15rem]' />
+          <button className="lg:block hidden">
+            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[20rem] ml-[15rem]' />
           </button>
           <div className="rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]">
             <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-[355px] w-72">
+              <table className="table-auto lg:w-[355px] w-full">
                 <thead className="bg-[#FAF6ED]">
                   <tr className="border-b">
-                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left w-72 text-xl font-bold">Category</th>
+                    <th className="p-2 text-left w-16 text-xl font-bold lg:table-cell hidden">S.No</th>
+                    <th className="p-2 text-left w-72 text-xl font-bold lg:cursor-default">
+                      {openSearchFields.category ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            className="border border-[#FAF6ED] border-r-2 border-l-2 border-b-2 border-t-2 bg-transparent rounded-lg p-1.5 flex-1 h-10 focus:outline-none text-sm"
+                            placeholder="Search Category.."
+                            value={poCategorySearch}
+                            onChange={(e) => setPoCategorySearch(e.target.value)}
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => toggleSearchField('category')}
+                            className="text-gray-500"
+                          >
+                            <img src={search} alt='search' className='w-4 h-4' />
+                          </button>
+                          <button 
+                            onClick={() => toggleTable('category')} 
+                            className="text-gray-700 lg:hidden"
+                          >
+                            <span className="text-xl font-bold">
+                              {expandedTables.category ? '↑' : '↓'}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setIsShowModal(true)}
+                            className="text-black font-bold text-xl lg:hidden"
+                          >
+                            +
+                          </button>
+                          <button
+                            className="text-black font-bold px-1 border-dashed border-b-2 border-[#BF9853] text-sm lg:block hidden"
+                            onClick={() => setIsShowModal(true)}
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span 
+                            className="cursor-pointer lg:cursor-default"
+                            onClick={() => toggleSearchField('category')}
+                          >
+                            Category
+                          </span>
+                          <div className="flex items-center gap-2 lg:hidden">
+                            <button 
+                              onClick={() => toggleSearchField('category')}
+                              className="text-gray-500"
+                            >
+                              <img src={search} alt='search' className='w-4 h-4' />
+                            </button>
+                            <button onClick={() => toggleTable('category')} className="text-gray-700">
+                              <span className="text-xl font-bold">
+                                {expandedTables.category ? '↑' : '↓'}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => setIsShowModal(true)}
+                              className="text-black font-bold text-xl"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                    <th className="p-2 text-right lg:hidden">
+                      {!openSearchFields.category && (
+                        <div className="flex items-center justify-end gap-2">
+                        </div>
+                      )}
+                    </th>
                   </tr>
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-96 w-72">
+            <div className={`overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 lg:block ${expandedTables.category ? 'block' : 'hidden'}`}>
+              <table className="table-auto w-full">
                 <tbody>
                   {filteredPocategory.map((item, index) => (
                     <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(poCategory.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                      <td className="p-2 text-left font-semibold lg:table-cell hidden">{(poCategory.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
                       <td className="p-2 text-left group flex font-semibold">
                         <div className="flex flex-grow">
                           {item.category}
@@ -1565,8 +2025,8 @@ const PurchaseInputData = () => {
             </div>
           </div>
         </div>
-        <div>
-          <div className="flex items-center mb-2">
+        <div className='lg:ml-0 ml-2 lg:mb-0 mb-4'>
+          <div className="lg:flex hidden items-center mb-2 lg:mt-0 mt-3">
             <input
               type="text"
               className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-[250px] h-12 focus:outline-none"
@@ -1581,30 +2041,103 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button className="text-[#E4572E] -mb-4 flex ">
-            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
+          <button className="text-[#E4572E] lg:flex hidden ">
+            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1 mb-6' />
             <h1 className='mt-1.5 text-sm'>Import file</h1>
           </button>
-          <button>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[23rem] ml-[15rem]' />
+          <button className="lg:block hidden">
+            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[20rem] ml-[15rem]' />
           </button>
           <div className="rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]">
             <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-[355px] w-72">
+              <table className="table-auto lg:w-[355px] w-full">
                 <thead className="bg-[#FAF6ED]">
                   <tr className="border-b">
-                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left w-72 text-xl font-bold">Site Incharge</th>
+                    <th className="p-2 text-left w-16 text-xl font-bold lg:table-cell hidden">S.No</th>
+                    <th className="p-2 text-left w-72 text-xl font-bold lg:cursor-default">
+                      {openSearchFields.siteIncharge ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            className="border border-[#FAF6ED] border-r-2 border-l-2 border-b-2 border-t-2 rounded-lg p-1.5 flex-1 h-10 focus:outline-none text-sm"
+                            placeholder="Search Site Incharge Name.."
+                            value={siteInchargeSearch}
+                            onChange={(e) => setSiteInchargeSearch(e.target.value)}
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => toggleSearchField('siteIncharge')}
+                            className="text-gray-500"
+                          >
+                            <img src={search} alt='search' className='w-4 h-4' />
+                          </button>
+                          <button 
+                            onClick={() => toggleTable('siteIncharge')} 
+                            className="text-gray-700 lg:hidden"
+                          >
+                            <span className="text-xl font-bold">
+                              {expandedTables.siteIncharge ? '↑' : '↓'}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setIsSiteInchargeAddPopupOpen(true)}
+                            className="text-black font-bold text-xl lg:hidden"
+                          >
+                            +
+                          </button>
+                          <button 
+                            onClick={() => setIsSiteInchargeAddPopupOpen(true)} 
+                            className="text-black font-bold px-1 border-dashed border-b-2 border-[#BF9853] text-sm lg:block hidden"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span 
+                            className="cursor-pointer lg:cursor-default"
+                            onClick={() => toggleSearchField('siteIncharge')}
+                          >
+                            Site Incharge
+                          </span>
+                          <div className="flex items-center gap-2 lg:hidden">
+                            <button 
+                              onClick={() => toggleSearchField('siteIncharge')}
+                              className="text-gray-500"
+                            >
+                              <img src={search} alt='search' className='w-4 h-4' />
+                            </button>
+                            <button onClick={() => toggleTable('siteIncharge')} className="text-gray-700">
+                              <span className="text-xl font-bold">
+                                {expandedTables.siteIncharge ? '↑' : '↓'}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => setIsSiteInchargeAddPopupOpen(true)}
+                              className="text-black font-bold text-xl"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                    <th className="p-2 text-right lg:hidden">
+                      {!openSearchFields.siteIncharge && (
+                        <div className="flex items-center justify-end gap-2">
+                        </div>
+                      )}
+                    </th>
                   </tr>
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-96 w-72">
+            <div className={`overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 lg:block ${expandedTables.siteIncharge ? 'block' : 'hidden'}`}>
+              <table className="table-auto w-full">
                 <tbody>
                   {filteredSiteIncharge.map((item, index) => (
                     <tr className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(siteIncharge.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                      <td className="p-2 text-left font-semibold lg:table-cell hidden">{(siteIncharge.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
                       <td className="p-2 group flex justify-between items-center font-semibold">
                         {item.siteEngineer}
                         <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
@@ -1626,8 +2159,8 @@ const PurchaseInputData = () => {
             </div>
           </div>
         </div>
-        <div>
-          <div className="flex items-center mb-2">
+        <div className='lg:ml-0 ml-2 lg:mb-0 mb-4'>
+          <div className="lg:flex hidden items-center mb-2 lg:mt-0 mt-3">
             <input
               type="text"
               value={groupNameSearch}
@@ -1642,30 +2175,103 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button className="text-[#E4572E] -mb-4 flex ">
-            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
+          <button className="text-[#E4572E] lg:flex hidden">
+            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1 mb-6' />
             <h1 className='mt-1.5 text-sm'>Import file</h1>
           </button>
-          <button>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[23rem] ml-[15rem]' />
+          <button className="lg:block hidden">
+            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[20rem] ml-[15rem]' />
           </button>
           <div className="rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]">
             <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-[355px] w-72">
+              <table className="table-auto lg:w-[355px] w-full">
                 <thead className="bg-[#FAF6ED]">
                   <tr className="border-b">
-                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left w-72 text-xl font-bold">Group Name</th>
+                    <th className="p-2 text-left w-16 text-xl font-bold lg:table-cell hidden">S.No</th>
+                    <th className="p-2 text-left w-72 text-xl font-bold lg:cursor-default">
+                      {openSearchFields.groupName ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            className="border border-[#FAF6ED] border-r-2 border-l-2 border-b-2 border-t-2 bg-transparent rounded-lg p-1.5 flex-1 h-10 focus:outline-none text-sm"
+                            placeholder="Search Group Name.."
+                            value={groupNameSearch}
+                            onChange={(e) => setGroupNameSearch(e.target.value)}
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => toggleSearchField('groupName')}
+                            className="text-gray-500"
+                          >
+                            <img src={search} alt='search' className='w-4 h-4' />
+                          </button>
+                          <button 
+                            onClick={() => toggleTable('groupName')} 
+                            className="text-gray-700 lg:hidden"
+                          >
+                            <span className="text-xl font-bold">
+                              {expandedTables.groupName ? '↑' : '↓'}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setIsGroupNameAddPopupOpen(true)}
+                            className="text-black font-bold text-xl lg:hidden"
+                          >
+                            +
+                          </button>
+                          <button 
+                            onClick={() => setIsGroupNameAddPopupOpen(true)} 
+                            className="text-black font-bold px-1 border-dashed border-b-2 border-[#BF9853] text-sm lg:block hidden"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span 
+                            className="cursor-pointer lg:cursor-default"
+                            onClick={() => toggleSearchField('groupName')}
+                          >
+                            Group Name
+                          </span>
+                          <div className="flex items-center gap-2 lg:hidden">
+                            <button 
+                              onClick={() => toggleSearchField('groupName')}
+                              className="text-gray-500"
+                            >
+                              <img src={search} alt='search' className='w-4 h-4' />
+                            </button>
+                            <button onClick={() => toggleTable('groupName')} className="text-gray-700">
+                              <span className="text-xl font-bold">
+                                {expandedTables.groupName ? '↑' : '↓'}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => setIsGroupNameAddPopupOpen(true)}
+                              className="text-black font-bold text-xl"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                    <th className="p-2 text-right lg:hidden">
+                      {!openSearchFields.groupName && (
+                        <div className="flex items-center justify-end gap-2">
+                        </div>
+                      )}
+                    </th>
                   </tr>
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-96 w-72">
+            <div className={`overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 lg:block ${expandedTables.groupName ? 'block' : 'hidden'}`}>
+              <table className="table-auto w-full">
                 <tbody>
                   {filteredGroupName.map((item, index) => (
                     <tr className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(groupNameList.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                      <td className="p-2 text-left font-semibold lg:table-cell hidden">{(groupNameList.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
                       <td className="p-2 group flex justify-between items-center font-semibold">
                         {item.groupName}
                         <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
@@ -1814,7 +2420,7 @@ const PurchaseInputData = () => {
       )}
       {isPopupOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-md w-[1050px] shadow-lg text-left p-6">
+          <div className="bg-white rounded-md w-[1150px] shadow-lg text-left p-6">
             <div className="flex justify-between items-center border-b pb-2 mb-4">
               <button onClick={() => setIsPopupOpen(false)} className="text-red-500 text-[30px] font-bold">×</button>
             </div>
@@ -1860,7 +2466,7 @@ const PurchaseInputData = () => {
                   placeholder="Test item"
                 />
               </div>
-              <div className="w-[1020px] overflow-x-hidden h-[250px] overflow-y-auto ">
+              <div className="w-[1120px] overflow-x-hidden h-[250px] overflow-y-auto ">
                 {poItemList.otherPOEntityList.map((item, index) => (
                   <div key={index} className="flex flex-wrap gap-4 items-end mb-2">
                     <div>
@@ -1881,7 +2487,7 @@ const PurchaseInputData = () => {
                           };
 
                           try {
-                            const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/save', {
+                            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_model/save', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify(newModelData),
@@ -1907,7 +2513,7 @@ const PurchaseInputData = () => {
                           }
                         }}
                         formatCreateLabel={(inputValue) => `+ Add "${inputValue}"`}
-                        className="border-2 border-[#BF9853] border-opacity-25 rounded-lg lg:w-[230px] w-64 text-left"
+                        className="border-2 border-[#BF9853] border-opacity-25 rounded-lg lg:w-[320px] w-64 text-left"
                         styles={customSelectStyles}
                       />
                     </div>
@@ -1929,7 +2535,7 @@ const PurchaseInputData = () => {
                           };
 
                           try {
-                            const response = await fetch('https://backendaab.in/aabuildersDash/api/po_brand/save', {
+                            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_brand/save', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify(newBrand),
@@ -1974,7 +2580,7 @@ const PurchaseInputData = () => {
                           };
 
                           try {
-                            const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/save', {
+                            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_type/save', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify(newTypeColor),
@@ -2460,7 +3066,7 @@ const PurchaseInputData = () => {
       )}
       {isItemNameEditPopupOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-md w-[1050px] shadow-lg text-left p-6">
+          <div className="bg-white rounded-md w-[1150px] shadow-lg text-left p-6">
             <div className="flex justify-between items-center border-b pb-2 mb-4">
               <button onClick={() => setIsItemNameEditPopupOpen(false)} className="text-red-500 text-[30px] font-bold">×</button>
             </div>
@@ -2507,7 +3113,7 @@ const PurchaseInputData = () => {
                   placeholder="Test item"
                 />
               </div>
-              <div className="w-[1020px] overflow-x-hidden h-[300px] overflow-y-auto ">
+              <div className="w-[1120px] overflow-x-hidden h-[300px] overflow-y-auto ">
                 {poEditItemList.otherPOEntityList.map((item, index) => (
                   <div key={index} className="flex flex-wrap gap-4 items-end mb-2">
                     <div>
@@ -2522,7 +3128,7 @@ const PurchaseInputData = () => {
                           setPoEditItemList({ ...poEditItemList, otherPOEntityList: updatedList });
                         }}
                         styles={{
-                          container: (base) => ({ ...base, width: 230 }),
+                          container: (base) => ({ ...base, width: 320 }),
                         }}
                       />
                     </div>

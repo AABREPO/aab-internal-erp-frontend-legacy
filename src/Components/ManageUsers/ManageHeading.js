@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import ManageUsers from './ManageUsers';
 import Userroleandpermission from './Userroleandpermission';
 
@@ -24,25 +25,25 @@ const ManageHeading = () => {
     };
 
   return (
-    <div className="bg-[#FAF6ED]">
-      <div className="topbar-title">
-                <h2
-                    className={`link ${activeTab === 'manageusers' ? 'active' : ''}`}
+    <ModuleHeadingWrapper>
+      <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === 'manageusers'}
                     onClick={() => setActiveTab('manageusers')}
                 >
                     Manage Users
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'userroleandpermission' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'userroleandpermission'}
                     onClick={() => setActiveTab('userroleandpermission')}
                 >
                     User Role and Premission
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {renderContent()}
             </div>
-    </div>
+    </ModuleHeadingWrapper>
   )
 }
 

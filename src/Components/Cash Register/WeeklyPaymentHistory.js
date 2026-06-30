@@ -1,0 +1,7007 @@
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import axios from 'axios';
+import Edit from '../Images/Edit.svg';
+import Delete from '../Images/Delete.svg';
+import history from '../Images/History.svg';
+import Change from '../Images/dropdownchange.png';
+import Select from 'react-select';
+import NotesStart from '../Images/TextUpload.svg';
+import NotesEnd from '../Images/TextView.svg';
+import fileUpload from '../Images/FileUpload.svg';
+import fileSignatureUpload from '../Images/SignatureIcon.svg';
+import file from '../Images/FileView.svg';
+import AddExtra from '../Images/AddExtra.svg';
+import FileRemover from '../Images/FileRemover.svg';
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import {
+    postBankRegisterLogSave,
+    bankRegisterLogSaveUrlMatchingRequest,
+    isPaymentModeRequiringBankRegisterLog,
+} from '../../utils/bankRegisterLogBeforeWeeklyBill';
+import {
+    fetchStaffPurposeOptions,
+    splitStaffAdvancePortalByPurpose,
+    getPortalAdvancePartyName,
+    getPortalAdvanceProjectName,
+} from '../../utils/weeklyPaymentStaffAdvancePdf';
+import { syncExpensesEntryFromWeeklyExpenseEdit } from '../../utils/expensesEntryWeeklyPaymentBill';
+import {
+    buildSummaryBillExpenseEditPrefill,
+    buildBillExpenseEntryPrefill,
+    canCloseSummaryBillExpenseModal,
+    clearLinkedExpensesOnWeeklyTypeChange,
+    clearWeeklyExpenseBillCopyUrl,
+    isSummaryBillPaymentRow,
+    isWeeklyRowAmountMatchingLinkedExpenses,
+    resolveLinkedExpensesForWeeklyRow,
+    updatePartyOnLinkedExpenses,
+    weeklyRowHadExpenseEntryLink,
+} from '../../utils/summaryBillWeeklyExpenses';
+import { i } from 'mathjs';
+import ExpenseEntryForm from '../ExpensesEntry/Form';
+import CustomDateField from '../ExpensesEntry/CustomDateField';
+import AdvancePortalForm from '../Advance Portal/AdvancePortal';
+import restore from '../Images/Restore.svg';
+import {
+    DATABASE_TABLE_FILTER_SELECT_STYLES,
+    EDBC_FILTER_CONTROL_BOX_STYLE,
+    EDBC_FILTER_CONTROL_HEIGHT_PX,
+    EDBC_IDS,
+    EDBC2_FIRST_COLUMN_WIDTH_CLASS,
+    EDBC_TABLE_EDGE_TABLE_CLASS,
+    EdbcColumnHeader,
+    EdbcDateBodyCell,
+    EdbcDateFilter,
+    EdbcEmptyFilterCell,
+    EdbcFilterToggleButton,
+    EdbcExpandableBodyCell,
+    EdbcProjectNameBodyCell,
+    EdbcProjectNameFilter,
+    EdbcSelectFilter,
+    EdbcTableBodyRow,
+    EdbcTableFilterRow,
+    EdbcTableHeaderRow,
+    EdbcTableToolbarRightActions,
+    EdbcTotalAmountFilter,
+    formatEdbcTotalAmountPlaceholder,
+    getEdbcColumnConfig,
+    matchesEdbcAmountFilter,
+    matchesWeeklyPaymentExpenseOverallSearch,
+    sortWeeklyPaymentExpenseRows,
+    sortWeeklyPaymentPaymentRows,
+    useEdbcExpandedCells,
+    useEdbcTableSort,
+} from '../ExpensesEntry/databaseExpensesSharedColumns';
+import { useLiveDataSync } from '../../utils/useLiveDataSync';
+import { useWeeklyPaymentRegisterPermissions } from '../../utils/useWeeklyPaymentRegisterPermissions';
+import { HandoverPaymentsModal } from './WeeklyPaymentHandover';
+
+const ENTRY_ROW_SELECT_CLASS_NAMES = {
+    menuList: () => 'no-scrollbar',
+};
+const entryRowSelectMenuListStyle = (provided) => ({
+    ...provided,
+    maxHeight: '300px',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+});
+
+const CASH_REGISTER_SELECT_STYLES = {
+    ...DATABASE_TABLE_FILTER_SELECT_STYLES,
+    clearIndicator: (provided) => ({
+        ...DATABASE_TABLE_FILTER_SELECT_STYLES.clearIndicator(provided),
+        color: '#000000',
+    }),
+    dropdownIndicator: (provided, state) => ({
+        ...DATABASE_TABLE_FILTER_SELECT_STYLES.dropdownIndicator(provided),
+        color: '#000000',
+        display: state.hasValue && state.selectProps.isClearable ? 'none' : 'flex',
+    }),
+};
+
+const WEEKLY_SUMMARY_FILE_API = 'https://backendaab.in/demoAabuildersDash/api/weekly_summary';
+
+const WEEKLY_PAYMENT_EDBC8_TABLE_CLASS =
+    '[&_thead_tr.bg-\\[\\#eeeeee\\]>th#EDBC-8]:!pr-0 [&_th#EDBC-8]:!w-[120px] [&_th#EDBC-8]:!max-w-[120px] [&_th#EDBC-8]:!overflow-hidden [&_tbody_td#EDBC-8]:!w-[98px] [&_tbody_td#EDBC-8]:!max-w-[98px] [&_tbody_td#EDBC-8]:!overflow-hidden';
+
+const WEEKLY_PAYMENT_EXPENSES_TABLE_LOCK_TABLE_CLASS =
+    '[&_th#EDBC-21]:!w-[70px] [&_td#EDBC-21]:!w-[70px] [&_th#EDBC-21]:!min-w-[70px] [&_td#EDBC-21]:!min-w-[70px] [&_th#EDBC-21]:!max-w-[70px] [&_td#EDBC-21]:!max-w-[70px] [&_th#EDBC-2]:!w-[120px] [&_td#EDBC-2]:!w-[120px] [&_th#EDBC-2]:!min-w-[120px] [&_td#EDBC-2]:!min-w-[120px] [&_th#EDBC-2]:!max-w-[120px] [&_td#EDBC-2]:!max-w-[120px] [&_th#EDBC-4]:!w-[218px] [&_td#EDBC-4]:!w-[218px] [&_th#EDBC-4]:!min-w-[218px] [&_td#EDBC-4]:!min-w-[218px] [&_th#EDBC-4]:!max-w-[218px] [&_td#EDBC-4]:!max-w-[218px] [&_th#EDBC-3]:!w-[298px] [&_td#EDBC-3]:!w-[298px] [&_th#EDBC-3]:!min-w-[298px] [&_td#EDBC-3]:!min-w-[298px] [&_th#EDBC-3]:!max-w-[298px] [&_td#EDBC-3]:!max-w-[298px] [&_th#EDBC-12]:!w-[158px] [&_td#EDBC-12]:!w-[158px] [&_th#EDBC-12]:!min-w-[158px] [&_td#EDBC-12]:!min-w-[158px] [&_th#EDBC-12]:!max-w-[158px] [&_td#EDBC-12]:!max-w-[158px] [&_thead_tr>th:nth-child(4)]:!w-[30px] [&_thead_tr>th:nth-child(4)]:!min-w-[30px] [&_thead_tr>th:nth-child(4)]:!max-w-[30px] [&_tbody_tr>td:nth-child(4)]:!w-[30px] [&_tbody_tr>td:nth-child(4)]:!min-w-[30px] [&_tbody_tr>td:nth-child(4)]:!max-w-[30px] [&_thead_tr:nth-child(2)>th:nth-child(4)]:!w-[30px] [&_thead_tr:nth-child(2)>th:nth-child(4)]:!min-w-[30px] [&_thead_tr:nth-child(2)>th:nth-child(4)]:!max-w-[30px] [&_thead_tr>th:nth-last-child(2)]:!w-[70px] [&_thead_tr>th:nth-last-child(2)]:!min-w-[70px] [&_thead_tr>th:nth-last-child(2)]:!max-w-[70px] [&_tbody_tr>td:nth-last-child(2)]:!w-[70px] [&_tbody_tr>td:nth-last-child(2)]:!min-w-[70px] [&_tbody_tr>td:nth-last-child(2)]:!max-w-[70px] [&_thead_tr>th:nth-last-child(2)]:!overflow-hidden [&_tbody_tr>td:nth-last-child(2)]:!overflow-hidden';
+
+const WEEKLY_PAYMENT_INCOME_TABLE_LOCK_TABLE_CLASS =
+    '[&_thead_tr>th#EDBC-2:first-child]:!w-[130px] [&_tbody_tr>td#EDBC-2:first-child]:!w-[130px] [&_thead_tr>th#EDBC-2:first-child]:!min-w-[130px] [&_tbody_tr>td#EDBC-2:first-child]:!min-w-[130px] [&_thead_tr>th#EDBC-2:first-child]:!max-w-[130px] [&_tbody_tr>td#EDBC-2:first-child]:!max-w-[130px] [&_th#EDBC-12]:!w-[158px] [&_td#EDBC-12]:!w-[158px] [&_th#EDBC-12]:!min-w-[158px] [&_td#EDBC-12]:!min-w-[158px] [&_th#EDBC-12]:!max-w-[158px] [&_td#EDBC-12]:!max-w-[158px] [&_thead_tr>th:nth-last-child(2)]:!w-[70px] [&_thead_tr>th:nth-last-child(2)]:!min-w-[70px] [&_thead_tr>th:nth-last-child(2)]:!max-w-[70px] [&_tbody_tr>td:nth-last-child(2)]:!w-[70px] [&_tbody_tr>td:nth-last-child(2)]:!min-w-[70px] [&_tbody_tr>td:nth-last-child(2)]:!max-w-[70px] [&_thead_tr>th:nth-last-child(2)]:!overflow-hidden [&_tbody_tr>td:nth-last-child(2)]:!overflow-hidden';
+
+const WEEKLY_PAYMENT_EXPENSES_TABLE_FIXED_WIDTH_CLASS = 'w-full xl:w-[1246px] xl:min-w-[1246px]';
+const WEEKLY_PAYMENT_INCOME_TABLE_FIXED_WIDTH_CLASS = 'w-[490px] min-w-[490px]';
+
+const WEEKLY_PAYMENT_INCOME_TBODY_TABLE_LOCK_TABLE_CLASS =
+    WEEKLY_PAYMENT_INCOME_TABLE_LOCK_TABLE_CLASS.replace(/\[&_td#/g, '[&_tbody_td#');
+
+const formatWeeklyPaymentAmountDisplay = (amount) =>
+    `₹${Number(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+function cleanUrl(url) {
+    if (!url) return url;
+    let cleanedUrl = url.replace(/^["']|["']$/g, '');
+    if (cleanedUrl.includes('{') && cleanedUrl.includes('billCopyUrl')) {
+        try {
+            const parsed = JSON.parse(cleanedUrl);
+            if (parsed.billCopyUrl) {
+                return parsed.billCopyUrl;
+            }
+        } catch (e) {
+            console.warn('Failed to parse URL as JSON:', cleanedUrl);
+        }
+    }
+    return cleanedUrl;
+}
+const History = ({ username, userRoles = [], viewMode = 'default', onExportActionsReady, onHandoverActionsReady, isTabActive = true }) => {
+    const resolveEnteredBy = () => {
+        const propUsername = typeof username === 'string' ? username.trim() : '';
+        if (propUsername) return propUsername;
+        try {
+            const user = JSON.parse(localStorage.getItem("user") || "{}");
+            return user?.name || user?.username || user?.userName || '';
+        } catch {
+            return '';
+        }
+    };
+    const enteredBy = resolveEnteredBy();
+    const { hasEditPermission, hasDeletePermission } = useWeeklyPaymentRegisterPermissions(userRoles);
+    const isExpensesEntryUploadOnly = viewMode === 'expenses-entry-upload';
+    const resolveActiveBranchId = () => {
+        try {
+            const selectedBranchId = localStorage.getItem("selectedBranchId");
+            const user = JSON.parse(localStorage.getItem("user") || "{}");
+            const fallbackBranchId = user?.branchId ?? user?.branch_id ?? user?.brachId;
+            const resolved = Number(selectedBranchId || fallbackBranchId);
+            return Number.isFinite(resolved) && resolved > 0 ? resolved : null;
+        } catch {
+            return null;
+        }
+    };
+    const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
+    const withBranchUrl = (baseUrl) => {
+        const url = new URL(baseUrl);
+        if (activeBranchId !== null && activeBranchId !== undefined && activeBranchId !== "") {
+            url.searchParams.set("branchId", String(activeBranchId));
+        }
+        return url.toString();
+    };
+    const withBranchParams = useCallback(() => (
+        activeBranchId !== null && activeBranchId !== undefined && activeBranchId !== ""
+            ? { params: { branchId: activeBranchId } }
+            : {}
+    ), [activeBranchId]);
+    /** Only rows for the selected branch — used so “last week” and lists never mix branches if the API returns extra rows. */
+    const isRowForActiveBranch = useCallback((row) => {
+        if (activeBranchId === null || activeBranchId === undefined || activeBranchId === "") return true;
+        const bid = row?.branch_id ?? row?.branchId;
+        if (bid === null || bid === undefined || bid === "") return false;
+        return Number(bid) === Number(activeBranchId);
+    }, [activeBranchId]);
+    useEffect(() => {
+        const syncBranch = () => {
+            const nextBranchId = resolveActiveBranchId();
+            setActiveBranchId((prevBranchId) => (prevBranchId === nextBranchId ? prevBranchId : nextBranchId));
+        };
+        syncBranch();
+        window.addEventListener("branchSelectionChanged", syncBranch);
+        return () => window.removeEventListener("branchSelectionChanged", syncBranch);
+    }, []);
+    const [expenses, setExpenses] = useState([]);
+    const [payments, setPayments] = useState([]);
+    const [newExpense, setNewExpense] = useState({
+        date: "",
+        contractor: "",
+        vendor: "",
+        project: "",
+        project_id: "",
+        contractor_id: "",
+        vendor_id: "",
+        employee_id: "",
+        type: "",
+        amount: "",
+        client_name: "",
+        client_id: "",
+    });
+    const [categoryComments, setCategoryComments] = useState("");
+    const [newPayment, setNewPayment] = useState({ date: "", amount: "", type: "" });
+    const [weeks, setWeeks] = useState([]);
+    const [lastWeekWithData, setLastWeekWithData] = useState(null);
+    const [lastEditableWeek, setLastEditableWeek] = useState(null); // { weekNumber, year }
+    /** Tracks branch+year for the last fetchWeeks run — used to reset the week dropdown when branch/year changes. */
+    const prevWeeksContextKeyRef = useRef(null);
+    const weekFetchTokenRef = useRef(0);
+    const lastPortalDescriptionKeyRef = useRef("");
+    const [vendorOptions, setVendorOptions] = useState([]);
+    const [contractorOptions, setContractorOptions] = useState([]);
+    const [siteOptions, setSiteOptions] = useState([]);
+    const [combinedOptions, setCombinedOptions] = useState([]);
+    const [clientOptions, setClientOptions] = useState([]);
+    const [clientProjectOptions, setClientProjectOptions] = useState([]);
+    const [clientProjectMap, setClientProjectMap] = useState({});
+    const [projectIdToClientName, setProjectIdToClientName] = useState({});
+    const [isClientToggleActive, setIsClientToggleActive] = useState(false);
+    const [selectedClient, setSelectedClient] = useState(null);
+    const [selectedContractor, setSelectedContractor] = useState(null);
+    const [selectedVendor, setSelectedVendor] = useState(null);
+    const [selectedEmployee, setSelectedEmployee] = useState(null);
+    const [selectedProjectName, setSelectedProjectName] = useState(null);
+    const [selectedProjectOption, setSelectedProjectOption] = useState(null);
+    const [projectId, setProjectId] = useState('');
+    const [vendorId, setVendorId] = useState('');
+    const [contractorId, setContractorId] = useState('');
+    const [selectedWeek, setSelectedWeek] = useState("");
+    const [editingRowId, setEditingRowId] = useState('');
+    const [editingOriginalRow, setEditingOriginalRow] = useState(null);
+    const [employeeOptions, setEmployeeOptions] = useState([]);
+    const [editingPaymentId, setEditingPaymentId] = useState('');
+    const [editingOriginalPayment, setEditingOriginalPayment] = useState(null);
+    const [showWeeklyPaymentExpensesModal, setShowWeeklyPaymentExpensesModal] = useState(false);
+    const [weeklyPaymentExpensesAudits, setWeeklyPaymentExpensesAudits] = useState([]);
+    const [showWeeklyPaymentReceivedModal, setShowWeeklyPaymentReceivedModal] = useState(false);
+    const [weeklyPaymentReceivedAudits, setWeeklyPaymentReceivedAudits] = useState([]);
+    const [showHandoverModal, setShowHandoverModal] = useState(false);
+    // Get the current week year (ISO 8601) - may differ from calendar year for weeks spanning year boundaries
+    const getCurrentWeekYear = () => {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        const dayOfWeek = d.getDay() || 7;
+        const thursday = new Date(d);
+        thursday.setDate(d.getDate() + 4 - dayOfWeek);
+        thursday.setHours(0, 0, 0, 0);
+        return thursday.getFullYear();
+    };
+    const [year, setYear] = useState(getCurrentWeekYear().toString());
+    const [weeklyTypes, setWeeklyTypes] = useState([]);
+    const [weeklyReceivedTypes, setWeeklyReceivedTypes] = useState([]);
+    const getWeeklyExpenseTypeId = useCallback((typeLabel) => {
+        if (typeLabel === null || typeLabel === undefined || String(typeLabel).trim() === "") return null;
+        const found = weeklyTypes.find((t) => t && t.type === typeLabel);
+        if (!found) return null;
+        const id = found.id;
+        return id !== undefined && id !== null && !Number.isNaN(Number(id)) ? Number(id) : null;
+    }, [weeklyTypes]);
+    const isWeeklyExpenseTypeMatched = useCallback(
+        (typeLabel) => getWeeklyExpenseTypeId(typeLabel) !== null,
+        [getWeeklyExpenseTypeId]
+    );
+    const getWeeklyReceivedTypeId = useCallback((receivedLabel) => {
+        if (receivedLabel === null || receivedLabel === undefined || String(receivedLabel).trim() === "") return null;
+        const found = weeklyReceivedTypes.find((t) => t && t.received_type === receivedLabel);
+        if (!found) return null;
+        const id = found.id;
+        return id !== undefined && id !== null && !Number.isNaN(Number(id)) ? Number(id) : null;
+    }, [weeklyReceivedTypes]);
+    const currentYear = new Date().getFullYear();
+    const startYear = 2000;
+    const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i);
+    const [showPaymentPopup, setShowPaymentPopup] = useState(false);
+    const [paymentPopupData, setPaymentPopupData] = useState({
+        date: new Date().toISOString().split('T')[0],
+        amount: "",
+        paymentMode: "",
+        chequeNo: "",
+        chequeDate: "",
+        transactionNumber: "",
+        accountNumber: ""
+    });
+    const [currentProjectAdvanceRow, setCurrentProjectAdvanceRow] = useState(null);
+    const [weeklyPaymentBills, setWeeklyPaymentBills] = useState([]);
+    const [nextWeekDiscountInfo, setNextWeekDiscountInfo] = useState(null);
+    const [previousPayments, setPreviousPayments] = useState([]);
+    const [accountDetails, setAccountDetails] = useState([]);
+    const [fileUploadPopup, setFileUploadPopup] = useState(false);
+    const [showBillExpenseEntryModal, setShowBillExpenseEntryModal] = useState(false);
+    const [showBillSettlementAdvanceModal, setShowBillSettlementAdvanceModal] = useState(false);
+    const [expenseEntryRefreshNonce, setExpenseEntryRefreshNonce] = useState(0);
+    const [currentFileRow, setCurrentFileRow] = useState(null);
+    const [selectedFileForPopup, setSelectedFileForPopup] = useState(null);
+    const [weeklySummaryFile, setWeeklySummaryFile] = useState(null);
+    const [weeklySummaryLoading, setWeeklySummaryLoading] = useState(false);
+    const [weeklySummaryUploading, setWeeklySummaryUploading] = useState(false);
+    const [weeklySummaryDeleteLoading, setWeeklySummaryDeleteLoading] = useState(false);
+    const [lastDeletedWeeklySummary, setLastDeletedWeeklySummary] = useState(null);
+    const weeklySummaryFileInputRef = useRef(null);
+    const resolveWeeklySummaryBillCopyUrl = (record) => {
+        if (!record) return '';
+        return cleanUrl(record.summary_bill_copy_url ?? record.summaryBillCopyUrl ?? '');
+    };
+    const weeklySummaryBillCopyUrl = resolveWeeklySummaryBillCopyUrl(weeklySummaryFile);
+    const hasWeeklySummaryBillCopyUrl = Boolean(String(weeklySummaryBillCopyUrl || '').trim());
+    const weeklySummaryFileLabel = 'Signature.PDF';
+    const fetchWeeklySummaryFile = useCallback(async () => {
+        if (!selectedWeek || !year) {
+            setWeeklySummaryFile(null);
+            setLastDeletedWeeklySummary(null);
+            return;
+        }
+        const weekParam = encodeURIComponent(String(selectedWeek));
+        const yearParam = encodeURIComponent(String(year));
+        setWeeklySummaryLoading(true);
+        try {
+            const res = await fetch(
+                `${WEEKLY_SUMMARY_FILE_API}/${weekParam}/${yearParam}`
+            );
+            if (res.ok) {
+                const data = await res.json();
+                setWeeklySummaryFile(data);
+                setLastDeletedWeeklySummary(null);
+            } else {
+                setWeeklySummaryFile(null);
+                // If no active record, try to fetch the most recent deleted record
+                try {
+                    const deletedRes = await fetch(
+                        `${WEEKLY_SUMMARY_FILE_API}/last-deleted/${weekParam}/${yearParam}`
+                    );
+                    if (deletedRes.ok) {
+                        const deletedData = await deletedRes.json();
+                        const deletedId = deletedData?.id;
+                        if (deletedId !== null && deletedId !== undefined) {
+                            setLastDeletedWeeklySummary({
+                                id: Number(deletedId),
+                                weekNumber: String(selectedWeek),
+                                year: String(year),
+                                summaryBillCopyUrl: deletedData?.summary_bill_copy_url ?? deletedData?.summaryBillCopyUrl ?? '',
+                            });
+                        } else {
+                            setLastDeletedWeeklySummary(null);
+                        }
+                    } else {
+                        setLastDeletedWeeklySummary(null);
+                    }
+                } catch (e) {
+                    console.error("Error fetching last deleted weekly summary file:", e);
+                    setLastDeletedWeeklySummary(null);
+                }
+            }
+        } catch (e) {
+            console.error("Error fetching weekly summary file:", e);
+            setWeeklySummaryFile(null);
+            setLastDeletedWeeklySummary(null);
+        } finally {
+            setWeeklySummaryLoading(false);
+        }
+    }, [selectedWeek, year]);
+    const [removedBillCopyRows, setRemovedBillCopyRows] = useState({});
+    const REMOVED_BILL_COPY_STORAGE_KEY = 'cashRegister_removedBillCopyIds';
+    const isRestorableRemovedBillCopy = (row) => {
+        if (!row) return false;
+        if (
+            row.removed_bill_copy_url ??
+            row.removedBillCopyUrl ??
+            row.stored_bill_copy_url ??
+            row.storedBillCopyUrl ??
+            row.backup_bill_copy_url ??
+            row.backupBillCopyUrl
+        ) {
+            return true;
+        }
+        return row.bill_copy_url_removed === true || row.billCopyUrlRemoved === true;
+    };
+    const buildRemovedBillCopyRowsMap = (expensesList) => {
+        const map = {};
+        const expenses = expensesList || [];
+        expenses.forEach((exp) => {
+            if (exp?.id != null && !exp.bill_copy_url && isRestorableRemovedBillCopy(exp)) {
+                map[exp.id] = true;
+            }
+        });
+        try {
+            const stored = JSON.parse(localStorage.getItem(REMOVED_BILL_COPY_STORAGE_KEY) || '[]');
+            const ids = Array.isArray(stored) ? stored : [];
+            const nextStored = [];
+            ids.forEach((id) => {
+                const row = expenses.find((e) => String(e.id) === String(id));
+                if (!row) {
+                    nextStored.push(Number(id));
+                    return;
+                }
+                if (!row.bill_copy_url) {
+                    map[row.id] = true;
+                    nextStored.push(Number(id));
+                }
+            });
+            localStorage.setItem(REMOVED_BILL_COPY_STORAGE_KEY, JSON.stringify(nextStored));
+        } catch {
+            // ignore
+        }
+        return map;
+    };
+    const persistRemovedBillCopyId = (id) => {
+        try {
+            const stored = JSON.parse(localStorage.getItem(REMOVED_BILL_COPY_STORAGE_KEY) || '[]');
+            const ids = Array.isArray(stored) ? stored : [];
+            if (!ids.some((x) => String(x) === String(id))) {
+                localStorage.setItem(REMOVED_BILL_COPY_STORAGE_KEY, JSON.stringify([...ids, Number(id)]));
+            }
+        } catch {
+            // ignore
+        }
+    };
+    const clearPersistedRemovedBillCopyId = (id) => {
+        try {
+            const stored = JSON.parse(localStorage.getItem(REMOVED_BILL_COPY_STORAGE_KEY) || '[]');
+            localStorage.setItem(
+                REMOVED_BILL_COPY_STORAGE_KEY,
+                JSON.stringify((Array.isArray(stored) ? stored : []).filter((x) => String(x) !== String(id)))
+            );
+        } catch {
+            // ignore
+        }
+    };
+    const [showCategoryPopup, setShowCategoryPopup] = useState(false);
+    const [categoryOptions, setCategoryOptions] = useState([]);
+    const [selectedCategory, setSelectedCategory] = useState(null);
+    const [isConfirmingCategory, setIsConfirmingCategory] = useState(false);
+    const [purposeOptions, setPurposeOptions] = useState([]);
+    const [showPurposePopup, setShowPurposePopup] = useState(false);
+    const [selectedPurpose, setSelectedPurpose] = useState(null);
+    const [loanPurposeDescription, setLoanPurposeDescription] = useState("");
+    const [pendingLoanData, setPendingLoanData] = useState(null); // { expensePayload, loanPayload, amount, date }
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [popup, setPopup] = useState({ show: false, message: "", type: "", dateStr: "", editRowId: null, editField: null, editIndex: null, originalDate: "" });
+    const [showPopups, setShowPopups] = useState(false);
+    const [isDescriptionEditing, setIsDescriptionEditing] = useState(false);
+    const [currentRow, setCurrentRow] = useState(null);
+    const [portalDescriptions, setPortalDescriptions] = useState({});
+    const [editFormData, setEditFormData] = useState({
+        date: "",
+        contractor_id: "",
+        vendor_id: "",
+        employee_id: "",
+        project_id: "",
+        type: "",
+        amount: "",
+        advance_portal_id: "",
+        staff_advance_portal_id: "",
+        client_name: "",
+        client_id: "",
+        description: "",
+    });
+    const scrollRef = useRef(null);
+    const filterRowRef = useRef(null);
+    const filterNudgeUsedRef = useRef(false);
+    const paymentsScrollRef = useRef(null);
+    const paymentsFilterRowRef = useRef(null);
+    const paymentsFilterNudgeUsedRef = useRef(false);
+    const expensesFilterChipsRef = useRef(null);
+    const paymentsFilterChipsRef = useRef(null);
+    const isDragging = useRef(false);
+    const activeScrollRef = useRef(null); // Track which scroll container is currently active
+    const start = useRef({ x: 0, y: 0 });
+    const lastPosition = useRef({ x: 0, y: 0 });
+    const velocity = useRef({ x: 0, y: 0 });
+    const animationFrame = useRef(null);
+    const lastMove = useRef({ time: 0, x: 0, y: 0 });
+    const dragHorizontalOnly = useRef(false);
+
+    const handleMouseDown = (e, ref, horizontalOnly = false) => {
+        if (!ref.current) return;
+        const interactiveSelector = 'input, select, textarea, button, a, [contenteditable="true"], [role="button"]';
+        if (e.target instanceof Element && e.target.closest(interactiveSelector)) {
+            return; // Allow native click/focus for form controls and action buttons
+        }
+        e.preventDefault(); // Prevent default behavior
+        e.stopPropagation(); // Prevent event from bubbling to other scroll containers
+        isDragging.current = true;
+        dragHorizontalOnly.current = horizontalOnly;
+        activeScrollRef.current = ref.current; // Store the active scroll container
+        start.current = { x: e.clientX, y: e.clientY };
+        lastPosition.current = { x: e.clientX, y: e.clientY };
+        lastMove.current = {
+            time: Date.now(),
+            x: e.clientX,
+            y: e.clientY,
+        };
+        ref.current.style.cursor = 'grabbing';
+        ref.current.style.userSelect = 'none';
+        ref.current.style.scrollBehavior = 'auto'; // Disable smooth scroll during drag for immediate response
+        cancelMomentum();
+    };
+
+    const handleMouseMove = (e, ref, horizontalOnly = false) => {
+        if (!isDragging.current || !ref.current || activeScrollRef.current !== ref.current) return;
+        e.stopPropagation(); // Prevent event from bubbling to other scroll containers        
+        const now = Date.now();
+        const dt = now - lastMove.current.time || 16;
+        // Calculate delta movement (incremental change)
+        const deltaX = e.clientX - lastPosition.current.x;
+        const deltaY = e.clientY - lastPosition.current.y;
+        const isHorizontalOnly = horizontalOnly || dragHorizontalOnly.current;
+        // Update velocity for momentum (based on last move, not start position)
+        velocity.current = {
+            x: (e.clientX - lastMove.current.x) / dt,
+            y: isHorizontalOnly ? 0 : (e.clientY - lastMove.current.y) / dt,
+        };
+        // Use scrollBy for smooth, continuous scrolling based on incremental movement
+        // This feels more natural like normal scrolling
+        if (ref.current && (deltaX !== 0 || (!isHorizontalOnly && deltaY !== 0))) {
+            ref.current.scrollBy({
+                left: -deltaX,
+                top: isHorizontalOnly ? 0 : -deltaY,
+                behavior: 'auto' // Instant but smooth
+            });
+        }
+        // Update last position for next incremental calculation
+        lastPosition.current = { x: e.clientX, y: e.clientY };
+        lastMove.current = {
+            time: now,
+            x: e.clientX,
+            y: e.clientY,
+        };
+    };
+    const handleMouseUp = (ref) => {
+        if (!isDragging.current || !ref.current || activeScrollRef.current !== ref.current) return;
+        isDragging.current = false;
+        if (ref.current) {
+            ref.current.style.cursor = '';
+            ref.current.style.userSelect = '';
+            ref.current.style.scrollBehavior = ''; // Restore default scroll behavior
+        }
+        applyMomentum();
+        activeScrollRef.current = null; // Clear the active ref after momentum is applied
+    };
+    const cancelMomentum = () => {
+        if (animationFrame.current) {
+            cancelAnimationFrame(animationFrame.current);
+            animationFrame.current = null;
+        }
+    };
+    const applyMomentum = () => {
+        if (!activeScrollRef.current) return;
+        const friction = 0.95;
+        const minVelocity = 0.1;
+        const step = () => {
+            const { x, y } = velocity.current;
+            const activeRef = activeScrollRef.current;
+            if (!activeRef) {
+                cancelMomentum();
+                return;
+            }
+            if (Math.abs(x) > minVelocity || (!dragHorizontalOnly.current && Math.abs(y) > minVelocity)) {
+                activeRef.scrollLeft -= x * 20;
+                if (!dragHorizontalOnly.current) {
+                    activeRef.scrollTop -= y * 20;
+                }
+                velocity.current.x *= friction;
+                velocity.current.y *= friction;
+                animationFrame.current = requestAnimationFrame(step);
+            } else {
+                cancelMomentum();
+                activeScrollRef.current = null; // Clear the active ref when momentum ends
+            }
+        };
+        animationFrame.current = requestAnimationFrame(step);
+    };
+    const [showFilters, setShowFilters] = useState(false);
+    const [showPaymentsFilters, setShowPaymentsFilters] = useState(false);
+    const [overallSearch, setOverallSearch] = useState('');
+    const [paymentsOverallSearch, setPaymentsOverallSearch] = useState('');
+    const [selectPaymentDate, setSelectPaymentDate] = useState('');
+    const [selectPaymentAmount, setSelectPaymentAmount] = useState('');
+    const [selectPaymentType, setSelectPaymentType] = useState('');
+    const { expandedCells, toggleExpandedCell } = useEdbcExpandedCells();
+    const [selectDate, setSelectDate] = useState('');
+    const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
+    const [selectProjectName, setSelectProjectName] = useState('');
+    const [selectType, setSelectType] = useState('');
+    const [selectExpenseAmount, setSelectExpenseAmount] = useState('');
+    const { sortField: expensesSortField, sortDirection: expensesSortDirection, sortProps: expensesSortProps } = useEdbcTableSort();
+    const { sortField: paymentsSortField, sortDirection: paymentsSortDirection, sortProps: paymentsSortProps } = useEdbcTableSort();
+    function getStartAndEndDateOfWeek(weekNumber, year) {
+        const simple = new Date(year, 0, 1 + (weekNumber - 1) * 7);
+        const dayOfWeek = simple.getDay();
+        const ISOWeekStart = new Date(simple);
+        ISOWeekStart.setDate(simple.getDate() - ((dayOfWeek + 7) % 9));
+        const ISOWeekEnd = new Date(ISOWeekStart);
+        ISOWeekEnd.setDate(ISOWeekStart.getDate() + 6);
+        return {
+            number: weekNumber,
+            start: ISOWeekStart.toISOString().split("T")[0],
+            end: ISOWeekEnd.toISOString().split("T")[0],
+        };
+    }
+    function getStartAndEndDateOfISOWeek(weekNo, year) {
+        const simple = new Date(year, 0, 1 + (weekNo - 1) * 7);
+        let dayOfWeek = simple.getDay();
+        if (dayOfWeek === 0) {
+            dayOfWeek = 7;
+        }
+        const ISOweekStart = new Date(simple);
+        ISOweekStart.setDate(simple.getDate() - dayOfWeek + 1);
+        const ISOweekEnd = new Date(ISOweekStart);
+        ISOweekEnd.setDate(ISOweekStart.getDate() + 6);
+        ISOweekStart.setHours(0, 0, 0, 0);
+        ISOweekEnd.setHours(23, 59, 59, 999);
+        return { startDate: ISOweekStart, endDate: ISOweekEnd };
+    }
+    const formatDateOnly = (dateString) => {
+        if (!dateString) return "";
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return "";
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}-${month}-${year}`;
+        } catch (error) {
+            console.error("Error formatting date:", error);
+            return "";
+        }
+    };
+    const formatDate = (dateString) => {
+        if (!dateString) return "";
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return "";
+            date.setMinutes(date.getMinutes());
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            let hours = date.getHours();
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? String(hours).padStart(2, '0') : '12';
+            return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+        } catch (error) {
+            console.error("Error formatting date:", error);
+            return "";
+        }
+    };
+    const buildClientKey = (name = "", father = "", mobile = "") => {
+        const normalizedName = (name || "").trim().toLowerCase();
+        if (!normalizedName) return "";
+        const normalizedFather = (father || "").trim().toLowerCase();
+        const normalizedMobile = (mobile || "").trim();
+        return `${normalizedName}|${normalizedFather}|${normalizedMobile}`;
+    };
+    const [laboursList, setLaboursList] = useState([]);
+    useEffect(() => {
+        fetchLaboursList();
+    }, []);
+    const fetchLaboursList = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/labours-details/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                const formattedData = data.map(item => ({
+                    value: item.labour_name,
+                    label: item.labour_name,
+                    id: item.id,
+                    type: "Labour",
+                    salary: item.labour_salary,
+                    extra: item.extra_amount
+                }));
+                setLaboursList(formattedData);
+            } else {
+                console.log('Error fetching Labour names.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    };
+    const getClientName = (entry) => {
+        if (!entry) return "";
+        if (entry.client_name) return entry.client_name;
+        if (entry.client_id) {
+            const option = clientOptions.find(opt => String(opt.clientId || opt.id) === String(entry.client_id));
+            if (option) return option.label;
+        }
+        if (entry.project_id) {
+            const mapped = projectIdToClientName[String(entry.project_id)];
+            if (mapped) return mapped;
+        }
+        return "";
+    };
+    const getClientOption = (clientId, clientName) => {
+        if (!clientOptions.length) return null;
+        if (clientId) {
+            const byId = clientOptions.find(opt => String(opt.clientId || opt.id) === String(clientId));
+            if (byId) return byId;
+        }
+        if (clientName) {
+            const byName = clientOptions.find(opt => opt.label === clientName);
+            if (byName) return byName;
+        }
+        return null;
+    };
+    useEffect(() => {
+        fetchWeeklyType();
+    }, []);
+    useEffect(() => {
+        fetchWeeklyReceivedType();
+    }, []);
+    useEffect(() => {
+        fetchAccountDetails();
+    }, []);
+    useEffect(() => {
+        fetchCategories();
+    }, []);
+    useEffect(() => {
+        fetchPurposeOptions();
+    }, []);
+    const fetchWeeklyType = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_types/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                setWeeklyTypes(data);
+            } else {
+                console.log('Error fetching tile area names.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    };
+    const fetchWeeklyReceivedType = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_received_types/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                setWeeklyReceivedTypes(data);
+            } else {
+                console.log('Error fetching Payment Received type.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    };
+    const fetchAccountDetails = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                setAccountDetails(data);
+            } else {
+                console.error('Error fetching account details');
+            }
+        } catch (error) {
+            console.error('Error fetching account details:', error);
+        }
+    };
+    const fetchCategories = async () => {
+        try {
+            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll", {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
+            if (!response.ok) {
+                throw new Error("Network response was not ok: " + response.statusText);
+            }
+            const data = await response.json();
+            const formattedData = data.map(item => ({
+                id: item.id,
+                value: item.category,
+                label: item.category,
+            }));
+            setCategoryOptions(formattedData);
+        } catch (error) {
+            console.error("Fetch error: ", error);
+        }
+    };
+    const fetchPurposeOptions = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loan-purposes/getAll', {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
+            if (!response.ok) {
+                throw new Error("Network response was not ok: " + response.statusText);
+            }
+            const data = await response.json();
+            const formattedData = data.map((item) => ({
+                value: item.purpose,
+                label: item.purpose,
+                id: item.id,
+                type: "Purpose"
+            }));
+            setPurposeOptions(formattedData);
+        } catch (error) {
+            console.error("Error fetching purpose options: ", error);
+            setPurposeOptions([]);
+        }
+    };
+    const handleFileUploadClick = async (row) => {
+        if (row.type === 'Bill Payment' || row.type === 'Claim') {
+            try {
+                const linked = await resolveLinkedExpensesForWeeklyRow(row, activeBranchId);
+                if (linked.length > 0) {
+                    if (isWeeklyRowAmountMatchingLinkedExpenses(row, linked)) {
+                        setCurrentFileRow(row);
+                        setSelectedFileForPopup(null);
+                        setFileUploadPopup(true);
+                        return;
+                    }
+                    if (isSummaryBillPaymentRow(row, siteOptions)) {
+                        openSummaryBillExpenseEditModal(row);
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to resolve linked expenses for file upload:', error);
+            }
+            const prefill = buildBillExpenseEntryPrefill(row, siteOptions, {
+                getVendorName,
+                getContractorName,
+            });
+            localStorage.setItem('expenseEntryPrefill', JSON.stringify(prefill));
+            setShowBillExpenseEntryModal(true);
+            return;
+        }
+        if (row.type === 'Bill Settlement') {
+            const project = siteOptions.find((opt) => Number(opt.id) === Number(row.project_id));
+            let dateStr = '';
+            if (row.date) {
+                const d = String(row.date);
+                dateStr = d.includes('T') ? d.split('T')[0] : d;
+            }
+            const rawVid = row.vendor_id ?? row.vendorId;
+            const rawCid = row.contractor_id ?? row.contractorId;
+            const vendorName =
+                row.vendor ??
+                row.vendor_name ??
+                row.vendorName ??
+                (rawVid != null && !Number.isNaN(Number(rawVid)) ? getVendorName(Number(rawVid)) : "") ??
+                "";
+            const contractorName =
+                row.contractor ??
+                row.contractor_name ??
+                row.contractorName ??
+                (rawCid != null && !Number.isNaN(Number(rawCid)) ? getContractorName(Number(rawCid)) : "") ??
+                "";
+            const selectedOptionPrefill =
+                rawVid != null && String(rawVid).trim() !== "" && !Number.isNaN(Number(rawVid))
+                    ? { id: Number(rawVid), value: vendorName, label: vendorName, type: "Vendor" }
+                    : rawCid != null && String(rawCid).trim() !== "" && !Number.isNaN(Number(rawCid))
+                        ? { id: Number(rawCid), value: contractorName, label: contractorName, type: "Contractor" }
+                        : null;
+            const selectedSitePrefill = project
+                ? {
+                    id: Number(project.id),
+                    value: project.value ?? project.label,
+                    label: project.label,
+                    sNo: project.sNo,
+                }
+                : null;
+            try {
+                sessionStorage.setItem("selectedType", JSON.stringify("Bill Settlement"));
+                if (selectedOptionPrefill) sessionStorage.setItem("selectedOption", JSON.stringify(selectedOptionPrefill));
+                else sessionStorage.removeItem("selectedOption");
+                if (selectedSitePrefill) sessionStorage.setItem("selectedSite", JSON.stringify(selectedSitePrefill));
+                else sessionStorage.removeItem("selectedSite");
+                if (row.amount != null && row.amount !== "") sessionStorage.setItem("advanceAmount", JSON.stringify(String(row.amount)));
+                else sessionStorage.removeItem("advanceAmount");
+                sessionStorage.removeItem("billAmount");
+                sessionStorage.setItem("paymentMode", JSON.stringify("Cash"));
+                sessionStorage.removeItem("description");
+                if (dateStr) sessionStorage.setItem("cashRegisterBillSettlementDate", JSON.stringify(dateStr));
+                // used by AdvancePortal popup to update this weekly expense row with uploaded bill URL
+                sessionStorage.setItem("advancePortalWeeklyExpenseIdForBillCopyUrl", JSON.stringify(row.id));
+            } catch {
+                // ignore
+            }
+            setShowBillSettlementAdvanceModal(true);
+            return;
+        }
+        setCurrentFileRow(row);
+        setSelectedFileForPopup(null);
+        setFileUploadPopup(true);
+    };
+    const openSummaryBillExpenseEditModal = (row) => {
+        const prefill = buildSummaryBillExpenseEditPrefill(row, siteOptions, {
+            getVendorName,
+            getContractorName,
+        });
+        localStorage.setItem('expenseEntryPrefill', JSON.stringify(prefill));
+        setShowBillExpenseEntryModal(true);
+    };
+    const canCloseExpenseEntryModal = () => canCloseSummaryBillExpenseModal();
+    const handleFileSelectInPopup = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setSelectedFileForPopup(file);
+        }
+        e.target.value = '';
+    };
+    const handleSaveFileFromPopup = async () => {
+        if (!selectedFileForPopup || !currentFileRow) return;
+        try {
+            const project = siteOptions.find(opt => opt.id === Number(currentFileRow.project_id));
+            const siteNo = project?.sNo || "";
+            const name =
+                vendorOptions.find(opt => opt.id === Number(currentFileRow.vendor_id))?.label ||
+                contractorOptions.find(opt => opt.id === Number(currentFileRow.contractor_id))?.label ||
+                employeeOptions.find(opt => opt.id === Number(currentFileRow.employee_id))?.label ||
+                "";
+            const now = new Date();
+            const timestamp = now.toLocaleString("en-GB", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: true
+            })
+                .replace(",", "")
+                .replace(/\s/g, "-");
+            const formData = new FormData();
+            const finalName = `${timestamp}-${siteNo}-${name}`;
+
+            const uploadFormData = new FormData();
+
+            // ✅ CHANGE 1: "files" instead of "file"
+            uploadFormData.append("files", selectedFileForPopup);
+
+            // ✅ CHANGE 2: required folder
+            uploadFormData.append("folder", "FileUpload / Cash_Register");
+
+            // ✅ CHANGE 3: filename param
+            uploadFormData.append("fileName", finalName);
+
+            const uploadResponse = await fetch(
+                "https://backendaab.in/demoAabuildersDash/api/files/upload",
+                {
+                    method: "POST",
+                    body: uploadFormData,
+                }
+            );
+
+            if (!uploadResponse.ok) {
+                throw new Error("File upload failed");
+            }
+
+            const uploadResult = await uploadResponse.json();
+
+            // ✅ CHANGE 4: new response format
+            const pdfUrl = uploadResult.urls[0];
+
+            const updateResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/${currentFileRow.id}/bill-copy-url`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(pdfUrl)
+            });
+            if (!updateResponse.ok) {
+                throw new Error("Failed to update bill copy URL");
+            }
+            setExpenses((prev) =>
+                prev.map((exp) => (exp.id === currentFileRow.id ? { ...exp, bill_copy_url: pdfUrl } : exp))
+            );
+            setRemovedBillCopyRows((prev) => {
+                const next = { ...prev };
+                delete next[currentFileRow.id];
+                return next;
+            });
+            clearPersistedRemovedBillCopyId(currentFileRow.id);
+            setFileUploadPopup(false);
+            setCurrentFileRow(null);
+            setSelectedFileForPopup(null);
+            setPopup({
+                show: true,
+                message: "File uploaded successfully!",
+                type: "success",
+                dateStr: new Date().toLocaleDateString('en-GB')
+            });
+        } catch (error) {
+            console.error("Error uploading file:", error);
+            setPopup({
+                show: true,
+                message: "Error during file upload. Please try again.",
+                type: "error",
+                dateStr: new Date().toLocaleDateString('en-GB')
+            });
+        }
+    };
+    const uploadWeeklySummaryBlobToUrl = async (file) => {
+        const now = new Date();
+        const timestamp = now.toLocaleString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true
+        })
+            .replace(",", "")
+            .replace(/\s/g, "-");
+        const uploadFormData = new FormData();
+        uploadFormData.append("files", file);
+        uploadFormData.append("folder", "FileUpload / Cash_Register_Weekly_Signature_Copy");
+        uploadFormData.append("fileName", `${timestamp}-Week-${selectedWeek}-Year-${year}-SignatureCopy`);
+        const uploadResponse = await fetch(
+            "https://backendaab.in/demoAabuildersDash/api/files/upload",
+            { method: "POST", body: uploadFormData }
+        );
+        if (!uploadResponse.ok) {
+            throw new Error("File upload failed");
+        }
+        const uploadResult = await uploadResponse.json();
+        const pdfUrl = uploadResult.urls?.[0];
+        if (!pdfUrl) {
+            throw new Error("No file URL returned");
+        }
+        return pdfUrl;
+    };
+    const handleWeeklySummaryFileChange = async (e) => {
+        const file = e.target.files?.[0];
+        e.target.value = "";
+        if (!file || !selectedWeek || !year) return;
+        if (hasWeeklySummaryBillCopyUrl) {
+            alert("A summary bill is already uploaded for this week. Remove it first to replace.");
+            return;
+        }
+        setWeeklySummaryUploading(true);
+        try {
+            const pdfUrl = await uploadWeeklySummaryBlobToUrl(file);
+            const saveRes = await fetch(`${WEEKLY_SUMMARY_FILE_API}/save`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    summary_bill_copy_url: pdfUrl,
+                    week_number: String(selectedWeek),
+                    year: String(year),
+                }),
+            });
+            const saveMsg = await saveRes.text();
+            if (!saveRes.ok || (saveMsg && saveMsg.toLowerCase().includes("already exists"))) {
+                alert(saveMsg || "Failed to save weekly summary file.");
+                return;
+            }
+            if (!saveMsg.toLowerCase().includes("success")) {
+                alert(saveMsg || "Failed to save weekly summary file.");
+                return;
+            }
+            setLastDeletedWeeklySummary(null);
+            await fetchWeeklySummaryFile();
+            setPopup({
+                show: true,
+                message: "Weekly summary file saved successfully!",
+                type: "success",
+                dateStr: new Date().toLocaleDateString("en-GB"),
+            });
+        } catch (err) {
+            console.error(err);
+            setPopup({
+                show: true,
+                message: "Error uploading weekly summary file. Please try again.",
+                type: "error",
+                dateStr: new Date().toLocaleDateString("en-GB"),
+            });
+        } finally {
+            setWeeklySummaryUploading(false);
+        }
+    };
+    const handleWeeklySummaryMarkDeleted = async () => {
+        if (!weeklySummaryFile?.id) return;
+        const ok = window.confirm(
+            "Remove the weekly summary bill for this week? You can undo this, or upload a new file after it is removed."
+        );
+        if (!ok) return;
+        setWeeklySummaryDeleteLoading(true);
+        try {
+            const res = await fetch(
+                `${WEEKLY_SUMMARY_FILE_API}/delete-status/${weeklySummaryFile.id}?isDeleted=true`,
+                { method: "PUT" }
+            );
+            const msg = await res.text();
+            if (!res.ok) {
+                alert(msg || "Failed to update delete status.");
+                return;
+            }
+            setLastDeletedWeeklySummary({
+                id: weeklySummaryFile.id,
+                weekNumber: String(selectedWeek),
+                year: String(year),
+                summaryBillCopyUrl: weeklySummaryFile?.summary_bill_copy_url ?? weeklySummaryFile?.summaryBillCopyUrl ?? '',
+            });
+            setWeeklySummaryFile(null);
+        } catch (err) {
+            console.error(err);
+            alert("Failed to mark summary as deleted.");
+        } finally {
+            setWeeklySummaryDeleteLoading(false);
+        }
+    };
+    const handleWeeklySummaryUndoDelete = async () => {
+        const id = lastDeletedWeeklySummary?.id;
+        if (id == null) return;
+        setWeeklySummaryDeleteLoading(true);
+        try {
+            const res = await fetch(
+                `${WEEKLY_SUMMARY_FILE_API}/delete-status/${id}?isDeleted=false`,
+                { method: "PUT" }
+            );
+            const msg = await res.text();
+            if (!res.ok) {
+                alert(msg || "Failed to restore summary file.");
+                return;
+            }
+            setLastDeletedWeeklySummary(null);
+            await fetchWeeklySummaryFile();
+        } catch (err) {
+            console.error(err);
+            alert("Failed to undo delete.");
+        } finally {
+            setWeeklySummaryDeleteLoading(false);
+        }
+    };
+    const handleRemoveBillCopyUrl = async (row) => {
+        if (!row?.id) return;
+        const shouldRemove = window.confirm('Remove attached bill file?');
+        if (!shouldRemove) return;
+        try {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/${row.id}/remove-bill`, {
+                method: 'PUT',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(username || ''),
+            });
+            if (!response.ok) {
+                throw new Error("Failed to remove bill copy URL");
+            }
+            setExpenses((prev) =>
+                prev.map((exp) => (exp.id === row.id ? { ...exp, bill_copy_url: null } : exp))
+            );
+            setRemovedBillCopyRows((prev) => ({ ...prev, [row.id]: true }));
+            persistRemovedBillCopyId(row.id);
+            setPopup({
+                show: true,
+                message: "Bill file removed successfully!",
+                type: "success",
+                dateStr: new Date().toLocaleDateString('en-GB')
+            });
+        } catch (error) {
+            console.error("Error removing bill file:", error);
+            setPopup({
+                show: true,
+                message: "Failed to remove bill file. Please try again.",
+                type: "error",
+                dateStr: new Date().toLocaleDateString('en-GB')
+            });
+        }
+    };
+    const handleRestoreBillCopyUrl = async (row) => {
+        if (!row?.id) return;
+        try {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/${row.id}/restore-bill`, {
+                method: 'PUT',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            if (!response.ok) {
+                throw new Error("Failed to restore bill copy URL");
+            }
+            const restored = await response.json().catch(() => null);
+            const restoredUrl = restored?.bill_copy_url ?? restored?.billCopyUrl ?? null;
+            setExpenses((prev) =>
+                prev.map((exp) =>
+                    exp.id === row.id ? { ...exp, bill_copy_url: restoredUrl || exp.bill_copy_url } : exp
+                )
+            );
+            setRemovedBillCopyRows((prev) => {
+                const next = { ...prev };
+                delete next[row.id];
+                return next;
+            });
+            clearPersistedRemovedBillCopyId(row.id);
+            setPopup({
+                show: true,
+                message: "Bill file restored successfully!",
+                type: "success",
+                dateStr: new Date().toLocaleDateString('en-GB')
+            });
+        } catch (error) {
+            console.error("Error restoring bill file:", error);
+            setPopup({
+                show: true,
+                message: "Failed to restore bill file. Please try again.",
+                type: "error",
+                dateStr: new Date().toLocaleDateString('en-GB')
+            });
+        }
+    };
+    const fetchWeeklyPaymentBills = async () => {
+        try {
+            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/all", {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
+            if (!response.ok) {
+                throw new Error("Network response was not ok: " + response.statusText);
+            }
+            const data = await response.json();
+            setWeeklyPaymentBills(data);
+            return data;
+        } catch (error) {
+            console.error("Error fetching payment bills:", error);
+            return [];
+        }
+    };
+    useEffect(() => {
+        const fetchNextWeekDiscount = async () => {
+            if (!selectedWeek || !year) {
+                setNextWeekDiscountInfo(null);
+                return;
+            }
+            const currentWeekNumber = Number(selectedWeek);
+            const selectedYear = parseInt(year, 10);
+            // Find the current week's info to determine its year
+            const currentWeek = weeks.find(w => w.number === currentWeekNumber);
+            if (!currentWeek) {
+                setNextWeekDiscountInfo(null);
+                return;
+            }
+            // Calculate next week - if we're in week 52, next week is week 1 of next year
+            let nextWeekNumber;
+            let nextWeekYear;
+            // Get the end date of current week
+            const currentWeekEnd = new Date(currentWeek.end);
+            const nextWeekStart = new Date(currentWeekEnd);
+            nextWeekStart.setDate(currentWeekEnd.getDate() + 1); // Next day after current week ends            
+            // Calculate the week year for the next week (ISO 8601)
+            nextWeekYear = getWeekYear(nextWeekStart);
+            nextWeekNumber = getISOWeekNumber(nextWeekStart);
+            if (!Number.isFinite(nextWeekNumber)) {
+                setNextWeekDiscountInfo(null);
+                return;
+            }
+            try {
+                const response = await axios.get(
+                    `https://backendaab.in/demoAabuildersDash/api/payments-received/week/${nextWeekNumber}`,
+                    withBranchParams()
+                );
+                const allNextWeekPayments = Array.isArray(response.data) ? response.data : [];
+                // Filter payments by weekly_number field (not by date) to include entries like "Carry (CF)"
+                // that may have dates from previous week but belong to the next week
+                const nextWeekPayments = allNextWeekPayments.filter(payment => {
+                    // Use weekly_number field to determine which week the payment belongs to
+                    const paymentWeekNumber = Number(payment.weekly_number);
+                    return paymentWeekNumber === nextWeekNumber;
+                });
+                const discountSum = nextWeekPayments.reduce((sum, payment) => {
+                    const discount = Number(payment.discount_amount) || 0;
+                    return discount > 0 ? sum + discount : sum;
+                }, 0);
+                if (discountSum > 0) {
+                    setNextWeekDiscountInfo({
+                        weekNumber: nextWeekNumber,
+                        amount: discountSum,
+                    });
+                } else {
+                    setNextWeekDiscountInfo(null);
+                }
+            } catch (error) {
+                console.error("Error fetching next week payments:", error);
+                setNextWeekDiscountInfo(null);
+            }
+        };
+        fetchNextWeekDiscount();
+    }, [selectedWeek, year, weeks, activeBranchId]);
+    useEffect(() => {
+        fetchWeeklyPaymentBills();
+    }, []);
+    useEffect(() => {
+        const fetchVendorNames = async () => {
+            try {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error("Network response was not ok: " + response.statusText);
+                }
+                const data = await response.json();
+                const formattedData = data.map(item => ({
+                    value: item.vendorName,
+                    label: item.vendorName,
+                    id: item.id,
+                    type: "Vendor",
+                }));
+                setVendorOptions(formattedData);
+            } catch (error) {
+                console.error("Fetch error: ", error);
+            }
+        };
+        fetchVendorNames();
+    }, []);
+    useEffect(() => {
+        const fetchEmployeeDetails = async () => {
+            try {
+                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/employee_details/basic/getAll", {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error("Network response was not ok: " + response.statusText);
+                }
+                const data = await response.json();
+                const formattedData = data.map(item => ({
+                    value: item.employee_name,
+                    label: item.employee_name,
+                    id: item.id,
+                    type: "Employee",
+                }));
+                setEmployeeOptions(formattedData);
+            } catch (error) {
+                console.error("Fetch error: ", error);
+            }
+        };
+        fetchEmployeeDetails();
+    }, []);
+    useEffect(() => {
+        const fetchContractorNames = async () => {
+            try {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error("Network response was not ok: " + response.statusText);
+                }
+                const data = await response.json();
+                const formattedData = data.map(item => ({
+                    value: item.contractorName,
+                    label: item.contractorName,
+                    id: item.id,
+                    type: "Contractor",
+                }));
+                setContractorOptions(formattedData);
+            } catch (error) {
+                console.error("Fetch error: ", error);
+            }
+        };
+        fetchContractorNames();
+    }, []);
+    useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions, ...employeeOptions]); }, [vendorOptions, contractorOptions, employeeOptions]);
+
+    const siteOptionsForNewEntry = useMemo(() => {
+        const hiddenPredefinedIds = new Set([1, 2, 3, 4, 5, 6, 8, 9, 10, 11]);
+        return (siteOptions || []).filter((opt) => {
+            if (String(opt?.label || opt?.value || "").trim() === "Multi-Project Batch") return false;
+            const idNum = Number(opt?.id);
+            if (Number.isFinite(idNum) && hiddenPredefinedIds.has(idNum)) return false;
+            return true;
+        });
+    }, [siteOptions]);
+    useEffect(() => {
+        const predefinedSiteOptions = [
+            { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+            { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+            { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+            { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+            { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+            { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+            { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+            { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+            { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+            { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+            { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
+        ];
+        const fetchSites = async () => {
+            try {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/projects/getAll", {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error("Network response was not ok: " + response.statusText);
+                }
+                const data = await response.json();
+                const projectClientMapTemp = {};
+                const projectClientNameTemp = {};
+                const projectOptions = Array.isArray(data)
+                    ? data.map((project, index) => {
+                        const label = (project.projectName || project.projectReferenceName || `Project ${project.projectId || project.id || index + 1}`).trim();
+                        const rawId = project.id ?? project.projectId ?? (100000 + index);
+                        const optionId = Number(rawId);
+                        const option = {
+                            value: label,
+                            label,
+                            id: optionId,
+                            sNo: project.projectId || ""
+                        };
+                        const ownerCandidates = Array.isArray(project?.ownerDetailsList)
+                            ? project.ownerDetailsList
+                            : Array.isArray(project?.ownerDetails)
+                                ? project.ownerDetails
+                                : [];
+                        ownerCandidates.forEach((owner) => {
+                            const key = buildClientKey(owner?.clientName, owner?.fatherName, owner?.mobile);
+                            if (!key) return;
+                            if (!projectClientMapTemp[key]) {
+                                projectClientMapTemp[key] = {
+                                    name: owner?.clientName || "",
+                                    fatherName: owner?.fatherName || "",
+                                    mobile: owner?.mobile || "",
+                                    clientId: owner?.id || key,
+                                    projects: [],
+                                };
+                            }
+                            projectClientMapTemp[key].projects.push(option);
+                            if (!projectClientNameTemp[optionId]) {
+                                projectClientNameTemp[optionId] = owner?.clientName || "";
+                            }
+                        });
+                        if (!projectClientNameTemp[optionId]) {
+                            projectClientNameTemp[optionId] = "";
+                        }
+                        return option;
+                    }) : [];
+                const combinedSiteOptions = [...predefinedSiteOptions, ...projectOptions];
+                setSiteOptions(combinedSiteOptions);
+                setProjectIdToClientName(projectClientNameTemp);
+                setClientProjectMap(projectClientMapTemp);
+                const clientOptionList = Object.entries(projectClientMapTemp).map(([key, value]) => ({
+                    value: value.name,
+                    label: value.name,
+                    id: value.clientId,
+                    clientId: value.clientId,
+                    fatherName: value.fatherName,
+                    mobile: value.mobile,
+                    projects: value.projects,
+                    compositeKey: key,
+                }));
+                setClientOptions(clientOptionList);
+            } catch (error) {
+                console.error("Fetch error: ", error);
+                setSiteOptions(predefinedSiteOptions);
+                setClientOptions([]);
+                setClientProjectMap({});
+                setProjectIdToClientName({});
+            }
+        };
+        fetchSites();
+    }, []);
+    useEffect(() => {
+        if (!isClientToggleActive) return;
+        if (clientProjectOptions.length === 1) {
+            const onlyProject = clientProjectOptions[0];
+            setSelectedProjectName(onlyProject);
+            setSelectedProjectOption(onlyProject);
+            setProjectId(onlyProject.id);
+            setNewExpense((prev) => ({ ...prev, project_id: onlyProject.id }));
+        }
+    }, [clientProjectOptions, isClientToggleActive]);
+    useEffect(() => {
+        const fetchWeeks = async () => {
+            const selectedYear = parseInt(year, 10);
+            const requestBranchId = activeBranchId;
+            const requestYearNum = selectedYear;
+            const requestKey = `${requestBranchId ?? "none"}-${requestYearNum}`;
+            try {
+                // Fetch all payments to determine which weeks have status-true data (branch-scoped rows only)
+                let weeksWithData = new Set();
+                try {
+                    const paymentsResponse = await axios.get('https://backendaab.in/demoAabuildersDash/api/payments-received/getAll', withBranchParams());
+                    paymentsResponse.data.forEach(payment => {
+                        if (!isRowForActiveBranch(payment)) return;
+                        if (payment.status !== true) return;
+                        const wn = Number(payment.weekly_number);
+                        if (!Number.isFinite(wn)) return;
+                        const paymentWeekYear = getIsoYearFromRowDate(payment);
+                        if (paymentWeekYear === selectedYear) {
+                            weeksWithData.add(wn);
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error fetching payments for week filtering:', error);
+                }
+
+                // Ignore stale responses if branch/year changed while the request was in flight
+                if (requestBranchId !== activeBranchId || requestYearNum !== parseInt(year, 10)) {
+                    return;
+                }
+
+                const allWeeks = [];
+                weeksWithData.forEach((weekNum) => {
+                    allWeeks.push(getStartAndEndDateOfWeek(weekNum, selectedYear));
+                });
+
+                allWeeks.sort((a, b) => b.number - a.number);
+
+                const lastWeekWithDataValue = weeksWithData.size > 0 ? Math.max(...Array.from(weeksWithData)) : null;
+                const defaultWeekNum =
+                    lastWeekWithDataValue != null && allWeeks.some((w) => w.number === lastWeekWithDataValue)
+                        ? lastWeekWithDataValue
+                        : allWeeks[0]?.number ?? null;
+
+                const previousKey = prevWeeksContextKeyRef.current;
+                const contextChanged = previousKey !== null && previousKey !== requestKey;
+                prevWeeksContextKeyRef.current = requestKey;
+
+                setLastWeekWithData(lastWeekWithDataValue);
+                setWeeks(allWeeks);
+
+                setSelectedWeek((prev) => {
+                    if (allWeeks.length === 0 || defaultWeekNum == null) return "";
+                    const prevNum = prev !== "" && prev != null ? Number(prev) : NaN;
+                    const prevInList = !Number.isNaN(prevNum) && allWeeks.some((w) => w.number === prevNum);
+                    if (contextChanged) {
+                        return String(defaultWeekNum);
+                    }
+                    if (!prev || prev === "" || !prevInList) {
+                        return String(defaultWeekNum);
+                    }
+                    return prev;
+                });
+            } catch (error) {
+                console.error('Error fetching active weeks:', error);
+            }
+        };
+        fetchWeeks();
+    }, [year, activeBranchId]);
+
+    // Editable week: current ISO week if any payment has status true for that weekly_number; else latest status-true week (by weekly_number + ISO year from date).
+    useEffect(() => {
+        const computeEditableWeek = async () => {
+            try {
+                const now = new Date();
+                const currentWeekNumber = getISOWeekNumber(now);
+                const currentWeekYear = getWeekYear(now);
+                const paymentsResponse = await axios.get('https://backendaab.in/demoAabuildersDash/api/payments-received/getAll', withBranchParams());
+                const data = (Array.isArray(paymentsResponse.data) ? paymentsResponse.data : []).filter(isRowForActiveBranch);
+                const hasCurrentWeekTrue = data.some((payment) => {
+                    if (payment?.status !== true) return false;
+                    const wn = Number(payment.weekly_number);
+                    if (!Number.isFinite(wn) || wn !== currentWeekNumber) return false;
+                    return getIsoYearFromRowDate(payment) === currentWeekYear;
+                });
+                if (hasCurrentWeekTrue) {
+                    setLastEditableWeek({ weekNumber: currentWeekNumber, year: currentWeekYear });
+                } else {
+                    const latest = getLatestStatusTrueWeekFromPayments(data);
+                    if (latest) {
+                        setLastEditableWeek(latest);
+                    } else {
+                        const { startDate } = getStartAndEndDateOfISOWeek(currentWeekNumber, currentWeekYear);
+                        const prevDate = new Date(startDate);
+                        prevDate.setDate(prevDate.getDate() - 1);
+                        setLastEditableWeek({
+                            weekNumber: getISOWeekNumber(prevDate),
+                            year: getWeekYear(prevDate),
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error computing editable week:', error);
+                const now = new Date();
+                const currentWeekNumber = getISOWeekNumber(now);
+                const currentWeekYear = getWeekYear(now);
+                const { startDate } = getStartAndEndDateOfISOWeek(currentWeekNumber, currentWeekYear);
+                const prevDate = new Date(startDate);
+                prevDate.setDate(prevDate.getDate() - 1);
+                setLastEditableWeek({
+                    weekNumber: getISOWeekNumber(prevDate),
+                    year: getWeekYear(prevDate),
+                });
+            }
+        };
+        computeEditableWeek();
+    }, [activeBranchId]); // Run again when branch changes
+    useEffect(() => {
+        weekFetchTokenRef.current += 1;
+        lastPortalDescriptionKeyRef.current = "";
+    }, [selectedWeek, year]);
+    const refreshWeekTableData = useCallback(async () => {
+        if (!selectedWeek) return [];
+        const fetchToken = weekFetchTokenRef.current;
+        const requestWeek = String(selectedWeek);
+        const requestYear = parseInt(year, 10);
+        try {
+            const [expensesRes, paymentsRes] = await Promise.all([
+                axios.get(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${requestWeek}`, withBranchParams()),
+                axios.get(`https://backendaab.in/demoAabuildersDash/api/payments-received/week/${requestWeek}`, withBranchParams()),
+            ]);
+
+            if (fetchToken !== weekFetchTokenRef.current) return [];
+
+            const selectedWeekNum = Number(requestWeek);
+
+            const filteredExpenses = expensesRes.data.filter((expense) => {
+                if (!isRowForActiveBranch(expense)) return false;
+                if (expense.status !== true) return false;
+                const wn = Number(expense.weekly_number);
+                if (!Number.isFinite(wn) || wn !== selectedWeekNum) return false;
+                return getIsoYearFromRowDate(expense) === requestYear;
+            });
+
+            const filteredPaymentsByYear = paymentsRes.data.filter((payment) => {
+                if (!isRowForActiveBranch(payment)) return false;
+                if (payment.status !== true) return false;
+                const wn = Number(payment.weekly_number);
+                if (!Number.isFinite(wn) || wn !== selectedWeekNum) return false;
+                return getIsoYearFromRowDate(payment) === requestYear;
+            });
+
+            const filteredPayments = filteredPaymentsByYear.filter(
+                (payment) => payment.type !== "Handover"
+            );
+
+            if (fetchToken !== weekFetchTokenRef.current) return [];
+
+            setExpenses(filteredExpenses);
+            setRemovedBillCopyRows(buildRemovedBillCopyRowsMap(filteredExpenses));
+            setPayments(filteredPayments);
+            await fetchWeeklyPaymentBills();
+
+            if (fetchToken !== weekFetchTokenRef.current) return [];
+
+            return filteredExpenses;
+        } catch (error) {
+            console.error("Error fetching weekly data:", error);
+            return [];
+        }
+    }, [selectedWeek, year, activeBranchId, withBranchParams, isRowForActiveBranch]);
+    useEffect(() => {
+        if (!selectedWeek) return;
+        const fetchToken = weekFetchTokenRef.current;
+        const loadWeekData = async () => {
+            const filteredExpenses = await refreshWeekTableData();
+            if (fetchToken !== weekFetchTokenRef.current) return;
+            const projectAdvanceRows = (filteredExpenses || []).filter(
+                (row) => row.type === "Project Advance" && row.advance_portal_id
+            );
+            const portalKey = projectAdvanceRows
+                .map((row) => row.advance_portal_id)
+                .sort((a, b) => String(a).localeCompare(String(b)))
+                .join(",");
+            if (portalKey && portalKey === lastPortalDescriptionKeyRef.current) return;
+            lastPortalDescriptionKeyRef.current = portalKey;
+            const newDescriptions = {};
+            for (const row of projectAdvanceRows) {
+                if (fetchToken !== weekFetchTokenRef.current) return;
+                try {
+                    const res = await fetch(
+                        `https://backendaab.in/demoAabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
+                    );
+                    if (res.ok) {
+                        const data = await res.json();
+                        const description = (data.description || "").trim();
+                        newDescriptions[row.advance_portal_id] = description !== "" ? description : undefined;
+                    }
+                } catch (error) {
+                    console.error("Error fetching advance portal data:", error);
+                }
+            }
+            if (fetchToken !== weekFetchTokenRef.current) return;
+            setPortalDescriptions(newDescriptions);
+        };
+        void loadWeekData();
+    }, [selectedWeek, year, activeBranchId, expenseEntryRefreshNonce, refreshWeekTableData]);
+    useLiveDataSync(
+        refreshWeekTableData,
+        Boolean(
+            editingRowId ||
+            editingPaymentId ||
+            isSubmitting ||
+            showPurposePopup ||
+            showPopups ||
+            fileUploadPopup ||
+            showPaymentPopup ||
+            !isTabActive
+        )
+    );
+    useEffect(() => {
+        void fetchWeeklySummaryFile();
+    }, [selectedWeek, year, fetchWeeklySummaryFile]);
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        if (name === "type") {
+            // Validate type selection against current party selection
+            const allowedTypesForClient = ["Loan", "Bank", "Claim"];
+            const isClientTypeAllowed = allowedTypesForClient.includes(value);
+
+            if (value === "Staff Advance") {
+                // Staff Advance only allows Employee
+                if (selectedContractor || selectedVendor || selectedClient) {
+                    alert("Staff Advance type only allows Employee. Please select an Employee or clear the Contractor/Vendor/Client selection.");
+                    return; // Prevent type change
+                }
+            } else if (value === "Project Advance") {
+                // Project Advance only allows Contractor or Vendor
+                if (selectedEmployee || selectedClient) {
+                    alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor or Vendor or clear the Employee/Client selection.");
+                    return; // Prevent type change
+                }
+            }
+
+            // If type doesn't allow client selection and client toggle is active, disable it and clear client selection
+            if (!isClientTypeAllowed && isClientToggleActive) {
+                setIsClientToggleActive(false);
+                setSelectedClient(null);
+                setClientProjectOptions([]);
+                setSelectedProjectName(null);
+                setSelectedProjectOption(null);
+                setNewExpense((prev) => ({
+                    ...prev,
+                    [name]: value,
+                    client_name: "",
+                    client_id: "",
+                }));
+                return;
+            }
+
+            // If validation passes, update the type
+            setNewExpense((prev) => ({ ...prev, [name]: value }));
+        } else {
+            setNewExpense((prev) => ({ ...prev, [name]: value }));
+        }
+    };
+    const clearFilters = () => {
+        setSelectDate('');
+        setSelectContractororVendorName('');
+        setSelectProjectName('');
+        setSelectType('');
+        setSelectExpenseAmount('');
+        setOverallSearch('');
+    };
+    const clearPaymentsFilters = () => {
+        setPaymentsOverallSearch('');
+        setSelectPaymentDate('');
+        setSelectPaymentAmount('');
+        setSelectPaymentType('');
+    };
+    const getVendorName = (id) =>
+        vendorOptions.find(v => v.id === id)?.value || "";
+    const getContractorName = (id) =>
+        contractorOptions.find(c => c.id === id)?.value || "";
+    const getEmployeeName = (id) =>
+        employeeOptions.find(c => c.id === id)?.value || "";
+    const getSiteName = (id) =>
+        siteOptions.find(s => String(s.id) === String(id))?.value || "";
+    const getLabourName = (id) =>
+        laboursList.find(l => l.id === id)?.value || "";
+    const getPartyDisplayName = (entry) => {
+        const hasContractorVendorEmployee = entry.contractor_id || entry.vendor_id || entry.employee_id;
+        if (!hasContractorVendorEmployee && entry.type === "Loan") {
+            const client = getClientName(entry);
+            if (client) return client;
+        }
+        if (entry.vendor_id) return getVendorName(entry.vendor_id);
+        if (entry.contractor_id) return getContractorName(entry.contractor_id);
+        if (entry.employee_id) return getEmployeeName(entry.employee_id);
+        if (entry.labour_id) return getLabourName(entry.labour_id);
+        return "";
+    };
+    const getExpenseFilterSnapshot = (entry) =>
+        editingRowId === entry.id && editingOriginalRow ? editingOriginalRow : entry;
+    const filteredExpenses = expenses.filter((entry) => {
+        const snapshot = getExpenseFilterSnapshot(entry);
+        if (selectDate) {
+            const [year, month, day] = selectDate.split("-");
+            const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
+            const entryDateObj = new Date(snapshot.date);
+            const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
+            if (formattedEntryDate !== formattedSelectDate) return false;
+        }
+        if (selectContractororVendorName) {
+            const name = getPartyDisplayName(snapshot);
+            if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
+                return false;
+        }
+        if (selectProjectName) {
+            const projectName = getSiteName(snapshot.project_id) || "";
+            if (projectName.toLowerCase() !== selectProjectName.toLowerCase())
+                return false;
+        }
+        if (selectType) {
+            if (snapshot.type?.toLowerCase() !== selectType.toLowerCase()) return false;
+        }
+        if (selectExpenseAmount && !matchesEdbcAmountFilter(snapshot.amount, selectExpenseAmount)) return false;
+        if (!matchesWeeklyPaymentExpenseOverallSearch(snapshot, overallSearch, {
+            formatDateOnly,
+            getPartyName: (entry) => {
+                if (isClientToggleActive) return getClientName(entry) || '';
+                return getPartyDisplayName(entry) || '';
+            },
+            getProjectName: (entry) => getSiteName(entry.project_id) || '',
+        })) {
+            return false;
+        }
+        return true;
+    });
+    const contractorVendorFilterOptions = React.useMemo(() => {
+        const labels = new Set();
+        return filteredExpenses.map(exp => {
+            const label = getPartyDisplayName(exp);
+            if (label && !labels.has(label)) {
+                labels.add(label);
+                return { value: label, label };
+            }
+            return null;
+        }).filter(Boolean);
+    }, [filteredExpenses, combinedOptions, clientOptions, projectIdToClientName]);
+    const projectFilterOptions = React.useMemo(() => {
+        const ids = new Set();
+        return filteredExpenses.map(exp => {
+            const option = siteOptions.find(opt => opt.id === Number(exp.project_id));
+            if (option && !ids.has(option.id)) {
+                ids.add(option.id);
+                return { value: option.label, label: option.label };
+            }
+            return null;
+        }).filter(Boolean);
+    }, [filteredExpenses, siteOptions]);
+    const balance = (
+        payments.reduce((total, row) => total + Number(row.amount || 0), 0) -
+        filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)
+    ).toFixed(2);
+    const getPartyNameForSort = useCallback((entry) => {
+        if (isClientToggleActive) return getClientName(entry) || '';
+        return getPartyDisplayName(entry) || '';
+    }, [isClientToggleActive]);
+    const getProjectNameForSort = useCallback((entry) => getSiteName(entry.project_id) || '', []);
+    const sortedExpenses = React.useMemo(() => {
+        const reversed = [...filteredExpenses].reverse();
+        if (!expensesSortField) return reversed;
+        return sortWeeklyPaymentExpenseRows(reversed, expensesSortField, expensesSortDirection, {
+            getPartyName: getPartyNameForSort,
+            getProjectName: getProjectNameForSort,
+        });
+    }, [filteredExpenses, expensesSortField, expensesSortDirection, getPartyNameForSort, getProjectNameForSort]);
+    const filteredPayments = React.useMemo(() => payments.filter((row) => {
+        if (paymentsOverallSearch.trim()) {
+            const q = paymentsOverallSearch.toLowerCase().trim();
+            if (
+                !String(row.type || '').toLowerCase().includes(q) &&
+                !String(row.amount || '').includes(q) &&
+                !String(formatDateOnly(row.date) || '').toLowerCase().includes(q)
+            ) {
+                return false;
+            }
+        }
+        if (selectPaymentDate) {
+            const [year, month, day] = selectPaymentDate.split('-');
+            const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
+            const entryDateObj = new Date(row.date);
+            const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
+            if (formattedEntryDate !== formattedSelectDate) return false;
+        }
+        if (selectPaymentAmount && !matchesEdbcAmountFilter(row.amount, selectPaymentAmount)) return false;
+        if (selectPaymentType && String(row.type || '').toLowerCase() !== selectPaymentType.toLowerCase()) return false;
+        return true;
+    }), [payments, paymentsOverallSearch, selectPaymentDate, selectPaymentAmount, selectPaymentType]);
+    const sortedPayments = React.useMemo(() => {
+        if (!paymentsSortField) return filteredPayments;
+        return sortWeeklyPaymentPaymentRows(filteredPayments, paymentsSortField, paymentsSortDirection);
+    }, [filteredPayments, paymentsSortField, paymentsSortDirection]);
+    const handleExpenseChange = (e) => {
+        const { name, value } = e.target;
+        if (name === "date") {
+            validateExpenseDate(value);
+        } else if (name === "amount" && Number(value) > Number(balance)) {
+            alert("Amount cannot exceed the available Balance!");
+            setNewExpense((prev) => ({ ...prev, [name]: "" }));
+            return;
+        } else {
+            setNewExpense((prev) => ({ ...prev, [name]: value }));
+        }
+    };
+    // Immediate date validation for Expense
+    const validateExpenseDate = (dateStr) => {
+        if (!dateStr || !selectedWeek) return;
+        const year = new Date().getFullYear();
+        const { startDate, endDate } = getStartAndEndDateOfISOWeek(Number(selectedWeek), year);
+        const selectedDate = new Date(dateStr);
+        selectedDate.setHours(0, 0, 0, 0);
+        if (selectedDate < startDate || selectedDate > endDate) {
+            setPopup({
+                show: true,
+                message: `Selected date is out of current week range (${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()})`,
+                type: "expense",
+                dateStr,
+                editRowId: null,
+                editField: null,
+                editIndex: null,
+                originalDate: ""
+            });
+        } else {
+            setNewExpense((prev) => ({ ...prev, date: dateStr }));
+        }
+    };
+    const handlePartySourceToggle = () => {
+        setIsClientToggleActive((prev) => !prev);
+        setSelectedClient(null);
+        setClientProjectOptions([]);
+        setSelectedProjectName(null);
+        setSelectedProjectOption(null);
+        setSelectedContractor(null);
+        setSelectedVendor(null);
+        setSelectedEmployee(null);
+        setNewExpense((prev) => ({
+            ...prev,
+            client_name: "",
+            client_id: "",
+            project_id: "",
+            contractor_id: "",
+            vendor_id: "",
+            employee_id: "",
+        }));
+        setVendorId('');
+        setContractorId('');
+        setProjectId('');
+    };
+    useEffect(() => {
+        const handleWheel = (event) => {
+            if (document.activeElement.type === "number") {
+                event.preventDefault();
+            }
+        };
+        document.addEventListener("wheel", handleWheel, { passive: false });
+        return () => {
+            document.removeEventListener("wheel", handleWheel);
+        };
+    }, []);
+    const updateLoanPortalEntry = async (loanPortalId, { date, amount, vendorId, contractorId, employeeId, projectId }) => {
+        if (!loanPortalId) return;
+        const payload = {
+            type: "Loan",
+            date,
+            amount,
+            loan_payment_mode: "Cash",
+            loan_refund_amount: 0,
+            from_purpose_id: 0,
+            transfer_Project_id: 0,
+            to_purpose_id: 0,
+            vendor_id: vendorId || 0,
+            contractor_id: contractorId || 0,
+            employee_id: employeeId || 0,
+            project_id: projectId || 0,
+            description: "",
+            file_url: "",
+            branch_id: activeBranchId ?? null,
+        };
+        const response = await fetch(
+            `https://backendaab.in/demoAabuildersDash/api/loans/${loanPortalId}?editedBy=${encodeURIComponent(username)}`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            }
+        );
+        if (!response.ok) {
+            throw new Error("Failed to update Loan Portal entry");
+        }
+        return response.json();
+    };
+    const clearLoanPortalEntry = async (loanPortalId, date) => {
+        if (!loanPortalId) return;
+        const payload = {
+            loanPortalId,
+            type: "",
+            date,
+            amount: 0,
+            loan_refund_amount: 0,
+            loan_payment_mode: "",
+            from_purpose_id: 0,
+            to_purpose_id: 0,
+            vendor_id: 0,
+            contractor_id: 0,
+            employee_id: 0,
+            project_id: 0,
+            transfer_Project_id: 0,
+            entry_no: 0,
+            description: "",
+            branch_id: activeBranchId ?? null,
+        };
+        const response = await fetch(
+            `https://backendaab.in/demoAabuildersDash/api/loans/${loanPortalId}?editedBy=${encodeURIComponent(username)}`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            }
+        );
+        if (!response.ok) {
+            throw new Error("Failed to clear Loan Portal entry");
+        }
+        return response.json();
+    };
+    const createLoanPortalEntry = async ({ date, amount, vendorId, contractorId, employeeId, projectId, purposeId = 0, description = "" }) => {
+        const payload = {
+            type: "Loan",
+            date,
+            amount,
+            loan_payment_mode: "Cash",
+            loan_refund_amount: 0,
+            from_purpose_id: Number(purposeId) || 0,
+            transfer_Project_id: 0,
+            to_purpose_id: 0,
+            vendor_id: vendorId || 0,
+            contractor_id: contractorId || 0,
+            employee_id: employeeId || 0,
+            project_id: 0,
+            source: "Cash Register",
+            description: description || "",
+            file_url: "",
+            branch_id: activeBranchId ?? null,
+            entered_by: enteredBy,
+        };
+        const response = await fetch(
+            "https://backendaab.in/demoAabuildersDash/api/loans/save",
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            }
+        );
+        if (!response.ok) {
+            throw new Error("Failed to save Loan Portal entry");
+        }
+        return response.json();
+    };
+    const handlePurposeSelection = async () => {
+        if (!selectedPurpose) {
+            alert("Please select a purpose");
+            return;
+        }
+        const trimmedDescription = (loanPurposeDescription || "").trim();
+        if (!trimmedDescription) {
+            alert("Please enter description");
+            return;
+        }
+        if (!pendingLoanData?.expensePayload || !pendingLoanData?.loanPayload) {
+            alert("No pending loan data found");
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            const loanResponse = await createLoanPortalEntry({
+                ...pendingLoanData.loanPayload,
+                purposeId: selectedPurpose.id,
+                description: trimmedDescription,
+            });
+
+            const expensePayloadToSave = {
+                ...pendingLoanData.expensePayload,
+                loan_portal_id: loanResponse?.id || loanResponse?.loanPortalId || null,
+                entered_by: enteredBy,
+            };
+
+            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-expenses/update/save", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(expensePayloadToSave),
+            });
+
+            if (response.ok) {
+                setShowPurposePopup(false);
+                setSelectedPurpose(null);
+                setLoanPurposeDescription("");
+                setPendingLoanData(null);
+                window.location.reload();
+                setExpenses((prev) => [{ id: Date.now(), ...newExpense }, ...prev]);
+                setNewExpense({
+                    date: "",
+                    contractor: "",
+                    vendor: "",
+                    project: "",
+                    project_id: "",
+                    contractor_id: "",
+                    vendor_id: "",
+                    employee_id: "",
+                    type: "",
+                    amount: "",
+                    client_name: "",
+                    client_id: "",
+                });
+                setSelectedClient(null);
+                setClientProjectOptions([]);
+                setSelectedProjectName(null);
+                setSelectedProjectOption(null);
+                setSelectedContractor(null);
+                setSelectedVendor(null);
+                setSelectedEmployee(null);
+                setVendorId('');
+                setContractorId('');
+                setProjectId('');
+            } else {
+                console.error("Failed to save expense. Server responded with:", response.status);
+                alert("Failed to save expense. Please try again.");
+            }
+        } catch (error) {
+            console.error("Error saving loan with purpose:", error);
+            alert("Error saving loan. Please try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+    // ISO 8601 week number calculation with year boundary handling
+    // For weeks spanning two years, use the year the week starts in (Monday's year)
+    // ISO 8601 week number calculation
+    // Week belongs to the year that contains the Thursday of that week
+    // Week 1 is the week with the year's first Thursday
+    const getISOWeekNumber = (date) => {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+
+        // Get Thursday of the week containing the date
+        const dayOfWeek = d.getDay() || 7; // Convert Sunday (0) to 7
+        const thursday = new Date(d);
+        thursday.setDate(d.getDate() + 4 - dayOfWeek); // Thursday is 4 days after Monday
+        thursday.setHours(0, 0, 0, 0);
+
+        // Use the year that Thursday falls in (ISO 8601 rule)
+        const weekYear = thursday.getFullYear();
+
+        // Get January 1st of that year
+        const jan1 = new Date(weekYear, 0, 1);
+        jan1.setHours(0, 0, 0, 0);
+
+        // Get the Thursday of week 1 (first Thursday of the year)
+        const jan1DayOfWeek = jan1.getDay() || 7;
+        const firstThursday = new Date(jan1);
+        firstThursday.setDate(jan1.getDate() + 4 - jan1DayOfWeek);
+        firstThursday.setHours(0, 0, 0, 0);
+
+        // Calculate week number: difference in days divided by 7, plus 1
+        const daysDiff = Math.floor((thursday - firstThursday) / 86400000);
+        const weekNo = Math.floor(daysDiff / 7) + 1;
+
+        return weekNo;
+    };
+
+    const getCurrentISOWeekNumber = () => {
+        return getISOWeekNumber(new Date());
+    };
+
+    // Get the year that a week belongs to (ISO 8601 - based on Thursday's year)
+    const getWeekYear = (date) => {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        const dayOfWeek = d.getDay() || 7;
+        const thursday = new Date(d);
+        thursday.setDate(d.getDate() + 4 - dayOfWeek);
+        thursday.setHours(0, 0, 0, 0);
+        return thursday.getFullYear();
+    };
+    /** ISO week-year from transaction date — do not use period_start_date / period_end_date. */
+    const getIsoYearFromRowDate = (row) => {
+        if (!row?.date) return null;
+        const d = new Date(row.date);
+        return isNaN(d.getTime()) ? null : getWeekYear(d);
+    };
+    /** Latest (weekNumber, year) among status-true rows, using weekly_number + ISO year from date. */
+    const getLatestStatusTrueWeekFromPayments = (payments) => {
+        const list = (Array.isArray(payments) ? payments : [])
+            .filter((p) => isRowForActiveBranch(p))
+            .filter((p) => p?.status === true)
+            .map((p) => {
+                const wn = Number(p.weekly_number);
+                if (!Number.isFinite(wn)) return null;
+                const y = getIsoYearFromRowDate(p);
+                if (y === null) return null;
+                return { weekNumber: wn, year: y };
+            })
+            .filter(Boolean);
+        if (list.length === 0) return null;
+        return list.reduce((best, cur) => {
+            if (cur.year > best.year) return cur;
+            if (cur.year === best.year && cur.weekNumber > best.weekNumber) return cur;
+            return best;
+        });
+    };
+    const updateAdvancePortalEntry = async (advancePortalId, { date, amount, vendorId, contractorId, projectId, description, weekNo }) => {
+        if (!advancePortalId) return;
+        const payload = {
+            type: "Advance",
+            date,
+            contractor_id: contractorId || null,
+            vendor_id: vendorId || null,
+            project_id: projectId || null,
+            transfer_site_id: 0,
+            payment_mode: "Cash",
+            amount: Number(amount) || 0,
+            bill_amount: 0,
+            refund_amount: 0,
+            week_no: weekNo || Number(selectedWeek) || getCurrentISOWeekNumber(),
+            description: description || "",
+            file_url: "",
+            branch_id: activeBranchId ?? null,
+        };
+        const response = await fetch(
+            `https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${advancePortalId}?editedBy=${encodeURIComponent(username)}`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            }
+        );
+        if (!response.ok) {
+            throw new Error("Failed to update Advance Portal entry");
+        }
+        return response.json();
+    };
+    const clearAdvancePortalEntry = async (advancePortalId, date) => {
+        if (!advancePortalId) return;
+        const clearedData = {
+            date: date || new Date().toISOString().split("T")[0],
+            amount: null,
+            project_id: null,
+            vendor_id: null,
+            contractor_id: null,
+            file_url: null,
+            description: null,
+            bill_amount: null,
+            type: null,
+            transfer_site_id: null,
+            payment_mode: null,
+            refund_amount: null,
+            week_no: null,
+            entry_no: null,
+            branch_id: activeBranchId ?? null,
+        };
+        const response = await fetch(
+            `https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${advancePortalId}?editedBy=${encodeURIComponent(username)}`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(clearedData),
+            }
+        );
+        if (!response.ok) {
+            throw new Error("Failed to clear Advance Portal entry");
+        }
+        return response.json();
+    };
+    const updateStaffAdvancePortalEntry = async (staffAdvancePortalId, { date, amount, employeeId, projectId, description, weekNo }) => {
+        if (!staffAdvancePortalId) return;
+        const payload = {
+            type: "Advance",
+            date,
+            employee_id: employeeId || null,
+            project_id: projectId || null,
+            amount: Number(amount) || 0,
+            week_no: weekNo || Number(selectedWeek) || getCurrentISOWeekNumber(),
+            staff_payment_mode: "Cash",
+            from_purpose_id: 4,
+            description: description || "",
+            staff_refund_amount: 0,
+            file_url: null,
+            branch_id: activeBranchId ?? null,
+        };
+        const response = await fetch(
+            `https://backendaab.in/demoAabuildersDash/api/staff-advance/${staffAdvancePortalId}?editedBy=${encodeURIComponent(username)}`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            }
+        );
+        if (!response.ok) {
+            throw new Error("Failed to update Staff Advance Portal entry");
+        }
+        return response.json();
+    };
+    const clearStaffAdvancePortalEntry = async (staffAdvancePortalId, date) => {
+        if (!staffAdvancePortalId) return;
+        const clearedData = {
+            date: date || new Date().toISOString().split("T")[0],
+            amount: null,
+            employee_id: null,
+            description: null,
+            type: null,
+            week_no: null,
+            from_purpose_id: null,
+            staff_payment_mode: null,
+            file_url: null,
+            staff_refund_amount: null,
+            entry_no: null,
+            branch_id: activeBranchId ?? null,
+        };
+        const response = await fetch(
+            `https://backendaab.in/demoAabuildersDash/api/staff-advance/${staffAdvancePortalId}?editedBy=${encodeURIComponent(username)}`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(clearedData),
+            }
+        );
+        if (!response.ok) {
+            throw new Error("Failed to clear Staff Advance Portal entry");
+        }
+        return response.json();
+    };
+    const createAdvancePortalEntry = async ({ date, amount, vendorId, contractorId, projectId }) => {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll");
+        if (!response.ok) {
+            throw new Error("Failed to fetch advance portal entry numbers");
+        }
+        const allEntries = await response.json();
+        const maxEntryNo = allEntries.length > 0 ? Math.max(...allEntries.map(item => item.entry_no || 0)) : 0;
+        const nextEntryNo = maxEntryNo + 1;
+        const weekNo = Number(selectedWeek) || getCurrentISOWeekNumber();
+        const payload = {
+            type: "Advance",
+            date,
+            contractor_id: contractorId || null,
+            vendor_id: vendorId || null,
+            project_id: projectId || null,
+            transfer_site_id: 0,
+            payment_mode: "Cash",
+            amount,
+            bill_amount: 0,
+            refund_amount: 0,
+            entry_no: nextEntryNo,
+            week_no: weekNo,
+            description: "",
+            file_url: "",
+            branch_id: activeBranchId ?? null,
+            entered_by: enteredBy,
+            source: "Cash Register",
+        };
+        const saveResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/advance_portal/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        if (!saveResponse.ok) {
+            throw new Error("Failed to save advance portal entry");
+        }
+        return saveResponse.json();
+    };
+    const handlePaymentChange = (e) => {
+        const { name, value } = e.target;
+        if (name === "date") {
+            validatePaymentDate(value);
+        } else {
+            setNewPayment((prev) => ({ ...prev, [name]: value }));
+        }
+    };
+    // Immediate date validation for Payment
+    const validatePaymentDate = (dateStr) => {
+        if (!dateStr || !selectedWeek) return;
+        const year = new Date().getFullYear();
+        const { startDate, endDate } = getStartAndEndDateOfISOWeek(Number(selectedWeek), year);
+        const selectedDate = new Date(dateStr);
+        selectedDate.setHours(0, 0, 0, 0);
+        if (selectedDate < startDate || selectedDate > endDate) {
+            setPopup({
+                show: true,
+                message: `Selected date is out of current week range (${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()})`,
+                type: "payment",
+                dateStr,
+                editRowId: null,
+                editField: null,
+                editIndex: null,
+                originalDate: ""
+            });
+        } else {
+            setNewPayment((prev) => ({ ...prev, date: dateStr }));
+        }
+    };
+    const handleKeyDown = async (e) => {
+        if (e.key !== "Enter") return;
+        if (!newExpense.date) {
+            alert("Please select a date");
+            return;
+        }
+        if (!selectedProjectName || !newExpense.type || !newExpense.amount) {
+            alert("Please fill all fields except date");
+            return;
+        }
+        // Validation before submit: Check type and party compatibility
+        if (newExpense.type === "Staff Advance") {
+            if (selectedContractor || selectedVendor || selectedClient) {
+                alert("Staff Advance type only allows Employee. Please select an Employee and remove Contractor/Vendor/Client selection.");
+                return;
+            }
+            if (!selectedEmployee) {
+                alert("Staff Advance type requires an Employee to be selected.");
+                return;
+            }
+        }
+        if (newExpense.type === "Project Advance") {
+            if (selectedEmployee || selectedClient) {
+                alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor or Vendor and remove Employee/Client selection.");
+                return;
+            }
+            if (!selectedContractor && !selectedVendor) {
+                alert("Project Advance type requires either a Contractor or Vendor to be selected.");
+                return;
+            }
+        }
+        const payload = {
+            date: newExpense.date,
+            created_at: new Date().toISOString(),
+            contractor_id: selectedContractor ? Number(selectedContractor.id) : null,
+            vendor_id: selectedVendor ? Number(selectedVendor.id) : null,
+            employee_id: selectedEmployee ? Number(selectedEmployee.id) : null,
+            project_id: selectedProjectName ? Number(selectedProjectName.id) : null,
+            client_name: selectedClient?.label || newExpense.client_name || null,
+            client_id: selectedClient?.id || newExpense.client_id || null,
+            type: newExpense.type,
+            type_id: getWeeklyExpenseTypeId(newExpense.type),
+            amount: Number(newExpense.amount),
+            status: true,
+            weekly_number: Number(selectedWeek),
+            period_start_date: new Date().toISOString().split("T")[0],
+            period_end_date: new Date().toISOString().split("T")[0],
+            advance_portal_id: null,
+            staff_advance_portal_id: null,
+            loan_portal_id: null,
+            branch_id: activeBranchId,
+            entered_by: enteredBy,
+        };
+        try {
+            if (newExpense.type === "Loan") {
+                const loanPayload = {
+                    date: newExpense.date,
+                    amount: Number(newExpense.amount) || 0,
+                    vendorId: selectedVendor ? Number(selectedVendor.id) : 0,
+                    contractorId: selectedContractor ? Number(selectedContractor.id) : 0,
+                    employeeId: selectedEmployee ? Number(selectedEmployee.id) : 0,
+                    projectId: selectedProjectName ? Number(selectedProjectName.id) : 0,
+                };
+                setPendingLoanData({
+                    expensePayload: payload,
+                    loanPayload,
+                    amount: Number(newExpense.amount) || 0,
+                    date: newExpense.date,
+                });
+                setSelectedPurpose(null);
+                setLoanPurposeDescription("");
+                setShowPurposePopup(true);
+                return;
+            }
+            if (newExpense.type === "Project Advance") {
+                const advanceResponse = await createAdvancePortalEntry({
+                    date: newExpense.date,
+                    amount: Number(newExpense.amount) || 0,
+                    vendorId: selectedVendor ? Number(selectedVendor.id) : null,
+                    contractorId: selectedContractor ? Number(selectedContractor.id) : null,
+                    projectId: selectedProjectName ? Number(selectedProjectName.id) : null,
+                });
+                payload.advance_portal_id = advanceResponse?.advancePortalId || advanceResponse?.id || null;
+            }
+            if (newExpense.type === "Staff Advance") {
+                try {
+                    const staffAdvanceRes = await fetch("https://backendaab.in/demoAabuildersDash/api/staff-advance/all");
+                    if (!staffAdvanceRes.ok) throw new Error("Failed to fetch staff advance entry numbers");
+                    const staffAdvanceData = await staffAdvanceRes.json();
+                    const maxEntryNo = staffAdvanceData.length > 0
+                        ? Math.max(...staffAdvanceData.map((item) => item.entry_no || 0))
+                        : 0;
+                    const nextEntryNo = maxEntryNo + 1;
+                    const weekNo = Number(selectedWeek) || getCurrentISOWeekNumber();
+                    const staffAdvanceSaveData = {
+                        date: newExpense.date,
+                        employee_id: selectedEmployee ? Number(selectedEmployee.id) : null,
+                        project_id: selectedProjectName ? Number(selectedProjectName.id) : null,
+                        type: "Advance",
+                        from_purpose_id: 4,
+                        staff_payment_mode: "Cash",
+                        entry_no: nextEntryNo,
+                        week_no: weekNo,
+                        amount: Number(newExpense.amount) || 0,
+                        staff_refund_amount: 0.0,
+                        description: "",
+                        file_url: null,
+                        branch_id: activeBranchId ?? null,
+                        entered_by: enteredBy,
+                        source: "Cash Register",
+                    };
+                    const staffAdvanceResponse = await fetch(
+                        "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
+                        {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(staffAdvanceSaveData)
+                        }
+                    );
+                    if (!staffAdvanceResponse.ok) {
+                        throw new Error("Failed to save staff advance");
+                    }
+                    const staffAdvanceResponseData = await staffAdvanceResponse.json();
+                    payload.staff_advance_portal_id = staffAdvanceResponseData.id || staffAdvanceResponseData.staff_advance_portal_id || staffAdvanceResponseData.staffAdvancePortalId || null;
+                } catch (staffAdvanceError) {
+                    console.error("Error creating staff advance portal entry:", staffAdvanceError);
+                }
+            }
+            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-expenses/update/save", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(payload),
+            });
+            if (response.ok) {
+                window.location.reload();
+                setExpenses((prev) => [{ id: Date.now(), ...newExpense }, ...prev]);
+                setNewExpense({
+                    date: "",
+                    contractor: "",
+                    vendor: "",
+                    project: "",
+                    project_id: "",
+                    contractor_id: "",
+                    vendor_id: "",
+                    employee_id: "",
+                    type: "",
+                    amount: "",
+                    client_name: "",
+                    client_id: "",
+                });
+                setSelectedClient(null);
+                setClientProjectOptions([]);
+                setSelectedProjectName(null);
+                setSelectedProjectOption(null);
+                setSelectedContractor(null);
+                setSelectedVendor(null);
+                setSelectedEmployee(null);
+                setVendorId('');
+                setContractorId('');
+                setProjectId('');
+            } else {
+                console.error("Failed to save expense. Server responded with:", response.status);
+            }
+        } catch (err) {
+            console.error("Error during expense save:", err);
+        }
+    };
+    const handleKeyDown1 = async (e) => {
+        if (e.key === "Enter") {
+            const paymentPayload = {
+                date: newPayment.date,
+                amount: parseFloat(newPayment.amount),
+                type: newPayment.type,
+                type_id: getWeeklyReceivedTypeId(newPayment.type),
+                status: true,
+                weekly_number: Number(selectedWeek),
+                period_start_date: new Date().toISOString().split("T")[0],
+                period_end_date: new Date().toISOString().split("T")[0],
+                branch_id: activeBranchId,
+                entered_by: enteredBy,
+            };
+            try {
+                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/payments-received/update/save", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(paymentPayload),
+                });
+                if (response.ok) {
+                    window.location.reload();
+                    setPayments((prev) => [{ id: Date.now(), ...newPayment }, ...prev]);
+                    setNewPayment({ date: "", amount: "", type: "Weekly" });
+                } else {
+                    console.error("❌ Failed to save payment");
+                }
+            } catch (error) {
+                console.error("🚨 Error saving payment:", error);
+            }
+        }
+    };
+    const handleEditExpense = (id, field, value) => {
+        if (field === "date") {
+            // Validate date against selected week range
+            if (!value || !selectedWeek) {
+                setExpenses((prevExpenses) =>
+                    prevExpenses.map((expense) =>
+                        expense.id === id ? { ...expense, [field]: value } : expense
+                    )
+                );
+                return;
+            }
+            const year = new Date().getFullYear();
+            const { startDate, endDate } = getStartAndEndDateOfISOWeek(Number(selectedWeek), year);
+            const selectedDate = new Date(value);
+            selectedDate.setHours(0, 0, 0, 0);
+            if (selectedDate < startDate || selectedDate > endDate) {
+                const row = expenses.find(exp => exp.id === id);
+                setPopup({
+                    show: true,
+                    message: `Selected date is out of current week range (${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()})`,
+                    type: "edit-expense",
+                    dateStr: value,
+                    editRowId: id,
+                    editField: field,
+                    editIndex: null,
+                    originalDate: row?.date || ""
+                });
+                return; // Prevent date change
+            }
+            setExpenses((prevExpenses) =>
+                prevExpenses.map((expense) =>
+                    expense.id === id ? { ...expense, [field]: value } : expense
+                )
+            );
+        } else if (field === "amount") {
+            const originalAmount =
+                editingOriginalRow && String(editingOriginalRow.id) === String(id)
+                    ? Number(editingOriginalRow.amount || 0)
+                    : Number(expenses.find((expense) => expense.id === id)?.amount || 0);
+            const availableBalance = Number(balance) + originalAmount;
+            if (Number(value) > availableBalance) {
+                alert(`Amount cannot exceed balance: ${availableBalance}`);
+                setExpenses((prevExpenses) =>
+                    prevExpenses.map((expense) =>
+                        expense.id === id ? { ...expense, amount: "" } : expense
+                    )
+                );
+                return;
+            }
+            setExpenses((prevExpenses) =>
+                prevExpenses.map((expense) =>
+                    expense.id === id ? { ...expense, [field]: value } : expense
+                )
+            );
+        } else if (field === "type") {
+            const row = expenses.find(exp => exp.id === id);
+            const allowedTypesForClient = ["Loan", "Bank", "Claim"];
+            const isClientTypeAllowed = allowedTypesForClient.includes(value);
+            if (value === "Staff Advance") {
+                if (row?.contractor_id || row?.vendor_id || row?.client_id) {
+                    alert("Staff Advance type only allows Employee. Please select an Employee or clear the Contractor/Vendor/Client selection.");
+                    return;
+                }
+            } else if (value === "Project Advance") {
+                if (row?.employee_id || row?.client_id) {
+                    alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor or Vendor or clear the Employee/Client selection.");
+                    return;
+                }
+            }
+            if (!isClientTypeAllowed && isClientToggleActive && row?.client_id) {
+                setIsClientToggleActive(false);
+                setSelectedClient(null);
+                setClientProjectOptions([]);
+                setSelectedProjectName(null);
+                setSelectedProjectOption(null);
+                setExpenses((prevExpenses) =>
+                    prevExpenses.map((expense) =>
+                        expense.id === id ? { ...expense, [field]: value, client_name: "", client_id: "" } : expense
+                    )
+                );
+                return;
+            }
+            setExpenses((prevExpenses) =>
+                prevExpenses.map((expense) =>
+                    expense.id === id ? { ...expense, [field]: value } : expense
+                )
+            );
+        } else {
+            setExpenses((prevExpenses) =>
+                prevExpenses.map((expense) =>
+                    expense.id === id ? { ...expense, [field]: value } : expense
+                )
+            );
+        }
+    };
+    const handleEditPayment = (index, field, value) => {
+        if (field === "date") {
+            const row = payments[index];
+            if (!value || !selectedWeek) {
+                setPayments((prevPayments) =>
+                    prevPayments.map((payment, i) =>
+                        i === index ? { ...payment, [field]: value } : payment
+                    )
+                );
+                return;
+            }
+            const year = new Date().getFullYear();
+            const { startDate, endDate } = getStartAndEndDateOfISOWeek(Number(selectedWeek), year);
+            const selectedDate = new Date(value);
+            selectedDate.setHours(0, 0, 0, 0);
+            if (selectedDate < startDate || selectedDate > endDate) {
+                setPopup({
+                    show: true,
+                    message: `Selected date is out of current week range (${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()})`,
+                    type: "edit-payment",
+                    dateStr: value,
+                    editRowId: null,
+                    editField: field,
+                    editIndex: index,
+                    originalDate: row?.date || ""
+                });
+                return;
+            }
+            setPayments((prevPayments) =>
+                prevPayments.map((payment, i) =>
+                    i === index ? { ...payment, [field]: value } : payment
+                )
+            );
+        } else {
+            setPayments((prevPayments) =>
+                prevPayments.map((payment, i) =>
+                    i === index ? { ...payment, [field]: value } : payment
+                )
+            );
+        }
+    };
+    function getWeekStartEnd(year, weekNumber) {
+        const simple = new Date(year, 0, 1 + (weekNumber - 1) * 7);
+        const dow = simple.getDay();
+        const ISOweekStart = simple;
+        if (dow <= 4) {
+            ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+        } else {
+            ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+        }
+        const ISOweekEnd = new Date(ISOweekStart);
+        ISOweekEnd.setDate(ISOweekStart.getDate() + 6);
+        return { start: ISOweekStart, end: ISOweekEnd };
+    }
+    const generatePDF = async () => {
+        if (!selectedWeek) {
+            alert("Please select a week before generating the PDF.");
+            return;
+        }
+        const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const year = new Date().getFullYear();
+        const weekDates = getWeekStartEnd(year, Number(selectedWeek));
+        if (!weekDates || !weekDates.start || !weekDates.end) {
+            alert("Error: Could not calculate week dates. Please try again.");
+            return;
+        }
+        const { start, end } = weekDates;
+        const weekStartDate = start.toLocaleDateString("en-GB");
+        const weekEndDate = end.toLocaleDateString("en-GB");
+        if (!Array.isArray(expenses) || !Array.isArray(payments)) {
+            alert("Error: Data not loaded properly. Please refresh the page and try again.");
+            return;
+        }
+        let advancePortalData = [];
+        let staffAdvanceData = [];
+        let loanPortalData = [];
+        try {
+            const [advanceRes, staffAdvanceRes, loanRes] = await Promise.all([
+                fetch("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll").catch(() => null),
+                fetch("https://backendaab.in/demoAabuildersDash/api/staff-advance/all").catch(() => null),
+                fetch("https://backendaab.in/demoAabuildersDash/api/loans/all").catch(() => null)
+            ]);
+            if (advanceRes && advanceRes.ok) {
+                advancePortalData = await advanceRes.json();
+            }
+            if (staffAdvanceRes && staffAdvanceRes.ok) {
+                staffAdvanceData = await staffAdvanceRes.json();
+            }
+            if (loanRes && loanRes.ok) {
+                loanPortalData = await loanRes.json();
+            }
+        } catch (error) {
+            console.error("Error fetching portal data:", error);
+        }
+        const isDateInWeek = (dateStr) => {
+            if (!dateStr) return false;
+            const date = new Date(dateStr);
+            date.setHours(0, 0, 0, 0);
+            return date >= start && date <= end;
+        };
+        const staffPurposeOptions = await fetchStaffPurposeOptions();
+        const {
+            salaryAdvanceEntries: salaryAdvancePortalEntries,
+            wageAdvanceEntries: wageAdvancePortalEntries,
+            salaryAdvanceTotal: staffAdvanceTotalFromPortal,
+        } = splitStaffAdvancePortalByPurpose(staffAdvanceData, isDateInWeek, staffPurposeOptions);
+        const loanTotalFromPortal = loanPortalData
+            .filter(entry =>
+                (entry.loan_payment_mode === "Cash" || entry.payment_mode === "Cash") &&
+                entry.type === "Loan" &&
+                isDateInWeek(entry.date)
+            )
+            .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+        const totalExpenses = expenses.reduce((t, e) => t + Number(e.amount || 0), 0);
+        const totalPayments = payments.reduce((t, p) => t + Number(p.amount || 0), 0);
+        const balance = totalPayments - totalExpenses;
+        const drawHeader = (doc, titleText = "") => {
+            doc.setFontSize(10);
+            doc.setTextColor(0, 0, 0);
+            doc.rect(20, 24, 810, 40);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            doc.text(`PS: ${String(selectedWeek || "")}`, 30, 40);
+            doc.setFontSize(9);
+            doc.text(String(new Date().toLocaleDateString("en-GB") || ""), 30, 55);
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "bold");
+            doc.text(titleText, 180, 50);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            doc.text(`START  ${String(weekStartDate || "")}`, 460, 40);
+            doc.text(`END    ${String(weekEndDate || "")}`, 465, 58);
+            doc.setFillColor(220, 250, 220);
+            doc.rect(620, 25, 190, 18.5, "F");
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            const amountX = 800;
+            doc.text("EXPENSES", 660, 37);
+            doc.text(
+                String(totalExpenses.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+                amountX, 37,
+                { align: "right" }
+            );
+            doc.setFillColor(250, 220, 220);
+            doc.rect(620, 44, 190, 18.5, "F");
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("BALANCE", 660, 58);
+            doc.text(
+                String(balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+                amountX, 58,
+                { align: "right" }
+            );
+        };
+        drawHeader(doc, "WEEKLY PAYMENT REPORT");
+        const expensesHeaders = [["SNO", "Date", "Party", "Project Name", "Type", "Amount", "AC", "C", ""]];
+        const pdfFilteredExpenses = expenses.filter(row => row.type === "Bill Payment" || row.type === "Wage" || row.type === "Bill Settlement");
+        const expensesData = pdfFilteredExpenses.map((row, idx) => [
+            String(idx + 1 || ""),
+            String(row.date ? formatDateOnly(row.date) : ""),
+            String(getPartyDisplayName(row) || ""),
+            String(siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""),
+            String(row.type || ""),
+            String(Number(row.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+            String(""),
+            String(""),
+            String("")
+        ]);
+        autoTable(doc, {
+            head: expensesHeaders,
+            body: expensesData,
+            margin: { top: 64, left: 20 },
+            tableWidth: 810,
+            theme: "grid",
+            styles: {
+                fontSize: 8,
+                cellPadding: 3,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.5
+            },
+            headStyles: {
+                textColor: [0, 0, 0],
+                fillColor: [255, 230, 230],
+                lineColor: [0, 0, 0],
+                lineWidth: 1.0,
+                fontStyle: 'normal'
+            },
+            columnStyles: {
+                5: { halign: 'right' }
+            },
+            didDrawPage: (data) => {
+                drawHeader(doc, "WEEKLY PAYMENT REPORT");
+                if (data.pageNumber > 1) {
+                    doc.setFontSize(10);
+                }
+            },
+            pageBreak: 'auto',
+            showHead: 'everyPage',
+        });
+        const paymentsHeaders = [["DATE RECEIVED", "AMOUNT", "TYPE"]];
+        const paymentsData = payments.map(r => [
+            String(r.created_at ? formatDate(r.created_at) : ""),
+            String(Number(r.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+            String(r.type || "")
+        ]);
+        paymentsData.push([
+            { content: "TOTAL", styles: { fontStyle: "bold" } },
+            { content: String(totalPayments.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"), styles: { fontStyle: "bold" } },
+            { content: "", styles: { fontStyle: "bold" } }
+        ]);
+        paymentsData.push([
+            { content: "BALANCE", styles: { fontStyle: "bold" } },
+            { content: String(balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"), styles: { fontStyle: "bold" } },
+            { content: "", styles: { fontStyle: "bold" } }
+        ]);
+        doc.addPage();
+        drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
+        const baseY = 110;
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("PAYMENT RECEIVED", 22, baseY - 25);
+        autoTable(doc, {
+            head: paymentsHeaders,
+            body: paymentsData,
+            startY: baseY - 20,
+            margin: { left: 20 },
+            tableWidth: 210,
+            theme: "grid",
+            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+            bodyStyles: { fontStyle: 'bold' },
+            columnStyles: {
+                1: { halign: 'right' }
+            },
+            didDrawPage: () => {
+                drawHeader(doc);
+            }
+        });
+        const paymentReceivedTable = doc.lastAutoTable;
+        const handoverStartY = paymentReceivedTable && paymentReceivedTable.finalY ? paymentReceivedTable.finalY + 20 : baseY + 250;
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("HANDOVER DETAILS", 22, handoverStartY - 5);
+        autoTable(doc, {
+            head: [["DATE RETURNED", "AMOUNT"]],
+            body: [
+                ["", ""],
+                ["RETURNED", "0"]
+            ],
+            startY: handoverStartY,
+            margin: { left: 22 },
+            tableWidth: 200,
+            theme: "grid",
+            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+            bodyStyles: { fontStyle: 'bold' },
+            columnStyles: {
+                1: { halign: 'right' }
+            },
+            didDrawPage: () => {
+                drawHeader(doc);
+            }
+        });
+        const dividerX = 260;
+        const headerBottomY = 65;
+        const pageHeight = doc.internal.pageSize.getHeight();
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.line(dividerX, headerBottomY, dividerX, pageHeight - 0);
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        const dailyExpenses = expenses.filter(expense => expense.type === "Daily");
+        const dailyExpenseData = dailyExpenses.map(expense => [
+            String(expense.date ? formatDateOnly(expense.date) : ""),
+            String(Number(expense.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+        ]);
+        const dailyExpensesTotal = dailyExpenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+        if (dailyExpenseData.length === 0) {
+            dailyExpenseData.push(["No Daily Expenses", "0.00"]);
+        }
+        const expenditureDailyWageGap = 28;
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("EXPENDITURE PAYMENTS", 300, baseY - 25);
+        const summaryMap = weeklyTypes.reduce((acc, typeObj) => {
+            acc[typeObj.type] = { count: 0, total: 0 };
+            return acc;
+        }, {});
+        const allExpenseTypes = [...new Set(
+            expenses
+                .filter(expense => expense.type)
+                .map(e => e.type)
+                .filter(Boolean)
+        )];
+        const fixedTypes = weeklyTypes.map(typeObj => typeObj.type);
+        allExpenseTypes.forEach(type => {
+            if (!fixedTypes.includes(type)) {
+                summaryMap[type] = { count: 0, total: 0 };
+            }
+        });
+        expenses
+            .filter(expense => Number(expense.amount) > 0)
+            .forEach(expense => {
+                const type = expense.type;
+                const amount = Number(expense.amount);
+                if (summaryMap[type]) {
+                    summaryMap[type].count += 1;
+                    if (type !== "Staff Advance" && type !== "Loan") {
+                        summaryMap[type].total += amount;
+                    }
+                }
+            });
+        if (summaryMap["Staff Advance"]) {
+            summaryMap["Staff Advance"].total = staffAdvanceTotalFromPortal;
+            summaryMap["Staff Advance"].count = salaryAdvancePortalEntries.length;
+        }
+        if (summaryMap["Loan"]) {
+            summaryMap["Loan"].total = loanTotalFromPortal;
+        }
+        const summaryData = Object.entries(summaryMap)
+            .map(([type, { count, total }]) => [
+                String(type || ""),
+                String(Number(total || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+                count,
+                total
+            ])
+            .sort((a, b) => {
+                const totalA = Number(a[3]);
+                const totalB = Number(b[3]);
+                if (totalA === 0 && totalB === 0) {
+                    return a[0].localeCompare(b[0]);
+                } else if (totalA === 0) {
+                    return 1;
+                } else if (totalB === 0) {
+                    return -1;
+                } else {
+                    return totalB - totalA;
+                }
+            })
+            .map(([type, formattedTotal, count, originalTotal]) => [
+                type,
+                formattedTotal,
+                count
+            ]);
+        autoTable(doc, {
+            head: [["SUMMARY", "TOTAL"]],
+            body: summaryData.map(r => [String(r[0] || ""), String(r[1] || "0")]),
+            startY: baseY - 20,
+            margin: { left: 300 },
+            tableWidth: 200,
+            theme: "grid",
+            styles: { fontSize: 9, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+            bodyStyles: { fontStyle: 'bold' },
+            columnStyles: {
+                1: { halign: 'right' }
+            },
+            didDrawPage: () => {
+                drawHeader(doc);
+            },
+            didDrawCell: (data) => {
+                if (data.section === 'body' && data.column.index === 0 && data.row && data.row.index !== undefined) {
+                    const rowData = summaryData[data.row.index];
+                    if (rowData && rowData[2] !== undefined) {
+                        const count = rowData[2];
+                        if (data.cell && typeof data.cell.x === 'number' && typeof data.cell.y === 'number' && typeof data.cell.height === 'number') {
+                            const textX = data.cell.x - 3;
+                            const textY = data.cell.y + data.cell.height / 2 + 2;
+                            doc.setFontSize(9);
+                            doc.text(String(count || "0"), textX, textY, { align: 'right' });
+                        }
+                    }
+                }
+            }
+        });
+        const summaryTable = doc.lastAutoTable;
+        if (summaryTable && summaryTable.body && Array.isArray(summaryTable.body)) {
+            summaryData.forEach((row, i) => {
+                const count = row[2];
+                if (count > 1 && summaryTable.body[i] && typeof summaryTable.body[i].y === 'number') {
+                    const rowY = summaryTable.body[i].y + 6;
+                    const leftX = (summaryTable.settings && summaryTable.settings.margin && summaryTable.settings.margin.left) ? summaryTable.settings.margin.left - 15 : 285;
+                    doc.setFontSize(9);
+                    doc.text(String(count || ""), leftX, rowY, { align: "right" });
+                }
+            });
+        }
+        const summaryTotal = summaryData.reduce((acc, row) => acc + Number(String(row[1] || "0").replace(/,/g, "")), 0);
+        const summaryBoxY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 15 : baseY + 100;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.rect(300, summaryBoxY - 12, 200, 20);
+        const splitX = 420;
+        doc.line(splitX, summaryBoxY - 12, splitX, summaryBoxY + 8);
+        doc.text("TOTAL", 310, summaryBoxY + 3);
+        doc.text(
+            String(summaryTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+            490,
+            summaryBoxY + 3,
+            { align: "right" }
+        );
+        const expenditureSectionBottomY = summaryBoxY + 8;
+        const dailyWageStartY = expenditureSectionBottomY + expenditureDailyWageGap;
+        autoTable(doc, {
+            head: [["DAILY WAGE", "AMOUNT"]],
+            body: dailyExpenseData,
+            startY: dailyWageStartY,
+            margin: { left: 300 },
+            tableWidth: 200,
+            theme: "grid",
+            styles: {
+                fontSize: 8,
+                cellPadding: 3,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.5
+            },
+            headStyles: {
+                textColor: [0, 0, 0],
+                fillColor: [255, 230, 230],
+                lineColor: [0, 0, 0],
+                lineWidth: 1,
+                fontStyle: 'bold',
+                halign: 'left'
+            },
+            bodyStyles: {
+                fontStyle: 'bold'
+            },
+            columnStyles: {
+                0: { halign: 'left' },
+                1: { halign: 'right' }
+            },
+            didDrawPage: () => {
+                drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
+            }
+        });
+        const dailyWageTable = doc.lastAutoTable;
+        if (dailyWageTable) {
+            const boxY = dailyWageTable.finalY + 2;
+            const boxX = 300;
+            const boxWidth = 200;
+            const boxHeight = 20;
+            const splitX = boxX + 114;
+            doc.rect(boxX, boxY, boxWidth, boxHeight);
+            doc.line(splitX, boxY, splitX, boxY + boxHeight);
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.text("TOTAL", boxX + 10, boxY + 13);
+            doc.text(
+                String(dailyExpensesTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })),
+                boxX + boxWidth - 10,
+                boxY + 13,
+                { align: "right" }
+            );
+        }
+        const newTableX = 520;
+        let newTableY = baseY;
+        const portalPartyHelpers = { getEmployeeName, getLabourName };
+        const appendPortalAdvanceTable = (title, portalEntries) => {
+            if (!portalEntries.length) return;
+            const count = portalEntries.length;
+            const total = portalEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+            if (newTableY > doc.internal.pageSize.getHeight() - 150) {
+                doc.addPage();
+                drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
+                newTableY = baseY;
+            }
+            const tableY = newTableY + 10;
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text(title, newTableX, tableY - 25);
+            const tableHead = [[
+                String(count || "0"),
+                "PARTY",
+                "PROJECT NAME",
+                String(total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]];
+            const tableBody = portalEntries.map((entry) => [
+                String(entry.date ? formatDateOnly(entry.date) : ""),
+                String(getPortalAdvancePartyName(entry, portalPartyHelpers) || ""),
+                String(getPortalAdvanceProjectName(entry, siteOptions) || ""),
+                String(Number(entry.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]);
+            autoTable(doc, {
+                head: tableHead,
+                body: tableBody,
+                startY: tableY - 20,
+                margin: { left: newTableX },
+                tableWidth: 310,
+                theme: "grid",
+                styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+                headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+                bodyStyles: { fontStyle: 'bold' },
+                columnStyles: {
+                    3: { halign: 'right' }
+                },
+                didParseCell: (data) => {
+                    if (data.section === 'head' && data.column.index === 3) {
+                        data.cell.styles.halign = 'right';
+                    }
+                },
+                didDrawPage: () => {
+                    drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
+                }
+            });
+            newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+        };
+        appendPortalAdvanceTable("SALARY ADVANCE", salaryAdvancePortalEntries);
+        appendPortalAdvanceTable("WAGE ADVANCE", wageAdvancePortalEntries);
+        const staffSalaryEntries = expenses.filter(e => e.type === "Staff Salary");
+        if (staffSalaryEntries.length > 0) {
+            const staffSalaryCount = staffSalaryEntries.length;
+            const staffSalaryTotal = staffSalaryEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+            const staffSalaryY = newTableY + 30;
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("STAFF SALARY", newTableX, staffSalaryY - 25);
+            const staffSalaryHead = [[
+                String(staffSalaryCount || "0"),
+                "PARTY",
+                "PROJECT NAME",
+                String(staffSalaryTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]];
+            const staffSalaryBody = staffSalaryEntries.map(e => [
+                String(e.date ? formatDateOnly(e.date) : ""),
+                String(getPartyDisplayName(e) || ""),
+                String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
+                String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]);
+            autoTable(doc, {
+                head: staffSalaryHead,
+                body: staffSalaryBody,
+                startY: staffSalaryY - 20,
+                margin: { left: newTableX },
+                tableWidth: 310,
+                theme: "grid",
+                styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+                headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+                bodyStyles: { fontStyle: 'bold' },
+                columnStyles: {
+                    3: { halign: 'right' }
+                },
+                didParseCell: (data) => {
+                    if (data.section === 'head' && data.column.index === 3) {
+                        data.cell.styles.halign = 'right';
+                    }
+                },
+                didDrawPage: () => {
+                    drawHeader(doc);
+                }
+            });
+            newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+        }
+        const excludedTypes = ["Bill Payment", "Wage", "Project Advance", "Staff Advance", "Staff Salary", "Daily", "Diwali Bonus", "Bill Settlement"];
+        const otherExpenseTypes = [...new Set(expenses.map(e => e.type).filter(type => type && !excludedTypes.includes(type)))];
+        otherExpenseTypes.forEach((expenseType) => {
+            const typeEntries = expenses.filter(e => e.type === expenseType);
+            if (typeEntries.length === 0) return;
+            const typeCount = typeEntries.length;
+            const typeTotal = typeEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+            const typeY = newTableY + 30;
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text(expenseType.toUpperCase(), newTableX, typeY - 25);
+            const typeHead = [[
+                String(typeCount || "0"),
+                "PARTY",
+                "PROJECT NAME",
+                String(typeTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]];
+            const typeBody = typeEntries.map(e => [
+                String(e.date ? formatDateOnly(e.date) : ""),
+                String(getPartyDisplayName(e) || ""),
+                String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
+                String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]);
+            if (newTableY > doc.internal.pageSize.getHeight() - 150) {
+                doc.addPage();
+                drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
+                newTableY = baseY;
+            }
+            autoTable(doc, {
+                head: typeHead,
+                body: typeBody,
+                startY: typeY - 20,
+                margin: { left: newTableX },
+                tableWidth: 310,
+                theme: "grid",
+                styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+                headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+                bodyStyles: { fontStyle: 'bold' },
+                columnStyles: {
+                    3: { halign: 'right' }
+                },
+                didParseCell: (data) => {
+                    if (data.section === 'head' && data.column.index === 3) {
+                        data.cell.styles.halign = 'right';
+                    }
+                },
+                didDrawPage: () => {
+                    drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
+                }
+            });
+            newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+        });
+        const diwaliBonusEntries = expenses.filter(e => e.type === "Diwali Bonus");
+        if (diwaliBonusEntries.length > 0) {
+            const diwaliBonusCount = diwaliBonusEntries.length;
+            const diwaliBonusTotal = diwaliBonusEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+            const diwaliBonusY = newTableY + 30;
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("DIWALI BONUS", newTableX, diwaliBonusY - 25);
+            const diwaliBonusHead = [[
+                String(diwaliBonusCount || "0"),
+                "PARTY",
+                "AMOUNT",
+                String(diwaliBonusTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]];
+            const diwaliBonusBody = diwaliBonusEntries.map(e => [
+                String(e.date ? formatDateOnly(e.date) : ""),
+                String(getPartyDisplayName(e) || ""),
+                String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+                ""
+            ]);
+            autoTable(doc, {
+                head: diwaliBonusHead,
+                body: diwaliBonusBody,
+                startY: diwaliBonusY - 20,
+                margin: { left: newTableX },
+                tableWidth: 310,
+                theme: "grid",
+                styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+                headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+                bodyStyles: { fontStyle: 'bold' },
+                columnStyles: {
+                    2: { halign: 'right' },
+                    3: { halign: 'right' }
+                },
+                didParseCell: (data) => {
+                    if (data.section === 'head' && data.column.index === 3) {
+                        data.cell.styles.halign = 'right';
+                    }
+                },
+                didDrawPage: () => {
+                    drawHeader(doc);
+                }
+            });
+            newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+        }
+        const lastPeriodEndDate = expenses
+            .map(exp => exp.period_end_date)
+            .filter(Boolean)
+            .pop();
+        newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+        doc.save(`PR ${selectedWeek || ""} - Weekly Payment Report ${formatDateOnly(lastPeriodEndDate)}.pdf`);
+    };
+    // Allow editing only for the most recent week (across all years) that has data with status === true
+    const canEditSelectedWeek = selectedWeek && lastEditableWeek !== null &&
+        Number(selectedWeek) === Number(lastEditableWeek.weekNumber) &&
+        parseInt(year, 10) === lastEditableWeek.year;
+    const getPaymentsByExpenseId = (expenseId) => {
+        if (!weeklyPaymentBills || weeklyPaymentBills.length === 0) {
+            return [];
+        }
+        const payments = weeklyPaymentBills.filter(bill => bill.weekly_payment_expense_id === expenseId);
+        return payments;
+    };
+    const updateDescription = async (id, description) => {
+        try {
+            const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/update/${id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ description }),
+            });
+            if (!res.ok) {
+                throw new Error("Failed to update description");
+            }
+            const data = await res.json();
+            setEditFormData((prev) => ({
+                ...prev,
+                description: data.description,
+            }));
+            setPortalDescriptions((prev) => ({
+                ...prev,
+                [id]: data.description,
+            }));
+            return data;
+        } catch (error) {
+            console.error("❌ Error updating description:", error);
+            alert("Failed to update description");
+        }
+    };
+    const handleEditChange = (e) => {
+        const { name, value } = e.target;
+        if (name === "description") {
+            setEditFormData((prev) => ({ ...prev, description: value }));
+        } else {
+            setEditFormData((prev) => ({ ...prev, [name]: value }));
+        }
+    };
+    const saveEditedExpense = async (row) => {
+        try {
+            if (row.type === "Staff Advance") {
+                if (row.contractor_id || row.vendor_id) {
+                    alert("Staff Advance type only allows Employee. Please select an Employee and remove Contractor/Vendor selection.");
+                    return;
+                }
+                if (!row.employee_id) {
+                    alert("Staff Advance type requires an Employee to be selected.");
+                    return;
+                }
+            }
+            if (row.type === "Project Advance") {
+                if (row.employee_id) {
+                    alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor/Vendor and remove Employee selection.");
+                    return;
+                }
+                if (!row.contractor_id && !row.vendor_id) {
+                    alert("Project Advance type requires either a Contractor or Vendor to be selected.");
+                    return;
+                }
+            }
+            const originalExpense =
+                editingOriginalRow && editingOriginalRow.id === row.id
+                    ? editingOriginalRow
+                    : expenses.find((exp) => exp.id === row.id);
+            let summaryBillAmountChanged = false;
+            if (originalExpense) {
+                const normalize = (val) => {
+                    if (val === null || val === undefined || val === "") return "";
+                    const str = String(val).trim();
+                    return str === "" ? "" : str;
+                };
+                const compareValues = (original, current) => {
+                    const origNorm = normalize(original);
+                    const currNorm = normalize(current);
+                    if (origNorm === "" && currNorm === "") return true;
+                    const origNum = Number(origNorm);
+                    const currNum = Number(currNorm);
+                    if (!isNaN(origNum) && !isNaN(currNum) && origNorm !== "" && currNorm !== "") {
+                        return origNum === currNum;
+                    }
+                    return origNorm === currNorm;
+                };
+                const hasChanges =
+                    !compareValues(originalExpense.date, row.date) ||
+                    !compareValues(originalExpense.type, row.type) ||
+                    !compareValues(originalExpense.amount, row.amount) ||
+                    !compareValues(originalExpense.project_id, row.project_id) ||
+                    !compareValues(originalExpense.contractor_id, row.contractor_id) ||
+                    !compareValues(originalExpense.vendor_id, row.vendor_id) ||
+                    !compareValues(originalExpense.employee_id, row.employee_id) ||
+                    !compareValues(originalExpense.client_id, row.client_id) ||
+                    !compareValues(originalExpense.client_name, row.client_name);
+                if (!hasChanges) {
+                    setEditingRowId(null);
+                    setEditingOriginalRow(null);
+                    return;
+                }
+                const summaryBillPaymentOrig = isSummaryBillPaymentRow(originalExpense, siteOptions);
+                const typeChanged = !compareValues(originalExpense.type, row.type);
+                summaryBillAmountChanged =
+                    summaryBillPaymentOrig &&
+                    !typeChanged &&
+                    !compareValues(originalExpense.amount, row.amount);
+                if (typeChanged && weeklyRowHadExpenseEntryLink(originalExpense, siteOptions)) {
+                    try {
+                        await clearLinkedExpensesOnWeeklyTypeChange(
+                            row.id,
+                            originalExpense,
+                            enteredBy,
+                            activeBranchId
+                        );
+                        if (originalExpense.bill_copy_url || originalExpense.billCopyUrl) {
+                            await clearWeeklyExpenseBillCopyUrl(row.id, enteredBy);
+                        }
+                    } catch (deleteError) {
+                        console.error('Failed to delete linked expense entries on type change:', deleteError);
+                        alert('Failed to delete linked expense entries. Please try again.');
+                        return;
+                    }
+                    row.expenses_entry_id = null;
+                    row.expensesEntryId = null;
+                    row.bill_copy_url = null;
+                } else if (!typeChanged && summaryBillPaymentOrig) {
+                    const vendorChanged = !compareValues(originalExpense.vendor_id, row.vendor_id);
+                    const contractorChanged = !compareValues(originalExpense.contractor_id, row.contractor_id);
+                    if (vendorChanged || contractorChanged) {
+                        const vid = row.vendor_id;
+                        const cid = row.contractor_id;
+                        const vendorName =
+                            vid != null && String(vid).trim() !== '' && !Number.isNaN(Number(vid))
+                                ? (vendorOptions.find((v) => Number(v.id) === Number(vid))?.value ||
+                                      vendorOptions.find((v) => Number(v.id) === Number(vid))?.label ||
+                                      '')
+                                : '';
+                        const contractorName =
+                            cid != null && String(cid).trim() !== '' && !Number.isNaN(Number(cid))
+                                ? (contractorOptions.find((c) => Number(c.id) === Number(cid))?.value ||
+                                      contractorOptions.find((c) => Number(c.id) === Number(cid))?.label ||
+                                      '')
+                                : '';
+                        try {
+                            await updatePartyOnLinkedExpenses(row.id, {
+                                vendorId: vid || null,
+                                contractorId: cid || null,
+                                vendor: vendorName,
+                                contractor: contractorName,
+                                editedBy: enteredBy,
+                                branchId: activeBranchId,
+                            });
+                        } catch (partyUpdateError) {
+                            console.error('Failed to update linked Summary Bill expense entries:', partyUpdateError);
+                            alert('Failed to update linked expense entries. Please try again.');
+                            return;
+                        }
+                    }
+                }
+            }
+            const wasLoan = originalExpense?.type === "Loan";
+            const isNowLoan = row.type === "Loan";
+            const wasProjectAdvance = originalExpense?.type === "Project Advance";
+            const isNowProjectAdvance = row.type === "Project Advance";
+            const wasStaffAdvance = originalExpense?.type === "Staff Advance";
+            const isNowStaffAdvance = row.type === "Staff Advance";
+            if (isNowLoan) {
+                const loanPayload = {
+                    date: row.date,
+                    amount: Number(row.amount) || 0,
+                    vendorId: row.vendor_id ? Number(row.vendor_id) : 0,
+                    contractorId: row.contractor_id ? Number(row.contractor_id) : 0,
+                    employeeId: row.employee_id ? Number(row.employee_id) : 0,
+                    projectId: row.project_id ? Number(row.project_id) : 0,
+                };
+                if (row.loan_portal_id) {
+                    await updateLoanPortalEntry(row.loan_portal_id, loanPayload);
+                } else {
+                    const newLoan = await createLoanPortalEntry(loanPayload);
+                    row.loan_portal_id = newLoan?.id || newLoan?.loanPortalId || null;
+                }
+            } else if (wasLoan && originalExpense?.loan_portal_id) {
+                try {
+                    await clearLoanPortalEntry(originalExpense.loan_portal_id, row.date);
+                } catch (loanError) {
+                    console.error("Error clearing loan portal entry:", loanError);
+                }
+                row.loan_portal_id = null;
+            }
+            if (isNowProjectAdvance) {
+                const advancePayload = {
+                    date: row.date,
+                    amount: Number(row.amount) || 0,
+                    vendorId: row.vendor_id ? Number(row.vendor_id) : 0,
+                    contractorId: row.contractor_id ? Number(row.contractor_id) : 0,
+                    projectId: row.project_id ? Number(row.project_id) : 0,
+                    description: "",
+                    weekNo: row.weekly_number || Number(selectedWeek) || getCurrentISOWeekNumber(),
+                };
+                if (row.advance_portal_id) {
+                    await updateAdvancePortalEntry(row.advance_portal_id, advancePayload);
+                } else {
+                    const newAdvance = await createAdvancePortalEntry({
+                        date: row.date,
+                        amount: Number(row.amount) || 0,
+                        vendorId: row.vendor_id ? Number(row.vendor_id) : 0,
+                        contractorId: row.contractor_id ? Number(row.contractor_id) : 0,
+                        projectId: row.project_id ? Number(row.project_id) : 0,
+                    });
+                    row.advance_portal_id = newAdvance?.advancePortalId || newAdvance?.id || null;
+                }
+            } else if (wasProjectAdvance && originalExpense?.advance_portal_id) {
+                try {
+                    await clearAdvancePortalEntry(originalExpense.advance_portal_id, row.date);
+                } catch (advanceError) {
+                    console.error("Error clearing advance portal entry:", advanceError);
+                }
+                row.advance_portal_id = null;
+            }
+            if (isNowStaffAdvance) {
+                const staffAdvancePayload = {
+                    date: row.date,
+                    amount: Number(row.amount) || 0,
+                    employeeId: row.employee_id ? Number(row.employee_id) : 0,
+                    projectId: row.project_id ? Number(row.project_id) : 0,
+                    description: "",
+                    weekNo: row.weekly_number || Number(selectedWeek) || getCurrentISOWeekNumber(),
+                };
+                if (row.staff_advance_portal_id) {
+                    await updateStaffAdvancePortalEntry(row.staff_advance_portal_id, staffAdvancePayload);
+                } else {
+                    try {
+                        const staffAdvanceRes = await fetch("https://backendaab.in/demoAabuildersDash/api/staff-advance/all");
+                        if (!staffAdvanceRes.ok) throw new Error("Failed to fetch staff advance entry numbers");
+                        const staffAdvanceData = await staffAdvanceRes.json();
+                        const maxEntryNo = staffAdvanceData.length > 0
+                            ? Math.max(...staffAdvanceData.map((item) => item.entry_no || 0))
+                            : 0;
+                        const nextEntryNo = maxEntryNo + 1;
+                        const weekNo = Number(selectedWeek) || getCurrentISOWeekNumber();
+                        const staffAdvanceSaveData = {
+                            date: row.date,
+                            employee_id: row.employee_id || null,
+                            project_id: row.project_id || null,
+                            type: "Advance",
+                            from_purpose_id: 4,
+                            staff_payment_mode: "Cash",
+                            entry_no: nextEntryNo,
+                            week_no: weekNo,
+                            amount: Number(row.amount) || 0,
+                            staff_refund_amount: 0.0,
+                            description: "",
+                            file_url: null,
+                            branch_id: activeBranchId ?? null,
+                            entered_by: enteredBy,
+                            source: "Cash Register",
+                        };
+                        const staffAdvanceResponse = await fetch(
+                            "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
+                            {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(staffAdvanceSaveData)
+                            }
+                        );
+                        if (!staffAdvanceResponse.ok) {
+                            throw new Error("Failed to save staff advance");
+                        }
+                        const staffAdvanceResponseData = await staffAdvanceResponse.json();
+                        row.staff_advance_portal_id = staffAdvanceResponseData.id || staffAdvanceResponseData.staff_advance_portal_id || null;
+                    } catch (error) {
+                        console.error("Error creating staff advance portal entry:", error);
+                    }
+                }
+            } else if (wasStaffAdvance && originalExpense?.staff_advance_portal_id) {
+                try {
+                    await clearStaffAdvancePortalEntry(originalExpense.staff_advance_portal_id, row.date);
+                } catch (staffAdvanceError) {
+                    console.error("Error clearing staff advance portal entry:", staffAdvanceError);
+                }
+                row.staff_advance_portal_id = null;
+            }
+            const expensePayload = {
+                ...row,
+                branch_id: row.branch_id ?? row.branchId ?? activeBranchId ?? null,
+                type_id: getWeeklyExpenseTypeId(row.type),
+            };
+            const typeChangedFromOriginal =
+                originalExpense &&
+                String(originalExpense.type ?? '').trim() !== String(row.type ?? '').trim();
+            const preservedExpensesEntryId = typeChangedFromOriginal
+                ? null
+                : row.expenses_entry_id ??
+                  row.expensesEntryId ??
+                  originalExpense?.expenses_entry_id ??
+                  originalExpense?.expensesEntryId ??
+                  editingOriginalRow?.expenses_entry_id ??
+                  editingOriginalRow?.expensesEntryId ??
+                  null;
+            if (
+                typeChangedFromOriginal &&
+                originalExpense &&
+                weeklyRowHadExpenseEntryLink(originalExpense, siteOptions)
+            ) {
+                expensePayload.expenses_entry_id = null;
+                expensePayload.bill_copy_url = null;
+            } else if (preservedExpensesEntryId != null && preservedExpensesEntryId !== '') {
+                expensePayload.expenses_entry_id = preservedExpensesEntryId;
+            }
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/edit/${row.id}?username=${encodeURIComponent(
+                enteredBy
+            )}`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(expensePayload),
+                });
+            if (!response.ok) {
+                throw new Error("Failed to update expense");
+            }
+            let updatedWeeklyRow = row;
+            try {
+                const parsed = await response.json();
+                if (parsed && typeof parsed === 'object') updatedWeeklyRow = parsed;
+            } catch {
+                // keep row fallback
+            }
+            const expensesEntryId =
+                preservedExpensesEntryId ??
+                row.expenses_entry_id ??
+                row.expensesEntryId ??
+                originalExpense?.expenses_entry_id ??
+                originalExpense?.expensesEntryId ??
+                null;
+            if (
+                expensesEntryId &&
+                !typeChangedFromOriginal &&
+                !weeklyRowHadExpenseEntryLink(originalExpense, siteOptions)
+            ) {
+                const weeklyRowForSync = {
+                    ...row,
+                    ...updatedWeeklyRow,
+                    expenses_entry_id: expensesEntryId,
+                };
+                const project = siteOptions.find(
+                    (opt) => Number(opt.id) === Number(weeklyRowForSync.project_id)
+                );
+                const vid = weeklyRowForSync.vendor_id ?? weeklyRowForSync.vendorId;
+                const cid = weeklyRowForSync.contractor_id ?? weeklyRowForSync.contractorId;
+                try {
+                    await syncExpensesEntryFromWeeklyExpenseEdit(weeklyRowForSync, {
+                        editedBy: enteredBy,
+                        siteLabel: project?.label ?? project?.value ?? '',
+                        vendorName:
+                            vid != null && String(vid).trim() !== '' && !Number.isNaN(Number(vid))
+                                ? (vendorOptions.find((v) => Number(v.id) === Number(vid))?.value ||
+                                      vendorOptions.find((v) => Number(v.id) === Number(vid))?.label ||
+                                      '')
+                                : '',
+                        contractorName:
+                            cid != null && String(cid).trim() !== '' && !Number.isNaN(Number(cid))
+                                ? (contractorOptions.find((c) => Number(c.id) === Number(cid))?.value ||
+                                      contractorOptions.find((c) => Number(c.id) === Number(cid))?.label ||
+                                      '')
+                                : '',
+                    });
+                } catch (syncError) {
+                    console.error('Failed to sync linked expense entry:', syncError);
+                    alert('Weekly expense saved, but the linked expense entry could not be updated.');
+                }
+            }
+            if (summaryBillAmountChanged && isSummaryBillPaymentRow(originalExpense, siteOptions)) {
+                setEditingRowId(null);
+                setEditingOriginalRow(null);
+                openSummaryBillExpenseEditModal(row);
+                return;
+            }
+            window.location.reload();
+            if (row.type === "Carry Forward") return;
+            setEditingRowId(null);
+            setEditingOriginalRow(null);
+        } catch (error) {
+            console.error("Error updating expense:", error);
+        }
+    };
+    const customStyles = {
+        control: (provided, state) => ({
+            ...provided,
+            borderWidth: '2px',
+            borderRadius: '8px',
+            borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
+            boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
+            '&:hover': {
+                borderColor: 'rgba(191, 152, 83, 0.2)',
+            }
+        }),
+        menu: (provided) => ({
+            ...provided,
+            zIndex: 10050,
+        }),
+        menuPortal: (provided) => ({
+            ...provided,
+            zIndex: 10050,
+        }),
+    };
+    const saveEditedPaymentReceived = async (row) => {
+        try {
+            const originalPayment = editingOriginalPayment && editingOriginalPayment.id === row.id
+                ? editingOriginalPayment
+                : payments.find((pay) => pay.id === row.id);
+            if (originalPayment) {
+                const normalize = (val) => {
+                    if (val === null || val === undefined || val === "") return "";
+                    const str = String(val).trim();
+                    return str === "" ? "" : str;
+                };
+                const compareValues = (original, current) => {
+                    const origNorm = normalize(original);
+                    const currNorm = normalize(current);
+                    if (origNorm === "" && currNorm === "") return true;
+                    const origNum = Number(origNorm);
+                    const currNum = Number(currNorm);
+                    if (!isNaN(origNum) && !isNaN(currNum) && origNorm !== "" && currNorm !== "") {
+                        return origNum === currNum;
+                    }
+                    return origNorm === currNorm;
+                };
+                const hasChanges =
+                    !compareValues(originalPayment.date, row.date) ||
+                    !compareValues(originalPayment.amount, row.amount) ||
+                    !compareValues(originalPayment.type, row.type);
+                if (!hasChanges) {
+                    setEditingPaymentId(null);
+                    setEditingOriginalPayment(null);
+                    return;
+                }
+            }
+            const paymentPayload = {
+                ...row,
+                branch_id: row.branch_id ?? row.branchId ?? activeBranchId ?? null,
+                type_id: getWeeklyReceivedTypeId(row.type),
+            };
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/payments-received/update/${row.id}?username=${encodeURIComponent(enteredBy)}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(paymentPayload),
+            });
+            if (!response.ok) {
+                throw new Error("Failed to update expense");
+            }
+            window.location.reload();
+            setEditingPaymentId(null);
+            setEditingOriginalPayment(null);
+        } catch (error) {
+            console.error("Error updating expense:", error);
+        }
+    };
+    useEffect(() => {
+        if (weeks.length === 0) {
+            if (selectedWeek !== "") setSelectedWeek("");
+            return;
+        }
+        const n = Number(selectedWeek);
+        const selectedWeekExists = selectedWeek && weeks.some((w) => w.number === n);
+        if (selectedWeekExists) return;
+        const preferred =
+            lastWeekWithData != null && weeks.some((w) => w.number === lastWeekWithData)
+                ? lastWeekWithData
+                : weeks[0].number;
+        setSelectedWeek(String(preferred));
+    }, [weeks, year, lastWeekWithData, selectedWeek]);
+    const fetchAuditDetailsForExpense = async (expensesId) => {
+        try {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_payment_audit/expenses/${expensesId}`);
+            const data = await response.json();
+            setWeeklyPaymentExpensesAudits(data);
+            setShowWeeklyPaymentExpensesModal(true);
+        } catch (error) {
+            console.error("Error fetching audit details:", error);
+        }
+    };
+    const fetchAuditDetailsForPaymentReceived = async (receivedId) => {
+        try {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_payment_audit/payments/${receivedId}`);
+            const data = await response.json();
+            setWeeklyPaymentReceivedAudits(data);
+            setShowWeeklyPaymentReceivedModal(true);
+        } catch (error) {
+            console.error("Error fetching audit details:", error);
+        }
+    };
+    const handleWeeklyExpensesDelete = async (id) => {
+        const confirmed = window.confirm("Are you sure you want to delete This Expense Data?");
+        if (confirmed) {
+            try {
+                const expenseRecord = expenses.find((exp) => exp.id === id);
+                if (expenseRecord?.type === "Loan" && expenseRecord.loan_portal_id) {
+                    try {
+                        await clearLoanPortalEntry(expenseRecord.loan_portal_id, expenseRecord.date);
+                    } catch (loanError) {
+                        console.error("Error clearing loan portal entry:", loanError);
+                        alert("Failed to clear the associated Loan entry. Please try again.");
+                        return;
+                    }
+                }
+                if (expenseRecord?.type === "Project Advance" && expenseRecord.advance_portal_id) {
+                    try {
+                        await clearAdvancePortalEntry(expenseRecord.advance_portal_id, expenseRecord.date);
+                    } catch (advanceError) {
+                        console.error("Error clearing advance portal entry:", advanceError);
+                        alert("Failed to clear the associated Advance Portal entry. Please try again.");
+                        return;
+                    }
+                }
+                if (expenseRecord?.type === "Staff Advance" && expenseRecord.staff_advance_portal_id) {
+                    try {
+                        await clearStaffAdvancePortalEntry(expenseRecord.staff_advance_portal_id, expenseRecord.date);
+                    } catch (staffAdvanceError) {
+                        console.error("Error clearing staff advance portal entry:", staffAdvanceError);
+                        alert("Failed to clear the associated Staff Advance Portal entry. Please try again.");
+                        return;
+                    }
+                }
+                const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/delete/${id}`, {
+                    method: 'DELETE',
+                });
+                if (response.ok) {
+                    alert("Weekly Expenses deleted successfully!!!");
+                    window.location.reload();
+                } else {
+                    console.error("Failed to delete the Weekly Expenses. Status:", response.status);
+                    alert("Error deleting the Weekly Expenses. Please try again.");
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                alert("An error occurred while deleting the Expense.");
+            }
+        } else {
+            console.log("Deletion cancelled.");
+        }
+    };
+    const handleWeeklyReceivedDelete = async (id) => {
+        const confirmed = window.confirm("Are you sure you want to delete This Expense Data?");
+        if (confirmed) {
+            try {
+                const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/payments-received/delete/${id}`, {
+                    method: 'DELETE',
+                });
+                if (response.ok) {
+                    alert("Weekly Expenses deleted successfully!!!");
+                    window.location.reload();
+                } else {
+                    console.error("Failed to delete the Weekly Expenses. Status:", response.status);
+                    alert("Error deleting the Weekly Expenses. Please try again.");
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                alert("An error occurred while deleting the Contractor Name.");
+            }
+        } else {
+            console.log("Deletion cancelled.");
+        }
+    };
+    useEffect(() => {
+        if (!onExportActionsReady || isExpensesEntryUploadOnly) return;
+        onExportActionsReady({ generatePDF });
+        return () => onExportActionsReady(null);
+    }, [onExportActionsReady, isExpensesEntryUploadOnly, generatePDF]);
+
+    useEffect(() => {
+        if (!onHandoverActionsReady || isExpensesEntryUploadOnly) return;
+        onHandoverActionsReady({ openHandover: () => setShowHandoverModal(true) });
+        return () => onHandoverActionsReady(null);
+    }, [onHandoverActionsReady, isExpensesEntryUploadOnly]);
+    const expensesDstCol21Label = 'S.No';
+    const expensesDstCol2Label = 'Date';
+    const expensesDstCol4Label = 'Associate';
+    const expensesDstCol4ClientLabel = 'Client Name';
+    const expensesDstCol3Label = 'Project Name';
+    const expensesDstCol12Label = 'Type';
+    const expensesDstCol8Label = 'Amount';
+    const expensesDstCol20FileLabel = 'File';
+    const expensesDstCol20ActivityLabel = 'Activity';
+    const expensesAssociateEntryPlaceholder = isClientToggleActive ? expensesDstCol4ClientLabel : 'Con/Ven/Emp';
+    const paymentsDstCol2Label = 'Date';
+    const paymentsDstCol8Label = 'Amount';
+    const paymentsDstCol12Label = 'Type';
+    const paymentsDstCol20Label = 'Activity';
+    return (
+        <body className="bg-[#FAF6ED] overflow-hidden">
+            <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED] px-[18px] pt-[18px] pb-[18px]">
+                <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
+                    <div className="w-full rounded-[6px] bg-white mb-[18px] shrink-0">
+                        <div className="flex flex-wrap items-center justify-between text-left max-md:flex-col max-md:items-stretch">
+                            {(() => {
+                                const entryCheckLikeSelectStyles = {
+                                    control: (provided, state) => ({
+                                        ...provided,
+                                        backgroundColor: 'transparent',
+                                        fontSize: '14px',
+                                        border: '2px solid rgba(191, 152, 83, 0.2)',
+                                        borderRadius: '8px',
+                                        minHeight: '40px',
+                                        fontWeight: 'medium',
+                                        height: '40px',
+                                        flexWrap: 'nowrap',
+                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                        '&:hover': { borderColor: 'rgba(191, 152, 83, 0.4)' },
+                                    }),
+                                    valueContainer: (provided) => ({
+                                        ...provided,
+                                        flexWrap: 'nowrap',
+                                        overflow: 'hidden',
+                                        paddingLeft: '12px',
+                                        paddingRight: '2px',
+                                        height: '36px',
+                                        alignItems: 'center',
+                                    }),
+                                    placeholder: (provided) => ({
+                                        ...provided,
+                                        color: '#999',
+                                        textAlign: 'left',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        maxWidth: '100%',
+                                        position: 'absolute',
+                                    }),
+                                    menu: (provided) => ({ ...provided, zIndex: 9999, maxHeight: 288 }),
+                                    menuList: (provided) => ({
+                                        ...provided,
+                                        maxHeight: 288,
+                                        paddingTop: 0,
+                                        paddingBottom: 0,
+                                        overflowY: 'auto',
+                                        scrollbarWidth: 'none',
+                                        msOverflowStyle: 'none',
+                                        '&::-webkit-scrollbar': { display: 'none' },
+                                    }),
+                                    option: (provided, state) => ({
+                                        ...provided,
+                                        minHeight: 36,
+                                        height: 36,
+                                        paddingTop: 0,
+                                        paddingBottom: 0,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        textAlign: 'left',
+                                        fontWeight: 'normal',
+                                        fontSize: '15px',
+                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                        color: 'black',
+                                    }),
+                                    singleValue: (provided) => ({
+                                        ...provided,
+                                        textAlign: 'left',
+                                        color: 'black',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        maxWidth: '100%',
+                                    }),
+                                    input: (provided) => ({
+                                        ...provided,
+                                        margin: 0,
+                                        padding: 0,
+                                        whiteSpace: 'nowrap',
+                                    }),
+                                    dropdownIndicator: (provided, state) => ({
+                                        ...provided,
+                                        display: state.hasValue && state.selectProps.isClearable ? 'none' : 'flex',
+                                        color: '#000000',
+                                        flexShrink: 0,
+                                    }),
+                                    clearIndicator: (provided) => ({
+                                        ...provided,
+                                        cursor: 'pointer',
+                                        color: '#000000',
+                                        flexShrink: 0,
+                                    }),
+                                    indicatorSeparator: () => ({ display: 'none' }),
+                                };
+                                const entryCheckLikeSelectClassNames = {
+                                    menuList: () => 'no-scrollbar scrollbar-none',
+                                    valueContainer: () => '!flex-nowrap !overflow-hidden',
+                                    placeholder: () => '!whitespace-nowrap !overflow-hidden !text-ellipsis',
+                                    singleValue: () => '!whitespace-nowrap !overflow-hidden !text-ellipsis !font-semibold',
+                                };
+                                const formatWeekOptionDate = (date) =>
+                                    date.toLocaleDateString("en-GB", {
+                                        day: "numeric",
+                                        month: "long"
+                                    });
+                                const weekSelectOptions = weeks.map((week) => ({
+                                    value: String(week.number),
+                                    label: `Week ${week.number}, ${formatWeekOptionDate(new Date(week.start))} to ${formatWeekOptionDate(new Date(week.end))}`,
+                                }));
+                                const yearSelectOptions = years.map((y) => ({ value: String(y), label: String(y) }));
+                                return (
+                                    <div className="flex flex-wrap items-center space-x-3 text-left p-[18px]">
+                                        <div className="min-w-0">
+                                            <h1 className='font-semibold mb-[8px]'>Select Week</h1>
+                                            <Select
+                                                className="min-w-0 w-[260px]"
+                                                classNames={entryCheckLikeSelectClassNames}
+                                                options={weekSelectOptions}
+                                                value={weekSelectOptions.find((opt) => opt.value === String(selectedWeek)) || null}
+                                                onChange={(opt) => setSelectedWeek(opt ? opt.value : "")}
+                                                placeholder="Select Week"
+                                                isSearchable
+                                                isClearable
+                                                styles={entryCheckLikeSelectStyles}
+                                            />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <label className="block font-semibold mb-[8px]">Year</label>
+                                            <Select
+                                                className="min-w-0 w-[120px]"
+                                                classNames={entryCheckLikeSelectClassNames}
+                                                options={yearSelectOptions}
+                                                value={yearSelectOptions.find((opt) => opt.value === String(year)) || null}
+                                                onChange={(opt) => setYear(opt ? opt.value : getCurrentWeekYear().toString())}
+                                                placeholder="Year"
+                                                isSearchable
+                                                isClearable
+                                                styles={entryCheckLikeSelectStyles}
+                                            />
+                                        </div>
+                                        {isExpensesEntryUploadOnly && (
+                                            <div className="min-w-0">
+                                                <label className="block font-semibold mb-[8px]">Weekly Balance</label>
+                                                <input
+                                                    type="text"
+                                                    readOnly
+                                                    value={`₹${Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                                    className="min-w-0 w-[150px] h-[40px] px-3 text-[#000000] text-left text-[14px] font-semibold bg-[#ededed] border-2 border-[rgba(191,152,83,0.2)] rounded-lg bg-transparent focus:outline-none"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+                            <div className="flex items-center flex-wrap justify-end pr-[18px] max-md:justify-start max-md:px-[18px] max-md:pb-[18px] max-md:w-full">
+                                {!selectedWeek && (
+                                    <span className="text-xs text-gray-500">Select a week</span>
+                                )}
+                                <div
+                                    className="rounded-md px-4 py-[8px] text-sm shrink-0"
+                                    style={{
+                                        backgroundColor: '#FFFDF9',
+                                        backgroundImage: [
+                                            'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                            'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                            'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                            'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                        ].join(', '),
+                                        backgroundSize: '100% 1px, 100% 1px, 1px 100%, 1px 100%',
+                                        backgroundPosition: '0 0, 0 100%, 0 0, 100% 0',
+                                        backgroundRepeat: 'repeat-x, repeat-x, repeat-y, repeat-y',
+                                    }}
+                                >
+                                    <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                        <span className="flex shrink-0 w-[76px] text-black font-semibold">
+                                            <span>Income</span>
+                                            <span className="ml-auto">:</span>
+                                        </span>
+                                        <span className="font-semibold" style={{ color: "#E4572E" }}>
+                                            ₹{payments.reduce((total, row) => total + Number(row.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                        <span className="flex shrink-0 w-[76px] text-black font-semibold">
+                                            <span>Expenses</span>
+                                            <span className="ml-auto">:</span>
+                                        </span>
+                                        <span className="font-semibold" style={{ color: "#E4572E" }}>
+                                            ₹{filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                        <span className="flex shrink-0 w-[76px] text-black font-semibold">
+                                            <span>Balance</span>
+                                            <span className="ml-auto">:</span>
+                                        </span>
+                                        <span className="font-semibold" style={{ color: "#E4572E" }}>
+                                            ₹{(
+                                                payments.reduce((total, row) => total + Number(row.amount || 0), 0) -
+                                                filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)
+                                            ).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className={isExpensesEntryUploadOnly
+                        ? 'w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden max-xl:overflow-y-auto max-xl:overflow-x-hidden no-scrollbar scrollbar-none'
+                        : 'w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden max-xl:overflow-y-auto max-xl:overflow-x-hidden no-scrollbar scrollbar-none'}>
+                        {nextWeekDiscountInfo && (
+                            <div className="flex justify-end mb-4 -mr-6 -mt-7">
+                                <h2 className="font-semibold text-base">
+                                    Discount :{" "}
+                                    <span className="inline-block text-right min-w-[120px] text-xl">
+                                        {nextWeekDiscountInfo.amount.toLocaleString('en-IN', {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2,
+                                        })}
+                                    </span>
+                                </h2>
+                            </div>
+                        )}
+                        <div className="flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto no-scrollbar scrollbar-none">
+                            <div className="flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto no-scrollbar scrollbar-none max-xl:shrink-0 xl:min-w-[1240] xl:max-w-[1240] xl:shrink-0 xl:h-full xl:flex-none xl:w-auto">
+                                <div className="w-full max-w-full xl:w-[1258px] xl:max-w-[1258px] flex flex-col shrink-0 self-start flex-1 min-h-0 overflow-hidden">
+                                <div className="flex justify-between items-center mb-[8px] shrink-0 w-full">
+                                    <h1 className="font-bold text-base">Expenses (PS {selectedWeek ?? "-"})</h1>
+                                    <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
+                                        ₹{filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </h1>
+                                </div>
+                                <div className="flex flex-col w-full max-w-full overflow-hidden xl:w-fit xl:flex-1 xl:min-h-0 max-xl:flex-none max-xl:overflow-x-auto no-scrollbar scrollbar-none">
+                                    <div className="mb-[12px] w-full max-w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center justify-between gap-[6px] overflow-hidden">
+                                        <div className="flex flex-row flex-nowrap items-center gap-[6px] min-w-0 flex-1 overflow-hidden">
+                                        <div className="shrink-0 flex items-center z-[2] bg-white">
+                                            <EdbcFilterToggleButton
+                                                onClick={() => {
+                                                    const willOpen = !showFilters;
+                                                    const scroller = scrollRef.current;
+                                                    if (willOpen) {
+                                                        setShowFilters(true);
+                                                        if (!scroller) return;
+                                                        if (scroller.scrollTop <= 0) return;
+                                                        if (filterNudgeUsedRef.current) return;
+                                                        filterNudgeUsedRef.current = true;
+                                                        requestAnimationFrame(() => {
+                                                            requestAnimationFrame(() => {
+                                                                const h = filterRowRef.current?.offsetHeight || 0;
+                                                                if (h > 0) {
+                                                                    scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+                                                                }
+                                                            });
+                                                        });
+                                                        return;
+                                                    }
+                                                    const h = filterRowRef.current?.offsetHeight || 0;
+                                                    setShowFilters(false);
+                                                    if (!scroller || h <= 0 || !filterNudgeUsedRef.current) return;
+                                                    filterNudgeUsedRef.current = false;
+                                                    requestAnimationFrame(() => {
+                                                        requestAnimationFrame(() => {
+                                                            scroller.scrollTop = scroller.scrollTop + h;
+                                                        });
+                                                    });
+                                                }}
+                                            />
+                                        </div>
+                                        <div
+                                            ref={expensesFilterChipsRef}
+                                            className="w-0 flex-1 min-w-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-x-auto overflow-y-hidden no-scrollbar scrollbar-none cursor-grab max-xl:w-auto max-xl:flex-none max-xl:shrink"
+                                            onMouseDown={(e) => handleMouseDown(e, expensesFilterChipsRef, true)}
+                                            onMouseMove={(e) => handleMouseMove(e, expensesFilterChipsRef, true)}
+                                            onMouseUp={() => handleMouseUp(expensesFilterChipsRef)}
+                                            onMouseLeave={() => handleMouseUp(expensesFilterChipsRef)}
+                                        >
+                                            {selectDate && (
+                                                <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                                    <span className="font-medium text-[#BF9853]">Date: </span>
+                                                    <span className="font-semibold text-[14px]">{formatDateOnly(selectDate)}</span>
+                                                    <button onClick={() => setSelectDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                                </span>
+                                            )}
+                                            {selectContractororVendorName && (
+                                                <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                    <span className="font-medium text-[#BF9853]">Associate: </span>
+                                                    <span className="font-semibold text-[14px]">{selectContractororVendorName}</span>
+                                                    <button onClick={() => setSelectContractororVendorName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                                </span>
+                                            )}
+                                            {selectProjectName && (
+                                                <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                    <span className="font-medium text-[#BF9853]">Project Name: </span>
+                                                    <span className="font-semibold text-[14px]">{selectProjectName}</span>
+                                                    <button onClick={() => setSelectProjectName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                                </span>
+                                            )}
+                                            {selectType && (
+                                                <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                    <span className="font-medium text-[#BF9853]">Type: </span>
+                                                    <span className="font-semibold text-[14px]">{selectType}</span>
+                                                    <button onClick={() => setSelectType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                                </span>
+                                            )}
+                                            {selectExpenseAmount.trim() && (
+                                                <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                    <span className="font-medium text-[#BF9853]">{expensesDstCol8Label}: </span>
+                                                    <span className="font-semibold text-[14px]">{selectExpenseAmount}</span>
+                                                    <button type="button" onClick={() => setSelectExpenseAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                                </span>
+                                            )}
+                                        </div>
+                                        </div>
+                                        <EdbcTableToolbarRightActions
+                                            onClearFilters={clearFilters}
+                                            overallSearch={overallSearch}
+                                            onOverallSearchChange={setOverallSearch}
+                                            wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] shrink-0"
+                                        />
+                                    </div>
+                                    <div className="w-full flex-1 min-h-0 rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden flex flex-col max-xl:min-h-[330px]">
+                                        <div
+                                            ref={scrollRef}
+                                            className="w-full flex-1 min-h-0 h-full overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none max-w-full max-xl:min-h-[330px]"
+                                            onWheel={() => { filterNudgeUsedRef.current = false; }}
+                                            onMouseDown={(e) => handleMouseDown(e, scrollRef)}
+                                            onMouseMove={(e) => handleMouseMove(e, scrollRef)}
+                                            onMouseUp={() => handleMouseUp(scrollRef)}
+                                            onMouseLeave={() => handleMouseUp(scrollRef)}
+                                        >
+
+                                            <table className={`border-collapse text-left ${WEEKLY_PAYMENT_EXPENSES_TABLE_FIXED_WIDTH_CLASS} table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_thead_tr>th#EDBC-19]:!pr-[1px] [&_tbody_tr>td#EDBC-19]:!pr-[1px] [&_th#EDBC-20]:!w-[70px] [&_td#EDBC-20]:!w-[70px] [&_th#EDBC-20]:!min-w-[70px] [&_td#EDBC-20]:!min-w-[70px] [&_th#EDBC-20]:!max-w-[70px] [&_td#EDBC-20]:!max-w-[70px] ${WEEKLY_PAYMENT_EDBC8_TABLE_CLASS} ${WEEKLY_PAYMENT_EXPENSES_TABLE_LOCK_TABLE_CLASS}`}>
+                                                <colgroup>
+                                                    <col style={{ width: '70px' }} />
+                                                    <col style={{ width: '120px' }} />
+                                                    <col style={{ width: '218px' }} />
+                                                    <col style={{ width: '30px' }} />
+                                                    <col style={{ width: '298px' }} />
+                                                    <col style={{ width: '158px' }} />
+                                                    <col style={{ width: '120px' }} />
+                                                    <col style={{ width: '70px' }} />
+                                                    <col style={{ width: '70px' }} />
+                                                    <col style={{ width: '70px' }} />
+                                                    <col style={{ width: '12px' }} />
+                                                </colgroup>
+                                                <thead className="sticky top-0 z-10 bg-white">
+                                                    <EdbcTableHeaderRow>
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC21} label={expensesDstCol21Label} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label={expensesDstCol2Label} {...expensesSortProps} />
+                                                        <EdbcColumnHeader
+                                                            columnId={EDBC_IDS.EDBC4}
+                                                            label={expensesDstCol4Label}
+                                                            {...expensesSortProps}
+                                                        />
+                                                        <th className="w-[30px] min-w-[30px] max-w-[30px] p-0 overflow-visible" aria-hidden="true"></th>
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label={expensesDstCol3Label} {...expensesSortProps} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label={expensesDstCol12Label} {...expensesSortProps} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label={expensesDstCol8Label} {...expensesSortProps} />
+                                                        <th
+                                                            id={EDBC_IDS.EDBC20}
+                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.headerClass || ''}`.replace(/\bcursor-pointer\b/g, '').replace(/\bhover:bg-gray-200\b/g, '').replace(/\bselect-none\b/g, '').replace(/\s+/g, ' ').trim() + ' !pr-0'}
+                                                            style={{ paddingRight: 0 }}
+                                                            aria-hidden="true"
+                                                        />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={expensesDstCol20FileLabel} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC19} label={expensesDstCol20ActivityLabel} />
+                                                        <th className="w-[12px] min-w-[12px] max-w-[12px] p-0" aria-hidden="true"></th>
+                                                    </EdbcTableHeaderRow>
+                                                    {showFilters && (
+                                                        <EdbcTableFilterRow ref={filterRowRef}>
+                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC21} />
+                                                            <EdbcDateFilter
+                                                                placeholder={expensesDstCol2Label}
+                                                                value={selectDate}
+                                                                onChange={setSelectDate}
+                                                            />
+                                                            <EdbcSelectFilter
+                                                                columnId={EDBC_IDS.EDBC4}
+                                                                placeholder={expensesDstCol4Label}
+                                                                options={contractorVendorFilterOptions}
+                                                                value={selectContractororVendorName}
+                                                                onChange={setSelectContractororVendorName}
+                                                                selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                            />
+                                                            <th className="w-[30px] min-w-[30px] max-w-[30px] p-0 overflow-visible"></th>
+                                                            <EdbcProjectNameFilter
+                                                                placeholder={expensesDstCol3Label}
+                                                                options={projectFilterOptions}
+                                                                value={selectProjectName}
+                                                                onChange={setSelectProjectName}
+                                                                selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                            />
+                                                            <EdbcSelectFilter
+                                                                columnId={EDBC_IDS.EDBC12}
+                                                                placeholder={expensesDstCol12Label}
+                                                                options={weeklyTypes.map((type) => ({ value: type.type, label: type.type }))}
+                                                                value={selectType}
+                                                                onChange={setSelectType}
+                                                                selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                            />
+                                                            <EdbcTotalAmountFilter
+                                                                columnId={EDBC_IDS.EDBC8}
+                                                                totalAmount={filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)}
+                                                                value={selectExpenseAmount}
+                                                                onChange={(e) => setSelectExpenseAmount(e.target.value)}
+                                                            />
+                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC19} />
+                                                            <th className="w-[12px] min-w-[12px] max-w-[12px] p-0" aria-hidden="true"></th>
+                                                        </EdbcTableFilterRow>
+                                                    )}
+                                                    {canEditSelectedWeek ? (
+                                                        <tr className="bg-white border-b-2 border-gray-200 h-[40px] max-h-[40px] [&>td]:!py-0 overflow-hidden">
+                                                            <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>
+                                                                {filteredExpenses.length + 1}.
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC2} className={getEdbcColumnConfig(EDBC_IDS.EDBC2)?.tdClass}>
+                                                                <div
+                                                                    className={getEdbcColumnConfig(EDBC_IDS.EDBC2)?.filterWidthClass}
+                                                                    onKeyDown={handleKeyDown}
+                                                                >
+                                                                    <CustomDateField
+                                                                        value={newExpense.date}
+                                                                        onChange={(dateStr) => handleExpenseChange({ target: { name: 'date', value: dateStr } })}
+                                                                        placeholder={expensesDstCol2Label}
+                                                                        alwaysOpenBelow
+                                                                        controlHeightPx={EDBC_FILTER_CONTROL_HEIGHT_PX}
+                                                                        className={` [&>div]:!w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div]:!text-[14px] [&>div:hover]:!border-[rgba(191,152,83,0.4)] ${newExpense.date ? '[&>div]:!text-black [&>div]:!font-normal' : '[&>div]:!text-[#d3d5db] [&>div]:!font-normal'}`}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC4} className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass}>
+                                                                <div className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass}>
+                                                                    <Select
+                                                                        name="contractor"
+                                                                        className="text-xs focus:outline-none w-full"
+                                                                        value={
+                                                                            isClientToggleActive
+                                                                                ? selectedClient
+                                                                                : selectedContractor ||
+                                                                                combinedOptions.find(
+                                                                                    opt =>
+                                                                                        (opt.type === "Contractor" && opt.id === Number(newExpense.contractor_id)) ||
+                                                                                        (opt.type === "Vendor" && opt.id === Number(newExpense.vendor_id)) ||
+                                                                                        (opt.type === "Employee" && opt.id === Number(newExpense.employee_id))
+                                                                                ) || null
+                                                                        }
+                                                                        onChange={(selectedOption) => {
+                                                                            if (newExpense.type === "Staff Advance") {
+                                                                                if (selectedOption && (selectedOption.type === "Contractor" || selectedOption.type === "Vendor")) {
+                                                                                    alert("Staff Advance type only allows Employee. Please select an Employee or change the type.");
+                                                                                    return;
+                                                                                }
+                                                                                if (isClientToggleActive && selectedOption) {
+                                                                                    alert("Staff Advance type only allows Employee. Please select an Employee or change the type.");
+                                                                                    return;
+                                                                                }
+                                                                            }
+                                                                            if (newExpense.type === "Project Advance") {
+                                                                                if (selectedOption && selectedOption.type === "Employee") {
+                                                                                    alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor or Vendor or change the type.");
+                                                                                    return;
+                                                                                }
+                                                                                if (isClientToggleActive && selectedOption) {
+                                                                                    alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor or Vendor or change the type.");
+                                                                                    return;
+                                                                                }
+                                                                            }
+                                                                            if (isClientToggleActive) {
+                                                                                const allowedTypesForClient = ["Loan", "Bank", "Claim"];
+                                                                                if (!allowedTypesForClient.includes(newExpense.type)) {
+                                                                                    alert("Client name selection is only allowed for Loan, Bank, or Claim types.");
+                                                                                    return;
+                                                                                }
+                                                                                setSelectedClient(selectedOption || null);
+                                                                                setNewExpense(prev => ({
+                                                                                    ...prev,
+                                                                                    client_name: selectedOption ? selectedOption.label : "",
+                                                                                    client_id: selectedOption ? (selectedOption.clientId || selectedOption.id) : "",
+                                                                                }));
+                                                                                setVendorId('');
+                                                                                setContractorId('');
+                                                                                setSelectedContractor(null);
+                                                                                setSelectedVendor(null);
+                                                                                setSelectedEmployee(null);
+                                                                                const clientKey = selectedOption?.compositeKey || (selectedOption ? buildClientKey(selectedOption.label, selectedOption.fatherName, selectedOption.mobile) : "");
+                                                                                const projectsForClient = selectedOption
+                                                                                    ? selectedOption.projects || (clientKey ? (clientProjectMap[clientKey]?.projects || []) : [])
+                                                                                    : [];
+                                                                                setClientProjectOptions(projectsForClient);
+                                                                                if (projectsForClient.length === 1) {
+                                                                                    const onlyProject = projectsForClient[0];
+                                                                                    setSelectedProjectName(onlyProject);
+                                                                                    setSelectedProjectOption(onlyProject);
+                                                                                    setProjectId(onlyProject.id);
+                                                                                    setNewExpense(prev => ({ ...prev, project_id: onlyProject.id }));
+                                                                                }
+                                                                                if (!selectedOption) {
+                                                                                    setSelectedProjectName(null);
+                                                                                    setSelectedProjectOption(null);
+                                                                                    setProjectId('');
+                                                                                    setNewExpense(prev => ({ ...prev, project_id: "" }));
+                                                                                }
+                                                                                return;
+                                                                            }
+                                                                            setSelectedClient(null);
+                                                                            setSelectedClient(null);
+                                                                            setClientProjectOptions([]);
+                                                                            setSelectedProjectName(null);
+                                                                            setSelectedProjectOption(null);
+                                                                            setProjectId('');
+                                                                            if (newExpense.type === "Staff Advance") {
+                                                                                if (selectedOption && (selectedOption.type === "Contractor" || selectedOption.type === "Vendor")) {
+                                                                                    alert("Staff Advance type only allows Employee. Please select an Employee or change the type.");
+                                                                                    return;
+                                                                                }
+                                                                            }
+                                                                            if (newExpense.type === "Project Advance") {
+                                                                                if (selectedOption && selectedOption.type === "Employee") {
+                                                                                    alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor or Vendor or change the type.");
+                                                                                    return;
+                                                                                }
+                                                                            }
+                                                                            if (!selectedOption) {
+                                                                                setNewExpense(prev => ({
+                                                                                    ...prev,
+                                                                                    contractor_id: "",
+                                                                                    vendor_id: "",
+                                                                                    employee_id: "",
+                                                                                    client_name: "",
+                                                                                    client_id: ""
+                                                                                }));
+                                                                                setContractorId("");
+                                                                                setVendorId("");
+                                                                                setSelectedContractor(null);
+                                                                                setSelectedVendor(null);
+                                                                                setSelectedEmployee(null);
+                                                                                setSelectedClient(null);
+                                                                            } else if (selectedOption.type === "Employee") {
+                                                                                setNewExpense(prev => ({
+                                                                                    ...prev,
+                                                                                    employee_id: selectedOption.id,
+                                                                                    contractor_id: "",
+                                                                                    vendor_id: ""
+                                                                                }));
+                                                                                setSelectedEmployee(selectedOption);
+                                                                                setSelectedContractor(null);
+                                                                                setSelectedVendor(null);
+                                                                            } else if (selectedOption.type === "Contractor") {
+                                                                                setNewExpense(prev => ({
+                                                                                    ...prev,
+                                                                                    contractor_id: selectedOption.id,
+                                                                                    vendor_id: ""
+                                                                                }));
+                                                                                setContractorId(selectedOption.id);
+                                                                                setVendorId("");
+                                                                                setSelectedContractor(selectedOption);
+                                                                                setSelectedVendor(null);
+                                                                                setSelectedEmployee(null);
+                                                                            } else if (selectedOption.type === "Vendor") {
+                                                                                setNewExpense(prev => ({
+                                                                                    ...prev,
+                                                                                    vendor_id: selectedOption.id,
+                                                                                    contractor_id: ""
+                                                                                }));
+                                                                                setVendorId(selectedOption.id);
+                                                                                setContractorId("");
+                                                                                setSelectedVendor(selectedOption);
+                                                                                setSelectedContractor(null);
+                                                                                setSelectedEmployee(null);
+                                                                            }
+                                                                        }}
+                                                                        options={isClientToggleActive ? clientOptions : combinedOptions}
+                                                                        placeholder={expensesAssociateEntryPlaceholder}
+                                                                        isSearchable
+                                                                        isClearable
+                                                                        menuPortalTarget={document.body}
+                                                                        menuPosition="fixed"
+                                                                        classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
+                                                                        styles={{
+                                                                            ...CASH_REGISTER_SELECT_STYLES,
+                                                                            menu: (provided) => ({
+                                                                                ...CASH_REGISTER_SELECT_STYLES.menu(provided),
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                            menuList: (provided) => ({
+                                                                                ...entryRowSelectMenuListStyle(provided),
+                                                                                paddingTop: 0,
+                                                                                paddingBottom: 0,
+                                                                                paddingLeft: 0,
+                                                                                paddingRight: 0,
+                                                                                WebkitOverflowScrolling: 'touch',
+                                                                            }),
+                                                                            menuPortal: (provided) => ({
+                                                                                ...provided,
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td className="w-[30px] min-w-[30px] max-w-[30px] px-[6px] p-0 overflow-visible">
+                                                                <button type="button" onClick={handlePartySourceToggle}>
+                                                                    <img
+                                                                        src={Change}
+                                                                        className={`w-4 h-4 ${isClientToggleActive ? 'opacity-100' : 'opacity-60'}`}
+                                                                        alt="Toggle party type"
+                                                                    />
+                                                                </button>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC3} className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.tdClass}>
+                                                                <div className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.filterWidthClass}>
+                                                                    <Select
+                                                                        name="project"
+                                                                        isClearable
+                                                                        className="text-xs focus:outline-none w-full"
+                                                                        value={selectedProjectName || siteOptions.find(opt => opt.id === Number(newExpense.project_id)) || null}
+                                                                        onChange={(selectedOption) => {
+                                                                            if (isClientToggleActive) {
+                                                                                setSelectedProjectName(selectedOption);
+                                                                                setSelectedProjectOption(selectedOption);
+                                                                            } else {
+                                                                                setSelectedProjectName(selectedOption);
+                                                                                setSelectedProjectOption(null);
+                                                                            }
+                                                                            setNewExpense(prev => ({
+                                                                                ...prev,
+                                                                                project_id: selectedOption ? selectedOption.id : ""
+                                                                            }));
+                                                                            setProjectId(selectedOption ? selectedOption.id : "");
+                                                                        }}
+                                                                        options={(isClientToggleActive && clientProjectOptions.length > 0) ? clientProjectOptions : siteOptionsForNewEntry}
+                                                                        placeholder={expensesDstCol3Label}
+                                                                        isSearchable
+                                                                        menuPortalTarget={document.body}
+                                                                        menuPosition="fixed"
+                                                                        classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
+                                                                        styles={{
+                                                                            ...CASH_REGISTER_SELECT_STYLES,
+                                                                            menu: (provided) => ({
+                                                                                ...CASH_REGISTER_SELECT_STYLES.menu(provided),
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                            menuList: entryRowSelectMenuListStyle,
+                                                                            menuPortal: (provided) => ({
+                                                                                ...provided,
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
+                                                                <div
+                                                                    className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass}
+                                                                    onKeyDown={handleKeyDown}
+                                                                >
+                                                                    <Select
+                                                                        name="type"
+                                                                        className="text-xs focus:outline-none w-full"
+                                                                        value={newExpense.type ? { value: newExpense.type, label: newExpense.type } : null}
+                                                                        onChange={(selectedOption) => handleInputChange({ target: { name: 'type', value: selectedOption ? selectedOption.value : '' } })}
+                                                                        options={weeklyTypes.map((type) => ({ value: type.type, label: type.type }))}
+                                                                        placeholder={expensesDstCol12Label}
+                                                                        isSearchable
+                                                                        isClearable
+                                                                        menuPortalTarget={document.body}
+                                                                        menuPosition="fixed"
+                                                                        classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
+                                                                        styles={{
+                                                                            ...CASH_REGISTER_SELECT_STYLES,
+                                                                            menu: (provided) => ({
+                                                                                ...CASH_REGISTER_SELECT_STYLES.menu(provided),
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                            menuList: entryRowSelectMenuListStyle,
+                                                                            menuPortal: (provided) => ({
+                                                                                ...provided,
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
+                                                                <div className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass}>
+                                                                    <input
+                                                                        type="number"
+                                                                        name="amount"
+                                                                        style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                        className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner`}
+                                                                        placeholder={expensesDstCol8Label}
+                                                                        value={newExpense.amount}
+                                                                        onChange={handleExpenseChange}
+                                                                        onKeyDown={handleKeyDown}
+                                                                        onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
+                                                                        onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
+                                                            <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
+                                                            <td id={EDBC_IDS.EDBC19} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
+                                                            <td className="w-[12px] min-w-[12px] max-w-[12px] p-0"></td>
+                                                        </tr>
+                                                    ) : null}
+                                                </thead>
+                                                <tbody>
+                                                    {sortedExpenses.map((row, index) => (
+                                                        <EdbcTableBodyRow key={row.id}>
+                                                            <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>
+                                                                {filteredExpenses.length - index}
+                                                            </td>
+                                                            {editingRowId === row.id ? (
+                                                                <td id={EDBC_IDS.EDBC2} className={getEdbcColumnConfig(EDBC_IDS.EDBC2)?.tdClass}>
+                                                                    <div className={getEdbcColumnConfig(EDBC_IDS.EDBC2)?.filterWidthClass}>
+                                                                        <CustomDateField
+                                                                            value={row.date}
+                                                                            onChange={(dateStr) => handleEditExpense(row.id, 'date', dateStr)}
+                                                                            placeholder={expensesDstCol2Label}
+                                                                            alwaysOpenBelow
+                                                                            controlHeightPx={EDBC_FILTER_CONTROL_HEIGHT_PX}
+                                                                            className={` [&>div]:!w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div]:!text-[14px] [&>div:hover]:!border-[rgba(191,152,83,0.4)] ${row.date ? '[&>div]:!text-black [&>div]:!font-normal' : '[&>div]:!text-[#d3d5db] [&>div]:!font-normal'}`}
+                                                                        />
+                                                                    </div>
+                                                                </td>
+                                                            ) : (
+                                                                <EdbcDateBodyCell
+                                                                    expense={row}
+                                                                    rowIndex={index}
+                                                                    expandedCells={expandedCells}
+                                                                    onToggleExpanded={toggleExpandedCell}
+                                                                    formatValue={formatDateOnly}
+                                                                />
+                                                            )}
+                                                            {editingRowId === row.id ? (
+                                                                <td id={EDBC_IDS.EDBC4} className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass}>
+                                                                    <Select
+                                                                        name="party"
+                                                                        className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass || ''}
+                                                                        value={
+                                                                            ((isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id))) && ["Loan", "Bank", "Claim"].includes(row.type))
+                                                                                ? getClientOption(row.client_id, row.client_name)
+                                                                                : combinedOptions.find(
+                                                                                    opt =>
+                                                                                        (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
+                                                                                        (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
+                                                                                        (opt.type === "Employee" && opt.id === Number(row.employee_id))
+                                                                                ) || null
+                                                                        }
+                                                                        onChange={(selectedOption) => {
+                                                                            const useClientMode = isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id));
+                                                                            if (useClientMode) {
+                                                                                // Only allow client selection if type is Loan, Bank, or Claim
+                                                                                const allowedTypesForClient = ["Loan", "Bank", "Claim"];
+                                                                                if (selectedOption && !allowedTypesForClient.includes(row.type)) {
+                                                                                    alert("Client name selection is only allowed for Loan, Bank, or Claim types.");
+                                                                                    return;
+                                                                                }
+                                                                                if (!selectedOption) {
+                                                                                    handleEditExpense(row.id, "client_name", "");
+                                                                                    handleEditExpense(row.id, "client_id", "");
+                                                                                } else {
+                                                                                    handleEditExpense(row.id, "client_name", selectedOption.label);
+                                                                                    handleEditExpense(row.id, "client_id", selectedOption.clientId || selectedOption.id);
+                                                                                }
+                                                                                handleEditExpense(row.id, "contractor_id", "");
+                                                                                handleEditExpense(row.id, "vendor_id", "");
+                                                                                return;
+                                                                            }
+                                                                            if (!selectedOption) {
+                                                                                handleEditExpense(row.id, "contractor_id", "");
+                                                                                handleEditExpense(row.id, "vendor_id", "");
+                                                                                handleEditExpense(row.id, "employee_id", "");
+                                                                                handleEditExpense(row.id, "client_id", "");
+                                                                                handleEditExpense(row.id, "client_name", "");
+                                                                            } else if (selectedOption.type === "Contractor") {
+                                                                                handleEditExpense(row.id, "contractor_id", selectedOption.id);
+                                                                                handleEditExpense(row.id, "vendor_id", "");
+                                                                            } else if (selectedOption.type === "Vendor") {
+                                                                                handleEditExpense(row.id, "vendor_id", selectedOption.id);
+                                                                                handleEditExpense(row.id, "contractor_id", "");
+                                                                            } else if (selectedOption.type === "Employee") {
+                                                                                handleEditExpense(row.id, "employee_id", selectedOption.id);
+                                                                                handleEditExpense(row.id, "contractor_id", "");
+                                                                                handleEditExpense(row.id, "vendor_id", "");
+                                                                            }
+                                                                        }}
+                                                                        options={((isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id))) && ["Loan", "Bank", "Claim"].includes(row.type)) ? clientOptions : combinedOptions}
+                                                                        placeholder={((isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id))) && ["Loan", "Bank", "Claim"].includes(row.type)) ? expensesDstCol4ClientLabel : expensesDstCol4Label}
+                                                                        isSearchable
+                                                                        isClearable
+                                                                        menuPortalTarget={document.body}
+                                                                        menuPosition="fixed"
+                                                                        classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
+                                                                        styles={{
+                                                                            ...CASH_REGISTER_SELECT_STYLES,
+                                                                            menu: (provided) => ({
+                                                                                ...CASH_REGISTER_SELECT_STYLES.menu(provided),
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                            menuList: (provided) => ({
+                                                                                ...entryRowSelectMenuListStyle(provided),
+                                                                                paddingTop: 0,
+                                                                                paddingBottom: 0,
+                                                                                paddingLeft: 0,
+                                                                                paddingRight: 0,
+                                                                                WebkitOverflowScrolling: 'touch',
+                                                                            }),
+                                                                            menuPortal: (provided) => ({
+                                                                                ...provided,
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                        }}
+                                                                    />
+                                                                </td>
+                                                            ) : (
+                                                                <EdbcExpandableBodyCell
+                                                                    columnId={EDBC_IDS.EDBC4}
+                                                                    expense={row}
+                                                                    rowIndex={index}
+                                                                    expandedCells={expandedCells}
+                                                                    onToggleExpanded={toggleExpandedCell}
+                                                                    getDisplayValue={getPartyDisplayName}
+                                                                />
+                                                            )}
+                                                            <td className="w-[30px] min-w-[30px] max-w-[30px] p-0 overflow-visible"></td>
+                                                            {editingRowId === row.id ? (
+                                                                <td id={EDBC_IDS.EDBC3} className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.tdClass}>
+                                                                    <div className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.filterWidthClass}>
+                                                                        <Select
+                                                                            name="project"
+                                                                            className="text-xs focus:outline-none w-full"
+                                                                            value={siteOptions.find(opt => opt.id === Number(row.project_id)) || null}
+                                                                            onChange={(selectedOption) =>
+                                                                                handleEditExpense(
+                                                                                    row.id,
+                                                                                    "project_id",
+                                                                                    selectedOption ? selectedOption.id : ""
+                                                                                )
+                                                                            }
+                                                                            options={siteOptions}
+                                                                            placeholder={expensesDstCol3Label}
+                                                                            isSearchable
+                                                                            isClearable
+                                                                            menuPortalTarget={document.body}
+                                                                            menuPosition="fixed"
+                                                                            classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
+                                                                            styles={{
+                                                                                ...CASH_REGISTER_SELECT_STYLES,
+                                                                                menu: (provided) => ({
+                                                                                    ...CASH_REGISTER_SELECT_STYLES.menu(provided),
+                                                                                    zIndex: 10050,
+                                                                                }),
+                                                                                menuList: entryRowSelectMenuListStyle,
+                                                                                menuPortal: (provided) => ({
+                                                                                    ...provided,
+                                                                                    zIndex: 10050,
+                                                                                }),
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                </td>
+                                                            ) : (
+                                                                <EdbcProjectNameBodyCell
+                                                                    expense={row}
+                                                                    rowIndex={index}
+                                                                    expandedCells={expandedCells}
+                                                                    onToggleExpanded={toggleExpandedCell}
+                                                                    getDisplayValue={(entry) => siteOptions.find(opt => opt.id === Number(entry.project_id))?.label || ''}
+                                                                />
+                                                            )}
+                                                            <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
+                                                                {editingRowId === row.id ? (
+                                                                    <div className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass}>
+                                                                        <Select
+                                                                            name="type"
+                                                                            className="text-xs focus:outline-none w-full"
+                                                                            value={row.type ? { value: row.type, label: row.type } : null}
+                                                                            onChange={(selectedOption) => handleEditExpense(row.id, 'type', selectedOption ? selectedOption.value : '')}
+                                                                            options={weeklyTypes.map((type) => ({ value: type.type, label: type.type }))}
+                                                                            placeholder={expensesDstCol12Label}
+                                                                            isSearchable
+                                                                            isClearable
+                                                                            menuPortalTarget={document.body}
+                                                                            menuPosition="fixed"
+                                                                            classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
+                                                                            styles={{
+                                                                                ...CASH_REGISTER_SELECT_STYLES,
+                                                                                menu: (provided) => ({
+                                                                                    ...CASH_REGISTER_SELECT_STYLES.menu(provided),
+                                                                                    zIndex: 10050,
+                                                                                }),
+                                                                                menuList: entryRowSelectMenuListStyle,
+                                                                                menuPortal: (provided) => ({
+                                                                                    ...provided,
+                                                                                    zIndex: 10050,
+                                                                                }),
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span>{row.type}</span>
+                                                                        </div>
+                                                                        {(() => {
+                                                                            const payments = getPaymentsByExpenseId(row.id);
+                                                                            const paymentModes = [...new Set(payments.map(p => p.bill_payment_mode).filter(mode => mode !== null && mode !== undefined))];
+                                                                            if (paymentModes.length === 0) return null;
+                                                                            const hoverContent = payments.map(payment =>
+                                                                                `${payment.bill_payment_mode}: ₹${payment.amount.toLocaleString('en-IN')}`
+                                                                            ).join('\n');
+                                                                            return (
+                                                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                                                    {paymentModes.length === 1 ? (
+                                                                                        <span
+                                                                                            className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full cursor-pointer hover:bg-blue-200 transition-colors"
+                                                                                            title={hoverContent}
+                                                                                        >
+                                                                                            {paymentModes[0]}
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <span
+                                                                                            className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full cursor-pointer hover:bg-green-200 transition-colors"
+                                                                                            title={hoverContent}
+                                                                                        >
+                                                                                            Online
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                            );
+                                                                        })()}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            {editingRowId === row.id ? (
+                                                                <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
+                                                                    <div className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass}>
+                                                                        <input
+                                                                            type="number"
+                                                                            name="amount"
+                                                                            style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner`}
+                                                                            value={row.amount}
+                                                                            onChange={(e) => handleEditExpense(row.id, 'amount', e.target.value)}
+                                                                            disabled={editingRowId !== row.id}
+                                                                            onWheel={(e) => e.preventDefault()}
+                                                                            onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
+                                                                            onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
+                                                                        />
+                                                                    </div>
+                                                                </td>
+                                                            ) : (
+                                                                <EdbcExpandableBodyCell
+                                                                    columnId={EDBC_IDS.EDBC8}
+                                                                    expense={row}
+                                                                    rowIndex={index}
+                                                                    expandedCells={expandedCells}
+                                                                    onToggleExpanded={toggleExpandedCell}
+                                                                    textAlignClass="text-right"
+                                                                    getDisplayValue={(entry) => formatWeeklyPaymentAmountDisplay(entry.amount)}
+                                                                />
+                                                            )}
+                                                            <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}>
+                                                                <div className="flex items-center w-[70px] gap-[20px]">
+                                                                    {row.type !== "Daily" && isWeeklyExpenseTypeMatched(row.type) ? (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setCurrentProjectAdvanceRow(row);
+                                                                                setPaymentPopupData({
+                                                                                    date: new Date().toISOString().split('T')[0],
+                                                                                    amount: "",
+                                                                                    paymentMode: "",
+                                                                                    chequeNo: "",
+                                                                                    chequeDate: "",
+                                                                                    transactionNumber: "",
+                                                                                    accountNumber: ""
+                                                                                });
+                                                                                const previousPaymentsForExpense = getPaymentsByExpenseId(row.id);
+                                                                                setPreviousPayments(previousPaymentsForExpense);
+                                                                                setShowPaymentPopup(true);
+                                                                            }}
+                                                                            className=" text-white flex items-center justify-center transition-colors text-xs"
+                                                                            title="Add Payment"
+                                                                        >
+                                                                            <img src={AddExtra} className="w-[18px] h-[18px]" alt="Add Payment" />
+                                                                        </button>
+                                                                    ) : null}
+                                                                    {row.type === "Project Advance" ? (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={async () => {
+                                                                                let description = "";
+                                                                                if (row.advance_portal_id) {
+                                                                                    try {
+                                                                                        const res = await fetch(
+                                                                                            `https://backendaab.in/demoAabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
+                                                                                        );
+                                                                                        if (!res.ok) throw new Error("Failed to fetch advance portal data");
+                                                                                        const data = await res.json();
+                                                                                        description = (data.description || "").trim();
+                                                                                        setPortalDescriptions((prev) => ({ ...prev, [row.advance_portal_id]: description !== "" ? description : undefined }));
+                                                                                    } catch (error) {
+                                                                                        console.error("Error fetching advance portal data:", error);
+                                                                                    }
+                                                                                }
+                                                                                setEditFormData((prev) => ({ ...prev, description }));
+                                                                                setCurrentRow(row);
+                                                                                setIsDescriptionEditing(false);
+                                                                                setShowPopups(true);
+                                                                            }}
+                                                                        >
+                                                                            <img
+                                                                                src={portalDescriptions[row.advance_portal_id] ? NotesEnd : NotesStart}
+                                                                                alt="Notes"
+                                                                                className="w-[18px] h-[18px]"
+                                                                            />
+                                                                        </button>
+                                                                    ) : null}
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                                <div className="flex w-full items-center justify-center">
+                                                                    <span className="inline-flex items-center gap-[4px]">
+                                                                        {row.bill_copy_url ? (
+                                                                            <>
+                                                                                <a
+                                                                                    href={cleanUrl(row.bill_copy_url)}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                    className="inline-flex shrink-0 w-[16px] h-[16px] items-center justify-center cursor-pointer"
+                                                                                    title="View File"
+                                                                                >
+                                                                                    <img src={file} className="" alt="Open File" />
+                                                                                </a>
+                                                                                {hasDeletePermission && isWeeklyExpenseTypeMatched(row.type) ? (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleRemoveBillCopyUrl(row)}
+                                                                                        className="flex h-[12px] w-[12px] shrink-0 items-center justify-center rounded-full hover:bg-[#fff1ee]"
+                                                                                        title="Remove File"
+                                                                                    >
+                                                                                        <img src={FileRemover} className="" alt="Remove File" />
+                                                                                    </button>
+                                                                                ) : null}
+                                                                            </>
+                                                                        ) : (
+                                                                            <span className="inline-flex items-center gap-2">
+                                                                                {isWeeklyExpenseTypeMatched(row.type) ? (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleFileUploadClick(row)}
+                                                                                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center cursor-pointer"
+                                                                                        title="Upload File"
+                                                                                    >
+                                                                                        <img src={fileUpload} className="w-4 h-4 opacity-70 hover:opacity-100" alt="Upload File" />
+                                                                                    </button>
+                                                                                ) : (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        disabled
+                                                                                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center opacity-40 cursor-not-allowed"
+                                                                                        title="Upload File"
+                                                                                    >
+                                                                                        <img src={fileUpload} className="w-4 h-4 opacity-70" alt="Upload File" />
+                                                                                    </button>
+                                                                                )}
+                                                                                {hasDeletePermission && isWeeklyExpenseTypeMatched(row.type) && removedBillCopyRows[row.id] ? (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleRestoreBillCopyUrl(row)}
+                                                                                        className="inline-flex shrink-0"
+                                                                                        title="Restore Removed File"
+                                                                                    >
+                                                                                        <img src={restore} alt="" className="w-4 h-4" />
+                                                                                    </button>
+                                                                                ) : null}
+                                                                            </span>
+                                                                        )}
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC19} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                                <div className="flex gap-1 justify-center">
+                                                                    {canEditSelectedWeek && (
+                                                                        <>
+                                                                            {editingRowId === row.id ? (
+                                                                                <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                    <button type="button" onClick={() => saveEditedExpense(row)} className="text-green-600 font-bold text-lg p-0 leading-none">
+                                                                                        ✓
+                                                                                    </button>
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                    {row.type === "Daily" || !isWeeklyExpenseTypeMatched(row.type) || !hasEditPermission ? (
+                                                                                        <img className="w-5 h-4 opacity-40 cursor-not-allowed" src={Edit} alt="Edit Disabled" />
+                                                                                    ) : (
+                                                                                        <button type="button" onClick={() => {
+                                                                                            setEditingRowId(row.id);
+                                                                                            setEditingOriginalRow({ ...row });
+                                                                                        }}>
+                                                                                            <img src={Edit} alt="Edit" className="w-5 h-4" />
+                                                                                        </button>
+                                                                                    )}
+                                                                                </span>
+                                                                            )}
+                                                                            <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                {row.type === "Daily" || !isWeeklyExpenseTypeMatched(row.type) || !hasDeletePermission ? (
+                                                                                    <img className="w-5 h-4 opacity-40 cursor-not-allowed" src={Delete} alt="Delete Disabled" />
+                                                                                ) : (
+                                                                                    <button type="button" onClick={() => handleWeeklyExpensesDelete(row.id)}>
+                                                                                        <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                                                    </button>
+                                                                                )}
+                                                                            </span>
+                                                                            <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                {row.type === "Daily" ? (
+                                                                                    <img className="w-5 h-4 opacity-40 cursor-not-allowed" src={history} alt="History Disabled" />
+                                                                                ) : (
+                                                                                    <button type="button" onClick={() => fetchAuditDetailsForExpense(row.id)}>
+                                                                                        <img className="w-5 h-4" src={history} alt="History" />
+                                                                                    </button>
+                                                                                )}
+                                                                            </span>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td className="w-[12px] min-w-[12px] max-w-[12px] p-0"></td>
+                                                        </EdbcTableBodyRow>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                                </div>
+                            </div>
+                            <div className={`w-fit shrink-0 flex flex-col min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto no-scrollbar scrollbar-none xl:h-full max-xl:h-auto max-xl:w-full${isExpensesEntryUploadOnly ? ' min-w-[486px]' : ''}`}>
+                                <div className="flex flex-col flex-1 min-h-0 max-xl:w-full">
+                                {!isExpensesEntryUploadOnly && (
+                                        <div className="w-[502px] max-w-full shrink-0 self-start flex flex-col">
+                                        <div className="flex justify-between items-center mb-[8px] w-full">
+                                            <h1 className="font-bold text-base">Income</h1>
+                                            <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
+                                                ₹{payments.reduce((total, row) => total + Number(row.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </h1>
+                                        </div>
+                                            <div className="mb-[12px] w-full max-w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center justify-between gap-[6px] overflow-hidden">
+                                                <div className="flex flex-row flex-nowrap items-center gap-[6px] min-w-0 flex-1 overflow-hidden">
+                                                <div className="shrink-0 flex items-center z-[2] bg-white">
+                                                    <EdbcFilterToggleButton
+                                                        onClick={() => {
+                                                            const willOpen = !showPaymentsFilters;
+                                                            const scroller = paymentsScrollRef.current;
+                                                            if (willOpen) {
+                                                                setShowPaymentsFilters(true);
+                                                                if (!scroller) return;
+                                                                if (scroller.scrollTop <= 0) return;
+                                                                if (paymentsFilterNudgeUsedRef.current) return;
+                                                                paymentsFilterNudgeUsedRef.current = true;
+                                                                requestAnimationFrame(() => {
+                                                                    requestAnimationFrame(() => {
+                                                                        const h = paymentsFilterRowRef.current?.offsetHeight || 0;
+                                                                        if (h > 0) {
+                                                                            scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+                                                                        }
+                                                                    });
+                                                                });
+                                                                return;
+                                                            }
+                                                            const h = paymentsFilterRowRef.current?.offsetHeight || 0;
+                                                            setShowPaymentsFilters(false);
+                                                            if (!scroller || h <= 0 || !paymentsFilterNudgeUsedRef.current) return;
+                                                            paymentsFilterNudgeUsedRef.current = false;
+                                                            requestAnimationFrame(() => {
+                                                                requestAnimationFrame(() => {
+                                                                    scroller.scrollTop = scroller.scrollTop + h;
+                                                                });
+                                                            });
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div
+                                                    ref={paymentsFilterChipsRef}
+                                                    className="w-0 flex-1 min-w-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-x-auto overflow-y-hidden no-scrollbar scrollbar-none cursor-grab max-xl:w-auto max-xl:flex-none max-xl:shrink"
+                                                    onMouseDown={(e) => handleMouseDown(e, paymentsFilterChipsRef, true)}
+                                                    onMouseMove={(e) => handleMouseMove(e, paymentsFilterChipsRef, true)}
+                                                    onMouseUp={() => handleMouseUp(paymentsFilterChipsRef)}
+                                                    onMouseLeave={() => handleMouseUp(paymentsFilterChipsRef)}
+                                                >
+                                                    {selectPaymentDate && (
+                                                        <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                                            <span className="font-medium text-[#BF9853]">Date: </span>
+                                                            <span className="font-semibold text-[14px]">{formatDateOnly(selectPaymentDate)}</span>
+                                                            <button onClick={() => setSelectPaymentDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                                        </span>
+                                                    )}
+                                                    {selectPaymentAmount && (
+                                                        <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                                            <span className="font-medium text-[#BF9853]">Amount: </span>
+                                                            <span className="font-semibold text-[14px]">{selectPaymentAmount}</span>
+                                                            <button onClick={() => setSelectPaymentAmount('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                                        </span>
+                                                    )}
+                                                    {selectPaymentType && (
+                                                        <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                                            <span className="font-medium text-[#BF9853]">Type: </span>
+                                                            <span className="font-semibold text-[14px]">{selectPaymentType}</span>
+                                                            <button onClick={() => setSelectPaymentType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                </div>
+                                                <EdbcTableToolbarRightActions
+                                                    onClearFilters={clearPaymentsFilters}
+                                                    overallSearch={paymentsOverallSearch}
+                                                    onOverallSearchChange={setPaymentsOverallSearch}
+                                                    wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] shrink-0"
+                                                />
+                                            </div>
+                                        </div>
+                                )}
+                                <div className="flex flex-col flex-1 min-h-0 max-xl:flex-row max-xl:flex-wrap max-xl:items-start max-xl:gap-x-[18px] max-xl:gap-y-[12px] w-full">
+                                {!isExpensesEntryUploadOnly && (
+                                        <div className="w-[502px] max-w-full shrink-0 self-start flex flex-col">
+                                            <div className="shrink-0">
+                                                <div ref={paymentsScrollRef} className="rounded-lg border-l-8 border-l-[#BF9853] min-h-[330px] w-full max-w-full shrink-0 overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none"
+                                                    style={{
+                                                        height: `${40 + (showPaymentsFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
+                                                        maxHeight: `${40 + (showPaymentsFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
+                                                        willChange: 'scroll-position',
+                                                        WebkitOverflowScrolling: 'touch',
+                                                        transform: 'translateZ(0)',
+                                                        backfaceVisibility: 'hidden'
+                                                    }}
+                                                    onWheel={(e) => {
+                                                        paymentsFilterNudgeUsedRef.current = false;
+                                                        e.stopPropagation();
+                                                    }}
+                                                    onMouseDown={(e) => handleMouseDown(e, paymentsScrollRef)}
+                                                    onMouseMove={(e) => handleMouseMove(e, paymentsScrollRef)}
+                                                    onMouseUp={() => handleMouseUp(paymentsScrollRef)}
+                                                    onMouseLeave={() => handleMouseUp(paymentsScrollRef)}
+                                                >
+                                                    <table className={`border-collapse text-left ${WEEKLY_PAYMENT_INCOME_TABLE_FIXED_WIDTH_CLASS} table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_th#EDBC-19]:!w-[70px] [&_td#EDBC-19]:!w-[70px] [&_th#EDBC-19]:!min-w-[70px] [&_td#EDBC-19]:!min-w-[70px] [&_th#EDBC-19]:!max-w-[70px] [&_td#EDBC-19]:!max-w-[70px] [&_th#EDBC-20]:!w-[70px] [&_td#EDBC-20]:!w-[70px] [&_th#EDBC-20]:!min-w-[70px] [&_td#EDBC-20]:!min-w-[70px] [&_th#EDBC-20]:!max-w-[70px] [&_td#EDBC-20]:!max-w-[70px] ${WEEKLY_PAYMENT_EDBC8_TABLE_CLASS} ${WEEKLY_PAYMENT_INCOME_TBODY_TABLE_LOCK_TABLE_CLASS}`}>
+                                                        <colgroup>
+                                                            <col style={{ width: '130px' }} />
+                                                            <col style={{ width: '158px' }} />
+                                                            <col style={{ width: '120px' }} />
+                                                            <col style={{ width: '70px' }} />
+                                                            <col style={{ width: '12px' }} />
+                                                        </colgroup>
+
+                                                        <thead className="sticky top-0 z-[99999] bg-white">
+                                                            <EdbcTableHeaderRow>
+                                                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label={paymentsDstCol2Label} columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS} {...paymentsSortProps} />
+                                                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label={paymentsDstCol12Label} {...paymentsSortProps} />
+                                                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label={paymentsDstCol8Label} {...paymentsSortProps} />
+                                                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC19} label={paymentsDstCol20Label} />
+                                                                <th className="w-[12px] min-w-[12px] max-w-[12px] p-0" aria-hidden="true"></th>
+                                                            </EdbcTableHeaderRow>
+                                                            {showPaymentsFilters && (
+                                                                <EdbcTableFilterRow ref={paymentsFilterRowRef}>
+                                                                    <EdbcDateFilter
+                                                                        placeholder={paymentsDstCol2Label}
+                                                                        value={selectPaymentDate}
+                                                                        onChange={setSelectPaymentDate}
+                                                                    />
+                                                                    <th id={EDBC_IDS.EDBC12} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass} overflow-hidden`}>
+                                                                        <div className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass} min-w-0 max-w-full`}>
+                                                                            <Select
+                                                                                className="text-xs focus:outline-none w-full"
+                                                                                options={weeklyReceivedTypes.map((type) => ({
+                                                                                    value: type.received_type,
+                                                                                    label: type.received_type,
+                                                                                }))}
+                                                                                value={weeklyReceivedTypes.map((type) => ({
+                                                                                    value: type.received_type,
+                                                                                    label: type.received_type,
+                                                                                })).find((opt) => opt.value === selectPaymentType) || null}
+                                                                                onChange={(opt) => setSelectPaymentType(opt ? opt.value : '')}
+                                                                                placeholder={paymentsDstCol12Label}
+                                                                                isSearchable
+                                                                                isClearable={false}
+                                                                                menuPlacement="bottom"
+                                                                                menuPortalTarget={document.body}
+                                                                                noOptionsMessage={() => null}
+                                                                                styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                                            />
+                                                                        </div>
+                                                                    </th>
+                                                                    <th id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
+                                                                        <div className="min-w-0 w-full">
+                                                                            <input
+                                                                                type="text"
+                                                                                inputMode="decimal"
+                                                                                value={selectPaymentAmount}
+                                                                                onChange={(e) => setSelectPaymentAmount(e.target.value.replace(/[^\d.,]/g, ''))}
+                                                                                placeholder={formatEdbcTotalAmountPlaceholder(payments.reduce((total, row) => total + Number(row.amount || 0), 0))}
+                                                                                style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                                className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner !w-full`}
+                                                                            />
+                                                                        </div>
+                                                                    </th>
+                                                                    <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC19} />
+                                                                    <th className="w-[12px] min-w-[12px] max-w-[12px] p-0" aria-hidden="true"></th>
+                                                                </EdbcTableFilterRow>
+                                                            )}
+                                                            {canEditSelectedWeek ? (
+                                                                <EdbcTableBodyRow className="!bg-white border-b-2 border-gray-200 !h-[40px] !max-h-[40px] [&>td]:!py-0 overflow-hidden">
+                                                                    <td id={EDBC_IDS.EDBC2} className={`pl-[12px] ${EDBC2_FIRST_COLUMN_WIDTH_CLASS} pr-[1px] text-left overflow-hidden`}>
+                                                                        <div
+                                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC2)?.filterWidthClass} overflow-visible relative z-[99999]`}
+                                                                            onKeyDown={handleKeyDown1}
+                                                                        >
+                                                                            <CustomDateField
+                                                                                value={newPayment.date}
+                                                                                onChange={(dateStr) => handlePaymentChange({ target: { name: 'date', value: dateStr } })}
+                                                                                placeholder={paymentsDstCol2Label}
+                                                                                alwaysOpenBelow
+                                                                                calendarPortal
+                                                                                controlHeightPx={EDBC_FILTER_CONTROL_HEIGHT_PX}
+                                                                                className={` !z-[99999] !overflow-visible [&_.absolute]:!z-[99999] [&>div]:!w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div]:!text-[14px] [&>div:hover]:!border-[rgba(191,152,83,0.4)] ${newPayment.date ? '[&>div]:!text-black [&>div]:!font-normal' : '[&>div]:!text-[#d3d5db] [&>div]:!font-normal'}`}
+                                                                            />
+                                                                        </div>
+                                                                    </td>
+                                                                    <td id={EDBC_IDS.EDBC12} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass} overflow-hidden`}>
+                                                                        <div
+                                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass} min-w-0 max-w-full`}
+                                                                            onKeyDown={handleKeyDown1}
+                                                                        >
+                                                                            <Select
+                                                                                name="type"
+                                                                                className="text-xs focus:outline-none w-full"
+                                                                                value={newPayment.type ? { value: newPayment.type, label: newPayment.type } : null}
+                                                                                onChange={(selectedOption) => handlePaymentChange({ target: { name: 'type', value: selectedOption ? selectedOption.value : '' } })}
+                                                                                options={weeklyReceivedTypes.map((type) => ({ value: type.received_type, label: type.received_type }))}
+                                                                                placeholder={paymentsDstCol12Label}
+                                                                                isSearchable
+                                                                                isClearable
+                                                                                menuPortalTarget={document.body}
+                                                                                menuPosition="fixed"
+                                                                                classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
+                                                                                styles={{
+                                                                                    ...CASH_REGISTER_SELECT_STYLES,
+                                                                                    menu: (provided) => ({
+                                                                                        ...CASH_REGISTER_SELECT_STYLES.menu(provided),
+                                                                                        zIndex: 10050,
+                                                                                    }),
+                                                                                    menuList: entryRowSelectMenuListStyle,
+                                                                                    menuPortal: (provided) => ({
+                                                                                        ...provided,
+                                                                                        zIndex: 10050,
+                                                                                    }),
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                    </td>
+                                                                    <td id={EDBC_IDS.EDBC8} className={`pl-[1px] pr-[9px] ${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass} text-right overflow-hidden`}>
+                                                                        <div className="min-w-0 w-full">
+                                                                            <input
+                                                                                type="number"
+                                                                                name="amount"
+                                                                                style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                                className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner !w-full`}
+                                                                                placeholder={paymentsDstCol8Label}
+                                                                                value={newPayment.amount}
+                                                                                onChange={handlePaymentChange}
+                                                                                onKeyDown={handleKeyDown1}
+                                                                                onWheel={(e) => e.preventDefault()}
+                                                                                onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
+                                                                                onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
+                                                                            />
+                                                                        </div>
+                                                                    </td>
+                                                                    <td id={EDBC_IDS.EDBC19} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
+                                                                    <td className="w-[12px] min-w-[12px] max-w-[12px] p-0"></td>
+                                                                </EdbcTableBodyRow>
+                                                            ) : null}
+                                                        </thead>
+                                                        <tbody>
+                                                            {sortedPayments.map((row, index) => (
+                                                                <EdbcTableBodyRow key={row.id || index}>
+                                                                    {editingPaymentId === (row.id || null) ? (
+                                                                        <td id={EDBC_IDS.EDBC2} className={`pl-[12px] ${EDBC2_FIRST_COLUMN_WIDTH_CLASS} pr-[1px] text-left overflow-visible`}>
+                                                                            <div
+                                                                                className={`${getEdbcColumnConfig(EDBC_IDS.EDBC2)?.filterWidthClass || ''} overflow-visible relative z-[99999]`}
+                                                                            >
+                                                                                <CustomDateField
+                                                                                    value={row.date || ""}
+                                                                                    onChange={(dateStr) => handleEditPayment(index, "date", dateStr)}
+                                                                                    placeholder={paymentsDstCol2Label}
+                                                                                    alwaysOpenBelow
+                                                                                    calendarPortal
+                                                                                    controlHeightPx={EDBC_FILTER_CONTROL_HEIGHT_PX}
+                                                                                    className={` !z-[99999] !overflow-visible [&_.absolute]:!z-[99999] [&>div]:!w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div]:!text-[14px] [&>div:hover]:!border-[rgba(191,152,83,0.4)] ${row.date ? '[&>div]:!text-black [&>div]:!font-normal' : '[&>div]:!text-[#d3d5db] [&>div]:!font-normal'}`}
+                                                                                />
+                                                                            </div>
+                                                                        </td>
+                                                                    ) : (
+                                                                        <EdbcDateBodyCell
+                                                                            expense={row}
+                                                                            rowIndex={index}
+                                                                            expandedCells={expandedCells}
+                                                                            onToggleExpanded={toggleExpandedCell}
+                                                                            formatValue={formatDateOnly}
+                                                                            columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS}
+                                                                        />
+                                                                    )}
+                                                                    {editingPaymentId === (row.id || null) ? (
+                                                                        <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
+                                                                            <div className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass}>
+                                                                                <Select
+                                                                                    name="type"
+                                                                                    className="text-xs focus:outline-none w-full"
+                                                                                    value={row.type ? { value: row.type, label: row.type } : null}
+                                                                                    onChange={(selectedOption) => handleEditPayment(index, "type", selectedOption ? selectedOption.value : "")}
+                                                                                    options={weeklyReceivedTypes.map((type) => ({ value: type.received_type, label: type.received_type }))}
+                                                                                    placeholder={paymentsDstCol12Label}
+                                                                                    isSearchable
+                                                                                    isClearable
+                                                                                    menuPortalTarget={document.body}
+                                                                                    menuPosition="fixed"
+                                                                                    classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
+                                                                                    styles={{
+                                                                                        ...CASH_REGISTER_SELECT_STYLES,
+                                                                                        menu: (provided) => ({
+                                                                                            ...CASH_REGISTER_SELECT_STYLES.menu(provided),
+                                                                                            zIndex: 10050,
+                                                                                        }),
+                                                                                        menuList: entryRowSelectMenuListStyle,
+                                                                                        menuPortal: (provided) => ({
+                                                                                            ...provided,
+                                                                                            zIndex: 10050,
+                                                                                        }),
+                                                                                    }}
+                                                                                />
+                                                                            </div>
+                                                                        </td>
+                                                                    ) : (
+                                                                        <EdbcExpandableBodyCell
+                                                                            columnId={EDBC_IDS.EDBC12}
+                                                                            expense={row}
+                                                                            rowIndex={index}
+                                                                            expandedCells={expandedCells}
+                                                                            onToggleExpanded={toggleExpandedCell}
+                                                                            getDisplayValue={(entry) => entry.type}
+                                                                        />
+                                                                    )}
+                                                                    {editingPaymentId === (row.id || null) ? (
+                                                                        <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
+                                                                            <div className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass}>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    value={row.amount || ""}
+                                                                                    onChange={(e) =>
+                                                                                        handleEditPayment(index, "amount", e.target.value)
+                                                                                    }
+                                                                                    style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner`}
+                                                                                    onWheel={(e) => e.preventDefault()}
+                                                                                    onFocus={() =>
+                                                                                        window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })
+                                                                                    }
+                                                                                    onBlur={() =>
+                                                                                        window.removeEventListener("wheel", (e) => e.preventDefault())
+                                                                                    }
+                                                                                />
+                                                                            </div>
+                                                                        </td>
+                                                                    ) : (
+                                                                        <EdbcExpandableBodyCell
+                                                                            columnId={EDBC_IDS.EDBC8}
+                                                                            expense={row}
+                                                                            rowIndex={index}
+                                                                            expandedCells={expandedCells}
+                                                                            onToggleExpanded={toggleExpandedCell}
+                                                                            textAlignClass="text-right"
+                                                                            getDisplayValue={(entry) => formatWeeklyPaymentAmountDisplay(entry.amount)}
+                                                                        />
+                                                                    )}
+                                                                    <td id={EDBC_IDS.EDBC19} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                                        <div className="flex gap-1 justify-center">
+                                                                            {canEditSelectedWeek && (
+                                                                                <>
+                                                                                    {editingPaymentId === row.id ? (
+                                                                                        <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                            <button
+                                                                                                className="text-green-600 font-bold text-lg"
+                                                                                                onClick={() => saveEditedPaymentReceived(row)}
+                                                                                                disabled={!weeklyReceivedTypes.some(type => type.received_type === row.type)}
+                                                                                            >
+                                                                                                ✓
+                                                                                            </button>
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                            {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
+                                                                                                hasEditPermission ? (
+                                                                                                    <button onClick={() => {
+                                                                                                        setEditingPaymentId(row.id);
+                                                                                                        setEditingOriginalPayment({ ...row });
+                                                                                                    }}>
+                                                                                                        <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                                                    </button>
+                                                                                                ) : (
+                                                                                                    <img
+                                                                                                        className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                                                        src={Edit}
+                                                                                                        alt="Edit Disabled"
+                                                                                                    />
+                                                                                                )
+                                                                                            ) : (
+                                                                                                <img
+                                                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                                                    src={Edit}
+                                                                                                    alt="Edit Disabled"
+                                                                                                />
+                                                                                            )}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
+                                                                                        <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                            {hasDeletePermission ? (
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    onClick={() => handleWeeklyReceivedDelete(row.id)}
+                                                                                                >
+                                                                                                    <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                                                                </button>
+                                                                                            ) : (
+                                                                                                <img
+                                                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                                                    src={Delete}
+                                                                                                    alt="Delete Disabled"
+                                                                                                />
+                                                                                            )}
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                            <img
+                                                                                                className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                                                src={Delete}
+                                                                                                alt="Delete Disabled"
+                                                                                            />
+                                                                                        </span>
+                                                                                    )}
+                                                                                    <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                        {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
+                                                                                            <button type="button" onClick={() => fetchAuditDetailsForPaymentReceived(row.id)}>
+                                                                                                <img src={history} className="w-5 h-4" alt="History" />
+                                                                                            </button>
+                                                                                        ) : (
+                                                                                            <img
+                                                                                                className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                                                src={history}
+                                                                                                alt="History Disabled"
+                                                                                            />
+                                                                                        )}
+                                                                                    </span>
+                                                                                </>
+                                                                            )}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="w-[12px] min-w-[12px] max-w-[12px] p-0"></td>
+                                                                </EdbcTableBodyRow>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                )}
+                                <div className={`${isExpensesEntryUploadOnly ? 'mt-[80px]' : 'xl:mt-[12px]'} max-xl:flex-1 max-xl:min-w-[280px] flex-1 min-h-0 rounded-xl bg-white px-[18px] py-[12px] border border-[#E6DAC6] text-left overflow-hidden overflow-x-hidden no-scrollbar scrollbar-none max-xl:overflow-visible`}>
+                                    <div className="flex flex-col h-full min-h-0 overflow-x-hidden">
+                                        <div className="flex items-center justify-between rounded-lg mb-[4px]">
+                                            <p className="text-[16px] font-semibold text-black">Summary Details</p>
+                                            <div className="flex items-center gap-2">
+                                                {hasDeletePermission &&
+                                                    lastDeletedWeeklySummary &&
+                                                    String(lastDeletedWeeklySummary.weekNumber) === String(selectedWeek) &&
+                                                    String(lastDeletedWeeklySummary.year) === String(year) && (
+                                                        <button
+                                                            type="button"
+                                                            disabled={weeklySummaryDeleteLoading}
+                                                            onClick={handleWeeklySummaryUndoDelete}
+                                                            className="text-sm font-semibold text-[#BF9853] flex items-center gap-1 disabled:opacity-50"
+                                                            title="Restore removed summary"
+                                                        >
+                                                            <img src={restore} alt="" className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                <input
+                                                    ref={weeklySummaryFileInputRef}
+                                                    type="file"
+                                                    className="hidden"
+                                                    accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf"
+                                                    onChange={handleWeeklySummaryFileChange}
+                                                />
+                                                {hasWeeklySummaryBillCopyUrl ? (
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <a
+                                                            href={weeklySummaryBillCopyUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-[14px] font-semibold text-[#E4572E] hover:underline"
+                                                            title="View Signature Copy"
+                                                        >
+                                                            {weeklySummaryFileLabel}
+                                                        </a>
+                                                        <button
+                                                            type="button"
+                                                            disabled={weeklySummaryDeleteLoading}
+                                                            onClick={handleWeeklySummaryMarkDeleted}
+                                                            className="inline-flex shrink-0 items-center justify-center rounded-full p-0 leading-none border-0 bg-transparent disabled:opacity-50"
+                                                            title="Remove Signature Copy"
+                                                        >
+                                                            <img
+                                                                src={Delete}
+                                                                className="w-5 h-4 block transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                                                alt="Delete"
+                                                            />
+                                                        </button>
+                                                    </span>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        disabled={weeklySummaryUploading || weeklySummaryLoading}
+                                                        onClick={() => weeklySummaryFileInputRef.current?.click()}
+                                                        className="inline-flex flex-row items-center gap-1 rounded shrink-0 text-[14px] font-semibold text-[#BF9853] disabled:opacity-50"
+                                                        title="Upload Signature Copy for this week"
+                                                    >
+                                                        <span>{weeklySummaryUploading ? "Uploading…" : "Signature"}</span>
+                                                        <img src={fileSignatureUpload} alt="" className="w-4 h-4 shrink-0" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="overflow-y-auto overflow-x-hidden no-scrollbar scrollbar-none flex-1 min-h-0 max-xl:overflow-visible max-xl:flex-none">
+                                            {Object.entries(
+                                                filteredExpenses
+                                                    .filter(expense => Number(expense.amount) > 0)
+                                                    .reduce((acc, expense) => {
+                                                        const type = expense.type;
+                                                        const amount = Number(expense.amount);
+                                                        acc[type] = (acc[type] || 0) + amount;
+                                                        return acc;
+                                                    }, {})
+                                            ).map(([type, total]) => (
+                                                <div key={type} className="flex items-center justify-between py-[4px]">
+                                                    <p className="text-[14px] font-semibold text-[#666666]">{type}</p>
+                                                    <p className="text-[14px] font-semibold text-black">
+                                                        ₹{Number(total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="flex items-center justify-between py-[6px] border-b border-t border-dashed mt-[4px] border-[#454545]">
+                                            <p className="text-[14px] font-semibold text-black">Total Amount</p>
+                                            <p className="text-[14px] font-semibold text-black">
+                                                ₹{filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                </div>
+                                </div>
+                            </div>
+                        </div>
+                        <AuditModal show={showWeeklyPaymentExpensesModal} onClose={() => setShowWeeklyPaymentExpensesModal(false)} audits={weeklyPaymentExpensesAudits} vendorOptions={vendorOptions} contractorOptions={contractorOptions}
+                            siteOptions={siteOptions} />
+                        <AuditModalWeeklyPaymentsReceived show={showWeeklyPaymentReceivedModal} onClose={() => setShowWeeklyPaymentReceivedModal(false)}
+                            audits={weeklyPaymentReceivedAudits} />
+                        <HandoverPaymentsModal
+                            show={showHandoverModal}
+                            onClose={() => setShowHandoverModal(false)}
+                        />
+                    </div>
+                    {showPaymentPopup && (
+                        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
+                            <div className="bg-white text-left rounded-xl px-[18px] py-[18px] overflow-y-auto">
+                                <label className="font-bold text-[18px]">Add Payment</label>
+                                <div className="space-y-[18px] mt-[14px]">
+                                    <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-[18px]">
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="block text-[16px] font-semibold text-black mb-2">Date</label>
+                                                <CustomDateField
+                                                    value={paymentPopupData.date || ''}
+                                                    onChange={() => { }}
+                                                    disabled
+                                                    placeholder="Date"
+                                                    placeholderButtonClassName="text-[14px] font-normal placeholder:text-[#A6A5A6] placeholder:text-[14px]"
+                                                    alwaysOpenBelow
+                                                    calendarPortal
+                                                    controlHeightPx={40}
+                                                    className={` [&>div]:!w-full [&>div]:!h-[40px] [&>div]:!min-h-[40px] [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div]:!text-[14px] ${paymentPopupData.date ? '[&>div]:!text-black [&>div]:!font-normal' : '[&>div]:!text-[#A6A5A6] [&>div]:!font-normal'}`}
+                                                />
+                                            </div>
+                                            <div>
+                                                {currentProjectAdvanceRow ? (
+                                                    <div className="flex justify-between items-center text-[16px] font-semibold text-black mb-2">
+                                                        <span>Amount</span>
+                                                        <span className="text-[#E45732]">
+                                                            ₹{(Number(currentProjectAdvanceRow.amount) + previousPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)).toLocaleString('en-IN')}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <label className="block text-[16px] font-semibold text-black mb-2">Amount</label>
+                                                )}
+                                                <input
+                                                    type="number"
+                                                    value={paymentPopupData.amount}
+                                                    onChange={(e) => setPaymentPopupData(prev => ({ ...prev, amount: e.target.value }))}
+                                                    placeholder="Amount"
+                                                    className="border-2 border-[#BF9853] border-opacity-25 h-[40px] box-border px-2 rounded-lg w-full focus:outline-none no-spinner text-[14px] placeholder:text-[#A6A5A6] placeholder:text-[14px] placeholder:font-normal"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[16px] font-semibold text-black mb-2">Mode</label>
+                                                <Select
+                                                    value={paymentPopupData.paymentMode ? { value: paymentPopupData.paymentMode, label: paymentPopupData.paymentMode } : null}
+                                                    onChange={(selectedOption) => setPaymentPopupData(prev => ({ ...prev, paymentMode: selectedOption ? selectedOption.value : '' }))}
+                                                    options={[
+                                                        { value: 'Gpay', label: 'Gpay' },
+                                                        { value: 'PhonePe', label: 'PhonePe' },
+                                                        { value: 'Net Banking', label: 'Net Banking' },
+                                                        { value: 'Cheque', label: 'Cheque' },
+                                                    ]}
+                                                    placeholder="Mode"
+                                                    isSearchable
+                                                    isClearable
+                                                    menuPortalTarget={document.body}
+                                                    menuPosition="fixed"
+                                                    className="w-full text-[14px] focus:outline-none"
+                                                    classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
+                                                    styles={{
+                                                        ...CASH_REGISTER_SELECT_STYLES,
+                                                        control: (provided, state) => ({
+                                                            ...CASH_REGISTER_SELECT_STYLES.control(provided, state),
+                                                            minHeight: '40px',
+                                                            height: '40px',
+                                                            maxHeight: '40px',
+                                                        }),
+                                                        placeholder: (provided) => ({
+                                                            ...CASH_REGISTER_SELECT_STYLES.placeholder(provided),
+                                                            color: '#A6A5A6',
+                                                            fontSize: '14px',
+                                                            fontWeight: 'normal',
+                                                        }),
+                                                        menu: (provided) => ({
+                                                            ...CASH_REGISTER_SELECT_STYLES.menu(provided),
+                                                            zIndex: 10050,
+                                                        }),
+                                                        menuList: entryRowSelectMenuListStyle,
+                                                        menuPortal: (provided) => ({
+                                                            ...provided,
+                                                            zIndex: 10050,
+                                                        }),
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-[18px]">
+                                        <div className="space-y-4">
+                                            {paymentPopupData.paymentMode === "Cheque" && (
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-[16px] font-semibold text-black mb-2">Cheque No</label>
+                                                        <input
+                                                            type="text"
+                                                            value={paymentPopupData.chequeNo}
+                                                            onChange={(e) => setPaymentPopupData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                                                            placeholder="Cheque No"
+                                                            className="border-2 border-[#BF9853] border-opacity-25 h-[40px] box-border px-2 rounded-lg w-full focus:outline-none text-[14px] placeholder:text-[#A6A5A6] placeholder:text-[14px] placeholder:font-normal"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[16px] font-semibold text-black mb-2">Cheque Date</label>
+                                                        <CustomDateField
+                                                            value={paymentPopupData.chequeDate || ''}
+                                                            onChange={(dateStr) => setPaymentPopupData(prev => ({ ...prev, chequeDate: dateStr }))}
+                                                            placeholder="Cheque Date"
+                                                            placeholderButtonClassName="text-[14px] font-normal placeholder:text-[#A6A5A6] placeholder:text-[14px]"
+                                                            alwaysOpenBelow
+                                                            calendarPortal
+                                                            controlHeightPx={40}
+                                                            className={` [&>div]:!w-full [&>div]:!h-[40px] [&>div]:!min-h-[40px] [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div]:!text-[14px] [&>div:hover]:!border-[rgba(191,152,83,0.4)] ${paymentPopupData.chequeDate ? '[&>div]:!text-black [&>div]:!font-normal' : '[&>div]:!text-[#A6A5A6] [&>div]:!font-normal'}`}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-[16px] font-semibold text-black mb-2">Transaction Number</label>
+                                                    <input
+                                                        type="text"
+                                                        value={paymentPopupData.transactionNumber}
+                                                        onChange={(e) => setPaymentPopupData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                                                        placeholder="Transaction Number"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 h-[40px] box-border px-2 rounded-lg w-full focus:outline-none text-[14px] placeholder:text-[#A6A5A6] placeholder:text-[14px] placeholder:font-normal"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[16px] font-semibold text-black mb-2">Account Number</label>
+                                                    <Select
+                                                        value={paymentPopupData.accountNumber ? { value: paymentPopupData.accountNumber, label: paymentPopupData.accountNumber } : null}
+                                                        onChange={(selectedOption) => setPaymentPopupData(prev => ({ ...prev, accountNumber: selectedOption ? selectedOption.value : '' }))}
+                                                        options={accountDetails.map((account) => ({
+                                                            value: account.account_number,
+                                                            label: account.account_number,
+                                                        }))}
+                                                        placeholder="Account Number"
+                                                        isSearchable
+                                                        isClearable
+                                                        menuPortalTarget={document.body}
+                                                        menuPosition="fixed"
+                                                        className="w-full text-[14px] focus:outline-none"
+                                                        classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
+                                                        styles={{
+                                                            ...CASH_REGISTER_SELECT_STYLES,
+                                                            control: (provided, state) => ({
+                                                                ...CASH_REGISTER_SELECT_STYLES.control(provided, state),
+                                                                minHeight: '40px',
+                                                                height: '40px',
+                                                                maxHeight: '40px',
+                                                            }),
+                                                            placeholder: (provided) => ({
+                                                                ...CASH_REGISTER_SELECT_STYLES.placeholder(provided),
+                                                                color: '#A6A5A6',
+                                                                fontSize: '14px',
+                                                                fontWeight: 'normal',
+                                                            }),
+                                                            menu: (provided) => ({
+                                                                ...CASH_REGISTER_SELECT_STYLES.menu(provided),
+                                                                zIndex: 10050,
+                                                            }),
+                                                            menuList: entryRowSelectMenuListStyle,
+                                                            menuPortal: (provided) => ({
+                                                                ...provided,
+                                                                zIndex: 10050,
+                                                            }),
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {previousPayments.length > 0 && (
+                                        <div>
+                                            <h4 className="text-md font-semibold text-black  ml-20">Previous Payments: {previousPayments.length} </h4>
+                                            <div className="mb-[18px] justify-items-center">
+                                                <div className="space-y-4 max-h-64 overflow-y-auto">
+                                                    {previousPayments.map((payment, index) => (
+                                                        <div key={index} className="">
+                                                            <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-[18px] mb-4">
+                                                                <div className="grid grid-cols-3 gap-4">
+                                                                    <div>
+                                                                        <label className="block text-[16px] font-semibold text-black mb-2">Date</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={new Date(payment.date).toLocaleDateString('en-GB')}
+                                                                            readOnly
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="block text-[16px] font-semibold text-black mb-2">Amount</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={payment.amount.toLocaleString('en-IN')}
+                                                                            readOnly
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="block text-[16px] font-semibold text-black mb-2">Mode</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={payment.bill_payment_mode}
+                                                                            readOnly
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
+                                                                <div className="space-y-4">
+                                                                    {payment.bill_payment_mode === "Cheque" && (
+                                                                        <div className="grid grid-cols-2 gap-4">
+                                                                            <div>
+                                                                                <label className="block text-[16px] font-semibold text-black mb-2">Cheque No</label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={payment.cheque_number || ""}
+                                                                                    readOnly
+                                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="block text-[16px] font-semibold text-black mb-2">Cheque Date</label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={payment.cheque_date ? new Date(payment.cheque_date).toLocaleDateString('en-GB') : ""}
+                                                                                    readOnly
+                                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="grid grid-cols-2 gap-4">
+                                                                        <div>
+                                                                            <label className="block text-[16px] font-semibold text-black mb-2">Transaction Number</label>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={payment.transaction_number || ""}
+                                                                                readOnly
+                                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                            />
+                                                                        </div>
+                                                                        <div>
+                                                                            <label className="block text-[16px] font-semibold text-black mb-2">Account Number</label>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={payment.account_number || ""}
+                                                                                readOnly
+                                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {currentProjectAdvanceRow && currentProjectAdvanceRow.type === "Claim" && currentProjectAdvanceRow.send_to_expenses_entry && (
+                                        <div className="mt-6 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                            <div className="text-center">
+                                                <span className="text-sm font-medium text-green-700">
+                                                    This Claim Amount Was Already Sent to the Expense Entry
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-end items-center mt-[18px]">
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={() => {
+                                                    setShowPaymentPopup(false);
+                                                    setPaymentPopupData({
+                                                        date: new Date().toISOString().split('T')[0],
+                                                        amount: "",
+                                                        paymentMode: "",
+                                                        chequeNo: "",
+                                                        chequeDate: "",
+                                                        transactionNumber: "",
+                                                        accountNumber: ""
+                                                    });
+                                                    setPreviousPayments([]);
+                                                    setCurrentProjectAdvanceRow(null);
+                                                }}
+                                                className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        if (currentProjectAdvanceRow && paymentPopupData.paymentMode && paymentPopupData.amount) {
+                                                            if (isPaymentModeRequiringBankRegisterLog(paymentPopupData.paymentMode)) {
+                                                                let mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save";
+                                                                if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
+                                                                    mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/advance_portal/save";
+                                                                } else if (currentProjectAdvanceRow.type === "Staff Advance") {
+                                                                    mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/staff-advance/save";
+                                                                }
+                                                                await postBankRegisterLogSave(
+                                                                    bankRegisterLogSaveUrlMatchingRequest(mainRefUrl),
+                                                                    "Cash Register — Weekly Payment History",
+                                                                    {
+                                                                        bill_payment_mode: paymentPopupData.paymentMode,
+                                                                        amount: paymentPopupData.amount,
+                                                                        entered_by: enteredBy,
+                                                                    }
+                                                                );
+                                                            }
+                                                            let advancePortalId = null;
+                                                            let staffAdvancePortalId = null;
+                                                            if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
+                                                                try {
+                                                                    const res = await fetch("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll");
+                                                                    if (!res.ok) throw new Error("Failed to fetch entry numbers");
+                                                                    const allData = await res.json();
+                                                                    const maxEntryNo =
+                                                                        allData.length > 0
+                                                                            ? Math.max(...allData.map((item) => item.entry_no || 0))
+                                                                            : 0;
+                                                                    const nextEntryNo = maxEntryNo + 1;
+                                                                    const getWeekNumber = () => {
+                                                                        return getISOWeekNumber(new Date());
+                                                                    };
+                                                                    const description = portalDescriptions[currentProjectAdvanceRow.advance_portal_id] || "";
+                                                                    const advanceUpdateData = {
+                                                                        type: "Advance",
+                                                                        date: paymentPopupData.date,
+                                                                        description: description,
+                                                                        bill_amount: 0,
+                                                                        amount: parseFloat(paymentPopupData.amount),
+                                                                        project_id: currentProjectAdvanceRow.project_id,
+                                                                        vendor_id: currentProjectAdvanceRow.vendor_id,
+                                                                        contractor_id: currentProjectAdvanceRow.contractor_id,
+                                                                        entry_no: nextEntryNo,
+                                                                        week_no: getWeekNumber(),
+                                                                        file_url: "",
+                                                                        transfer_site_id: 0,
+                                                                        refund_amount: 0,
+                                                                        payment_mode: paymentPopupData.paymentMode,
+                                                                        not_allow_to_edit: true,
+                                                                        branch_id: activeBranchId ?? null,
+                                                                        source: "Cash Register",
+                                                                        entered_by: enteredBy,
+                                                                    };
+                                                                    const advanceResponse = await fetch(
+                                                                        "https://backendaab.in/demoAabuildersDash/api/advance_portal/save",
+                                                                        {
+                                                                            method: "POST",
+                                                                            headers: { "Content-Type": "application/json" },
+                                                                            body: JSON.stringify(advanceUpdateData)
+                                                                        }
+                                                                    );
+                                                                    if (!advanceResponse.ok) {
+                                                                        console.error("Failed to update advance portal payment mode");
+                                                                    } else {
+                                                                        const advanceResponseData = await advanceResponse.json();
+                                                                        advancePortalId = advanceResponseData.advancePortalId || advanceResponseData.advance_portal_id;
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.error("Error updating advance portal payment mode:", error);
+                                                                }
+                                                            }
+                                                            if (currentProjectAdvanceRow.type === "Staff Advance") {
+                                                                try {
+                                                                    const staffAdvanceRes = await fetch("https://backendaab.in/demoAabuildersDash/api/staff-advance/all");
+                                                                    if (!staffAdvanceRes.ok) throw new Error("Failed to fetch staff advance entry numbers");
+                                                                    const staffAdvanceData = await staffAdvanceRes.json();
+                                                                    const maxEntryNo =
+                                                                        staffAdvanceData.length > 0
+                                                                            ? Math.max(...staffAdvanceData.map((item) => item.entry_no || 0))
+                                                                            : 0;
+                                                                    const nextEntryNo = maxEntryNo + 1;
+                                                                    const getWeekNumber = () => {
+                                                                        return getISOWeekNumber(new Date());
+                                                                    };
+                                                                    const staffAdvanceSaveData = {
+                                                                        date: paymentPopupData.date,
+                                                                        employee_id: currentProjectAdvanceRow.employee_id,
+                                                                        project_id: currentProjectAdvanceRow.project_id,
+                                                                        type: "Advance",
+                                                                        from_purpose_id: 4,
+                                                                        staff_payment_mode: paymentPopupData.paymentMode,
+                                                                        entry_no: nextEntryNo,
+                                                                        week_no: getWeekNumber(),
+                                                                        amount: parseFloat(paymentPopupData.amount),
+                                                                        staff_refund_amount: 0.0,
+                                                                        description: "",
+                                                                        file_url: null,
+                                                                        labour_id: 0,
+                                                                        not_allow_to_edit: true,
+                                                                        branch_id: activeBranchId ?? null,
+                                                                        entered_by: enteredBy,
+                                                                        source: "Cash Register",
+                                                                    };
+                                                                    const staffAdvanceResponse = await fetch(
+                                                                        "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
+                                                                        {
+                                                                            method: "POST",
+                                                                            headers: { "Content-Type": "application/json" },
+                                                                            body: JSON.stringify(staffAdvanceSaveData)
+                                                                        }
+                                                                    );
+                                                                    if (!staffAdvanceResponse.ok) {
+                                                                        console.error("Failed to save staff advance");
+                                                                    } else {
+                                                                        const staffAdvanceResponseData = await staffAdvanceResponse.json();
+                                                                        staffAdvancePortalId = staffAdvanceResponseData.staffAdvancePortalId || staffAdvanceResponseData.staff_advance_portal_id;
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.error("Error saving staff advance:", error);
+                                                                }
+                                                            }
+                                                            const paymentData = {
+                                                                date: paymentPopupData.date,
+                                                                created_at: new Date().toISOString(),
+                                                                contractor_id: currentProjectAdvanceRow.contractor_id || null,
+                                                                vendor_id: currentProjectAdvanceRow.vendor_id || null,
+                                                                employee_id: currentProjectAdvanceRow.employee_id || null,
+                                                                project_id: currentProjectAdvanceRow.project_id || null,
+                                                                type: currentProjectAdvanceRow.type || null,
+                                                                bill_payment_mode: paymentPopupData.paymentMode,
+                                                                amount: parseFloat(paymentPopupData.amount),
+                                                                status: true,
+                                                                weekly_number: Number(selectedWeek),
+                                                                weekly_payment_expense_id: currentProjectAdvanceRow.id,
+                                                                advance_portal_id: advancePortalId,
+                                                                staff_advance_portal_id: staffAdvancePortalId,
+                                                                cheque_number: paymentPopupData.chequeNo || null,
+                                                                cheque_date: paymentPopupData.chequeDate || null,
+                                                                transaction_number: paymentPopupData.transactionNumber || null,
+                                                                account_number: paymentPopupData.accountNumber || null,
+                                                                branch_id: activeBranchId ?? null,
+                                                                entered_by: enteredBy,
+                                                                source: "Cash Register",
+                                                            };
+                                                            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save", {
+                                                                method: "POST",
+                                                                headers: { "Content-Type": "application/json" },
+                                                                body: JSON.stringify(paymentData)
+                                                            });
+                                                            if (!response.ok) {
+                                                                throw new Error("Failed to save payment");
+                                                            }
+                                                            const [expensesRes, paymentsRes] = await Promise.all([
+                                                                axios.get(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
+                                                                axios.get(`https://backendaab.in/demoAabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams())
+                                                            ]);
+                                                            setExpenses(expensesRes.data);
+                                                            const filteredPayments = paymentsRes.data.filter(
+                                                                (payment) => payment.type !== "Handover"
+                                                            );
+                                                            setPayments(filteredPayments);
+                                                            await fetchWeeklyPaymentBills();
+                                                        }
+                                                    } catch (error) {
+                                                        console.error("Error saving payment:", error);
+                                                    }
+
+                                                    setShowPaymentPopup(false);
+                                                    setPaymentPopupData({
+                                                        date: new Date().toISOString().split('T')[0],
+                                                        amount: "",
+                                                        paymentMode: "",
+                                                        chequeNo: "",
+                                                        chequeDate: "",
+                                                        transactionNumber: "",
+                                                        accountNumber: ""
+                                                    });
+                                                    setPreviousPayments([]);
+                                                    setCurrentProjectAdvanceRow(null);
+                                                }}
+                                                className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
+                                                disabled={!paymentPopupData.paymentMode || !paymentPopupData.amount}
+                                            >
+                                                Submit
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {showPopups && (currentRow?.type === "Project Advance" || currentRow?.type === "Bill Payment") && (
+                        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[9999]">
+                            <div className="bg-white rounded-xl shadow-lg p-[18px] w-[650px]">
+                                <label className="block text-left">
+                                    <span className="font-semibold text-[18px] block mb-[8px]">Description</span>
+                                    <textarea
+                                        name="description"
+                                        rows={4}
+                                        className={`w-full p-2 border-2 border-[#BF9853] border-opacity-25 rounded-lg focus:outline-none resize-none whitespace-normal break-words${Boolean(portalDescriptions[currentRow?.advance_portal_id]) && !isDescriptionEditing ? ' bg-[#ededed]' : ''}`}
+                                        value={editFormData.description}
+                                        onChange={handleEditChange}
+                                        readOnly={Boolean(portalDescriptions[currentRow?.advance_portal_id]) && !isDescriptionEditing}
+                                    />
+                                </label>
+                                <div className="flex justify-end gap-[18px] mt-[18px]">
+                                    {portalDescriptions[currentRow?.advance_portal_id] && !isDescriptionEditing && editingRowId === currentRow?.id && (
+                                        <button onClick={() => setIsDescriptionEditing(true)} className="px-4 py-2 bg-green-600 text-white rounded-md">
+                                            Edit
+                                        </button>
+                                    )}
+                                    <button onClick={() => { setShowPopups(false); setIsDescriptionEditing(false); }} className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-md">
+                                        Close
+                                    </button>
+                                    {(!portalDescriptions[currentRow?.advance_portal_id] || isDescriptionEditing) && (!portalDescriptions[currentRow?.advance_portal_id] || editingRowId === currentRow?.id) && (
+                                        <button
+                                            onClick={async () => {
+                                                await updateDescription(currentRow.advance_portal_id, editFormData.description);
+                                                setIsDescriptionEditing(false);
+                                                setShowPopups(false);
+                                            }}
+                                            className="px-4 py-2 bg-[#BF9853] text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Save
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {showBillExpenseEntryModal ? (
+                        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-[18px]">
+                            <div className="bg-white rounded-lg w-full max-w-[690px] max-h-[92vh] overflow-y-auto shadow-lg relative p-[18px]">
+                                <div className="flex items-center justify-between mb-[14px]">
+                                    <p className="text-[18px] font-semibold text-[#202020]">Expense Entry</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (!canCloseExpenseEntryModal()) return;
+                                            setShowBillExpenseEntryModal(false);
+                                            localStorage.removeItem('expenseEntryPrefill');
+                                            localStorage.removeItem('summaryBillEditProgress');
+                                        }}
+                                        className="w-3 h-3 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
+                                    >
+                                        <img src={FileRemover} className="w-4 h-4" alt="Close" />
+                                    </button>
+                                </div>
+                                <style>{`
+                                    .weekly-payment-expense-entry-form > div > div {
+                                        padding-top: 0 !important;
+                                        padding-bottom: 0 !important;
+                                    }
+                                    .weekly-payment-expense-entry-form div.flex.items-start.justify-between:has(label[for="fileInput"]) {
+                                        margin-top: 8px !important;
+                                        margin-bottom: 12px !important;
+                                    }
+                                    .weekly-payment-expense-entry-form div.mt-\\[12px\\].flex:has(button[type="submit"]) {
+                                        margin-top: 0 !important;
+                                    }
+                                    .weekly-payment-expense-entry-form [aria-readonly="true"].w-\\[300px\\] {
+                                        min-height: 40px !important;
+                                        height: 40px !important;
+                                        max-height: 40px !important;
+                                        background-color: #ededed !important;
+                                    }
+                                `}</style>
+                                <div className="weekly-payment-expense-entry-form">
+                                    <ExpenseEntryForm
+                                        username={username}
+                                        userRoles={userRoles}
+                                        embedded
+                                        lockAccountTypePrefill
+                                        lockClaimPaymentModeCash
+                                        disableWeeklyExpensesSave
+                                        onSuccess={() => {
+                                            setShowBillExpenseEntryModal(false);
+                                            localStorage.removeItem('expenseEntryPrefill');
+                                            localStorage.removeItem('summaryBillEditProgress');
+                                            setExpenseEntryRefreshNonce((n) => n + 1);
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
+                    {showBillSettlementAdvanceModal ? (
+                        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-lg w-full max-w-[1824px] overflow-y-auto shadow-lg relative p-[18px]">
+                                <div className="sticky top-0 z-10 bg-white flex items-center justify-between">
+                                    <p className="text-sm font-semibold text-[#202020]">Advance Portal</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowBillSettlementAdvanceModal(false);
+                                            try {
+                                                sessionStorage.removeItem("selectedType");
+                                                sessionStorage.removeItem("selectedOption");
+                                                sessionStorage.removeItem("selectedSite");
+                                                sessionStorage.removeItem("advanceAmount");
+                                                sessionStorage.removeItem("billAmount");
+                                                sessionStorage.removeItem("paymentMode");
+                                                sessionStorage.removeItem("description");
+                                                sessionStorage.removeItem("cashRegisterBillSettlementDate");
+                                            } catch {
+                                                /* ignore */
+                                            }
+                                        }}
+                                        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200"
+                                    >
+                                        <img src={FileRemover} className="w-3 h-3" alt="Close" />
+                                    </button>
+                                </div>
+                                <AdvancePortalForm
+                                        username={username}
+                                        userRoles={userRoles}
+                                        embedded
+                                        modalEmbedded
+                                        lockTypePrefill
+                                        onSuccess={() => {
+                                            setShowBillSettlementAdvanceModal(false);
+                                            try {
+                                                sessionStorage.removeItem("selectedType");
+                                                sessionStorage.removeItem("selectedOption");
+                                                sessionStorage.removeItem("selectedSite");
+                                                sessionStorage.removeItem("advanceAmount");
+                                                sessionStorage.removeItem("billAmount");
+                                                sessionStorage.removeItem("paymentMode");
+                                                sessionStorage.removeItem("description");
+                                                sessionStorage.removeItem("cashRegisterBillSettlementDate");
+                                            } catch {
+                                                /* ignore */
+                                            }
+                                            setExpenseEntryRefreshNonce((n) => n + 1);
+                                        }}
+                                    />
+                            </div>
+                        </div>
+                    ) : null}
+                    {fileUploadPopup && (
+                        <div
+                            className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Escape') {
+                                    setFileUploadPopup(false);
+                                    setCurrentFileRow(null);
+                                    setSelectedFileForPopup(null);
+                                }
+                            }}
+                            tabIndex={0}
+                        >
+                            <div className="bg-white rounded-xl shadow-lg p-6 w-[500px]">
+                                <h3 className="text-lg font-semibold mb-4 text-center">
+                                    {currentFileRow?.bill_copy_url ? 'Change File' : 'Upload File'}
+                                </h3>
+                                {currentFileRow?.bill_copy_url && (
+                                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                                        <p className="text-sm text-gray-600 mb-2">Current file:</p>
+                                        <a href={cleanUrl(currentFileRow.bill_copy_url)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:text-blue-800 underline"
+                                        >
+                                            View Current File
+                                        </a>
+                                    </div>
+                                )}
+                                <div className="mb-4">
+                                    <label
+                                        htmlFor="weekly-payment-history-file-upload-input"
+                                        className="flex flex-col items-center justify-center w-full h-[120px] border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                                    >
+                                        <svg width="40" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                            <path d="M17 8L12 3L7 8" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                            <path d="M12 3V15" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                        <p className="text-[14px] font-medium text-[#E4572E] mt-[4px]">Click to Upload</p>
+                                        <p className="text-[10px] text-gray-400">Files will be compressed on upload</p>
+                                    </label>
+                                    <input
+                                        id="weekly-payment-history-file-upload-input"
+                                        type="file"
+                                        accept="application/pdf"
+                                        onChange={handleFileSelectInPopup}
+                                        className="hidden"
+                                    />
+                                    {selectedFileForPopup && (
+                                        <div className="mt-2">
+                                            <p className="text-[12px] font-medium text-black mb-[4px]">File Uploading</p>
+                                            <div className="bg-gray-50 rounded-lg p-[12px]">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-[12px] flex-1 min-w-0">
+                                                        <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                                <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                            </svg>
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-[12px] font-medium text-black truncate">{selectedFileForPopup.name}</p>
+                                                            <p className="text-[10px] text-gray-500">{(selectedFileForPopup.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-[12px]">
+                                                        <button type="button" onClick={() => setSelectedFileForPopup(null)} className="text-red-500 hover:text-red-700">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                                <path d="M3 6H5H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                                <path d="M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                            </svg>
+                                                        </button>
+                                                        <span className="text-[12px] font-semibold text-black w-[40px] text-right">100%</span>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-2 w-full h-1 bg-gray-200 rounded-full overflow-hidden">
+                                                    <div className="h-full w-full bg-[#BF9853] rounded-full" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex flex-col gap-3 mt-6 w-full">
+                                    <button onClick={handleSaveFileFromPopup} disabled={!selectedFileForPopup}
+                                        className={`w-full px-4 py-2 rounded-lg ${!selectedFileForPopup
+                                            ? 'bg-[#BF9853] opacity-50 cursor-not-allowed text-white'
+                                            : 'bg-[#BF9853] text-white'
+                                            }`}
+                                    >
+                                        Confirm
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setFileUploadPopup(false);
+                                            setCurrentFileRow(null);
+                                            setSelectedFileForPopup(null);
+                                        }}
+                                        className="w-full px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {showCategoryPopup && (
+                        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                            <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
+                                <h3 className="text-lg font-semibold mb-4 text-center">Select Category</h3>
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Category
+                                    </label>
+                                    <Select
+                                        value={selectedCategory}
+                                        onChange={(selectedOption) => setSelectedCategory(selectedOption)}
+                                        options={categoryOptions}
+                                        placeholder="Select Category..."
+                                        isSearchable
+                                        isClearable
+                                        menuPortalTarget={document.body}
+                                        menuPosition="fixed"
+                                        styles={{
+                                            control: (provided, state) => ({
+                                                ...provided,
+                                                backgroundColor: 'white',
+                                                borderWidth: '2px',
+                                                borderColor: state.isFocused
+                                                    ? '#BF9853'
+                                                    : '#BF9853',
+                                                borderRadius: '8px',
+                                                boxShadow: state.isFocused ? '0 0 0 1px #BF9853' : 'none',
+                                                '&:hover': {
+                                                    borderColor: '#BF9853',
+                                                },
+                                            }),
+                                            placeholder: (provided) => ({
+                                                ...provided,
+                                                color: '#999',
+                                                textAlign: 'left',
+                                            }),
+                                            menu: (provided) => ({
+                                                ...provided,
+                                                zIndex: 10050,
+                                                maxHeight: '300px',
+                                                overflow: 'auto',
+                                            }),
+                                            menuList: (provided) => ({
+                                                ...provided,
+                                                maxHeight: '300px',
+                                                overflowY: 'auto',
+                                                padding: '4px',
+                                            }),
+                                            menuPortal: (provided) => ({
+                                                ...provided,
+                                                zIndex: 10050,
+                                            }),
+                                            option: (provided, state) => ({
+                                                ...provided,
+                                                textAlign: 'left',
+                                                fontWeight: 'normal',
+                                                fontSize: '15px',
+                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                color: 'black',
+                                            }),
+                                            singleValue: (provided) => ({
+                                                ...provided,
+                                                textAlign: 'left',
+                                                fontWeight: 'normal',
+                                                color: 'black',
+                                            }),
+                                            indicatorSeparator: () => ({
+                                                display: 'none'
+                                            }),
+                                            indicatorsContainer: (provided) => ({
+                                                ...provided,
+                                                height: '40px',
+                                                gap: '0px'
+                                            }),
+                                            clearIndicator: (provided) => ({
+                                                ...provided,
+                                                padding: '2px',
+                                                color: '#000000',
+                                            }),
+                                            dropdownIndicator: (provided, state) => ({
+                                                ...provided,
+                                                padding: '2px',
+                                                color: '#000000',
+                                                display: state.hasValue && state.selectProps.isClearable ? 'none' : 'flex',
+                                            })
+                                        }}
+                                    />
+                                </div>
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Comments
+                                    </label>
+                                    <textarea
+                                        value={categoryComments}
+                                        onChange={(e) => setCategoryComments(e.target.value)}
+                                        placeholder="Enter comments..."
+                                        className="w-full border-2 border-[#BF9853] border-opacity-25 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent resize-none"
+                                        rows={3}
+                                    />
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button
+                                        onClick={() => {
+                                            setShowCategoryPopup(false);
+                                            setSelectedCategory(null);
+                                            setIsConfirmingCategory(false);
+                                        }}
+                                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={async () => {
+                                            if (!selectedCategory || isConfirmingCategory) {
+                                                if (!selectedCategory) {
+                                                    alert("Please select a category");
+                                                }
+                                                return;
+                                            }
+                                            setIsConfirmingCategory(true);
+                                            setShowCategoryPopup(false);
+                                            try {
+                                                const enoResponse = await fetch('https://backendaab.in/demoAabuilderDash/expenses_form/get_form');
+                                                if (!enoResponse.ok) {
+                                                    throw new Error('Failed to fetch ENo');
+                                                }
+                                                const enoData = await enoResponse.json();
+                                                const nextEno = enoData.length > 0 ? Math.max(...enoData.map(item => item.eno || 0)) + 1 : 1;
+                                                const expensesFormData = {
+                                                    accountType: "Claim",
+                                                    eno: nextEno,
+                                                    date: currentProjectAdvanceRow.date,
+                                                    siteName: siteOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.project_id))?.label || "",
+                                                    vendor: vendorOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.vendor_id))?.label || "",
+                                                    quantity: 1,
+                                                    contractor: contractorOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.contractor_id))?.label || "",
+                                                    amount: Number(currentProjectAdvanceRow.amount) + previousPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+                                                    category: selectedCategory.value,
+                                                    comments: categoryComments || "",
+                                                    machineTools: "",
+                                                    source: "Cash Register",
+                                                    billCopyUrl: cleanUrl(currentProjectAdvanceRow.bill_copy_url || ''),
+                                                    branchId: activeBranchId ?? null,
+                                                    enteredBy: enteredBy,
+                                                };
+                                                const expensesFormResponse = await fetch('https://backendaab.in/demoAabuilderDash/expenses_form/save', {
+                                                    method: 'POST',
+                                                    headers: {
+                                                        'Content-Type': 'application/json',
+                                                    },
+                                                    body: JSON.stringify(expensesFormData)
+                                                });
+                                                if (!expensesFormResponse.ok) {
+                                                    throw new Error('Failed to save to expenses form');
+                                                }
+                                                const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/${currentProjectAdvanceRow.id}/send-to-expenses`, {
+                                                    method: 'PUT',
+                                                    headers: {
+                                                        'Content-Type': 'application/json',
+                                                    },
+                                                });
+                                                if (response.ok) {
+                                                    const [expensesRes, paymentsRes] = await Promise.all([
+                                                        axios.get(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
+                                                        axios.get(`https://backendaab.in/demoAabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams())
+                                                    ]);
+                                                    setExpenses(expensesRes.data);
+                                                    const filteredPayments = paymentsRes.data.filter(
+                                                        (payment) => payment.type !== "Handover"
+                                                    );
+                                                    setPayments(filteredPayments);
+                                                    await fetchWeeklyPaymentBills();
+                                                    setCurrentProjectAdvanceRow(prev => ({ ...prev, send_to_expenses_entry: true }));
+                                                    setPopup({
+                                                        show: true,
+                                                        message: "Successfully added to expense entry!",
+                                                        type: "success",
+                                                        dateStr: new Date().toLocaleDateString('en-GB')
+                                                    });
+                                                    setTimeout(() => {
+                                                        setShowPaymentPopup(false);
+                                                        setPaymentPopupData({
+                                                            date: new Date().toISOString().split('T')[0],
+                                                            amount: "",
+                                                            paymentMode: "",
+                                                            chequeNo: "",
+                                                            chequeDate: "",
+                                                            transactionNumber: "",
+                                                            accountNumber: ""
+                                                        });
+                                                        setPreviousPayments([]);
+                                                        setCurrentProjectAdvanceRow(null);
+                                                        setSelectedCategory(null);
+                                                        setIsConfirmingCategory(false);
+                                                        setCategoryComments("");
+                                                    }, 2000);
+                                                } else {
+                                                    throw new Error('Failed to update expense entry status');
+                                                }
+                                            } catch (error) {
+                                                console.error('Error updating expense entry status:', error);
+                                                setIsConfirmingCategory(false);
+                                                setPopup({
+                                                    show: true,
+                                                    message: "Failed to add to expense entry. Please try again.",
+                                                    type: "error",
+                                                    dateStr: new Date().toLocaleDateString('en-GB')
+                                                });
+                                            }
+                                        }}
+                                        className="px-4 py-2 bg-[#BF9853] text-white rounded-lg hover:bg-[#BF9853]/90 transition-colors"
+                                        disabled={!selectedCategory || isConfirmingCategory}
+                                    >
+                                        {isConfirmingCategory ? "Processing..." : "Confirm"}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {popup.show && (
+                        <div className="fixed top-1/3 left-1/2 transform -translate-x-1/2 bg-white border rounded-lg shadow-lg p-4 z-50 w-96">
+                            <p className="mb-4 font-semibold text-center">{popup.message}</p>
+                            <div className="flex justify-around">
+                                <button
+                                    className="px-4 py-2 border border-[#BF9853] w-[90px] rounded-lg"
+                                    onClick={() => {
+                                        if (popup.type === "expense") {
+                                            setNewExpense((prev) => ({ ...prev, date: "" }));
+                                        } else if (popup.type === "payment") {
+                                            setNewPayment((prev) => ({ ...prev, date: "" }));
+                                        } else if (popup.type === "edit-expense" && popup.editRowId !== null && popup.originalDate) {
+                                            setExpenses((prevExpenses) =>
+                                                prevExpenses.map((expense) =>
+                                                    expense.id === popup.editRowId ? { ...expense, date: popup.originalDate } : expense
+                                                )
+                                            );
+                                        } else if (popup.type === "edit-payment" && popup.editIndex !== null && popup.originalDate) {
+                                            setPayments((prevPayments) =>
+                                                prevPayments.map((payment, i) =>
+                                                    i === popup.editIndex ? { ...payment, date: popup.originalDate } : payment
+                                                )
+                                            );
+                                        }
+                                        setPopup({ show: false, message: "", type: "", dateStr: "", editRowId: null, editField: null, editIndex: null, originalDate: "" });
+                                    }}
+                                >
+                                    OK
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    {showPurposePopup && (
+                        <div
+                            className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Escape') {
+                                    setShowPurposePopup(false);
+                                    setSelectedPurpose(null);
+                                    setLoanPurposeDescription("");
+                                    setPendingLoanData(null);
+                                }
+                            }}
+                            tabIndex={0}
+                        >
+                            <div className="bg-white rounded-xl shadow-lg p-6 w-[500px]">
+                                <h3 className="text-lg font-semibold mb-4 text-center">
+                                    Select Purpose for Loan
+                                </h3>
+                                <div className="mb-4">
+                                    <label className="block mb-2 text-sm font-medium">
+                                        Purpose <span className="text-red-500">*</span>
+                                    </label>
+                                    <Select
+                                        name="purpose"
+                                        className="w-full"
+                                        placeholder="Select Purpose"
+                                        isSearchable
+                                        isClearable
+                                        value={selectedPurpose}
+                                        onChange={(selectedOption) => setSelectedPurpose(selectedOption)}
+                                        options={purposeOptions}
+                                        menuPortalTarget={document.body}
+                                        menuPosition="fixed"
+                                        styles={{
+                                            control: (provided, state) => ({
+                                                ...provided,
+                                                minHeight: '45px',
+                                                border: '2px solid rgba(191, 152, 83, 0.25)',
+                                                borderRadius: '8px',
+                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                '&:hover': {
+                                                    border: '2px solid rgba(191, 152, 83, 0.5)'
+                                                }
+                                            }),
+                                            valueContainer: (provided) => ({
+                                                ...provided,
+                                                padding: '2px 8px'
+                                            }),
+                                            input: (provided) => ({
+                                                ...provided,
+                                                margin: '0px'
+                                            }),
+                                            indicatorSeparator: () => ({
+                                                display: 'none'
+                                            }),
+                                            indicatorsContainer: (provided) => ({
+                                                ...provided,
+                                                height: '45px',
+                                                gap: '0px'
+                                            }),
+                                            clearIndicator: (provided) => ({
+                                                ...provided,
+                                                padding: '2px',
+                                                color: '#000000',
+                                            }),
+                                            dropdownIndicator: (provided, state) => ({
+                                                ...provided,
+                                                padding: '2px',
+                                                color: '#000000',
+                                                display: state.hasValue && state.selectProps.isClearable ? 'none' : 'flex',
+                                            }),
+                                            menuPortal: (provided) => ({
+                                                ...provided,
+                                                zIndex: 10050
+                                            }),
+                                            menu: (provided) => ({
+                                                ...provided,
+                                                zIndex: 10050
+                                            })
+                                        }}
+                                    />
+                                </div>
+                                <div className="mb-4">
+                                    <label className="block mb-2 text-sm font-medium">
+                                        Description <span className="text-red-500">*</span>
+                                    </label>
+                                    <textarea
+                                        value={loanPurposeDescription}
+                                        onChange={(e) => setLoanPurposeDescription(e.target.value)}
+                                        placeholder="Enter description"
+                                        rows={3}
+                                        className="w-full border-2 border-[rgba(191, 152, 83, 0.25)] rounded-lg px-3 py-2 focus:outline-none focus:border-[rgba(191, 152, 83, 0.5)]"
+                                    />
+                                </div>
+                                {pendingLoanData && (
+                                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                                        <p className="text-sm text-gray-600 mb-1">Loan Details:</p>
+                                        <p className="text-sm">Amount: ₹{Number(pendingLoanData.amount || 0).toLocaleString('en-IN')}</p>
+                                        <p className="text-sm">Date: {formatDateOnly(pendingLoanData.date)}</p>
+                                    </div>
+                                )}
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button
+                                        onClick={() => {
+                                            setShowPurposePopup(false);
+                                            setSelectedPurpose(null);
+                                            setLoanPurposeDescription("");
+                                            setPendingLoanData(null);
+                                        }}
+                                        className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handlePurposeSelection}
+                                        className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
+                                        disabled={!selectedPurpose || !(loanPurposeDescription || "").trim() || isSubmitting}
+                                    >
+                                        {isSubmitting ? "Saving..." : "Save"}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </body >
+    )
+}
+export default History
+const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, siteOptions }) => {
+    if (!show) return null;
+    const getNameById = (id, options) => {
+        if (!id && id !== 0) return "-";
+        const found = options.find(opt => String(opt.id) === String(id));
+        return found ? found.label : id;
+    };
+    const fields = [
+        { oldKey: "old_date", newKey: "new_date", label: "Date", width: "120px" },
+        { oldKey: "old_type", newKey: "new_type", label: "Type", width: "100px" },
+        { oldKey: "old_amount", newKey: "new_amount", label: "Amount", width: "100px" },
+    ];
+    const normalizeAuditId = (id) => {
+        if (id == null || String(id).trim() === "" || String(id) === "0") return null;
+        return id;
+    };
+    const getAssociateFromAudit = (audit, keyPrefix) => {
+        const vendorId = normalizeAuditId(audit[`${keyPrefix}_vendor_id`]);
+        const contractorId = normalizeAuditId(audit[`${keyPrefix}_contractor_id`]);
+        const projectId = normalizeAuditId(audit[`${keyPrefix}_project_id`]);
+        if (vendorId) return { name: getNameById(vendorId, vendorOptions), type: "Vendor" };
+        if (contractorId) return { name: getNameById(contractorId, contractorOptions), type: "Contractor" };
+        if (projectId) return { name: getNameById(projectId, siteOptions), type: "Project" };
+        return { name: "-", type: "-" };
+    };
+    const formatDateTime = (dateString) => {
+        if (!dateString) return "-";
+        const date = new Date(dateString);
+        const day = String(date.getDate()).padStart(2, "0");
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const year = date.getFullYear();
+        let hours = date.getHours();
+        const minutes = String(date.getMinutes()).padStart(2, "0");
+        const ampm = hours >= 12 ? "PM" : "AM";
+        hours = hours % 12 || 12;
+        hours = String(hours).padStart(2, "0");
+        return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+    };
+    const formatDisplayValue = (value, field) => {
+        if (
+            (field.oldKey?.includes("vendor_id") || field.oldKey?.includes("transfer_site_id") ||
+                field.newKey?.includes("vendor_id") || field.newKey?.includes("transfer_site_id")) &&
+            String(value) === "0"
+        ) {
+            return "-";
+        }
+        if (field.lookup) {
+            return getNameById(value, field.lookup);
+        }
+        if (field.label.includes("Amount")) {
+            return value ? Number(value).toLocaleString("en-IN") : "-";
+        }
+        if (field.label === "Date") {
+            return value ? new Date(value).toLocaleDateString("en-GB") : "-";
+        }
+        return value ?? "-";
+    };
+    return (
+        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center">
+            <div className="bg-white rounded-md shadow-lg p-4">
+                <div className="flex justify-between items-center mb-[8px]">
+                    <h2 className="text-xl font-bold">History</h2>
+                    <button onClick={onClose}>
+                        <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
+                    </button>
+                </div>
+                <div className="overflow-auto max-h-80 no-scrollbar scrollbar-none border border-l-8 border-l-[#BF9853] rounded-lg">
+                    <table className="table-fixed min-w-full bg-white">
+                        <thead>
+                            <EdbcTableHeaderRow>
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC1} label="Time Stamp" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label="Associate" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Associate Type" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Type" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Amount" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Edited By" />
+                            </EdbcTableHeaderRow>
+                        </thead>
+                        <tbody>
+                            {audits.map((audit, index) => (
+                                <EdbcTableBodyRow key={index}>
+                                    <td id={EDBC_IDS.EDBC1} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC1)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis`} >
+                                        {formatDateTime(audit.edited_date)}
+                                    </td>
+                                    {fields.slice(0, 1).map((f) => {
+                                        const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
+                                        const newDisplay = formatDisplayValue(audit[f.newKey], f);
+                                        const changed = oldDisplay !== newDisplay;
+                                        return (
+                                            <td key={f.label} id={EDBC_IDS.EDBC2} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+                                                className={`${getEdbcColumnConfig(EDBC_IDS.EDBC2)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${changed ? "bg-[#BF9853] font-bold" : ""}`}
+                                            >
+                                                {oldDisplay}
+                                            </td>
+                                        );
+                                    })}
+                                    {(() => {
+                                        const oldAssociate = getAssociateFromAudit(audit, "old");
+                                        const newAssociate = getAssociateFromAudit(audit, "new");
+                                        const associateChanged = oldAssociate.name !== newAssociate.name;
+                                        const associateTypeChanged = oldAssociate.type !== newAssociate.type;
+                                        return (
+                                            <>
+                                                <td id={EDBC_IDS.EDBC4} title={associateChanged ? `Previous: ${oldAssociate.name} → Current: ${newAssociate.name}` : ""}
+                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${associateChanged ? "bg-[#BF9853] font-bold" : ""}`}
+                                                >
+                                                    {oldAssociate.name}
+                                                </td>
+                                                <td id={EDBC_IDS.EDBC12} title={associateTypeChanged ? `Previous: ${oldAssociate.type} → Current: ${newAssociate.type}` : ""}
+                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${associateTypeChanged ? "bg-[#BF9853] font-bold" : ""}`}
+                                                >
+                                                    {oldAssociate.type}
+                                                </td>
+                                            </>
+                                        );
+                                    })()}
+                                    {fields.slice(1, 2).map((f) => {
+                                        const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
+                                        const newDisplay = formatDisplayValue(audit[f.newKey], f);
+                                        const changed = oldDisplay !== newDisplay;
+                                        return (
+                                            <td key={f.label} id={EDBC_IDS.EDBC12} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+                                                className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${changed ? "bg-[#BF9853] font-bold" : ""}`}
+                                            >
+                                                {oldDisplay}
+                                            </td>
+                                        );
+                                    })}
+                                    {fields.slice(2).map((f) => {
+                                        const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
+                                        const newDisplay = formatDisplayValue(audit[f.newKey], f);
+                                        const changed = oldDisplay !== newDisplay;
+                                        return (
+                                            <td key={f.label} id={EDBC_IDS.EDBC8} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+                                                className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${changed ? "bg-[#BF9853] font-bold" : ""}`}
+                                            >
+                                                {oldDisplay}
+                                            </td>
+                                        );
+                                    })}
+                                    <td id={EDBC_IDS.EDBC12} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis`} >
+                                        {audit.edited_by}
+                                    </td>
+                                </EdbcTableBodyRow>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits }) => {
+    if (!show) return null;
+    const getNameById = (id, options) => {
+        if (!id && id !== 0) return "-";
+        const found = options.find(opt => String(opt.id) === String(id));
+        return found ? found.label : id;
+    };
+    const fields = [
+        { oldKey: "old_date", newKey: "new_date", label: "Date", width: "120px" },
+        { oldKey: "old_type", newKey: "new_type", label: "Type", width: "100px" },
+        { oldKey: "old_amount", newKey: "new_amount", label: "Amount", width: "100px" },
+    ];
+    const formatDateTime = (dateString) => {
+        if (!dateString) return "-";
+        const date = new Date(dateString);
+        const day = String(date.getDate()).padStart(2, "0");
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const year = date.getFullYear();
+        let hours = date.getHours();
+        const minutes = String(date.getMinutes()).padStart(2, "0");
+        const ampm = hours >= 12 ? "PM" : "AM";
+        hours = hours % 12 || 12;
+        hours = String(hours).padStart(2, "0");
+        return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+    };
+    const formatDisplayValue = (value, field) => {
+        if (
+            (field.oldKey?.includes("vendor_id") || field.oldKey?.includes("transfer_site_id") ||
+                field.newKey?.includes("vendor_id") || field.newKey?.includes("transfer_site_id")) &&
+            String(value) === "0"
+        ) {
+            return "-";
+        }
+        if (field.lookup) {
+            return getNameById(value, field.lookup);
+        }
+        if (field.label.includes("Amount")) {
+            return value ? Number(value).toLocaleString("en-IN") : "-";
+        }
+        if (field.label === "Date") {
+            return value ? new Date(value).toLocaleDateString("en-GB") : "-";
+        }
+        return value ?? "-";
+    };
+    return (
+        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center">
+            <div className="bg-white rounded-md shadow-lg p-4">
+                <div className="flex justify-between items-center mb-[8px]">
+                    <h2 className="text-xl font-bold">History</h2>
+                    <button onClick={onClose}>
+                        <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
+                    </button>
+                </div>
+                <div className="overflow-auto max-h-80 no-scrollbar scrollbar-none border border-l-8 border-l-[#BF9853] rounded-lg">
+                    <table className="table-fixed min-w-full bg-white">
+                        <thead>
+                            <EdbcTableHeaderRow>
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC1} label="Time Stamp" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Type" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Amount" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Edited By" />
+                            </EdbcTableHeaderRow>
+                        </thead>
+                        <tbody>
+                            {audits.map((audit, index) => (
+                                <EdbcTableBodyRow key={index}>
+                                    <td id={EDBC_IDS.EDBC1} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC1)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis`} >
+                                        {formatDateTime(audit.edited_date)}
+                                    </td>
+                                    {fields.map((f) => {
+                                        const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
+                                        const newDisplay = formatDisplayValue(audit[f.newKey], f);
+                                        const changed = oldDisplay !== newDisplay;
+                                        const columnId = f.label === "Date" ? EDBC_IDS.EDBC2 : f.label === "Type" ? EDBC_IDS.EDBC12 : EDBC_IDS.EDBC8;
+                                        return (
+                                            <td key={f.label} id={columnId} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+                                                className={`${getEdbcColumnConfig(columnId)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${changed ? "bg-[#BF9853] font-bold" : ""}`}
+                                            >
+                                                {oldDisplay}
+                                            </td>
+                                        );
+                                    })}
+                                    <td id={EDBC_IDS.EDBC12} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis`} >
+                                        {audit.edited_by}
+                                    </td>
+                                </EdbcTableBodyRow>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};

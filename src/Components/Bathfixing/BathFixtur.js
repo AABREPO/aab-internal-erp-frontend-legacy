@@ -54,7 +54,7 @@ const BathFixtur = () => {
 
   const fetchBathModelData = useCallback(async () => {
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/bath_model/getAll");
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/bath_model/getAll");
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
@@ -93,7 +93,7 @@ const BathFixtur = () => {
   }, []);
   const fetchItemNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/bath/getAll/item');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/bath/getAll/item');
       if (response.ok) {
         const data = await response.json();
         setItemNames(data);
@@ -135,7 +135,7 @@ const BathFixtur = () => {
   }, []);
   const fetchBrandNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/brand_names/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/brand_names/getAll');
       if (response.ok) {
         const data = await response.json();
         setBrandNames(data);
@@ -152,7 +152,7 @@ const BathFixtur = () => {
   }, []);
   const fetchTypes = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/bath_types/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/bath_types/getAll');
       if (response.ok) {
         const data = await response.json();
         setTypes(data);
@@ -340,7 +340,7 @@ const BathFixtur = () => {
   };
   const getRevisionNumber = async (clientName) => {
     try {
-      const clientResponse = await fetch("https://backendaab.in/aabuilderDash/api/bath_fixture_calculation/all");
+      const clientResponse = await fetch("https://backendaab.in/demoAabuilderDash/api/bath_fixture_calculation/all");
       if (!clientResponse.ok) {
         throw new Error("Failed to fetch calculations from the backend");
       }
@@ -1881,7 +1881,7 @@ const BathFixtur = () => {
   }, [bathClientName, bathClientSNo, bathFloors, filteredFileOptions, areaTables, bathSelectedFile]);
   const fetchBathFixtureData = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/bath_fixture_calculation/all');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/bath_fixture_calculation/all');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -1904,7 +1904,7 @@ const BathFixtur = () => {
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -2010,7 +2010,7 @@ const BathFixtur = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/floorName');
+        const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/floorName');
         if (!response.ok) {
           throw new Error('Network response was not ok');
         }
@@ -2227,7 +2227,7 @@ const BathFixtur = () => {
     return `${day}/${month}/${year}`;
   };
   const prepareBathFixturePayload = async (e) => {
-    const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/bath_fixture_calculation/all`);
+    const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/bath_fixture_calculation/all`);
     if (!clientResponse.ok) {
       throw new Error("Failed to fetch calculations from the backend");
     }
@@ -2317,7 +2317,7 @@ const BathFixtur = () => {
       const uploadPdf = async (pdf, name) => {
         const singleFormData = new FormData();
         singleFormData.append("files", pdf, name);
-        const pdfUploadResponse = await fetch('https://backendaab.in/aabuilderDash/googleUploader/bathPdfs', {
+        const pdfUploadResponse = await fetch('https://backendaab.in/demoAabuilderDash/googleUploader/bathPdfs', {
           method: "POST",
           body: singleFormData,
         });
@@ -2329,7 +2329,7 @@ const BathFixtur = () => {
       await uploadPdf(summaryPdf, `BFS OC ${clientId} - ${selectedDate} - ${revisionNumber}.pdf`);
       await uploadPdf(StockingPdf, `BFS SC ${clientId} - ${selectedDate} - ${revisionNumber}.pdf`);
       await uploadPdf(customerCopyPdf, `BFS CC ${clientId} - ${selectedDate} - ${revisionNumber}.pdf`);
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/bath_fixture_calculation/save', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/bath_fixture_calculation/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2352,7 +2352,7 @@ const BathFixtur = () => {
     const payload = await prepareBathFixturePayloadOfDumyFile();
     console.log(payload);
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/bath_fixture_calculation/save', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/bath_fixture_calculation/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

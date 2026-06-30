@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ModuleHeadingWrapper, ModuleHeadingBar } from '../MainHeadingpage/MainHeadingpage';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import BathFixtur from './BathFixtur';
 import BathFixingInputData from './BathFixingInputData';
@@ -10,42 +11,42 @@ const BHeading = () => {
         setActiveLink(path);
     }
     return (
-        <div className="bg-[#FAF6ED]">
-        <div className="topbar-title">
-            <h2 className="mb-2">
+        <ModuleHeadingWrapper>
+        <ModuleHeadingBar>
+            <h2 className={`link whitespace-nowrap${activeLink === '/bath/BathFixtures Matrix' ? ' active' : ''}`}>
                 <Link
-                    className={`link ${activeLink === '/bath/BathFixtures Matrix' ? 'active' : ''}`}
                     to="/bath/BathFixtures Matrix"
                     onClick={() => handleLinkClick('/bath/BathFixtures Matrix')}
+                    style={{ color: 'inherit', textDecoration: 'none', display: 'block', font: 'inherit', fontWeight: 'inherit', fontSize: 'inherit' }}
                 >
                     Bath Fixtures Matrix
                 </Link>
             </h2>
-            <h2>
+            <h2 className={`link whitespace-nowrap${activeLink === '/bath/BathFixtureHistory' ? ' active' : ''}`}>
                 <Link
-                    className={`link ${activeLink === '/bath/BathFixtureHistory' ? 'active' : ''}`}
                     to="/bath/BathFixtureHistory"
                     onClick={() => handleLinkClick('/bath/BathFixtureHistory')}
-                > 
+                    style={{ color: 'inherit', textDecoration: 'none', display: 'block', font: 'inherit', fontWeight: 'inherit', fontSize: 'inherit' }}
+                >
                 History
                 </Link>
             </h2>
-            <h2>
+            <h2 className={`link whitespace-nowrap${activeLink === '/bath/Addinput' ? ' active' : ''}`}>
                 <Link
-                    className={`link ${activeLink === '/bath/Addinput' ? 'active' : ''}`}
                     to="/bath/Addinput"
                     onClick={() => handleLinkClick('/bath/Addinput')}
+                    style={{ color: 'inherit', textDecoration: 'none', display: 'block', font: 'inherit', fontWeight: 'inherit', fontSize: 'inherit' }}
                 >
                     Add Input
                 </Link>
             </h2>
-        </div>
+        </ModuleHeadingBar>
         <Routes>
             <Route path="BathFixtures Matrix" element={<BathFixtur/>} />
             <Route path='BathFixtureHistory' element={<BathFixtureHistory/>}/>
             <Route path='Addinput' element={<BathFixingInputData/>}/>
         </Routes>
-    </div>
+    </ModuleHeadingWrapper>
     )
 }
 

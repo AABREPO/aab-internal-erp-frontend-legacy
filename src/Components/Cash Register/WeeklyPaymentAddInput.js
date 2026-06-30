@@ -1,0 +1,1140 @@
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import axios from 'axios';
+import search from '../Images/search.png';
+import imports from '../Images/Import.svg';
+import cross from '../Images/cross.png';
+import edit from '../Images/Edit.svg';
+import deleteIcon from '../Images/Delete.svg';
+import Add from '../Images/+Add.svg';
+import { set } from 'date-fns';
+
+const MODAL_OVERLAY_CLASS = 'fixed inset-0 z-[9999] bg-black bg-opacity-50 flex justify-center items-center';
+const MODAL_PANEL_CLASS = 'bg-white text-left rounded-xl shadow-lg p-[18px] w-[480px] relative';
+const MODAL_LABEL_CLASS = 'font-semibold text-[18px] block mb-[8px]';
+const MODAL_INPUT_CLASS = 'border-2 border-[#BF9853] border-opacity-25 h-[40px] box-border px-2 rounded-lg w-full focus:outline-none text-[14px] placeholder:text-[#A6A5A6] placeholder:text-[14px] placeholder:font-normal';
+const MODAL_FIELDS_CLASS = 'space-y-[18px]';
+const MODAL_ACTIONS_CLASS = 'flex justify-end gap-[18px] mt-[18px]';
+const MODAL_SUBMIT_BTN_CLASS = 'px-4 py-2 bg-[#BF9853] text-white rounded-lg';
+const MODAL_CANCEL_BTN_CLASS = 'px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg';
+
+function ModalOverlay({ children }) {
+    return createPortal(
+        <div className={MODAL_OVERLAY_CLASS}>{children}</div>,
+        document.body
+    );
+}
+
+const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
+    const [isWeeklyTypeOpen, setIsWeeklyTypeOpen] = useState(false);
+    const [weeklyReceivedTypeSearch, setWeeklyReceivedTypeSearch] = useState('');
+    const [weeklyReceivedType, setWeeklyReceivedType] = useState('');
+    const [weeklyReceivedTypes, setWeeklyReceivedTypes] = useState([]);
+    const [isEditWeeklyReceivedTypeOpen, setIsEditWeeklyReceivedTypeOpen] = useState(false);
+    const [selectedWeeklyReceivedTypeId, setSelectedWeeklyReceivedTypeId] = useState(null);
+    const [editWeeklyReceivedType, setEditWeeklyReceivedType] = useState('');
+    const [isWeeklyReceivedTypeOpen, setIsWeeklyReceivedTypeOpen] = useState(false);
+    const [weeklyReceivedNameSearch, setWeeklyReceivedNameSearch] = useState('');
+    const [weeklyReceivedName, setWeeklyReceivedName] = useState('');
+    const [weeklyReceivedTypeRows, setWeeklyReceivedTypeRows] = useState([]);
+    const [isEditWeeklyReceivedNameOpen, setIsEditWeeklyReceivedNameOpen] = useState(false);
+    const [selectedWeeklyReceivedNameId, setSelectedWeeklyReceivedNameId] = useState(null);
+    const [editWeeklyReceivedName, setEditWeeklyReceivedName] = useState('');
+    const [isLaboursListDataOpen, setIsLaboursListDataOpen] = useState(false);
+    const [isEmployeeDataOpen, setIsEmployeeDataOpen] = useState(false);
+    const [laboursListSearch, setLaboursListSearch] = useState('');
+    const [employeeSearch, setEmployeeSearch] = useState('');
+    const [labourName, setLabourName] = useState('');
+    const [labourSalary, setLabourSalary] = useState('');
+    const [laboursList, setLaboursList] = useState([]);
+    const [employeeList, setEmployeeList] = useState([]);
+    const [employeeName, setEmployeeName] = useState('');
+    const [mobileNumber, setMobileNumber] = useState('');
+    const [roleOfEmployee, setRoleOfEmployee] = useState('');
+    const [isEditLaboursListDataOpen, setIsEditLaboursListDataOpen] = useState(false);
+    const [isEditEmployeeDataOpen, setIsEditEmployeeDataOpen] = useState(false);
+    const [selectedLabourDataId, setSelectedLabourDataId] = useState(null);
+    const [selectedEmployeeDataId, setSelectedEmployeeDataId] = useState(null);
+    const [editEmployeeName, setEditEmployeeName] = useState('');
+    const [editEmployeeMobileNumber, setEditEmployeeMobileNumber] = useState('');
+    const [editRoleOfEmployee, setEditRoleOfEmployee] = useState('');
+    const [editLabourName, setEditLabourName] = useState('');
+    const [editLabourSalary, setEditLabourSalary] = useState('');
+    const [message, setMessage] = useState('');
+    console.log(message);
+    const [laboursListBulkUploadOpen, setLaboursListBulkUploadOpen] = useState(false);
+    const openLabourBulkUploadModal = () => setLaboursListBulkUploadOpen(true);
+    const closeLabourBulkUploadModal = () => setLaboursListBulkUploadOpen(false)
+    const openWeeklyTypes = () => setIsWeeklyTypeOpen(true);
+    const closeWeeklyTypes = () => setIsWeeklyTypeOpen(false);
+    const openWeeklyReceivedTypes = () => setIsWeeklyReceivedTypeOpen(true);
+    const closeWeeklyReceivedTypes = () => setIsWeeklyReceivedTypeOpen(false);
+    const openLabourDetails = () => setIsLaboursListDataOpen(true);
+    const closeLabourDetails = () => setIsLaboursListDataOpen(false);
+    const openEmployeeDetails = () => setIsEmployeeDataOpen(true);
+    const closeEmployeeDetails = () => setIsEmployeeDataOpen(false);
+    const [file, setFile] = useState(null);
+    const handleFileChange = (e) => {
+        setFile(e.target.files[0]);
+    };
+    const openEditWeeklyTypePopup = (item) => {
+        setEditWeeklyReceivedType(item.type);
+        setSelectedWeeklyReceivedTypeId(item.id)
+        setIsEditWeeklyReceivedTypeOpen(true);
+    }
+    const closeEditWeeklyTypePopup = () => {
+        setIsEditWeeklyReceivedTypeOpen(false);
+        setEditWeeklyReceivedType('');
+        setSelectedWeeklyReceivedTypeId('');
+    }
+    const openEditWeeklyReceivedNamePopup = (item) => {
+        setEditWeeklyReceivedName(item.received_type);
+        setSelectedWeeklyReceivedNameId(item.id);
+        setIsEditWeeklyReceivedNameOpen(true);
+    }
+    const closeEditWeeklyReceivedNamePopup = () => {
+        setIsEditWeeklyReceivedNameOpen(false);
+        setEditWeeklyReceivedName('');
+        setSelectedWeeklyReceivedNameId('');
+    }
+
+    const openEditLaboursDetails = (item) => {
+        setEditLabourName(item.labour_name);
+        setEditLabourSalary(item.labour_salary);
+        setSelectedLabourDataId(item.id);
+        setIsEditLaboursListDataOpen(true);
+    }
+    const closeEditLaboursDetails = (item) => {
+        setIsEditLaboursListDataOpen(false);
+        setSelectedLabourDataId('');
+        setEditLabourName('');
+        setEditLabourSalary('');
+    }
+    const openEditEmployeeDetails = (item) => {
+        setEditEmployeeName(item.employee_name);
+        setEditEmployeeMobileNumber(item.employee_mobile_number);
+        setEditRoleOfEmployee(item.role_of_employee);
+        setSelectedEmployeeDataId(item.id);
+        setIsEditEmployeeDataOpen(true);
+    }
+    const closeEditEmployeeDetails = (item) => {
+        setIsEditEmployeeDataOpen(false);
+        setSelectedEmployeeDataId('');
+        setEditEmployeeName('');
+        setEditEmployeeMobileNumber('');
+        setEditRoleOfEmployee('');
+    }
+
+    useEffect(() => {
+        fetchWeeklyType();
+    }, []);
+    const fetchWeeklyType = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_types/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                setWeeklyReceivedTypes(data);
+            } else {
+                setMessage('Error fetching tile area names.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            setMessage('Error fetching tile area names.');
+        }
+    };
+    const handleDeleteAllWeeklyTypes = async () => {
+        const confirmed = window.confirm("Are you sure you want to delete all Machine Tools?");
+        if (confirmed) {
+            try {
+                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly_types/deleteAll", {
+                    method: "DELETE",
+                });
+                if (response.ok) {
+                    setWeeklyReceivedTypes([]);
+                    alert("All Type have been deleted successfully.");
+                } else {
+                    console.error("Failed to delete all Types. Status:", response.status);
+                    alert("Error deleting the Types. Please try again.");
+                }
+            } catch (error) {
+                console.error("Error deleting all Types:", error);
+                alert("An error occurred while deleting all Types.");
+            }
+        } else {
+            console.log("Deletion cancelled.");
+        }
+    };
+    const handleWeeklyTypeDelete = async (id) => {
+        try {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_types/delete/${id}`, {
+                method: 'DELETE',
+            });
+            if (response.ok) {
+                alert("Weekly Type deleted successfully!!!");
+                window.location.reload();
+            } else {
+                console.error("Failed to delete the Account Type. Status:", response.status);
+                alert("Error deleting the Account Type. Please try again.");
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            alert("An error occurred while deleting the Contractor Name.");
+        }
+    };
+    const handleSubmitWeeklyTypes = async (e) => {
+        e.preventDefault();
+        const newWeeklyType = { type: weeklyReceivedType };
+        try {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_types/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(newWeeklyType),
+            });
+            if (response.ok) {
+                setMessage('Weekly Type saved successfully!');
+                setWeeklyReceivedType('');
+                window.location.reload();
+            } else {
+                setMessage('Error saving area name.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            setMessage('Error saving area name.');
+        }
+    };
+    const handleEditWeeklyTypes = async (e) => {
+        e.preventDefault();
+        try {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_types/edit/${selectedWeeklyReceivedTypeId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ type: editWeeklyReceivedType }),
+            });
+            if (response.ok) {
+                closeEditWeeklyTypePopup();
+                window.location.reload();
+            } else {
+                console.error('Failed to update floor name');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    };
+    useEffect(() => {
+        fetchWeeklyReceivedTypes();
+    }, []);
+    const fetchWeeklyReceivedTypes = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_received_types/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                setWeeklyReceivedTypeRows(data);
+            } else {
+                setMessage('Error fetching received types.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            setMessage('Error fetching received types.');
+        }
+    };
+    const handleDeleteAllWeeklyReceivedTypes = async () => {
+        const confirmed = window.confirm("Are you sure you want to delete all Weekly Received Types?");
+        if (confirmed) {
+            try {
+                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly_received_types/deleteAll", {
+                    method: "DELETE",
+                });
+                if (response.ok) {
+                    setWeeklyReceivedTypeRows([]);
+                    alert("All Weekly Received Types have been deleted successfully.");
+                } else {
+                    console.error("Failed to delete received types. Status:", response.status);
+                    alert("Error deleting received types. Please try again.");
+                }
+            } catch (error) {
+                console.error("Error deleting received types:", error);
+                alert("An error occurred while deleting received types.");
+            }
+        }
+    };
+    const handleWeeklyReceivedTypeDelete = async (id) => {
+        try {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_received_types/delete/${id}`, {
+                method: 'DELETE',
+            });
+            if (response.ok) {
+                alert("Weekly Received Type deleted successfully!");
+                window.location.reload();
+            } else {
+                console.error("Failed to delete Weekly Received Type. Status:", response.status);
+                alert("Error deleting Weekly Received Type. Please try again.");
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            alert("An error occurred while deleting Weekly Received Type.");
+        }
+    };
+    const handleSubmitWeeklyReceivedType = async (e) => {
+        e.preventDefault();
+        const payload = { received_type: weeklyReceivedName };
+        try {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_received_types/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+            if (response.ok) {
+                setMessage('Weekly Received Type saved successfully!');
+                setWeeklyReceivedName('');
+                window.location.reload();
+            } else {
+                setMessage('Error saving Weekly Received Type.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            setMessage('Error saving Weekly Received Type.');
+        }
+    };
+    const handleEditWeeklyReceivedType = async (e) => {
+        e.preventDefault();
+        try {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_received_types/edit/${selectedWeeklyReceivedNameId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ received_type: editWeeklyReceivedName }),
+            });
+            if (response.ok) {
+                closeEditWeeklyReceivedNamePopup();
+                window.location.reload();
+            } else {
+                console.error('Failed to update Weekly Received Type');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    };
+
+    useEffect(() => {
+        fetchLaboursList();
+    }, []);
+    const fetchLaboursList = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/labours-details/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                setLaboursList(data);
+            } else {
+                setMessage('Error fetching Labour names.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            setMessage('Error fetching Labour names.');
+        }
+    };
+    useEffect(() => {
+        fetchEmployeeList();
+    }, []);
+    const fetchEmployeeList = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                setEmployeeList(data);
+            } else {
+                setMessage('Error fetching Employee names.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            setMessage('Error fetching Employee names.');
+        }
+    };
+    const handleDeleteAllLaboursList = async () => {
+        const confirmed = window.confirm("Are you sure you want to delete all Labours List?");
+        if (confirmed) {
+            try {
+                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/labours-details/deleteAll", {
+                    method: "DELETE",
+                });
+                if (response.ok) {
+                    setLaboursList([]);
+                    alert("All Type have been deleted successfully.");
+                } else {
+                    console.error("Failed to delete all Types. Status:", response.status);
+                    alert("Error deleting the Types. Please try again.");
+                }
+            } catch (error) {
+                console.error("Error deleting all Types:", error);
+                alert("An error occurred while deleting all Types.");
+            }
+        } else {
+            console.log("Deletion cancelled.");
+        }
+    };
+    const handleDeleteAllEmployeeDetails = async () => {
+        const confirmed = window.confirm("Are you sure you want to delete all Labours List?");
+        if (confirmed) {
+            try {
+                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/employee_details/deleteAll", {
+                    method: "DELETE",
+                });
+                if (response.ok) {
+                    setEmployeeList([]);
+                    alert("All Type have been deleted successfully.");
+                } else {
+                    console.error("Failed to delete all Types. Status:", response.status);
+                    alert("Error deleting the Types. Please try again.");
+                }
+            } catch (error) {
+                console.error("Error deleting all Types:", error);
+                alert("An error occurred while deleting all Types.");
+            }
+        } else {
+            console.log("Deletion cancelled.");
+        }
+    };
+    const handleLabourDataDelete = async (id) => {
+        try {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/labours-details/delete/${id}`, {
+                method: 'DELETE',
+            });
+            if (response.ok) {
+                alert("Weekly Type deleted successfully!!!");
+                window.location.reload();
+            } else {
+                console.error("Failed to delete the Account Type. Status:", response.status);
+                alert("Error deleting the Account Type. Please try again.");
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            alert("An error occurred while deleting the Contractor Name.");
+        }
+    };
+    const handleEmployeeDataDelete = async (id) => {
+        try {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/employee_details/delete/${id}`, {
+                method: 'DELETE',
+            });
+            if (response.ok) {
+                alert("Employee Details deleted successfully!!!");
+                window.location.reload();
+            } else {
+                console.error("Failed to delete the Employee Details. Status:", response.status);
+                alert("Error deleting the Employee Details. Please try again.");
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            alert("An error occurred while deleting the Contractor Name.");
+        }
+    };
+    const handleSubmitLaboursData = async (e) => {
+        e.preventDefault();
+        const newLaboursList = { labour_name: labourName, labour_salary: labourSalary };
+        try {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/labours-details/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(newLaboursList),
+            });
+            if (response.ok) {
+                setMessage('Labours Details saved successfully!');
+                setLabourName('');
+                setLabourSalary('');
+                window.location.reload();
+            } else {
+                setMessage('Error saving area name.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            setMessage('Error saving area name.');
+        }
+    };
+    const handleSubmitEmployeeData = async (e) => {
+        e.preventDefault();
+        const newEmployeeList = { employee_name: employeeName, employee_mobile_number: mobileNumber, role_of_employee: roleOfEmployee };
+        try {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(newEmployeeList),
+            });
+            if (response.ok) {
+                setMessage('Employee Details saved successfully!');
+                setEmployeeName('');
+                setMobileNumber('');
+                setRoleOfEmployee('');
+                window.location.reload();
+            } else {
+                setMessage('Error saving area name.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            setMessage('Error saving area name.');
+        }
+    };
+    const handleEditLabourData = async (e) => {
+        e.preventDefault();
+        try {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/labours-details/edit/${selectedLabourDataId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ labour_name: editLabourName, labour_salary: editLabourSalary }),
+            });
+            if (response.ok) {
+                closeEditLaboursDetails();
+                window.location.reload();
+            } else {
+                console.error('Failed to update floor name');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    };
+    const handleEditEmployeeData = async (e) => {
+        e.preventDefault();
+        try {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/employee_details/edit/${selectedEmployeeDataId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ employee_name: editEmployeeName, employee_mobile_number: editEmployeeMobileNumber, role_of_employee: editRoleOfEmployee }),
+            });
+            if (response.ok) {
+                closeEditLaboursDetails();
+                window.location.reload();
+            } else {
+                console.error('Failed to update floor name');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    };
+    const handleUploadLaboursList = async () => {
+        if (!file) {
+            alert("Please select a file to upload.");
+            return;
+        }
+        const formData = new FormData();
+        formData.append("file", file);
+        try {
+            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/labours-details/bulk_upload", {
+                method: "POST",
+                body: formData,
+            });
+            const result = await response.text();
+            alert(result);
+        } catch (error) {
+            console.error("Error uploading file:", error);
+            alert("File upload failed!");
+        }
+        window.location.reload();
+    };
+
+    const filteredWeeklyReceivedType = weeklyReceivedTypes.filter((item) =>
+        (item.type || '').toLowerCase().includes(weeklyReceivedTypeSearch.toLowerCase())
+    );
+    const filteredWeeklyReceivedNameType = weeklyReceivedTypeRows.filter((item) =>
+        (item.received_type || '').toLowerCase().includes(weeklyReceivedNameSearch.toLowerCase())
+    );
+    const filteredLaboursData = laboursList.filter((item) =>
+        item.labour_name.toLowerCase().includes(laboursListSearch.toLowerCase())
+    );
+    const filteredEmployeeData = employeeList.filter((item) =>
+        item.employee_name.toLowerCase().includes(employeeSearch.toLowerCase())
+    );
+    return (
+        <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED] px-[18px] pt-[18px] pb-[18px]">
+            <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-white px-[18px] pt-[18px] pb-[18px]">
+                <div className="lg:flex space-x-[18px] lg:w-full overflow-hidden">
+                    <div>
+                        <div className="flex items-center mb-[6px] lg:mt-0 mt-3">
+                            <input
+                                type="text"
+                                className=" border-[#BF9853] border-2 border-opacity-25 rounded-full text-[14px] pl-[16px] flex-1 w-44 h-[40px] focus:outline-none"
+                                placeholder="Type"
+                                value={weeklyReceivedTypeSearch}
+                                onChange={(e) => setWeeklyReceivedTypeSearch(e.target.value)}
+                            />
+                            <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
+                                <img src={search} alt='search' className=' w-5 h-5' />
+                            </button>
+                            <button className="text-black font-bold px-1 ml-4"
+                                onClick={openWeeklyTypes}>
+                                <img src={Add} alt='add' className='w-[30px] h-[30px]' />
+                            </button>
+                        </div>
+                        <button className="text-[#E4572E] flex mb-[8px]"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' /><h1 className='mt-1.5 text-[14px] font-semibold'>Import file</h1></button>
+                        <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
+                            <div className="bg-[#FAF6ED]">
+                                <table className="table-auto lg:w-72 ">
+                                    <thead className='bg-[#FAF6ED]'>
+                                        <tr className="border-b">
+                                            <th className="p-2 text-left lg:w-16 text-[16px] font-semibold">S.No</th>
+                                            <th className="p-2 text-left lg:w-72 text-[16px] font-semibold">
+                                                <div className="flex items-center justify-between gap-[12px]">
+                                                    <span>Type</span>
+                                                    <button type="button" onClick={handleDeleteAllWeeklyTypes} className="inline-flex shrink-0 items-center justify-center">
+                                                        <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                                                    </button>
+                                                </div>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                </table>
+                            </div>
+                            <div className="overflow-y-auto max-h-[660px] no-scrollbar scrollbar-none">
+                                <table className="table-auto lg:w-72 w-full">
+                                    <tbody>
+                                        {filteredWeeklyReceivedType.map((item, index) => (
+                                            <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
+                                                <td className="p-2 text-left text-[14px] font-semibold">{(weeklyReceivedTypes.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                                                <td className="p-2 text-left text-[14px] group flex font-semibold">
+                                                    <div className="flex flex-grow">
+                                                        {item.type}
+                                                    </div>
+                                                    <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
+                                                        <button type="button" >
+                                                            <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditWeeklyTypePopup(item)} />
+                                                        </button>
+                                                        <button >
+                                                            <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleWeeklyTypeDelete(item.id)} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <div className="flex items-center mb-[6px] lg:mt-0 mt-3">
+                            <input
+                                type="text"
+                                className=" border-[#BF9853] border-2 border-opacity-25 rounded-full text-[14px] pl-[16px] flex-1 w-44 h-[40px] focus:outline-none"
+                                placeholder="Received type"
+                                value={weeklyReceivedNameSearch}
+                                onChange={(e) => setWeeklyReceivedNameSearch(e.target.value)}
+                            />
+                            <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
+                                <img src={search} alt='search' className=' w-5 h-5' />
+                            </button>
+                            <button className="text-black font-bold px-1 ml-4"
+                                onClick={openWeeklyReceivedTypes}>
+                                <img src={Add} alt='add' className='w-[30px] h-[30px]' />
+                            </button>
+                        </div>
+                        <button className="text-[#E4572E] flex mb-[8px]"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' /><h1 className='mt-1.5 text-[14px] font-semibold'>Import file</h1></button>
+                        <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
+                            <div className="bg-[#FAF6ED]">
+                                <table className="table-auto lg:w-72 ">
+                                    <thead className='bg-[#FAF6ED]'>
+                                        <tr className="border-b">
+                                            <th className="p-2 text-left lg:w-16 text-[16px] font-semibold">S.No</th>
+                                            <th className="p-2 text-left lg:w-72 text-[16px] font-semibold">
+                                                <div className="flex items-center justify-between gap-[12px]">
+                                                    <span>Received Type</span>
+                                                    <button type="button" onClick={handleDeleteAllWeeklyReceivedTypes} className="inline-flex shrink-0 items-center justify-center">
+                                                        <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                                                    </button>
+                                                </div>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                </table>
+                            </div>
+                            <div className="overflow-y-auto max-h-[660px] no-scrollbar scrollbar-none">
+                                <table className="table-auto lg:w-72 w-full">
+                                    <tbody>
+                                        {filteredWeeklyReceivedNameType.map((item) => (
+                                            <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
+                                                <td className="p-2 text-left text-[14px] font-semibold">{(weeklyReceivedTypeRows.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                                                <td className="p-2 text-left text-[14px] group flex font-semibold">
+                                                    <div className="flex flex-grow">
+                                                        {item.received_type}
+                                                    </div>
+                                                    <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
+                                                        <button type="button" >
+                                                            <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditWeeklyReceivedNamePopup(item)} />
+                                                        </button>
+                                                        <button >
+                                                            <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleWeeklyReceivedTypeDelete(item.id)} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <div className="flex items-center mb-[6px] lg:mt-0 mt-3">
+                            <input
+                                type="text"
+                                className=" border-[#BF9853] border-2 border-opacity-25 rounded-full text-[14px] pl-[16px] flex-1 w-44 h-[40px] focus:outline-none"
+                                placeholder="Labour Name"
+                                value={laboursListSearch}
+                                onChange={(e) => setLaboursListSearch(e.target.value)}
+                            />
+                            <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
+                                <img src={search} alt='search' className=' w-5 h-5' />
+                            </button>
+                            <button className="text-black font-bold px-1 ml-4">
+                                <img src={Add} alt='add' className='w-[30px] h-[30px]' />
+                            </button>
+                        </div>
+                        <button className="text-[#E4572E] flex mb-[8px]"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' /><h1 className='mt-1.5 text-[14px] font-semibold'>Import file</h1></button>
+                        <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] overflow-hidden'>
+                            <div className="bg-[#FAF6ED]">
+                                <table className="table-auto lg:w-72 ">
+                                    <thead className='bg-[#FAF6ED]'>
+                                        <tr className="border-b">
+                                            <th className="p-2 text-left lg:w-16 text-[16px] font-semibold">S.No</th>
+                                            <th className="p-2 text-left lg:w-72 text-[16px] font-semibold">
+                                                <div className="flex items-center justify-between gap-[12px]">
+                                                    <span>Labour Name</span>
+                                                    <button type="button" className="inline-flex shrink-0 items-center justify-center">
+                                                        <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                                                    </button>
+                                                </div>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                </table>
+                            </div>
+                            <div className="overflow-y-auto max-h-[calc(100vh-300px)] no-scrollbar scrollbar-none">
+                                <table className="table-auto lg:w-72 w-full">
+                                    <tbody>
+                                        {filteredLaboursData.map((item, index) => (
+                                            <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED] last:border-b-0">
+                                                <td className="p-2 text-left text-[14px] font-semibold">{(laboursList.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                                                <td className="p-2 text-left text-[14px] group flex font-semibold">
+                                                    <div className="flex flex-grow">
+                                                        {item.labour_name}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <div className="flex items-center mb-[6px] lg:mt-0 mt-3">
+                            <input
+                                type="text"
+                                className=" border-[#BF9853] border-2 border-opacity-25 rounded-full text-[14px] pl-[16px] flex-1 w-44 h-[40px] focus:outline-none"
+                                placeholder="Employee Name"
+                                value={employeeSearch}
+                                onChange={(e) => setEmployeeSearch(e.target.value)}
+                            />
+                            <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
+                                <img src={search} alt='search' className=' w-5 h-5' />
+                            </button>
+                            <button className="text-black font-bold px-1 ml-4">
+                                <img src={Add} alt='add' className='w-[30px] h-[30px]' />
+                            </button>
+                        </div>
+                        <button className="text-[#E4572E] flex mb-[8px]"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' /><h1 className='mt-1.5 text-[14px] font-semibold'>Import file</h1></button>
+                        <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] overflow-hidden'>
+                            <div className="bg-[#FAF6ED]">
+                                <table className="table-auto lg:w-72 ">
+                                    <thead className='bg-[#FAF6ED]'>
+                                        <tr className="border-b">
+                                            <th className="p-2 text-left lg:w-16 text-[16px] font-semibold">S.No</th>
+                                            <th className="p-2 text-left lg:w-72 text-[16px] font-semibold">
+                                                <div className="flex items-center justify-between gap-[12px]">
+                                                    <span>Employee Name</span>
+                                                    <button type="button" className="inline-flex shrink-0 items-center justify-center">
+                                                        <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                                                    </button>
+                                                </div>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                </table>
+                            </div>
+                            <div className="overflow-y-auto max-h-[calc(100vh-300px)] no-scrollbar scrollbar-none">
+                                <table className="table-auto lg:w-72 w-full">
+                                    <tbody>
+                                        {filteredEmployeeData.map((item, index) => (
+                                            <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED] last:border-b-0">
+                                                <td className="p-2 text-left text-[14px] font-semibold">{(employeeList.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                                                <td className="p-2 text-left text-[14px] group flex font-semibold">
+                                                    <div className="flex flex-grow">
+                                                        {item.employee_name}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {isWeeklyTypeOpen && (
+                    <ModalOverlay>
+                        <div className={MODAL_PANEL_CLASS}>
+                            <button type="button" className="absolute top-[18px] right-[18px]" onClick={closeWeeklyTypes}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
+                            <form onSubmit={handleSubmitWeeklyTypes}>
+                                <label className="block text-left">
+                                    <span className={MODAL_LABEL_CLASS}>Type</span>
+                                    <input
+                                        type="text"
+                                        className={MODAL_INPUT_CLASS}
+                                        placeholder="Type"
+                                        onChange={(e) => setWeeklyReceivedType(e.target.value)}
+                                        required
+                                    />
+                                </label>
+                                <div className={MODAL_ACTIONS_CLASS}>
+                                    <button type="button" className={MODAL_CANCEL_BTN_CLASS} onClick={closeWeeklyTypes}>
+                                        Cancel
+                                    </button>
+                                    <button type="submit" className={MODAL_SUBMIT_BTN_CLASS}>
+                                        Submit
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </ModalOverlay>
+                )}
+                {isWeeklyReceivedTypeOpen && (
+                    <ModalOverlay>
+                        <div className={MODAL_PANEL_CLASS}>
+                            <button type="button" className="absolute top-[18px] right-[18px]" onClick={closeWeeklyReceivedTypes}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
+                            <form onSubmit={handleSubmitWeeklyReceivedType}>
+                                <label className="block text-left">
+                                    <span className={MODAL_LABEL_CLASS}>Received Type</span>
+                                    <input
+                                        type="text"
+                                        className={MODAL_INPUT_CLASS}
+                                        placeholder="Received Type"
+                                        onChange={(e) => setWeeklyReceivedName(e.target.value)}
+                                        required
+                                    />
+                                </label>
+                                <div className={MODAL_ACTIONS_CLASS}>
+                                    <button type="button" className={MODAL_CANCEL_BTN_CLASS} onClick={closeWeeklyReceivedTypes}>
+                                        Cancel
+                                    </button>
+                                    <button type="submit" className={MODAL_SUBMIT_BTN_CLASS}>
+                                        Submit
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </ModalOverlay>
+                )}
+                {isLaboursListDataOpen && (
+                    <ModalOverlay>
+                        <div className={MODAL_PANEL_CLASS}>
+                            <button type="button" className="absolute top-[18px] right-[18px]" onClick={closeLabourDetails}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
+                            <form onSubmit={handleSubmitLaboursData}>
+                                <div className={MODAL_FIELDS_CLASS}>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Labour Name</span>
+                                        <input
+                                            type="text"
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Labour Name"
+                                            onChange={(e) => setLabourName(e.target.value)}
+                                            required
+                                        />
+                                    </label>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Salary</span>
+                                        <input
+                                            type="number"
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Salary"
+                                            onChange={(e) => setLabourSalary(e.target.value)}
+                                            required
+                                        />
+                                    </label>
+                                </div>
+                                <div className={MODAL_ACTIONS_CLASS}>
+                                    <button type="button" className={MODAL_CANCEL_BTN_CLASS} onClick={closeLabourDetails}>
+                                        Cancel
+                                    </button>
+                                    <button type="submit" className={MODAL_SUBMIT_BTN_CLASS}>
+                                        Submit
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </ModalOverlay>
+                )}
+                {isEmployeeDataOpen && (
+                    <ModalOverlay>
+                        <div className={MODAL_PANEL_CLASS}>
+                            <button type="button" className="absolute top-[18px] right-[18px]" onClick={closeEmployeeDetails}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
+                            <form onSubmit={handleSubmitEmployeeData}>
+                                <div className={MODAL_FIELDS_CLASS}>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Employee Name</span>
+                                        <input
+                                            type="text"
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Employee Name"
+                                            onChange={(e) => setEmployeeName(e.target.value)}
+                                            required
+                                        />
+                                    </label>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Mobile Number</span>
+                                        <input
+                                            type="text"
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Mobile Number"
+                                            onChange={(e) => setMobileNumber(e.target.value)}
+                                            required
+                                        />
+                                    </label>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Role</span>
+                                        <input
+                                            type="text"
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Role"
+                                            onChange={(e) => setRoleOfEmployee(e.target.value)}
+                                            required
+                                        />
+                                    </label>
+                                </div>
+                                <div className={MODAL_ACTIONS_CLASS}>
+                                    <button type="button" className={MODAL_CANCEL_BTN_CLASS} onClick={closeEmployeeDetails}>
+                                        Cancel
+                                    </button>
+                                    <button type="submit" className={MODAL_SUBMIT_BTN_CLASS}>
+                                        Submit
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </ModalOverlay>
+                )}
+                {isEditWeeklyReceivedTypeOpen && (
+                    <ModalOverlay>
+                        <div className={MODAL_PANEL_CLASS}>
+                            <button type="button" className="absolute top-[18px] right-[18px]" onClick={closeEditWeeklyTypePopup}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
+                            <form onSubmit={handleEditWeeklyTypes}>
+                                <label className="block text-left">
+                                    <span className={MODAL_LABEL_CLASS}>Type</span>
+                                    <input
+                                        type="text"
+                                        value={editWeeklyReceivedType}
+                                        className={MODAL_INPUT_CLASS}
+                                        placeholder="Type"
+                                        onChange={(e) => setEditWeeklyReceivedType(e.target.value)}
+                                        required
+                                    />
+                                </label>
+                                <div className={MODAL_ACTIONS_CLASS}>
+                                    <button type="button" className={MODAL_CANCEL_BTN_CLASS} onClick={closeEditWeeklyTypePopup}>
+                                        Cancel
+                                    </button>
+                                    <button type="submit" className={MODAL_SUBMIT_BTN_CLASS}>
+                                        Submit
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </ModalOverlay>
+                )}
+                {isEditWeeklyReceivedNameOpen && (
+                    <ModalOverlay>
+                        <div className={MODAL_PANEL_CLASS}>
+                            <button type="button" className="absolute top-[18px] right-[18px]" onClick={closeEditWeeklyReceivedNamePopup}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
+                            <form onSubmit={handleEditWeeklyReceivedType}>
+                                <label className="block text-left">
+                                    <span className={MODAL_LABEL_CLASS}>Received Type</span>
+                                    <input
+                                        type="text"
+                                        value={editWeeklyReceivedName}
+                                        className={MODAL_INPUT_CLASS}
+                                        placeholder="Received Type"
+                                        onChange={(e) => setEditWeeklyReceivedName(e.target.value)}
+                                        required
+                                    />
+                                </label>
+                                <div className={MODAL_ACTIONS_CLASS}>
+                                    <button type="button" className={MODAL_CANCEL_BTN_CLASS} onClick={closeEditWeeklyReceivedNamePopup}>
+                                        Cancel
+                                    </button>
+                                    <button type="submit" className={MODAL_SUBMIT_BTN_CLASS}>
+                                        Submit
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </ModalOverlay>
+                )}
+                {isEditLaboursListDataOpen && (
+                    <ModalOverlay>
+                        <div className={MODAL_PANEL_CLASS}>
+                            <button type="button" className="absolute top-[18px] right-[18px]" onClick={closeEditLaboursDetails}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
+                            <form onSubmit={handleEditLabourData}>
+                                <div className={MODAL_FIELDS_CLASS}>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Labour Name</span>
+                                        <input
+                                            type="text"
+                                            value={editLabourName}
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Labour Name"
+                                            onChange={(e) => setEditLabourName(e.target.value)}
+                                            required
+                                        />
+                                    </label>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Salary</span>
+                                        <input
+                                            type="number"
+                                            value={editLabourSalary}
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Salary"
+                                            onChange={(e) => setEditLabourSalary(e.target.value)}
+                                            required
+                                        />
+                                    </label>
+                                </div>
+                                <div className={MODAL_ACTIONS_CLASS}>
+                                    <button type="button" className={MODAL_CANCEL_BTN_CLASS} onClick={closeEditLaboursDetails}>
+                                        Cancel
+                                    </button>
+                                    <button type="submit" className={MODAL_SUBMIT_BTN_CLASS}>
+                                        Submit
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </ModalOverlay>
+                )}
+                {isEditEmployeeDataOpen && (
+                    <ModalOverlay>
+                        <div className={MODAL_PANEL_CLASS}>
+                            <button type="button" className="absolute top-[18px] right-[18px]" onClick={closeEditEmployeeDetails}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
+                            <form onSubmit={handleEditEmployeeData}>
+                                <div className={MODAL_FIELDS_CLASS}>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Employee Name</span>
+                                        <input
+                                            type="text"
+                                            value={editEmployeeName}
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Employee Name"
+                                            onChange={(e) => setEditEmployeeName(e.target.value)}
+                                            required
+                                        />
+                                    </label>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Mobile Number</span>
+                                        <input
+                                            type="text"
+                                            value={editEmployeeMobileNumber}
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Mobile Number"
+                                            onChange={(e) => setEditEmployeeMobileNumber(e.target.value)}
+                                            required
+                                        />
+                                    </label>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Role</span>
+                                        <input
+                                            type="text"
+                                            value={editRoleOfEmployee}
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Role"
+                                            onChange={(e) => setEditRoleOfEmployee(e.target.value)}
+                                            required
+                                        />
+                                    </label>
+                                </div>
+                                <div className={MODAL_ACTIONS_CLASS}>
+                                    <button type="button" className={MODAL_CANCEL_BTN_CLASS} onClick={closeEditEmployeeDetails}>
+                                        Cancel
+                                    </button>
+                                    <button type="submit" className={MODAL_SUBMIT_BTN_CLASS}>
+                                        Submit
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </ModalOverlay>
+                )}
+                <ModalLaboursList
+                    isOpen={laboursListBulkUploadOpen}
+                    onClose={closeLabourBulkUploadModal}
+                    onFileChange={handleFileChange}
+                    onUpload={handleUploadLaboursList}
+                />
+            </div>
+        </div>
+    )
+}
+export default WeeklyPaymentAddInput
+function ModalLaboursList({ isOpen, onClose, onFileChange, onUpload }) {
+    if (!isOpen) return null;
+    return (
+        <ModalOverlay>
+            <div className={`${MODAL_PANEL_CLASS} w-[384px]`}>
+                <button type="button" className="absolute top-[18px] right-[18px]" onClick={onClose}>
+                    <img src={cross} alt="close" className="w-5 h-5" />
+                </button>
+                <label className="block text-left">
+                    <span className={MODAL_LABEL_CLASS}>Upload Bulk Data</span>
+                    <input
+                        type="file"
+                        onChange={onFileChange}
+                        accept=".csv, .sql"
+                        className={`${MODAL_INPUT_CLASS} h-auto py-2`}
+                    />
+                </label>
+                <div className={MODAL_ACTIONS_CLASS}>
+                    <button type="button" onClick={onClose} className={MODAL_CANCEL_BTN_CLASS}>
+                        Close
+                    </button>
+                    <button type="button" onClick={onUpload} className={MODAL_SUBMIT_BTN_CLASS}>
+                        Upload
+                    </button>
+                </div>
+            </div>
+        </ModalOverlay>
+    );
+}

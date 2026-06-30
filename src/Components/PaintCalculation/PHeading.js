@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Paintcalculation from './Paintcalculation';
 import PaintHistory from './PaintHistory';
 import PaintAddinput from './PaintAddinput';
-import './PHeading.css';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 
 const PHeading = () => {
     // Get the last active tab from localStorage or default to 'paintCalculation'
@@ -29,31 +29,31 @@ const PHeading = () => {
     };
 
     return (
-        <div className="bg-[#FAF6ED]">
-            <div className="topbar-title">
-                <h2
-                    className={`link ${activeTab === 'paintCalculation' ? 'active' : ''}`}
+        <ModuleHeadingWrapper>
+            <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === 'paintCalculation'}
                     onClick={() => setActiveTab('paintCalculation')}
                 >
                     Paint Calculation
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'paintHistory' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'paintHistory'}
                     onClick={() => setActiveTab('paintHistory')}
                 >
                     History
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'paintAddInput' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'paintAddInput'}
                     onClick={() => setActiveTab('paintAddInput')}
                 >
                     Add Input
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {renderContent()}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     );
 };
 

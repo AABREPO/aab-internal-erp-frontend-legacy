@@ -1,0 +1,8 @@
+/* Change margin-top here to update all module headings */
+.topbar-title.expense-entry-tabs.main-heading-page-tabs {
+    margin-top: 0 !important;
+}
+
+.topbar-title.expense-entry-tabs.main-heading-page-tabs h2 {
+    margin-top: 0 !important;
+}

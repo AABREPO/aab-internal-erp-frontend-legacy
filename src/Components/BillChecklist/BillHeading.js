@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import EntryChecklist from './EntryChecklist';
 import History from './EntryChecklistHistory';
 import ExpenseTableView from './ExpensesTableView';
@@ -27,31 +28,31 @@ const BHeading = () => {
         }
     };
     return (
-        <div className="bg-[#FAF6ED]">
-            <div className="topbar-title">
-                <h2
-                    className={`link ${activeTab === 'entrychecklist' ? 'active' : ''}`}
+        <ModuleHeadingWrapper className="w-full h-auto min-h-screen">
+            <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === 'entrychecklist'}
                     onClick={() => setActiveTab('entrychecklist')}
                 >
                     Entry Check List
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'expensesTable' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'expensesTable'}
                     onClick={() => setActiveTab('expensesTable')}
                 >
                     Expenses Table View
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'history' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'history'}
                     onClick={() => setActiveTab('history')}
                 >
                     History
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {renderContent()}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     )
 }
 

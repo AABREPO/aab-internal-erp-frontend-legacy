@@ -1,20 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
-import './InHeading.css';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import Invoice from '../Invoice/Invoice';
 import EditInvoice from '../Invoice/EditInvoice';
 import History from './History';
 import Database from './Database';
 import AddInput from './AddInput';
 
-const Heading = () => {
+const Heading = ({ username, userRoles = [] }) => {
     const location = useLocation();
-    const [activeTab, setActiveTab] = useState(location.pathname);
+    const [activeTab, setActiveTab] = useState(() => {
+        const savedTab = location.pathname;
+        if (savedTab === '/invoice-bill/database' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+            return '/invoice-bill/invoice';
+        }
+        return savedTab;
+    });
 
     useEffect(() => {
-        // Save the active tab to localStorage whenever it changes
-        localStorage.setItem('activeInvoiceTab', activeTab);
-    }, [activeTab]);
+        if (activeTab === '/invoice-bill/database' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+            setActiveTab('/invoice-bill/invoice');
+        } else {
+            localStorage.setItem('activeInvoiceTab', activeTab);
+        }
+    }, [activeTab, username]);
 
     const renderContent = () => {
         switch (activeTab) {
@@ -38,43 +47,45 @@ const Heading = () => {
     };
 
     return (
-        <div className="bg-[#FAF6ED]">
-            <div className="topbar-title ml-40">
-                <h2
-                    className={`link ${activeTab === '/invoice-bill/invoice' ? 'active' : ''}`}
+        <ModuleHeadingWrapper>
+            <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === '/invoice-bill/invoice'}
                     onClick={() => handleTabClick('/invoice-bill/invoice')}
                 >
                     Create Invoice
-                </h2>
-                <h2
-                    className={`link ${activeTab === '/invoice-bill/editinvoice' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === '/invoice-bill/editinvoice'}
                     onClick={() => handleTabClick('/invoice-bill/editinvoice')}
                 >
                     Edit Invoice
-                </h2>
-                <h2
-                    className={`link ${activeTab === '/invoice-bill/history' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === '/invoice-bill/history'}
                     onClick={() => handleTabClick('/invoice-bill/history')}
                 >
                     History
-                </h2>
-                <h2
-                    className={`link ${activeTab === '/invoice-bill/database' ? 'active' : ''}`}
-                    onClick={() => handleTabClick('/invoice-bill/database')}
-                >
-                    Database
-                </h2>
-                <h2
-                    className={`link ${activeTab === '/invoice-bill/addinput' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                {(username === 'Mahalingam M' || username === 'Admin') && (
+                    <ModuleHeadingTab
+                        active={activeTab === '/invoice-bill/database'}
+                        onClick={() => handleTabClick('/invoice-bill/database')}
+                    >
+                        Database
+                    </ModuleHeadingTab>
+                )}
+                <ModuleHeadingTab
+                    active={activeTab === '/invoice-bill/addinput'}
                     onClick={() => handleTabClick('/invoice-bill/addinput')}
                 >
                     Add Input
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {renderContent()}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     );
 };
 

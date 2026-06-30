@@ -1,15 +1,21 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import axios from 'axios';
 import Edit from '../Images/Edit.svg'
 import Select from 'react-select';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+/** Keeps react-select menus above sticky table headers (e.g. EB No thead z-10). */
+const withSelectMenuAboveTable = (styleObj) => ({
+    ...styleObj,
+    menuPortal: (base) => ({ ...base, zIndex: 10050 }),
+    menu: (base) => ({ ...base, zIndex: 10050 }),
+});
+
 const Ebno = () => {
 
     const [rentForms, setRentForms] = useState([]);
-    const [ebtenantShopData, setEbTenantShopData] = useState([]);
-    const [ebproperties, setEbProperties] = useState([]);
+    const [ebprojects, setEbProjects] = useState([]);
     const [selectedEbShopNo, setSelectedEbShopNo] = useState('');
     const [selectedEbDoorNo, setSelectedEbDoorNo] = useState('');
     const [selectedEbNo, setSelectedEbNo] = useState('');
@@ -17,23 +23,36 @@ const Ebno = () => {
     const [selectedEbProperty, setSelectedEbProperty] = useState(null);
     const [ebtableData, setEbTableData] = useState([]);
     const [ebNoOptions, setEbNoOptions] = useState([]);
+    const [tenantLinkList, setTenantLinkList] = useState([]);
     const [sortField, setSortField] = useState('');
     const [sortOrder, setSortOrder] = useState('asc');
 
     useEffect(() => {
-        fetchProperties();
+        fetchProjects();
     }, []);
 
-    const fetchProperties = async () => {
+    const fetchProjects = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/properties/all');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
-                setEbProperties(data);
-                console.log("✅ Full property :", data);
-                // 🧠 Flatten all propertyDetailsList and extract unique ebNos
-                const ebNos = data
-                    .flatMap(property => property.propertyDetailsList || [])
+                // Filter for "own project" category
+                const ownProjects = Array.isArray(data)
+                    ? data.filter(p => (p.projectCategory || '').toLowerCase() === 'own project')
+                    : [];
+                setEbProjects(ownProjects);
+                console.log("✅ Full projects :", ownProjects);
+                // 🧠 Flatten all propertyDetails and extract unique ebNos
+                // Only include projects with projectReferenceName
+                const ebNos = ownProjects
+                    .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+                    .flatMap(project => {
+                        // Convert Set to Array if needed
+                        const propertyDetailsArray = Array.isArray(project.propertyDetails) 
+                            ? project.propertyDetails 
+                            : Array.from(project.propertyDetails || []);
+                        return propertyDetailsArray;
+                    })
                     .map(detail => detail.ebNo)
                     .filter(eb => !!eb); // Remove undefined/null/empty
 
@@ -42,48 +61,68 @@ const Ebno = () => {
 
                 console.log("✅ EB Options:", uniqueEbNos);
             } else {
-                console.log('❌ Error fetching properties.');
+                console.log('❌ Error fetching projects.');
             }
         } catch (error) {
             console.error('❌ Fetch error:', error);
         }
     };
-    useEffect(() => {
-        fetchTenants();
-    }, []);
-    const fetchTenants = async () => {
-        try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/tenantShop/getAll');
-            if (response.ok) {
-                const data = await response.json();
-                setEbTenantShopData(data);
-                console.log(data);
-            } else {
-                console.error('Error fetching tenants.');
+
+    const getShopDetailsById = useCallback((shopNoId) => {
+        if (shopNoId == null || shopNoId === '') return null;
+        for (const project of ebprojects) {
+            if (!project.propertyDetails) continue;
+            const propertyDetailsArray = Array.isArray(project.propertyDetails)
+                ? project.propertyDetails
+                : Array.from(project.propertyDetails || []);
+            const detail = propertyDetailsArray.find((d) =>
+                (d.id != null && String(d.id).trim() === String(shopNoId).trim()) ||
+                (d.shopNo != null && String(d.shopNo).trim() === String(shopNoId).trim())
+            );
+            if (detail) {
+                return {
+                    shopNo: detail.shopNo || '',
+                    doorNo: detail.doorNo || '',
+                    projectReferenceName: project.projectReferenceName || '',
+                };
             }
-        } catch (error) {
-            console.error('Error:', error);
         }
-    };
-    const shopInfoMap = {};
-    ebtenantShopData.forEach(tenant => {
-        tenant.property?.forEach(property => {
-            property.shops?.forEach(shop => {
-                if (shop.shopNo) {
-                    shopInfoMap[shop.shopNo] = {
-                        doorNo: shop.doorNo || '',
-                        propertyName: property.propertyName || '',
+        return null;
+    }, [ebprojects]);
+
+    useEffect(() => {
+        const loadTenantLinkShop = async () => {
+            try {
+                const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
+                setTenantLinkList(Array.isArray(response.data) ? response.data : []);
+            } catch (error) {
+                console.error('Error fetching tenant link with shop:', error);
+            }
+        };
+        loadTenantLinkShop();
+    }, []);
+
+    const shopInfoMap = useMemo(() => {
+        const map = {};
+        tenantLinkList.forEach((tenant) => {
+            tenant.shopNos?.forEach((shop) => {
+                const d = getShopDetailsById(shop.shopNoId);
+                if (d?.shopNo) {
+                    map[d.shopNo] = {
+                        doorNo: d.doorNo || '',
+                        projectReferenceName: d.projectReferenceName || '',
                         advanceAmount: shop.advanceAmount || '',
                         monthlyRent: shop.monthlyRent || '',
-                        tenantId: tenant.id,     // ← Add tenant ID
-                        shopId: shop.id,          // ← Add shop ID
+                        tenantId: tenant.id,
+                        shopId: shop.id,
                         startingDate: shop.startingDate,
-                        shouldCollectAdvance: shop.shouldCollectAdvance
+                        shouldCollectAdvance: shop.shouldCollectAdvance,
                     };
                 }
             });
         });
-    });
+        return map;
+    }, [tenantLinkList, getShopDetailsById]);
     const formatDateOnly = (dateString) => {
         const date = new Date(dateString);
         const day = String(date.getDate()).padStart(2, '0');
@@ -93,37 +132,45 @@ const Ebno = () => {
     };
     useEffect(() => {
         const allShops = [];
-        // 1. Collect all shop data from properties
-        ebproperties.forEach(property => {
-            property.propertyDetailsList?.forEach(shop => {
-                if (shop.shopNo) {
-                    allShops.push({
-                        shopNo: shop.shopNo,
-                        doorNo: shop.doorNo || '',
-                        propertyName: property.propertyName || '',
-                        advance: null,
-                        tenantName: null,
-                        tenantId: null,
-                        shopId: shop.id,
-                        active: false
-                    });
-                }
-            });
-        });
-        // 2. Merge tenant data (excluding advance)
-        ebtenantShopData.forEach(tenant => {
-            tenant.property?.forEach(property => {
-                property.shops?.forEach(shop => {
-                    const shopEntryIndex = allShops.findIndex(s => s.shopNo === shop.shopNo);
-                    if (shopEntryIndex !== -1) {
-                        allShops[shopEntryIndex] = {
-                            ...allShops[shopEntryIndex],
-                            tenantName: tenant.tenantName || '',
-                            tenantId: tenant.id,
-                            active: shop.active ?? true
-                        };
+        // 1. Collect all shop data from projects (project management)
+        ebprojects
+            .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+            .forEach(project => {
+                // Convert Set to Array if needed
+                const propertyDetailsArray = Array.isArray(project.propertyDetails) 
+                    ? project.propertyDetails 
+                    : Array.from(project.propertyDetails || []);
+                
+                propertyDetailsArray.forEach(shop => {
+                    if (shop.shopNo) {
+                        allShops.push({
+                            shopNo: shop.shopNo,
+                            doorNo: shop.doorNo || '',
+                            propertyName: project.projectReferenceName || '', // Use projectReferenceName
+                            advance: null,
+                            tenantName: null,
+                            tenantId: null,
+                            shopId: shop.id,
+                            active: false
+                        });
                     }
                 });
+            });
+        // 2. Merge tenant data from tenant_link_shop (shopNoId → project shopNo)
+        tenantLinkList.forEach((tenant) => {
+            tenant.shopNos?.forEach((shop) => {
+                const resolved = getShopDetailsById(shop.shopNoId);
+                const resolvedShopNo = resolved?.shopNo;
+                if (!resolvedShopNo) return;
+                const shopEntryIndex = allShops.findIndex((s) => s.shopNo === resolvedShopNo);
+                if (shopEntryIndex !== -1) {
+                    allShops[shopEntryIndex] = {
+                        ...allShops[shopEntryIndex],
+                        tenantName: tenant.tenantName || '',
+                        tenantId: tenant.id,
+                        active: shop.active ?? true,
+                    };
+                }
             });
         });
         // 3. Filter rent data for selected year
@@ -211,12 +258,14 @@ const Ebno = () => {
             }
         });
         setEbTableData(finalTableData);
-    }, [rentForms, ebtenantShopData, ebproperties]);
+    }, [rentForms, tenantLinkList, ebprojects, shopInfoMap, getShopDetailsById]);
 
-    const options = ebproperties.map((property) => ({
-        value: property.propertyName,
-        label: property.propertyName,
-    }));
+    const options = ebprojects
+        .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+        .map((project) => ({
+            value: project.projectReferenceName,
+            label: project.projectReferenceName,
+        }));
 
     const shopOptions = [...new Set(ebtableData.map(shop => shop.shopNo))].map(no => ({ value: no, label: no }));
     const filteredByShop = selectedEbShopNo
@@ -228,53 +277,113 @@ const Ebno = () => {
         : filteredByShop;
     const doorOptions = [...new Set(filteredByTenant.map(shop => shop.doorNo))].map(door => ({ value: door, label: door }));
 
-    const selectedTenant = ebtenantShopData.find(
-        t => t.tenantName === selectedEbTenantName
-    );
+    const selectedTenantLink = useMemo(() => {
+        if (!selectedEbTenantName || !Array.isArray(tenantLinkList)) return null;
+        return tenantLinkList.find(
+            (item) => String(item?.tenantName || '').trim() === String(selectedEbTenantName).trim()
+        ) || null;
+    }, [tenantLinkList, selectedEbTenantName]);
 
-    // Extract all shopNos for the selected tenant
-    const tenantShopNos = selectedTenant?.property?.flatMap(p =>
-        p.shops?.map(shop => shop.shopNo)
-    ) || [];
+    const tenantShopNos = useMemo(() => {
+        if (!selectedTenantLink) return [];
+        const nos = [];
+        for (const shop of selectedTenantLink.shopNos || []) {
+            const d = getShopDetailsById(shop.shopNoId);
+            if (d?.shopNo) nos.push(d.shopNo);
+        }
+        return nos;
+    }, [selectedTenantLink, getShopDetailsById]);
 
-    const filteredEbProperties = ebproperties.flatMap(property => {
-        const owner = property.ownerDetailsList?.[0] || {};
+    const filteredEbProperties = ebprojects
+        .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+        .flatMap(project => {
+            // Convert Set to Array if needed for ownerDetails
+            const ownerDetailsArray = Array.isArray(project.ownerDetails) 
+                ? project.ownerDetails 
+                : Array.from(project.ownerDetails || []);
+            const owner = ownerDetailsArray[0] || {};
 
-        return (property.propertyDetailsList || [])
-            .filter(detail => {
-                const matchesTenant = !selectedEbTenantName || tenantShopNos.includes(detail.shopNo);
+            // Convert Set to Array if needed for propertyDetails
+            const propertyDetailsArray = Array.isArray(project.propertyDetails) 
+                ? project.propertyDetails 
+                : Array.from(project.propertyDetails || []);
 
-                return (
-                    (!selectedEbNo || detail.ebNo === selectedEbNo) &&
-                    (!selectedEbShopNo || detail.shopNo === selectedEbShopNo) &&
-                    (!selectedEbDoorNo || detail.doorNo === selectedEbDoorNo) &&
-                    matchesTenant &&
-                    (!selectedEbProperty || selectedEbProperty.value === property.propertyName)
-                );
-            })
-            .map(detail => {
-                let matchedTenantName = '';
+            return propertyDetailsArray
+                .filter(detail => {
+                    const matchesTenant = !selectedEbTenantName || tenantShopNos.includes(detail.shopNo);
 
-                for (const tenant of ebtenantShopData) {
-                    for (const prop of tenant.property || []) {
-                        for (const shop of prop.shops || []) {
-                            if (shop.shopNo === detail.shopNo && shop.doorNo === detail.doorNo) {
+                    return (
+                        (!selectedEbNo || detail.ebNo === selectedEbNo) &&
+                        (!selectedEbShopNo || detail.shopNo === selectedEbShopNo) &&
+                        (!selectedEbDoorNo || detail.doorNo === selectedEbDoorNo) &&
+                        matchesTenant &&
+                        (!selectedEbProperty || selectedEbProperty.value === project.projectReferenceName)
+                    );
+                })
+                .map(detail => {
+                    let matchedTenantName = '';
+                    let matchedTenantRent = null;
+                    for (const tenant of tenantLinkList) {
+                        for (const shop of tenant.shopNos || []) {
+                            const d = getShopDetailsById(shop.shopNoId);
+                            if (d && d.shopNo === detail.shopNo && d.doorNo === detail.doorNo) {
                                 matchedTenantName = tenant.tenantName;
+                                matchedTenantRent = shop.monthlyRent;
                                 break;
                             }
+                        }
+                        if (matchedTenantName) break;
+                    }
+                    return {
+                        property: project, // Store the full project object
+                        owner,
+                        detail,
+                        tenantName: matchedTenantName,
+                        rent: matchedTenantRent
+                    };
+                });
+        });
+    console.log("✅ Filtered EB Properties:", filteredEbProperties);
+    
+    // ✅ All EB Properties (unfiltered) for PDF/CSV export
+    const allEbProperties = ebprojects
+        .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+        .flatMap(project => {
+            // Convert Set to Array if needed for ownerDetails
+            const ownerDetailsArray = Array.isArray(project.ownerDetails) 
+                ? project.ownerDetails 
+                : Array.from(project.ownerDetails || []);
+            const owner = ownerDetailsArray[0] || {};
+
+            // Convert Set to Array if needed for propertyDetails
+            const propertyDetailsArray = Array.isArray(project.propertyDetails) 
+                ? project.propertyDetails 
+                : Array.from(project.propertyDetails || []);
+
+            return propertyDetailsArray.map(detail => {
+                let matchedTenantName = '';
+                let matchedTenantRent = null;
+                for (const tenant of tenantLinkList) {
+                    for (const shop of tenant.shopNos || []) {
+                        const d = getShopDetailsById(shop.shopNoId);
+                        if (d && d.shopNo === detail.shopNo && d.doorNo === detail.doorNo) {
+                            matchedTenantName = tenant.tenantName;
+                            matchedTenantRent = shop.monthlyRent;
+                            break;
                         }
                     }
                     if (matchedTenantName) break;
                 }
-
                 return {
-                    property,
+                    property: project, // Store the full project object
                     owner,
                     detail,
-                    tenantName: matchedTenantName
+                    tenantName: matchedTenantName,
+                    rent: matchedTenantRent
                 };
             });
-    });
+        });
+    
     const handleSort = (field) => {
         if (sortField === field) {
             setSortOrder((prevOrder) => (prevOrder === 'asc' ? 'desc' : 'asc'));
@@ -283,26 +392,57 @@ const Ebno = () => {
             setSortOrder('asc');
         }
     };
-    const sortedEbProperties = [...filteredEbProperties].sort((a, b) => {
+
+    const parseDashboardStyleShopNo = (shopNoValue) => {
+        if (!shopNoValue) return { letters: '', number: 0, suffix: '' };
+        const normalized = shopNoValue.toString().replace(/\s+/g, '').toUpperCase();
+        const baseValue = normalized.split(',')[0];
+        const letterMatch = baseValue.match(/^([A-Z]{1,2})/);
+        const numberMatch = baseValue.match(/(\d+)/);
+        const suffixStartIndex = numberMatch
+            ? baseValue.indexOf(numberMatch[1]) + numberMatch[1].length
+            : (letterMatch ? letterMatch[1].length : 0);
+        const suffix = baseValue.slice(suffixStartIndex) || '';
+        return {
+            letters: letterMatch ? letterMatch[1] : '',
+            number: numberMatch ? parseInt(numberMatch[1], 10) : 0,
+            suffix
+        };
+    };
+
+    const sortedEbProperties = useMemo(() => {
         const getValue = (obj) => {
             if (!sortField) return '';
-            if (sortField === 'propertyName') return obj.property.propertyName || '';
-            if (sortField === 'ownerName') return obj.owner.ownerName || '';
+            if (sortField === 'propertyName') return obj.property.projectReferenceName || '';
+            if (sortField === 'ownerName') return obj.owner.clientName || ''; // Use clientName from ownerDetails
+            if (sortField === 'propertyType') return obj.detail.projectType || '';
             return obj.detail[sortField] || '';
         };
 
-        let valA = getValue(a)?.toString().toLowerCase();
-        let valB = getValue(b)?.toString().toLowerCase();
+        return [...filteredEbProperties].sort((a, b) => {
+            let valA = getValue(a);
+            let valB = getValue(b);
 
-        if (sortField === 'shopNo') {
-            valA = valA.charAt(0);
-            valB = valB.charAt(0);
-        }
+            if (sortField === 'shopNo') {
+                const parsedA = parseDashboardStyleShopNo(valA);
+                const parsedB = parseDashboardStyleShopNo(valB);
+                if (parsedA.letters < parsedB.letters) return sortOrder === 'asc' ? -1 : 1;
+                if (parsedA.letters > parsedB.letters) return sortOrder === 'asc' ? 1 : -1;
+                if (parsedA.number < parsedB.number) return sortOrder === 'asc' ? -1 : 1;
+                if (parsedA.number > parsedB.number) return sortOrder === 'asc' ? 1 : -1;
+                if (parsedA.suffix < parsedB.suffix) return sortOrder === 'asc' ? -1 : 1;
+                if (parsedA.suffix > parsedB.suffix) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
+            }
 
-        if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-        if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-        return 0;
-    });
+            const normalizedA = valA?.toString().toLowerCase() || '';
+            const normalizedB = valB?.toString().toLowerCase() || '';
+
+            if (normalizedA < normalizedB) return sortOrder === 'asc' ? -1 : 1;
+            if (normalizedA > normalizedB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }, [filteredEbProperties, sortField, sortOrder]);
     const generatePdf = () => {
         const doc = new jsPDF();
         // ✅ Add heading at the top (centered)
@@ -311,7 +451,7 @@ const Ebno = () => {
         doc.text("EB Property List", 14, 15);
 
         const tableColumn = [
-            "Property Name",
+            "Project Reference Name",
             "Owner Name",
             "Property Type",
             "Floor Name",
@@ -322,9 +462,9 @@ const Ebno = () => {
         ];
 
         const tableRows = filteredEbProperties.map(({ property, owner, detail }) => [
-            property.propertyName || " - ",
-            owner.ownerName || " - ",
-            detail.propertyType || " - ",
+            property.projectReferenceName || " - ",
+            owner.clientName || " - ", // Use clientName from ownerDetails
+            detail.projectType || " - ", // Use projectType
             detail.floorName || " - ",
             detail.shopNo || " - ",
             detail.doorNo || " - ",
@@ -359,10 +499,151 @@ const Ebno = () => {
 
         doc.save("eb-properties.pdf");
     };
-
+    // ✅ Common helper to filter, sort and prepare rows
+    const prepareEbRows = (filteredEbProperties) => {
+        // ✅ Parse shopNo into { prefix, num, suffix }
+        const parseShopNo = (shopNo) => {
+            if (!shopNo) return { prefix: "", num: NaN, suffix: "" };
+            // Match prefix (letters/spaces/hyphen), number, suffix (letters/commas)
+            const match = shopNo.match(/^([A-Za-z -]*?)(\d+)([A-Za-z, ]*)$/);
+            if (match) {
+                return {
+                    prefix: match[1].trim(),   // e.g. "M" or "TC - B"
+                    num: parseInt(match[2], 10), // e.g. 5
+                    suffix: match[3].trim() || "" // e.g. "A" or "A, B"
+                };
+            }
+            // If no number at all → treat whole as prefix
+            return { prefix: shopNo.trim(), num: NaN, suffix: "" };
+        };
+        // ✅ Sorting logic: projectReferenceName → shopNo
+        const sortedRows = filteredEbProperties.sort((a, b) => {
+            if (a.property.projectReferenceName === b.property.projectReferenceName) {
+                const aParsed = parseShopNo(a.detail.shopNo);
+                const bParsed = parseShopNo(b.detail.shopNo);
+                // Compare prefixes (M, TA, TC-B, etc.)
+                if (aParsed.prefix !== bParsed.prefix) {
+                    return aParsed.prefix.localeCompare(bParsed.prefix);
+                }
+                // Compare numbers
+                if (!isNaN(aParsed.num) && !isNaN(bParsed.num)) {
+                    if (aParsed.num !== bParsed.num) {
+                        return aParsed.num - bParsed.num;
+                    }
+                    // ✅ Numbers equal → plain number before suffixed number
+                    if (aParsed.suffix && !bParsed.suffix) return 1;
+                    if (!aParsed.suffix && bParsed.suffix) return -1;
+                    return aParsed.suffix.localeCompare(bParsed.suffix);
+                }
+                // One has no number → fallback to string compare
+                return (a.detail.shopNo || "").localeCompare(b.detail.shopNo || "");
+            }
+            return (a.property.projectReferenceName || "").localeCompare(b.property.projectReferenceName || "");
+        });
+        // ✅ Prepare table rows for PDF/CSV
+        const tableRows = sortedRows.map(({ property, owner, detail, rent }) => [
+            property.projectReferenceName || "-",
+            owner.clientName || "-", // Use clientName from ownerDetails
+            detail.projectType || "-", // Use projectType
+            detail.shopNo || "-",
+            detail.floorName || "-",
+            detail.doorNo || "-",
+            detail.area || "-",
+            detail.ebNo || "-",
+            rent || "-"
+        ]);
+        // ✅ Total rent
+        const totalRent = sortedRows.reduce(
+            (sum, { rent }) => sum + (parseFloat(rent) || 0),
+            0
+        );
+        return { tableRows, totalRent };
+    };
+    // ✅ Generate PDF
+    const generatePdfWithRent = () => {
+        const doc = new jsPDF();
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("EB Property List", 14, 15);
+        const tableColumn = [
+            "Project Reference Name",
+            "Owner Name",
+            "Property",
+            "Shop No",
+            "Floor Name",
+            "Door No",
+            "Area",
+            "EB.No",
+            "Rent"
+        ];
+        const { tableRows, totalRent } = prepareEbRows(allEbProperties);
+        // Show total top-right
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "normal");
+        doc.text(
+            `Total Rent: ${Number(totalRent).toLocaleString("en-IN")}`,
+            150,
+            15
+        );
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 22,
+            styles: {
+                fontSize: 8,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.1,
+            },
+            headStyles: {
+                fontStyle: "bold",
+                fillColor: [255, 255, 255],
+                textColor: [0, 0, 0],
+            },
+            bodyStyles: {
+                fontStyle: "normal",
+                fillColor: [255, 255, 255],
+                textColor: [0, 0, 0],
+            },
+            didParseCell: (data) => {
+                data.cell.styles.fillColor = [255, 255, 255];
+            },
+        });
+        doc.save("eb-properties.pdf");
+    };
+    // ✅ Generate CSV
+    const generateCsvWithRent = () => {
+        const headers = [
+            "Project Reference Name",
+            "Owner Name",
+            "Property",
+            "Shop No",
+            "Floor Name",
+            "Door No",
+            "Area",
+            "EB.No",
+            "Rent"
+        ];
+        const { tableRows, totalRent } = prepareEbRows(allEbProperties);
+        // Add total row
+        tableRows.push([
+            "TOTAL", "", "", "", "", "", "", "",
+            Number(totalRent).toLocaleString("en-IN")
+        ]);
+        // Convert to CSV
+        const csvContent = [headers, ...tableRows]
+            .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+            .join("\n");
+        // Trigger download
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "eb-properties.csv";
+        link.click();
+    };
     return (
         <div>
-            <div className='mx-auto lg:w-[1750px] p-4 lg:pl-8 bg-white lg:ml-7 lg:mr-6 rounded-md text-left flex'>
+            <div className='lg:w-[1750px] p-4 lg:pl-8 bg-white lg:ml-10 lg:mr-10 rounded-md text-left lg:flex'>
                 <div>
                     <h1 className='font-semibold mb-3'>Select EB NO</h1>
                     <Select
@@ -372,7 +653,8 @@ const Ebno = () => {
                         value={ebNoOptions.find(o => o.value === selectedEbNo) || null}
                         onChange={(option) => setSelectedEbNo(option?.value || '')}
                         className="w-[200px]"
-                        styles={{
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        styles={withSelectMenuAboveTable({
                             control: (provided, state) => ({
                                 ...provided,
                                 height: '45px',
@@ -394,7 +676,7 @@ const Ebno = () => {
                                 ...provided,
                                 color: 'black',
                             }),
-                        }}
+                        })}
                     />
                 </div>
                 <div className="flex gap-4 mt-9 ml-3.5 w-full flex-wrap">
@@ -409,7 +691,8 @@ const Ebno = () => {
                                 setSelectedEbTenantName('');
                                 setSelectedEbDoorNo('');
                             }}
-                            styles={{
+                            menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                            styles={withSelectMenuAboveTable({
                                 control: (provided, state) => ({
                                     ...provided,
                                     height: '45px',
@@ -433,7 +716,7 @@ const Ebno = () => {
                                     ...provided,
                                     color: 'black',
                                 }),
-                            }}
+                            })}
                         />
                     </div>
                     <div className="min-w-[200px]">
@@ -447,7 +730,8 @@ const Ebno = () => {
                                 setSelectedEbDoorNo('');
                             }}
                             isDisabled={!filteredByShop.length}
-                            styles={{
+                            menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                            styles={withSelectMenuAboveTable({
                                 control: (provided, state) => ({
                                     ...provided,
                                     height: '45px',
@@ -471,7 +755,7 @@ const Ebno = () => {
                                     ...provided,
                                     color: 'black',
                                 }),
-                            }}
+                            })}
                         />
                     </div>
                     <div className="min-w-[200px]">
@@ -482,7 +766,8 @@ const Ebno = () => {
                             value={doorOptions.find(o => o.value === selectedEbDoorNo) || null}
                             onChange={(option) => setSelectedEbDoorNo(option?.value || '')}
                             isDisabled={!filteredByTenant.length}
-                            styles={{
+                            menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                            styles={withSelectMenuAboveTable({
                                 control: (provided, state) => ({
                                     ...provided,
                                     height: '45px',
@@ -506,7 +791,7 @@ const Ebno = () => {
                                     ...provided,
                                     color: 'black',
                                 }),
-                            }}
+                            })}
                         />
                     </div>
                     <div className="min-w-[200px]">
@@ -518,7 +803,8 @@ const Ebno = () => {
                             onChange={setSelectedEbProperty}
                             placeholder="Select"
                             isSearchable
-                            styles={{
+                            menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                            styles={withSelectMenuAboveTable({
                                 control: (provided, state) => ({
                                     ...provided,
                                     height: '45px',
@@ -542,31 +828,36 @@ const Ebno = () => {
                                     ...provided,
                                     color: 'black',
                                 }),
-                            }}
+                            })}
                         />
                     </div>
-
                 </div>
             </div>
-            <div className='mx-auto lg:w-[1750px] p-4 lg:pl-8 mt-6 bg-white lg:ml-7 mr-6 rounded-md'>
+            <div className='lg:w-[1750px] p-4 lg:pl-8 mt-6 bg-white lg:ml-10 mr-10 rounded-md'>
                 <div className="flex justify-between">
                     <div></div>
-                    <div>
+                    <div className="flex items-center gap-3 cursor-pointer">
                         <h1
-                            className='font-bold text-sm mt-2 mb-3 text-[#E4572E] cursor-pointer hover:underline'
-                            onClick={generatePdf}
+                            className='text-sm text-[#E4572E] hover:underline font-bold'
+                            onClick={generatePdfWithRent}
                         >
                             Export PDF
                         </h1>
+                        <h1
+                            className='text-sm text-[#007233] hover:underline font-bold'
+                            onClick={generateCsvWithRent}
+                        >
+                            Export XL
+                        </h1>
                     </div>
                 </div>
-                <div className="rounded-lg border-l-8 border-[#BF9853] h-[500px] overflow-x-auto no-scrollbar">
+                <div className="rounded-lg border-l-8 border-[#BF9853] h-[550px] overflow-x-auto overflow-y-auto no-scrollbar">
                     <table className="border-collapse w-full text-left">
-                        <thead className="h-10">
+                        <thead className="h-10 sticky top-0 z-10 bg-[#FAF6ED]">
                             <tr className="bg-[#FAF6ED]">
                                 <th className="pl-3">S.No</th>
                                 <th onClick={() => handleSort('propertyName')} className="cursor-pointer px-4 py-2 font-semibold">
-                                    Property Name {sortField === 'propertyName' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                    Project Reference Name {sortField === 'propertyName' && (sortOrder === 'asc' ? '↑' : '↓')}
                                 </th>
                                 <th onClick={() => handleSort('shopNo')} className="cursor-pointer  font-semibold">
                                     Shop No {sortField === 'shopNo' && (sortOrder === 'asc' ? '↑' : '↓')}
@@ -594,15 +885,15 @@ const Ebno = () => {
                             {sortedEbProperties.map(({ property, owner, detail, tenantName }, index) => (
                                 <tr key={`${property.id}-${detail.id}-${index}`} className="border-b border-gray-200 odd:bg-white even:bg-[#FAF6ED]">
                                     <td className="pl-5 py-2">{index + 1}.</td>
-                                    <td className="pl-2">{property.propertyName || '-'}</td>
+                                    <td className="pl-2">{property.projectReferenceName || '-'}</td>
                                     <td>{detail.shopNo || '-'}</td>
                                     <td>{detail.doorNo || '-'}</td>
-                                    <td>{owner.ownerName || '-'}</td>
-                                    <td>{detail.propertyType || '-'}</td>
+                                    <td>{owner.clientName || '-'}</td>
+                                    <td>{detail.projectType || '-'}</td>
                                     <td>{detail.floorName || '-'}</td>
                                     <td>{detail.area || '-'}</td>
                                     <td>{detail.ebNo || '-'}</td>
-                                    <td>{tenantName || '-'}</td> {/* New column */}
+                                    <td>{tenantName || '-'}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -612,5 +903,4 @@ const Ebno = () => {
         </div>
     )
 }
-
 export default Ebno

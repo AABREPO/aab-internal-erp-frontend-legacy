@@ -10,7 +10,7 @@ const MonthlyReport = () => {
     const [monthlyReportUrl, setMonthlyReportUrl] = useState([]);
     const [sortedMonthlyRentReports, setSortedMonthlyRentReports] = useState([]);
     const [selectedReportNumber, setSelectedReportNumber] = useState([]);
-    const [clickedReportNumber,setClickedReportNumber] = useState(null);
+    const [clickedReportNumber, setClickedReportNumber] = useState(null);
     const scrollRef = useRef(null);
     const isDragging = useRef(false);
     const start = useRef({ x: 0, y: 0 });
@@ -106,7 +106,7 @@ const MonthlyReport = () => {
     };
     useEffect(() => {
         axios
-            .get('https://backendaab.in/aabuildersDash/api/rental_forms/monthly_report')
+            .get('https://backendaab.in/demoAabuildersDash/api/rental_forms/monthly_report')
             .then((response) => {
                 const sortedRents = response.data.sort((a, b) => new Date(b.date) - new Date(a.date));
                 const uniqueUrls = [
@@ -123,31 +123,42 @@ const MonthlyReport = () => {
     }, []);
     return (
         <div>
-            <div className="flex flex-col lg:flex-row ml-9 gap-10 mt-5">
-                <div className="bg-white rounded-lg shadow p-4 lg:w-[693px] h-[610px] space-y-2 overflow-auto">
+            <div className="flex flex-col lg:flex-row ml-9 gap-10 ">
+                <div className="bg-white rounded-lg shadow p-4 lg:w-[693px] h-[750px] space-y-2 overflow-auto">
                     {monthlyReportUrl.length > 0 ? (
                         <table className="table-auto w-full border-collapse">
                             <thead>
                             </thead>
                             <tbody>
                                 {monthlyReportUrl.map((url, index) => {
-                                    // For each URL, find the corresponding checklist number and date
                                     const MonthlyRentReportData = sortedMonthlyRentReports.find(
                                         (rent) => rent.monthlyReportUrl === url
                                     );
+
                                     const reportNumber = MonthlyRentReportData ? MonthlyRentReportData.reportNumber : '';
-                                    const timestamp = MonthlyRentReportData ? MonthlyRentReportData.timestamp : '';
-                                    // Format the timestamp to DD/MM/YYYY
-                                    const formattedDate = timestamp
-                                        ? new Date(timestamp).toLocaleDateString('en-GB') // 'en-GB' gives DD/MM/YYYY format
-                                        : '';
+                                    const paidOnDate = MonthlyRentReportData ? MonthlyRentReportData.paidOnDate : '';
+
+                                    // Compute last day of month from paidOnDate
+                                    let formattedDate = '';
+                                    if (paidOnDate) {
+                                        const paidDateObj = new Date(paidOnDate);
+                                        // Create a date for the first day of the next month, then subtract 1 day
+                                        const lastDayOfMonth = new Date(
+                                            paidDateObj.getFullYear(),
+                                            paidDateObj.getMonth() + 1,
+                                            0
+                                        );
+                                        formattedDate = lastDayOfMonth.toLocaleDateString('en-GB'); // DD/MM/YYYY
+                                    }
+
                                     const serialNumber = (monthlyReportUrl.length - index).toString().padStart(2, '0');
+
                                     return (
                                         <tr key={index}>
                                             <td className="px-4 py-2 font-bold">{serialNumber}</td>
                                             <td>
-                                                <div className='flex space-x-4'>
-                                                    <img className=' w-5 h-5 font-bold' src={fileDownload} alt='' />
+                                                <div className="flex space-x-4">
+                                                    <img className="w-5 h-5 font-bold" src={fileDownload} alt="" />
                                                     <button
                                                         onClick={(e) => {
                                                             e.preventDefault();
@@ -168,7 +179,7 @@ const MonthlyReport = () => {
                                                         className="underline font-semibold"
                                                         style={{
                                                             color:
-                                                                clickedReportNumber === MonthlyRentReportData.reportNumber
+                                                                clickedReportNumber === MonthlyRentReportData?.reportNumber
                                                                     ? '#ef6f47'
                                                                     : 'black',
                                                         }}
@@ -176,7 +187,6 @@ const MonthlyReport = () => {
                                                         {reportNumber} - {formattedDate} Monthly Rent Report
                                                     </button>
                                                 </div>
-
                                             </td>
                                         </tr>
                                     );
@@ -188,7 +198,7 @@ const MonthlyReport = () => {
                     )}
                 </div>
                 {/* Right: Entry Detail */}
-                <div className="bg-white rounded-lg shadow p-4 w-full max-w-[1066px] lg:h-[610px] ">
+                <div className="bg-white rounded-lg shadow p-4 w-full max-w-[1066px] lg:h-[750px] ">
                     <div>
                         <h1 className="text-2xl font-bold">Monthly Rent Report</h1>
                     </div>
@@ -247,7 +257,7 @@ const MonthlyReport = () => {
                                         <td className="px-2 text-left font-semibold">{rent.shopNo}</td>
                                         <td className="px-2 text-left font-semibold">{rent.tenantName}</td>
                                         <td className="text-sm text-left pl-2 font-semibold">
-                                            ₹{Number(rent.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            ₹{Number(rent.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                         <td className="px-2 text-left font-semibold">{rent.formType}</td>
                                         <td className="px-2 text-left font-semibold">{formatDateOnly(rent.paidOnDate)}</td>

@@ -42,3 +42,29 @@ code {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Thin scrollbar styling */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: #BF9853;
+  border-radius: 3px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a67c3a;
+}
+
+/* Firefox thin scrollbar */
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #BF9853 #f1f1f1;
+}

@@ -157,11 +157,11 @@ const DesignTool = () => {
     useEffect(() => {
         return () => cancelMomentum();
     }, []);
-    const calculateSkirtingArea = (tile, areaName) => {
+    const calculateSkirtingArea = (tile, areaName, skirtingValue = null) => {
         const length = parseFeetInches(tile.length);
         const breadth = parseFeetInches(tile.breadth);
         const height = parseFeetInches(tile.height);
-        const selectedSkirtingArea = selectSkirtingArea;
+        const selectedSkirtingArea = skirtingValue !== null ? skirtingValue : selectSkirtingArea;
         // Skip skirting if areaName contains "bath" or "toilet" (case-insensitive)
         const name = areaName?.toLowerCase() || '';
         if (name.includes('bath') || name.includes('toilet')) {
@@ -171,10 +171,20 @@ const DesignTool = () => {
         let skirtingArea = 0;
         if (tile.type === "Floor Tile") {
             const perimeter = (2 * length) + (2 * breadth);
-            const skirtingHeight = (selectedSkirtingArea / 12).toFixed(2); // inches to feet
+            const skirtingHeight = parseFloat(selectedSkirtingArea) / 12; // inches to feet
             skirtingArea = perimeter * skirtingHeight;
         }
         return skirtingArea;
+    };
+    const resolveSkirtingArea = (tile, areaName) => {
+        if (tile.type !== "Floor Tile") return 0;
+        const isUserChanged =
+            tile.isUserChanged === true ||
+            tile.isUserChanged === "true";
+        if (isUserChanged) {
+            return Number(tile.skirtingArea ?? tile.directValue) || 0;
+        }
+        return Number(calculateSkirtingArea(tile, areaName)) || 0;
     };
     const handleSkirtingAreaChange = (selectedOption) => {
         if (!selectedOption) return;
@@ -225,7 +235,88 @@ const DesignTool = () => {
     const currentDate = new Date().toLocaleDateString();
     const [selectedFile, setSelectedFile] = useState(null);
     const [fileOptions, setFileOptions] = useState([]);
+    const [isImportPopup, setIsImportPopup] = useState(false);
+    const [selectedFiles, setSelectedFiles] = useState(null);
+    const [fileOption, setFileOption] = useState([]);
+    const [selectedModule, setSelectedModule] = useState("");
+    const [fullDatas, setFullDatas] = useState([]);
     const inputRef = useRef(null);
+    const initialTileStateRef = useRef(null);
+    const pendingSnapshotCaptureRef = useRef(false);
+    const initialSnapshotSetRef = useRef(false);
+    const normalizeSnapshotValue = (value) => {
+        if (value === null || value === undefined) return "";
+        if (typeof value === "number" && !Number.isNaN(value)) return value;
+        if (value !== "" && !Number.isNaN(Number(value))) return Number(value);
+        return String(value).trim();
+    };
+    const buildTileDataSnapshot = useCallback(() => {
+        const normalizeTile = (tile, areaName) => ({
+            type: normalizeSnapshotValue(tile.type),
+            length: normalizeSnapshotValue(tile.length),
+            breadth: normalizeSnapshotValue(tile.breadth),
+            height: normalizeSnapshotValue(tile.height),
+            lengthInput: normalizeSnapshotValue(tile.lengthInput),
+            breadthInput: normalizeSnapshotValue(tile.breadthInput),
+            heightInput: normalizeSnapshotValue(tile.heightInput),
+            deductionArea: Number(tile.deductionArea) || 0,
+            deductionInput: normalizeSnapshotValue(tile.deductionInput),
+            deduction1: normalizeSnapshotValue(tile.deduction1),
+            deduction2: normalizeSnapshotValue(tile.deduction2),
+            deduction3: normalizeSnapshotValue(tile.deduction3),
+            deduction4: normalizeSnapshotValue(tile.deduction4),
+            deduction5: normalizeSnapshotValue(tile.deduction5),
+            deduction6: normalizeSnapshotValue(tile.deduction6),
+            deduction7: normalizeSnapshotValue(tile.deduction7),
+            deduction8: normalizeSnapshotValue(tile.deduction8),
+            deduction9: normalizeSnapshotValue(tile.deduction9),
+            deduction10: normalizeSnapshotValue(tile.deduction10),
+            deduction11: normalizeSnapshotValue(tile.deduction11),
+            deduction12: normalizeSnapshotValue(tile.deduction12),
+            deduction13: normalizeSnapshotValue(tile.deduction13),
+            deduction14: normalizeSnapshotValue(tile.deduction14),
+            deduction15: normalizeSnapshotValue(tile.deduction15),
+            deduction16: normalizeSnapshotValue(tile.deduction16),
+            wastagePercentage: normalizeSnapshotValue(tile.wastagePercentage),
+            skirtingArea: Number(resolveSkirtingArea(tile, areaName).toFixed(2)),
+            tileName: normalizeSnapshotValue(tile.tileName),
+            tileSize: normalizeSnapshotValue(tile.tileSize),
+            size: normalizeSnapshotValue(tile.size),
+            rate: normalizeSnapshotValue(tile.rate),
+            vendor: normalizeSnapshotValue(tile.vendor),
+            quantityBox: normalizeSnapshotValue(tile.quantityBox),
+            areaTile: normalizeSnapshotValue(tile.areaTile),
+            correctQuantityBox: normalizeSnapshotValue(tile.correctQuantityBox),
+            isUserChanged: tile.isUserChanged === true || tile.isUserChanged === "true",
+        });
+        return JSON.stringify({
+            skirting: Number(selectSkirtingArea) || 0,
+            commonWastage: Number(wastagePercentages) || 0,
+            rate: normalizeSnapshotValue(commonRate),
+            commonVendors: normalizeSnapshotValue(commonVendor),
+            floors: floors.map((floor) => ({
+                floorName: normalizeSnapshotValue(floor.floorName),
+                areaName: normalizeSnapshotValue(floor.areaName),
+                tiles: (floor.tiles || []).map((tile) => normalizeTile(tile, floor.areaName)),
+            })),
+        });
+    }, [floors, selectSkirtingArea, wastagePercentages, commonRate, commonVendor]);
+    const resetTileStateSnapshot = () => {
+        initialTileStateRef.current = null;
+        pendingSnapshotCaptureRef.current = false;
+        initialSnapshotSetRef.current = false;
+    };
+    const scheduleTileStateSnapshotCapture = () => {
+        pendingSnapshotCaptureRef.current = true;
+    };
+    const hasTileDataChanged = () => {
+        if (!initialTileStateRef.current) {
+            return true;
+        }
+        return initialTileStateRef.current !== buildTileDataSnapshot();
+    };
+    const closeImportPopup = () => setIsImportPopup(false);
+    const openImportPopup = () => setIsImportPopup(true);
     const evaluateExpression = (expression) => {
         try {
             const sanitizedExpression = expression.replace(/x|X/g, '*').replace(/[^\d+\-*/().\s]/g, '');
@@ -286,163 +377,12 @@ const DesignTool = () => {
     const handleTileBillClick = () => {
         setIsTileBillOpen(true);
     }
-    const preprocessFloors = (calculationData) => {
-        let lastValidFloorName = '';
-        return calculationData.map((floor) => {
-            if (!floor.floorName || floor.floorName.trim() === '') {
-                return {
-                    ...floor,
-                    floorName: lastValidFloorName
-                };
-            } else {
-                lastValidFloorName = floor.floorName;
-                return floor;
-            }
-        });
-    };
-    const getMismatchedFloors = () => {
-        const processedFloors = preprocessFloors(calculationData.calculations);
-        const mismatches = [];
-        if (!selectedClientData || !selectedClientData.calculations) {
-            console.error("selectedClientData or calculations are missing!");
-            mismatches.push({
-                type: 'Missing Calculations',
-                message: 'No calculations found for selectedClientData'
-            });
-            return mismatches;
-        }
-        const calculations = selectedClientData.calculations;
-        if (calculations.length !== processedFloors.length) {
-            mismatches.push({
-                type: 'Length Mismatch',
-                calculationsLength: calculations.length,
-                floorsLength: processedFloors.length
-            });
-        }
-        for (let i = 0; i < processedFloors.length; i++) {
-            const calc = calculations[i];
-            const floor = processedFloors[i];
-            const diff = {};
-            const calcFloorName = calc.floorName?.trim() || '';
-            const floorFloorName = floor.floorName?.trim() || '';
-            const calcAreaName = calc.areaName?.trim() || '';
-            const floorAreaName = floor.areaName?.trim() || '';
-            if (calcFloorName !== floorFloorName) {
-                diff.floorName = {
-                    expected: calcFloorName,
-                    actual: floorFloorName
-                };
-            }
-            if (calcAreaName !== floorAreaName) {
-                diff.areaName = {
-                    expected: calcAreaName,
-                    actual: floorAreaName
-                };
-            }
-            const sanitizeTiles = (tiles) => {
-                if (!tiles) return [];
-                return tiles.map(tile => {
-                    const {
-                        id,
-                        actualQuantity,
-                        deductionThickness,
-                        deductionThicknessInputs,
-                        isUserChanged,
-                        vendor,
-                        vendors,
-                        ...rest
-                    } = tile;
-                    const normalizedIsUserChanged =
-                        rest.isUserChanged === "" ||
-                            rest.isUserChanged === null ||
-                            rest.isUserChanged === false ||
-                            rest.isUserChanged === undefined
-                            ? "false"
-                            : String(rest.isUserChanged);
-                    const normalizeValue = (value) => {
-                        if (value === null || value === undefined) return "";
-                        if (!isNaN(value) && value !== "") return Number(value);
-                        return String(value).trim();
-                    };
-                    return {
-                        ...rest,
-                        isUserChanged: normalizedIsUserChanged,
-                        areaInSqft: normalizeValue(rest.areaInSqft),
-                        breadth: normalizeValue(rest.breadth),
-                        correctQuantityBox: normalizeValue(rest.correctQuantityBox),
-                        deductionArea: normalizeValue(rest.deductionArea),
-                        height: normalizeValue(rest.height),
-                        length: normalizeValue(rest.length),
-                        noOfBoxes: normalizeValue(rest.noOfBoxes),
-                        qtyPerBox: normalizeValue(rest.qtyPerBox),
-                        rate: normalizeValue(rest.rate),
-                        skirtingArea: normalizeValue(rest.skirtingArea),
-                        totalOrderedTile: normalizeValue(rest.totalOrderedTile),
-                        wastagePercentage: normalizeValue(rest.wastagePercentage),
-                    };
-                });
-            };
-            const sanitizedCalcTiles = sanitizeTiles(calc.tiles);
-            const sanitizedFloorTiles = sanitizeTiles(floor.tiles);
-            const tileDifferences = [];
-            sanitizedCalcTiles.forEach((calcTile, tileIndex) => {
-                const floorTile = sanitizedFloorTiles[tileIndex];
-                if (!floorTile) {
-                    tileDifferences.push({
-                        tileIndex,
-                        issue: 'Missing tile in floor data',
-                        expected: calcTile
-                    });
-                    return;
-                }
-                const tileDiff = {};
-                Object.keys(calcTile).forEach(key => {
-                    if (calcTile[key] !== floorTile[key]) {
-                        tileDiff[key] = {
-                            expected: calcTile[key],
-                            actual: floorTile[key]
-                        };
-                    }
-                });
-                if (Object.keys(tileDiff).length > 0) {
-                    tileDifferences.push({
-                        tileIndex,
-                        differences: tileDiff
-                    });
-                }
-            });
-            if (sanitizedFloorTiles.length > sanitizedCalcTiles.length) {
-                for (let j = sanitizedCalcTiles.length; j < sanitizedFloorTiles.length; j++) {
-                    tileDifferences.push({
-                        tileIndex: j,
-                        issue: 'Extra tile in floor data',
-                        actual: sanitizedFloorTiles[j]
-                    });
-                }
-            }
-            if (tileDifferences.length > 0) {
-                diff.tiles = tileDifferences;
-            }
-            if (Object.keys(diff).length > 0) {
-                mismatches.push({
-                    index: i,
-                    differences: diff
-                });
-            }
-        }
-        return mismatches;
-    };
     const handleConfirmTileBill = () => {
-        const mismatches = getMismatchedFloors();
         if (floorRateSelect === 'With Rate' || floorRateSelect === 'Without Rate') {
             extractTileBillData();
         }
-        if (mismatches.length > 0) {
-            console.log(mismatches);
-            console.log("Not Match!!!!!!!!!");
+        if (hasTileDataChanged()) {
             handleSubmitWithTileBile();
-        } else {
-            console.log('No mismatches found. Proceeding...');
         }
         setFloorRateSelect([]);
         setIsTileBillOpen(false);
@@ -733,6 +673,9 @@ const DesignTool = () => {
             if (savedSelectedFile) setSelectedFile(JSON.parse(savedSelectedFile));
             if (savedSelectedSkirtingArea) setSelectSkiritingArea(JSON.parse(savedSelectedSkirtingArea));
             if (savedWastagePercentage) setWastagePercentage(JSON.parse(savedWastagePercentage));
+            if (savedSelectedFile) {
+                scheduleTileStateSnapshotCapture();
+            }
         } catch (error) {
             console.error("Error parsing sessionStorage data:", error);
         }
@@ -760,9 +703,26 @@ const DesignTool = () => {
         if (wastagePercentages) sessionStorage.setItem('wastagePercentages', JSON.stringify(wastagePercentages));
     }, [clientName, clientSNo, floors, filteredFileOptions, selectedFile, selectSkirtingArea, wastagePercentages]);
     useEffect(() => {
+        if (!pendingSnapshotCaptureRef.current && !initialSnapshotSetRef.current && !selectedFile && floors.length > 0) {
+            initialTileStateRef.current = buildTileDataSnapshot();
+            initialSnapshotSetRef.current = true;
+            return;
+        }
+        if (!pendingSnapshotCaptureRef.current || floors.length === 0) {
+            return;
+        }
+        const timer = setTimeout(() => {
+            if (!pendingSnapshotCaptureRef.current) return;
+            initialTileStateRef.current = buildTileDataSnapshot();
+            pendingSnapshotCaptureRef.current = false;
+            initialSnapshotSetRef.current = true;
+        }, 100);
+        return () => clearTimeout(timer);
+    }, [floors, selectSkirtingArea, wastagePercentages, commonRate, commonVendor, selectedFile, buildTileDataSnapshot]);
+    useEffect(() => {
         const fetchSites = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -787,7 +747,7 @@ const DesignTool = () => {
     }, []);
     const fetchCalculations = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/all');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/all');
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
@@ -813,6 +773,44 @@ const DesignTool = () => {
     useEffect(() => {
         fetchCalculations();
     }, []);
+    const fetchPaintCalculation = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/paint_calculation/all/paints');
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            const data = await response.json();
+            setFullDatas(data);
+        } catch (error) {
+            console.error('Error fetching paint calculations:', error);
+        }
+    };
+    useEffect(() => {
+        fetchPaintCalculation();
+    }, []);
+    useEffect(() => {
+        if (!clientName) {
+            setFileOption([]);
+            return;
+        }
+        let filteredOptions = [];
+        if (selectedModule === "Tile Calculation") {
+            filteredOptions = fullData.filter(calculation => calculation.clientName === clientName.value);
+            filteredOptions = filteredOptions.map(calculation => ({
+                value: calculation.id,
+                label: calculation.fileName,
+            }));
+        } else if (selectedModule === "Paint Calculation") {
+            filteredOptions = fullDatas.filter(calculation => calculation.clientName === clientName.value);
+            filteredOptions = filteredOptions.map(calculation => ({
+                value: calculation.id,
+                label: calculation.fileName,
+            }));
+        } else {
+            filteredOptions = [];
+        }
+        setFileOption(filteredOptions);
+    }, [clientName, fullData, fullDatas, selectedModule]);
     const parseFeetInches = (value) => {
         if (!value || typeof value !== "string") return 0;
         const feetInchMatch = value.match(/^(\d+)'(\d+)"?$/);
@@ -878,6 +876,7 @@ const DesignTool = () => {
             setFilteredFileOptions([]);
             setSelectedFile(null);
             setSelectedClientData({ calculations: [] });
+            resetTileStateSnapshot();
             setFloors([{
                 floorName: "Ground Floor",
                 areaName: "",
@@ -898,7 +897,7 @@ const DesignTool = () => {
     }, []);
     const fetchTileFloorTypes = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/floorType');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/floorType');
             if (response.ok) {
                 const data = await response.json();
                 setTileFloorTypes(data);
@@ -992,7 +991,7 @@ const DesignTool = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/areaName');
+                const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/areaName');
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -1008,7 +1007,7 @@ const DesignTool = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/vendor/getAll');
+                const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/vendor/getAll');
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -1024,7 +1023,7 @@ const DesignTool = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/floorName');
+                const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/floorName');
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -1039,7 +1038,7 @@ const DesignTool = () => {
     }, []);
     const fetchTileData = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/quantity/size');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/quantity/size');
             const data = await response.json();
             setTileList(data);
         } catch (error) {
@@ -1303,7 +1302,7 @@ const DesignTool = () => {
             return;
         }
         try {
-            const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+            const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
             if (!clientResponse.ok) {
                 throw new Error("Failed to fetch calculations from the backend");
             }
@@ -1322,7 +1321,7 @@ const DesignTool = () => {
             const clientId = clientSNo || 0;
             const getRevisionNumber = async (clientName) => {
                 try {
-                    const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                    const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                     if (!clientResponse.ok) {
                         throw new Error("Failed to fetch calculations from the backend");
                     }
@@ -1406,8 +1405,11 @@ const DesignTool = () => {
             const summaryPdf = await generateSummaryPDF();
             const uploadPdf = async (pdf, name) => {
                 const singleFormData = new FormData();
+                // backend expects: files (plural), folder (required), fileName (optional prefix)
                 singleFormData.append("files", pdf, name);
-                const pdfUploadResponse = await fetch(`https://backendaab.in/aabuilderDash/googleUploader/pdfs`, {
+                singleFormData.append("folder", "FileUpload / Tile_Calculator");
+                singleFormData.append("fileName", name);
+                const pdfUploadResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/files/upload`, {
                     method: "POST",
                     body: singleFormData,
                 });
@@ -1419,7 +1421,7 @@ const DesignTool = () => {
             await uploadPdf(customerCopyPdf, `TMS CC ${clientId} - ${selectedDate} - ${revisionNumber}.pdf`);
             await uploadPdf(summaryPdf, `TMS OC ${clientId} - ${selectedDate} - ${revisionNumber}.pdf`);
             await uploadPdf(StockingPdf, `TMS SC ${clientId} - ${selectedDate} - ${revisionNumber}.pdf`);
-            const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/tile/save", {
+            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/tile/save", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -1463,7 +1465,7 @@ const DesignTool = () => {
             return;
         }
         try {
-            const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+            const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
             if (!clientResponse.ok) {
                 throw new Error("Failed to fetch calculations from the backend");
             }
@@ -1533,7 +1535,7 @@ const DesignTool = () => {
                     })),
                 })),
             };
-            const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/tile/save", {
+            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/tile/save", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -1543,6 +1545,7 @@ const DesignTool = () => {
             if (!response.ok) {
                 throw new Error("Failed to send data to the backend");
             }
+            initialTileStateRef.current = buildTileDataSnapshot();
             setEno(eno + 1);
             setIsSubmitting(false);
             setClientName(null);
@@ -1749,7 +1752,7 @@ const DesignTool = () => {
     useEffect(() => {
         const fetchTiles = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuilderDash/api/tiles/all/data');
+                const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tiles/all/data');
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -1846,7 +1849,7 @@ const DesignTool = () => {
         const clientId = clientSNo || 0;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -1927,7 +1930,7 @@ const DesignTool = () => {
                 const wastagePercentageNum = Number(wastagePercentage);
                 const deductionAreaNum = Number(deductionArea || 0);
                 let tileArea;
-                let skirtingArea = tile.type === "Floor Tile" ? Number(tile.skirtingArea) : 0;
+                let skirtingArea = resolveSkirtingArea(tile, floor.areaName);
                 if (tileFloorTypes.find(floorType => floorType.floorType === tile.type)?.formula === 'L x B') {
                     tileArea = lengthNum * breadthNum;
                 } else if (tileFloorTypes.find(floorType => floorType.floorType === tile.type)?.formula === 'L x H') {
@@ -2069,7 +2072,7 @@ const DesignTool = () => {
         pdf.addFont("ArialNovaCond.ttf", "ArialNovaCond", "normal");
         const getRevisionNumber = async (clientName) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch revision data");
                 }
@@ -2228,7 +2231,7 @@ const DesignTool = () => {
         const clientId = clientSNo || 0;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -2421,7 +2424,7 @@ const DesignTool = () => {
         const clientId = clientSNo || 0;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -2692,6 +2695,7 @@ const DesignTool = () => {
         if (!selected) {
             setSelectedFile(null);
             setSelectedClientData({ calculations: [] });
+            resetTileStateSnapshot();
             setFloors([]);
             return;
         }
@@ -2701,7 +2705,7 @@ const DesignTool = () => {
         setDeductionPopupState({});
         if (selectedClientData) {
             const { commonWastage, skirting, rate, commonVendors } = selectedClientData;
-            setSelectSkiritingArea(skirting);
+            setSelectSkiritingArea(skirting || 4);
             setWastagePercentage(commonWastage);
             setCommonRate(rate);
             setSelectedClientData(selectedClientData);
@@ -2786,9 +2790,299 @@ const DesignTool = () => {
                     }),
                 };
             });
+            scheduleTileStateSnapshotCapture();
             setFloors(newFloorsData);
         } else {
             setSelectedClientData({ calculations: [] });
+            resetTileStateSnapshot();
+            setFloors([]);
+        }
+    };
+    const handleFileNameSelect = (e) => {
+        e.preventDefault();
+        if (!selectedFiles) {
+            alert("Please select a file before submitting.");
+            return;
+        }
+        if (!selectedModule) {
+            alert("Please select a module before submitting.");
+            return;
+        }
+        handleFileChanges(selectedFiles);
+        closeImportPopup();
+    };
+    const handleFileChanges = (selected) => {
+        if (!selected) {
+            setSelectedFiles(null);
+            resetTileStateSnapshot();
+            setFloors([]);
+            return;
+        }
+        let selectedClientDatas = null;
+        if (selectedModule === "Tile Calculation") {
+            selectedClientDatas = fullData.find(calculation => calculation.id === selected.value);
+        } else if (selectedModule === "Paint Calculation") {
+            selectedClientDatas = fullDatas.find(calculation => calculation.id === selected.value);
+        }
+        setSelectedFiles(selected);
+        setDeductionPopupData({});
+        setDeductionPopupState({});
+        if (selectedClientDatas) {
+            // Check if it's a Tile Calculation file (has 'calculations' property)
+            if (selectedClientDatas.calculations && Array.isArray(selectedClientDatas.calculations)) {
+                const { commonWastage, skirting, rate, commonVendors } = selectedClientDatas;
+                setSelectSkiritingArea(skirting || 4);
+                setWastagePercentage(commonWastage);
+                setCommonRate(rate);
+                setSelectedClientData(selectedClientDatas);
+                setCommonVendor(commonVendors);
+                const seenFloors = new Set();
+                let deductionData = {};
+                const newFloorsData = selectedClientDatas.calculations.map((calc, floorIndex) => {
+                const floorName = calc.floorName || 'No floor name available';
+                const areaName = calc.areaName || 'No area name available';
+                const floorVisible = !seenFloors.has(floorName);
+                seenFloors.add(floorName);
+                return {
+                    floorName: floorVisible ? floorName : null,
+                    areaName: areaName,
+                    tiles: calc.tiles.map((tile, tileIndex) => {
+                        const deductions = [
+                            tile.deduction1, tile.deduction2, tile.deduction3, tile.deduction4,
+                            tile.deduction5, tile.deduction6, tile.deduction7, tile.deduction8,
+                            tile.deduction9, tile.deduction10, tile.deduction11, tile.deduction12,
+                            tile.deduction13, tile.deduction14, tile.deduction15, tile.deduction16
+                        ];
+                        const processedDeductions = deductions.map((deduction) => {
+                            if (deduction) {
+                                const splitData = deduction.split(',').map((val) => val.trim());
+                                return {
+                                    type: splitData[0] || '',
+                                    measurement: splitData[1] || '',
+                                    qty: splitData[2] || '',
+                                    location: splitData[3] || '',
+                                    thickness: splitData[4] || '',
+                                    deductionThickness: splitData[5] || '',
+                                    output: splitData[6] || ''
+                                };
+                            }
+                            return null;
+                        }).filter(row => row !== null);
+                        if (processedDeductions.length > 0) {
+                            deductionData[`${floorIndex}-${tileIndex}`] = processedDeductions;
+                        }
+                        const selectedTile = tileList.find(t => t.tileSize === tile.tileSize);
+                        const tileType = tile.type || "Floor Tile";
+                        const tempTile = {
+                            type: tileType,
+                            length: tile.length,
+                            breadth: tile.breadth,
+                            height: tile.height,
+                        };
+                        const calculatedSkirtingArea = tileType === "Floor Tile" ? calculateSkirtingArea(tempTile, areaName, skirting) : (tile.skirtingArea || "");
+                        return {
+                            type: tileType,
+                            length: tile.length,
+                            breadth: tile.breadth,
+                            height: tile.height,
+                            lengthInput: tile.lengthInput || "No Input",
+                            breadthInput: tile.breadthInput || "No Input",
+                            heightInput: tile.heightInput || "No Input",
+                            deduction1: tile.deduction1 || "",
+                            deduction2: tile.deduction2 || "",
+                            deduction3: tile.deduction3 || "",
+                            deduction4: tile.deduction4 || "",
+                            deduction5: tile.deduction5 || "",
+                            deduction6: tile.deduction6 || "",
+                            deduction7: tile.deduction7 || "",
+                            deduction8: tile.deduction8 || "",
+                            deduction9: tile.deduction9 || "",
+                            deduction10: tile.deduction10 || "",
+                            deduction11: tile.deduction11 || "",
+                            deduction12: tile.deduction12 || "",
+                            deduction13: tile.deduction13 || "",
+                            deduction14: tile.deduction14 || "",
+                            deduction15: tile.deduction15 || "",
+                            deduction16: tile.deduction16 || "",
+                            deductionArea: tile.deductionArea || 0,
+                            deductionInput: tile.deductionInput || "",
+                            skirtingArea: calculatedSkirtingArea,
+                            areaTile: tile.areaInSqft || '',
+                            quantityBox: tile.qtyPerBox || '',
+                            tileName: tile.tileName,
+                            tileSize: tile.tileSize,
+                            size: tile.size,
+                            rate: tile.rate,
+                            vendor: tile.vendors,
+                            actualQuantity: tile.actualQuantity,
+                            noOfBoxes: tile.noOfBoxes,
+                            wastagePercentage: tile.wastagePercentage,
+                            isUserChanged: false,
+                            directValue: calculatedSkirtingArea,
+                            defaultSize: selectedTile ? selectedTile.tileSize : tile.tileSize || '',
+                            correctQuantityBox: tile.correctQuantityBox,
+                            hasSizeChanged: selectedTile && tile.size !== selectedTile.tileSize,
+                        };
+                    }),
+                };
+            });
+                scheduleTileStateSnapshotCapture();
+                setFloors(newFloorsData);
+                if (Object.keys(deductionData).length > 0) {
+                    setDeductionPopupData(deductionData);
+                }
+                // Recalculate skirting areas after setting floors
+                setTimeout(() => {
+                    scheduleTileStateSnapshotCapture();
+                    setFloors((prevFloors) =>
+                        prevFloors.map((floor) => {
+                            const updatedTiles = floor.tiles.map((tile) => {
+                                if (tile.type === "Floor Tile" && !tile.isUserChanged) {
+                                    const newSkirtingArea = calculateSkirtingArea(tile, floor.areaName, skirting);
+                                    return {
+                                        ...tile,
+                                        skirtingArea: newSkirtingArea,
+                                        directValue: newSkirtingArea,
+                                    };
+                                }
+                                return tile;
+                            });
+                            return {
+                                ...floor,
+                                tiles: updatedTiles,
+                            };
+                        })
+                    );
+                }, 0);
+            } else if (selectedClientDatas.paintCalculations && Array.isArray(selectedClientDatas.paintCalculations)) {
+                // Handle Paint Calculation files - convert paintCalculations structure to calculations structure
+                const paintSkirtingValue = selectedClientDatas.skirting || 4;
+                setSelectSkiritingArea(paintSkirtingValue);
+                const seenFloors = new Set();
+                let deductionData = {};
+                const newFloorsData = selectedClientDatas.paintCalculations.map((calc, floorIndex) => {
+                    const floorName = calc.floorName || 'No floor name available';
+                    const areaName = calc.areaName || 'No area name available';
+                    const floorVisible = !seenFloors.has(floorName);
+                    seenFloors.add(floorName);
+                    return {
+                        floorName: floorVisible ? floorName : null,
+                        areaName: areaName,
+                        tiles: (calc.paintTiles || []).map((tile, tileIndex) => {
+                            const deductions = [
+                                tile.deduction1, tile.deduction2, tile.deduction3, tile.deduction4,
+                                tile.deduction5, tile.deduction6, tile.deduction7, tile.deduction8,
+                                tile.deduction9, tile.deduction10, tile.deduction11, tile.deduction12,
+                                tile.deduction13, tile.deduction14, tile.deduction15, tile.deduction16
+                            ];
+                            const processedDeductions = deductions.map((deduction) => {
+                                if (deduction) {
+                                    const splitData = deduction.split(',').map((val) => val.trim());
+                                    return {
+                                        type: splitData[0] || '',
+                                        measurement: splitData[1] || '',
+                                        qty: splitData[2] || '',
+                                        location: splitData[3] || '',
+                                        thickness: splitData[4] || '',
+                                        deductionThickness: splitData[5] || '',
+                                        output: splitData[6] || ''
+                                    };
+                                }
+                                return null;
+                            }).filter(row => row !== null);
+                            if (processedDeductions.length > 0) {
+                                deductionData[`${floorIndex}-${tileIndex}`] = processedDeductions;
+                            }
+                            const selectedTile = tileList.find(t => t.tileSize === tile.tileSize);
+                            const tileType = "Floor Tile";
+                            const tempTile = {
+                                type: tileType,
+                                length: tile.length || "",
+                                breadth: tile.breadth || "",
+                                height: tile.height || "",
+                            };
+                            // For Paint Calculation files, use default skirting value or current state
+                            const calculatedSkirtingArea = calculateSkirtingArea(tempTile, areaName, paintSkirtingValue);
+                            return {
+                                type: tileType,
+                                length: tile.length || "",
+                                breadth: tile.breadth || "",
+                                height: tile.height || "",
+                                lengthInput: tile.lengthInput || "No Input",
+                                breadthInput: tile.breadthInput || "No Input",
+                                heightInput: tile.heightInput || "No Input",
+                                deduction1: tile.deduction1 || "",
+                                deduction2: tile.deduction2 || "",
+                                deduction3: tile.deduction3 || "",
+                                deduction4: tile.deduction4 || "",
+                                deduction5: tile.deduction5 || "",
+                                deduction6: tile.deduction6 || "",
+                                deduction7: tile.deduction7 || "",
+                                deduction8: tile.deduction8 || "",
+                                deduction9: tile.deduction9 || "",
+                                deduction10: tile.deduction10 || "",
+                                deduction11: tile.deduction11 || "",
+                                deduction12: tile.deduction12 || "",
+                                deduction13: tile.deduction13 || "",
+                                deduction14: tile.deduction14 || "",
+                                deduction15: tile.deduction15 || "",
+                                deduction16: tile.deduction16 || "",
+                                deductionArea: tile.deductionArea || 0,
+                                deductionInput: tile.deductionInput || "",
+                                skirtingArea: calculatedSkirtingArea,
+                                areaTile: tile.areaInSqft || '',
+                                quantityBox: tile.qtyPerBox || '',
+                                tileName: tile.tileName || '',
+                                tileSize: tile.tileSize || '',
+                                size: tile.size || '',
+                                rate: tile.rate || '',
+                                vendor: tile.vendors || '',
+                                actualQuantity: tile.actualQuantity || '',
+                                noOfBoxes: tile.noOfBoxes || '',
+                                wastagePercentage: tile.wastagePercentage || "0",
+                                isUserChanged: false,
+                                directValue: calculatedSkirtingArea,
+                                defaultSize: selectedTile ? selectedTile.tileSize : tile.tileSize || '',
+                                correctQuantityBox: tile.correctQuantityBox || '',
+                                hasSizeChanged: selectedTile && tile.size !== selectedTile.tileSize,
+                            };
+                        }),
+                    };
+                });
+                scheduleTileStateSnapshotCapture();
+                setFloors(newFloorsData);
+                if (Object.keys(deductionData).length > 0) {
+                    setDeductionPopupData(deductionData);
+                }
+                // Recalculate skirting areas after setting floors for Paint Calculation files
+                const finalSkirtingValue = paintSkirtingValue;
+                setTimeout(() => {
+                    scheduleTileStateSnapshotCapture();
+                    setFloors((prevFloors) =>
+                        prevFloors.map((floor) => {
+                            const updatedTiles = floor.tiles.map((tile) => {
+                                if (tile.type === "Floor Tile" && !tile.isUserChanged) {
+                                    const newSkirtingArea = calculateSkirtingArea(tile, floor.areaName, finalSkirtingValue);
+                                    return {
+                                        ...tile,
+                                        skirtingArea: newSkirtingArea,
+                                        directValue: newSkirtingArea,
+                                    };
+                                }
+                                return tile;
+                            });
+                            return {
+                                ...floor,
+                                tiles: updatedTiles,
+                            };
+                        })
+                    );
+                }, 0);
+            } else {
+                // If file structure doesn't match either format, set empty floors
+                setFloors([]);
+            }
+        } else {
             setFloors([]);
         }
     };
@@ -2816,7 +3110,7 @@ const DesignTool = () => {
         const fileLabel = selectedFile && selectedFile.label ? selectedFile.label : `${selectedDate}`;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -2831,7 +3125,7 @@ const DesignTool = () => {
         };
         const getIncrement = async (fileLabel) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -2844,7 +3138,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -3084,7 +3378,7 @@ const DesignTool = () => {
         const fileLabel = selectedFile && selectedFile.label ? selectedFile.label : `${selectedDate}`;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -3099,7 +3393,7 @@ const DesignTool = () => {
         };
         const getIncrement = async (fileLabel) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -3112,7 +3406,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -3415,7 +3709,7 @@ const DesignTool = () => {
         const fileLabel = selectedFile && selectedFile.label ? selectedFile.label : `${selectedDate}`;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -3431,7 +3725,7 @@ const DesignTool = () => {
         const getIncrement = async (fileLabel) => {
             try {
 
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -3444,7 +3738,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -3635,7 +3929,7 @@ const DesignTool = () => {
         const fileLabel = selectedFile && selectedFile.label ? selectedFile.label : `${selectedDate}`;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -3651,7 +3945,7 @@ const DesignTool = () => {
         const getIncrement = async (fileLabel) => {
             try {
 
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -3664,7 +3958,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -3885,7 +4179,7 @@ const DesignTool = () => {
         const fileLabel = selectedFile && selectedFile.label ? selectedFile.label : `${selectedDate}`;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -3900,7 +4194,7 @@ const DesignTool = () => {
         };
         const getIncrement = async (fileLabel) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -3913,7 +4207,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -4118,7 +4412,7 @@ const DesignTool = () => {
         const fileLabel = selectedFile && selectedFile.label ? selectedFile.label : `${selectedDate}`;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -4133,7 +4427,7 @@ const DesignTool = () => {
         };
         const getIncrement = async (fileLabel) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -4146,7 +4440,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -4255,7 +4549,7 @@ const DesignTool = () => {
                 const wastagePercentageNum = Number(wastagePercentage);
                 const deductionAreaNum = Number(deductionArea || 0);
                 let tileArea;
-                let skirtingArea = tile.type === "Floor Tile" ? Number(tile.skirtingArea) : 0;
+                let skirtingArea = resolveSkirtingArea(tile, floor.areaName);
                 if (tileFloorTypes.find(floorType => floorType.floorType === tile.type)?.formula === 'L x B') {
                     tileArea = lengthNum * breadthNum;
                 } else if (tileFloorTypes.find(floorType => floorType.floorType === tile.type)?.formula === 'L x H') {
@@ -4359,7 +4653,7 @@ const DesignTool = () => {
     };
     const getRevisionNumber = async (clientName) => {
         try {
-            const clientResponse = await fetch("https://backendaab.in/aabuilderDash/api/tile/tile/all");
+            const clientResponse = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/all');
             if (!clientResponse.ok) {
                 throw new Error("Failed to fetch calculations from the backend");
             }
@@ -4422,7 +4716,7 @@ const DesignTool = () => {
                 const skirtingAreaMeasurement = tile.type === "Floor Tile"
                     ? `((${tile.length}x2)+(${tile.breadth}x2))x${skirtingAreaInch}`
                     : 0;
-                const skirtingArea = tile.type === "Floor Tile" ? Number(tile.skirtingArea) : 0;
+                const skirtingArea = resolveSkirtingArea(tile, floor.areaName);
                 if (!typeTotals[tile.type]) {
                     typeTotals[tile.type] = 0;
                 }
@@ -4510,7 +4804,7 @@ const DesignTool = () => {
         const fileLabel = selectedFile && selectedFile.label ? selectedFile.label : `${selectedDate}`;
         const getIncrement = async (fileLabel) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -4523,7 +4817,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -5020,6 +5314,14 @@ const DesignTool = () => {
                                 isDisabled={!clientName}
                             />
                         </div>
+                    </div>
+                    <div className="flex justify-end items-center w-full lg:-mt-20 -mt-12 pr-4">
+                        <button
+                            className="bg-[#007233] lg:w-28 w-16 h-[36px] rounded-md text-white"
+                            onClick={openImportPopup}
+                        >
+                            + Import
+                        </button>
                     </div>
                 </div>
             </div>
@@ -6358,6 +6660,57 @@ const DesignTool = () => {
                                 Confirm
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+            {isImportPopup && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+                    <div className="bg-white rounded-md w-[32rem] px-2 py-2">
+                        <div>
+                            <button className="text-red-500 ml-[95%]" onClick={closeImportPopup}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleFileNameSelect}>
+                            <div className="flex">
+                                <div>
+                                    <label className="block -ml-16 text-lg font-medium mb-2">Module Name</label>
+                                    <select
+                                        className="w-52 ml-6 rounded-lg border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 h-12 focus:outline-none"
+                                        value={selectedModule}
+                                        onChange={(e) => setSelectedModule(e.target.value)}
+                                    >
+                                        <option value="" disabled>Select Module...</option>
+                                        <option value="Tile Calculation">Tile Calculation</option>
+                                        <option value="Paint Calculation">Paint Calculation</option>
+                                    </select>
+                                </div>
+                                <div className="ml-4">
+                                    <label className="block text-lg font-medium mb-2 -ml-32">Revision</label>
+                                    <Select
+                                        placeholder="Select the file..."
+                                        className="border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] rounded-lg w-60 h-12"
+                                        styles={customSelectStyles}
+                                        options={fileOption}
+                                        isClearable
+                                        value={selectedFiles}
+                                        onChange={(option) => setSelectedFiles(option)}
+                                        isDisabled={!clientName}
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex space-x-2 mt-6 ml-6 mb-5">
+                                <button type="submit" className="bg-[#BF9853] text-white px-8 py-2 rounded-lg font-semibold">
+                                    Save
+                                </button>
+                                <button
+                                    type="button"
+                                    className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                                    onClick={closeImportPopup}>
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

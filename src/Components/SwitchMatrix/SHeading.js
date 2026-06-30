@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ModuleHeadingWrapper, ModuleHeadingBar } from '../MainHeadingpage/MainHeadingpage';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import SwitchMatrix from './SwitchMatrix';
 
@@ -10,42 +11,42 @@ const SHeading = () => {
         setActiveLink(path);
     }
     return (
-        <div className="bg-[#FAF6ED]">
-        <div className="topbar-title">
-            <h2 className="mb-2">
+        <ModuleHeadingWrapper>
+        <ModuleHeadingBar>
+            <h2 className={`link whitespace-nowrap${activeLink === '/switch/SwitchMatrix' ? ' active' : ''}`}>
                 <Link
-                    className={`link ${activeLink === '/switch/SwitchMatrix' ? 'active' : ''}`}
                     to="/switch/SwitchMatrix"
                     onClick={() => handleLinkClick('/switch/SwitchMatrix')}
+                    style={{ color: 'inherit', textDecoration: 'none', display: 'block', font: 'inherit', fontWeight: 'inherit', fontSize: 'inherit' }}
                 >
                     Switch Matrix
                 </Link>
             </h2>
-            <h2>
+            <h2 className={`link whitespace-nowrap${activeLink === '/switch/' ? ' active' : ''}`}>
                 <Link
-                    className={`link ${activeLink === '/switch/' ? 'active' : ''}`}
                     to="/switch/"
                     onClick={() => handleLinkClick('/switch/')}
-                > 
+                    style={{ color: 'inherit', textDecoration: 'none', display: 'block', font: 'inherit', fontWeight: 'inherit', fontSize: 'inherit' }}
+                >
                 History
                 </Link>
             </h2>
-            <h2>
+            <h2 className={`link whitespace-nowrap${activeLink === '/switch/' ? ' active' : ''}`}>
                 <Link
-                    className={`link ${activeLink === '/switch/' ? 'active' : ''}`}
                     to="/switch/"
                     onClick={() => handleLinkClick('/switch/')}
+                    style={{ color: 'inherit', textDecoration: 'none', display: 'block', font: 'inherit', fontWeight: 'inherit', fontSize: 'inherit' }}
                 >
                     Add Input
                 </Link>
             </h2>
-        </div>
+        </ModuleHeadingBar>
         <Routes>
             <Route path="SwitchMatrix" element={<SwitchMatrix/>} />
             <Route path='history' element={""}/>
             <Route path='addinput' element={""}/>
         </Routes>
-    </div>
+    </ModuleHeadingWrapper>
     )
 }
 

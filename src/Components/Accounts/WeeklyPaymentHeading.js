@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ModuleHeadingWrapper, ModuleHeadingBar } from '../MainHeadingpage/MainHeadingpage';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import WeeklyPayment from './WeeklyPayment';
 import History from './WeeklyPaymentHistory';
@@ -9,8 +10,8 @@ const WHeading = () => {
         setActiveLink(path);
     }
     return (
-        <div className="bg-[#FAF6ED]">
-        <div className="topbar-title">
+        <ModuleHeadingWrapper>
+        <ModuleHeadingBar>
             <h2 className="mb-2">
                 <Link
                     className={`link ${activeLink === '/weekly-payment/WeeklyPayment' ? 'active' : ''}`}
@@ -29,12 +30,12 @@ const WHeading = () => {
                 History
                 </Link>
             </h2>
-        </div>
+        </ModuleHeadingBar>
         <Routes>
             <Route path="weeklypayment" element={<WeeklyPayment/>} />
             <Route path='history' element={<History/>}/>
         </Routes>
-    </div>
+    </ModuleHeadingWrapper>
     )
 }
 

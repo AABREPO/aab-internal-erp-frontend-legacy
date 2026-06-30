@@ -1,0 +1,467 @@
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import Select from 'react-select';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+
+const SUBSCRIPTION_EXPENSES_ENDPOINT = 'https://backendaab.in/demoAabuilderDash/expenses_form/utility/subscription';
+
+const SubscriptionDatabase = ({ username, userRoles = [] }) => {
+    const [subscriptionData, setSubscriptionData] = useState([]);
+    const [filteredData, setFilteredData] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [filters, setFilters] = useState({
+        siteName: '',
+        vendor: '',
+        utilityTypeNumber: '',
+        contractor: '',
+        paymentMode: ''
+    });
+
+    useEffect(() => {
+        const fetchSubscriptionData = async () => {
+            try {
+                const response = await axios.get(SUBSCRIPTION_EXPENSES_ENDPOINT);
+                setSubscriptionData(response.data || []);
+                setFilteredData(response.data || []);
+            } catch (err) {
+                console.error('Error fetching subscription data:', err);
+                setError('Failed to fetch subscription data');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchSubscriptionData();
+    }, []);
+
+    useEffect(() => {
+        let filtered = subscriptionData;
+
+        if (filters.siteName) {
+            filtered = filtered.filter(item =>
+                item.siteName && item.siteName.toLowerCase().includes(filters.siteName.toLowerCase())
+            );
+        }
+
+        if (filters.vendor) {
+            filtered = filtered.filter(item =>
+                item.vendor && item.vendor.toLowerCase().includes(filters.vendor.toLowerCase())
+            );
+        }
+
+        if (filters.utilityTypeNumber) {
+            filtered = filtered.filter(item =>
+                item.utilityTypeNumber && item.utilityTypeNumber.toLowerCase().includes(filters.utilityTypeNumber.toLowerCase())
+            );
+        }
+
+        if (filters.contractor) {
+            filtered = filtered.filter(item =>
+                item.contractor && item.contractor.toLowerCase().includes(filters.contractor.toLowerCase())
+            );
+        }
+
+        if (filters.paymentMode) {
+            filtered = filtered.filter(item =>
+                item.paymentMode && item.paymentMode.toLowerCase().includes(filters.paymentMode.toLowerCase())
+            );
+        }
+
+        setFilteredData(filtered);
+    }, [filters, subscriptionData]);
+
+    const handleFilterChange = (filterType, value) => {
+        setFilters(prev => ({
+            ...prev,
+            [filterType]: value
+        }));
+    };
+
+    const formatTimestamp = (timestamp) => {
+        if (!timestamp) return '-';
+
+        try {
+            const date = new Date(timestamp);
+            const formattedDate = date.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            const formattedTime = date.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
+
+            return `${formattedDate} ${formattedTime}`;
+        } catch {
+            return '-';
+        }
+    };
+
+    const formatDate = (dateValue) => {
+        if (!dateValue) return '-';
+
+        try {
+            return new Date(dateValue).toLocaleDateString('en-GB');
+        } catch {
+            return '-';
+        }
+    };
+
+    const formatAmountDisplay = (value) => {
+        if (value === null || value === undefined || value === '') {
+            return '₹0';
+        }
+
+        const amountNumber = Number(value);
+
+        if (Number.isFinite(amountNumber)) {
+            return `₹${amountNumber.toLocaleString()}`;
+        }
+
+        return `₹${value}`;
+    };
+
+    const getAmountExportValue = (value) => {
+        if (value === null || value === undefined || value === '') {
+            return 0;
+        }
+
+        const amountNumber = Number(value);
+
+        if (Number.isFinite(amountNumber)) {
+            return amountNumber;
+        }
+
+        return value;
+    };
+
+    const formatUtilityMonth = (utilityForTheMonth) => {
+        if (!utilityForTheMonth) return '-';
+
+        try {
+            const [year, month] = utilityForTheMonth.split('-');
+            const monthNames = [
+                'January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'
+            ];
+
+            const monthIndex = parseInt(month, 10) - 1;
+            if (monthIndex >= 0 && monthIndex < 12) {
+                return `${monthNames[monthIndex]} ${year}`;
+            }
+            return utilityForTheMonth;
+        } catch {
+            return utilityForTheMonth;
+        }
+    };
+
+    const handleExportPDF = () => {
+        if (!filteredData.length) return;
+
+        const doc = new jsPDF({ orientation: 'landscape' });
+        doc.setFontSize(14);
+        doc.text('Subscription Expenses', 14, 20);
+
+        const tableColumn = [
+            'Sl.No',
+            'Timestamp',
+            'Date',
+            'Site Name',
+            'Vendor',
+            'Contractor',
+            'Subscription Number',
+            'Category',
+            'Amount',
+            'Payment Mode',
+            'For The Month',
+            'ENo',
+            'Bill Copy'
+        ];
+
+        const tableRows = filteredData.map((item, index) => [
+            index + 1,
+            formatTimestamp(item.timestamp),
+            formatDate(item.date),
+            item.siteName || '-',
+            item.vendor || '-',
+            item.contractor || '-',
+            item.utilityTypeNumber || '-',
+            item.category || '-',
+            formatAmountDisplay(item.amount),
+            item.paymentMode || '-',
+            formatUtilityMonth(item.utilityForTheMonth),
+            item.eno || '-',
+            item.billCopy ? 'Available' : '-'
+        ]);
+
+        doc.autoTable({
+            head: [tableColumn],
+            body: tableRows,
+            startY: 28,
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [191, 152, 83] }
+        });
+
+        doc.save('SubscriptionExpenses.pdf');
+    };
+
+    const handleExportExcel = () => {
+        if (!filteredData.length) return;
+
+        const worksheetData = filteredData.map((item, index) => ({
+            'Sl.No': index + 1,
+            Timestamp: formatTimestamp(item.timestamp),
+            Date: formatDate(item.date),
+            'Site Name': item.siteName || '-',
+            Vendor: item.vendor || '-',
+            Contractor: item.contractor || '-',
+            'Subscription Number': item.utilityTypeNumber || '-',
+            Category: item.category || '-',
+            Amount: getAmountExportValue(item.amount),
+            'Payment Mode': item.paymentMode || '-',
+            'For The Month': formatUtilityMonth(item.utilityForTheMonth),
+            ENo: item.eno || '-',
+            'Bill Copy URL': item.billCopy || '-'
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'SubscriptionExpenses');
+        XLSX.writeFile(workbook, 'SubscriptionExpenses.xlsx');
+    };
+
+    const customSelectStyles = {
+        control: (provided, state) => ({
+            ...provided,
+            height: '45px',
+            border: '2px solid #BF9853',
+            borderOpacity: '0.35',
+            borderRadius: '8px',
+            boxShadow: 'none',
+            '&:hover': { border: '2px solid #BF9853' },
+            ...(state.isFocused && { border: '2px solid #BF9853', boxShadow: 'none' }),
+        }),
+        option: (provided, state) => ({
+            ...provided,
+            backgroundColor: state.isSelected ? '#BF9853' : state.isFocused ? '#F5F5F5' : 'white',
+            color: state.isSelected ? 'white' : 'black',
+        }),
+        placeholder: (provided) => ({ ...provided, color: '#9CA3AF' }),
+    };
+
+    const getUniqueValues = (key) => {
+        const values = new Set();
+        subscriptionData.forEach(item => {
+            if (key === 'siteName' && item.siteName) values.add(item.siteName);
+            else if (key === 'vendor' && item.vendor) values.add(item.vendor);
+            else if (key === 'utilityTypeNumber' && item.utilityTypeNumber) values.add(item.utilityTypeNumber);
+            else if (key === 'contractor' && item.contractor) values.add(item.contractor);
+            else if (key === 'paymentMode' && item.paymentMode) values.add(item.paymentMode);
+        });
+        return Array.from(values).sort().map(value => ({ value, label: value }));
+    };
+
+    const clearFilters = () => {
+        setFilters({
+            siteName: '',
+            vendor: '',
+            utilityTypeNumber: '',
+            contractor: '',
+            paymentMode: ''
+        });
+    };
+
+    return (
+        <div className="bg-[#FAF6ED] rounded-lg shadow-sm">
+            <div className="bg-white rounded-md mb-5 h-[128px] ml-5 mr-5">
+                <div className="p-6">
+                    <div className="flex text-left gap-4">
+                        <div>
+                            <label className="block font-semibold mb-1">Site Name</label>
+                            <Select
+                                options={getUniqueValues('siteName')}
+                                value={filters.siteName ? { value: filters.siteName, label: filters.siteName } : null}
+                                onChange={(selectedOption) => handleFilterChange('siteName', selectedOption ? selectedOption.value : '')}
+                                placeholder="Select Site Name"
+                                isClearable
+                                isSearchable
+                                styles={customSelectStyles}
+                                className="w-full"
+                            />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Vendor</label>
+                            <Select
+                                options={getUniqueValues('vendor')}
+                                value={filters.vendor ? { value: filters.vendor, label: filters.vendor } : null}
+                                onChange={(selectedOption) => handleFilterChange('vendor', selectedOption ? selectedOption.value : '')}
+                                placeholder="Select Vendor"
+                                isClearable
+                                isSearchable
+                                styles={customSelectStyles}
+                                className="w-full"
+                            />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Subscription Number</label>
+                            <Select
+                                options={getUniqueValues('utilityTypeNumber')}
+                                value={filters.utilityTypeNumber ? { value: filters.utilityTypeNumber, label: filters.utilityTypeNumber } : null}
+                                onChange={(selectedOption) => handleFilterChange('utilityTypeNumber', selectedOption ? selectedOption.value : '')}
+                                placeholder="Select Subscription Number"
+                                isClearable
+                                isSearchable
+                                styles={customSelectStyles}
+                                className="w-full"
+                            />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Contractor</label>
+                            <Select
+                                options={getUniqueValues('contractor')}
+                                value={filters.contractor ? { value: filters.contractor, label: filters.contractor } : null}
+                                onChange={(selectedOption) => handleFilterChange('contractor', selectedOption ? selectedOption.value : '')}
+                                placeholder="Select Contractor"
+                                isClearable
+                                isSearchable
+                                styles={customSelectStyles}
+                                className="w-full"
+                            />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Payment Mode</label>
+                            <Select
+                                options={getUniqueValues('paymentMode')}
+                                value={filters.paymentMode ? { value: filters.paymentMode, label: filters.paymentMode } : null}
+                                onChange={(selectedOption) => handleFilterChange('paymentMode', selectedOption ? selectedOption.value : '')}
+                                placeholder="Select Payment Mode"
+                                isClearable
+                                isSearchable
+                                styles={customSelectStyles}
+                                className="w-full"
+                            />
+                        </div>
+                        <div className="flex items-end">
+                            <button
+                                onClick={clearFilters}
+                                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                            >
+                                Clear Filters
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-md ml-5 mr-5 p-6">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-800">Subscription Expenses</h3>
+                    <div className="flex items-center gap-4 text-sm text-black">
+                        <button
+                            type="button"
+                            onClick={handleExportPDF}
+                            disabled={!filteredData.length}
+                            className="flex items-center font-semibold gap-2 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-current"
+                        >
+                            Export PDF
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleExportExcel}
+                            disabled={!filteredData.length}
+                            className="flex items-center font-semibold gap-2 hover:text-green-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-current"
+                        >
+                            Export Excel
+                        </button>
+                    </div>
+                </div>
+
+                <div className="border-l-8 border-l-[#BF9853] rounded-lg">
+                    <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                            <thead>
+                                <tr className="bg-[#FAF6ED]">
+                                    <td className="px-4 py-2 text-left font-semibold">Sl.No</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Timestamp</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Date</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Site Name</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Vendor</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Contractor</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Subscription Number</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Category</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Amount</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Payment Mode</td>
+                                    <td className="px-4 py-2 text-left font-semibold">For The Month</td>
+                                    <td className="px-4 py-2 text-left font-semibold">ENo</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Bill Copy</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan="13" className="text-center py-4">Loading...</td>
+                                    </tr>
+                                ) : error ? (
+                                    <tr>
+                                        <td colSpan="13" className="text-center py-4 text-red-500">{error}</td>
+                                    </tr>
+                                ) : filteredData.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="13" className="text-center py-4">No subscription expenses found</td>
+                                    </tr>
+                                ) : (
+                                    filteredData.map((item, index) => (
+                                        <tr key={item.id ?? `${item.timestamp ?? index}-${index}`} className="odd:bg-white even:bg-[#FAF6ED]">
+                                            <td className="px-4 py-2">{index + 1}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">{formatTimestamp(item.timestamp)}</td>
+                                            <td className="px-4 py-2 text-left">{formatDate(item.date)}</td>
+                                            <td className="px-4 py-2 text-left">{item.siteName || '-'}</td>
+                                            <td className="px-4 py-2 text-left">{item.vendor || '-'}</td>
+                                            <td className="px-4 py-2 text-left">{item.contractor || '-'}</td>
+                                            <td className="px-4 py-2 text-left font-mono">{item.utilityTypeNumber || '-'}</td>
+                                            <td className="px-4 py-2 text-left">
+                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                    {item.category || '-'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-2 text-right">
+                                                <span className="font-semibold text-green-600">{formatAmountDisplay(item.amount)}</span>
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                    {item.paymentMode || '-'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-2">{formatUtilityMonth(item.utilityForTheMonth)}</td>
+                                            <td className="px-4 py-2">{item.eno || '-'}</td>
+                                            <td className="px-4 py-2">
+                                                {item.billCopy ? (
+                                                    <button
+                                                        onClick={() => window.open(item.billCopy, '_blank')}
+                                                        className="text-blue-600 hover:text-blue-800 underline text-sm"
+                                                    >
+                                                        View Bill
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-gray-400">-</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default SubscriptionDatabase;
+

@@ -401,37 +401,64 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             // Error fetching account details
         }
     };
-    const calculateAdvanceAmount = (tenantName, shopNo) => {
-
-        if (!tenantName || !shopNo || rentalFormsData.length === 0) {
+    const resolveSelectedTenantShopLink = () => {
+        if (!formTenantName || !formShopNo) return null;
+        const tenant = (selectedTenantId
+            ? tenantShopData.find((t) => t.id === selectedTenantId)
+            : null) || tenantShopData.find((t) => t.tenantName === formTenantName);
+        if (!tenant) return null;
+        const shop = tenant.shopNos?.find((entry) => {
+            const resolvedShopNo = entry?.shopNo
+                ? String(entry.shopNo)
+                : (entry?.shopNoId ? shopNoIdToShopNoMap[entry.shopNoId] : '');
+            return resolvedShopNo === formShopNo;
+        });
+        if (!shop) return null;
+        return {
+            tenantId: tenant.id,
+            tenantName: tenant.tenantName,
+            shopNo: formShopNo,
+            shopNoId: shop.shopNoId ?? null,
+        };
+    };
+    const doesFormBelongToTenantShop = (form, link) => {
+        if (!form || !link) return false;
+        const shopMatches = form.shopNoId != null
+            ? link.shopNoId != null && String(form.shopNoId) === String(link.shopNoId)
+            : form.shopNo === link.shopNo;
+        if (!shopMatches) return false;
+        if (form.tenantNameId != null) {
+            return link.tenantId != null && String(form.tenantNameId) === String(link.tenantId);
+        }
+        if (form.tenantName && link.tenantName) {
+            return form.tenantName === link.tenantName;
+        }
+        return !form.tenantName && !link.tenantName;
+    };
+    const calculateAdvanceAmount = () => {
+        const link = resolveSelectedTenantShopLink();
+        if (!link || rentalFormsData.length === 0) {
             setAdvanceAmount(0);
             return;
         }
         let totalAdvance = 0;
-        const relevantForms = rentalFormsData.filter(form =>
-            form.tenantName === tenantName && form.shopNo === shopNo
-        );
-        relevantForms.forEach(form => {
-            if (form.formType === 'Advance' && form.amount) {
-                const advanceAmount = parseFloat(form.amount) || 0;
-                totalAdvance += advanceAmount;
+        rentalFormsData.forEach((form) => {
+            if (!doesFormBelongToTenantShop(form, link)) return;
+            if (form.formType === 'Advance' && form.amount != null) {
+                totalAdvance += parseFloat(form.amount) || 0;
             } else if (
-                form.paymentMode &&
-                form.paymentMode.trim() === 'Advance Adjustment' &&
+                (form.formType === 'Rent' || form.formType === 'Pending Rent') &&
+                form.paymentMode?.trim() === 'Advance Adjustment' &&
                 form.amount != null
             ) {
-                const adjustmentAmount = parseFloat(form.amount) || 0;
-                totalAdvance -= adjustmentAmount;
-            } else if (form.formType === 'Shop Closure' && form.refundAmount) {
-                const refundAmount = parseFloat(form.refundAmount) || 0;
-                totalAdvance -= refundAmount;
-            } else if (form.formType === 'Refund' && form.refundAmount) {
-                const refundAmount = parseFloat(form.refundAmount) || 0;
-                totalAdvance -= refundAmount;
+                totalAdvance -= parseFloat(form.amount) || 0;
+            } else if (form.formType === 'Shop Closure') {
+                totalAdvance -= parseFloat(form.refundAmount ?? form.amount) || 0;
+            } else if (form.formType === 'Refund') {
+                totalAdvance -= parseFloat(form.refundAmount ?? form.amount) || 0;
             }
         });
-
-        setAdvanceAmount(totalAdvance);
+        setAdvanceAmount(Math.max(0, totalAdvance));
     };
     const buildTenantShopMapping = () => {
         const tenantShopMapping = {};
@@ -1427,11 +1454,11 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
     }, [selectedRentType, calculatedRent]);
     useEffect(() => {
         if (formTenantName && formShopNo && rentalFormsData.length > 0) {
-            calculateAdvanceAmount(formTenantName, formShopNo);
+            calculateAdvanceAmount();
         } else {
             setAdvanceAmount(0);
         }
-    }, [formTenantName, formShopNo, rentalFormsData, rentHistoryData]);
+    }, [formTenantName, formShopNo, selectedTenantId, rentalFormsData, tenantShopData, shopNoIdToShopNoMap]);
     useEffect(() => {
         if (!formPaymentMode || formPaymentMode.trim() !== "Advance Adjustment") {
             setAmountError('');

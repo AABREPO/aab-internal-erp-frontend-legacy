@@ -55,7 +55,7 @@ const BathTableView = () => {
         e.preventDefault();
         const newBrand = { brandName };
         try {
-            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/brand_names/save", {
+            const response = await fetch("https://backendaab.in/aabuilderDash/api/brand_names/save", {
                 method: "POST",
                 headers: {
                     'Content-Type': 'application/json',
@@ -85,7 +85,7 @@ const BathTableView = () => {
         if (modelImage) formData.append("image", modelImage);
         if (modelTechnicalImage) formData.append("technicalImage", modelTechnicalImage);
         try {
-            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/bath_model/save", {
+            const response = await fetch("https://backendaab.in/aabuilderDash/api/bath_model/save", {
                 method: "POST",
                 body: formData,
             });
@@ -103,7 +103,7 @@ const BathTableView = () => {
         e.preventDefault();
         const newType = { type };
         try {
-            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/bath_types/save", {
+            const response = await fetch("https://backendaab.in/aabuilderDash/api/bath_types/save", {
                 method: "POST",
                 headers: {
                     'Content-Type': 'application/json',
@@ -126,7 +126,7 @@ const BathTableView = () => {
         e.preventDefault();
         const newItem = { itemName };
         try {
-            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/bath/item/save", {
+            const response = await fetch("https://backendaab.in/aabuilderDash/api/bath/item/save", {
                 method: "POST",
                 headers: {
                     'Content-Type': 'application/json',
@@ -147,7 +147,7 @@ const BathTableView = () => {
     };
     const handleTypeDelete = async (id) => {
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/bath_types/delete/${id}`, {
+            const response = await fetch(`https://backendaab.in/aabuilderDash/api/bath_types/delete/${id}`, {
                 method: 'DELETE',
             });
             if (response.ok) {
@@ -164,7 +164,7 @@ const BathTableView = () => {
     };
     const handleBrandNameDelete = async (id) => {
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/brand_names/delete/${id}`, {
+            const response = await fetch(`https://backendaab.in/aabuilderDash/api/brand_names/delete/${id}`, {
                 method: 'DELETE',
             });
             if (response.ok) {
@@ -181,7 +181,7 @@ const BathTableView = () => {
     };
     const handleITemNameDelete = async (id) => {
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/bath/delete/${id}`, {
+            const response = await fetch(`https://backendaab.in/aabuilderDash/api/bath/delete/${id}`, {
                 method: 'DELETE',
             });
             if (response.ok) {
@@ -198,7 +198,7 @@ const BathTableView = () => {
     };
     const handleModelDelete = async (id) => {
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/bath_model/delete/${id}`, {
+            const response = await fetch(`https://backendaab.in/aabuilderDash/api/bath_model/delete/${id}`, {
                 method: 'DELETE',
             });
             if (response.ok) {
@@ -216,7 +216,7 @@ const BathTableView = () => {
     const handleItemNameEditSave = async () => {
         if (!itemNameEdit) return;
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/bath/edit/${itemNameEdit.id}`, {
+            const response = await fetch(`https://backendaab.in/aabuilderDash/api/bath/edit/${itemNameEdit.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -241,7 +241,7 @@ const BathTableView = () => {
     const handleBrandNameEditSave = async () => {
         if (!brandNameEdit) return;
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/brand_names/edit/${brandNameEdit.id}`, {
+            const response = await fetch(`https://backendaab.in/aabuilderDash/api/brand_names/edit/${brandNameEdit.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -277,7 +277,7 @@ const BathTableView = () => {
             if (modelEdit.technicalImageFile) {
                 formData.append('technicalImage', modelEdit.technicalImageFile);
             }
-            const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/bath_model/edit/${modelEdit.id}`, {
+            const response = await fetch(`https://backendaab.in/aabuilderDash/api/bath_model/edit/${modelEdit.id}`, {
                 method: 'PUT',
                 body: formData,
             });
@@ -296,7 +296,7 @@ const BathTableView = () => {
     const handleTypeEditSave = async () => {
         if (!typeEdit) return;
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/bath_types/edit/${typeEdit.id}`, {
+            const response = await fetch(`https://backendaab.in/aabuilderDash/api/bath_types/edit/${typeEdit.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -327,7 +327,7 @@ const BathTableView = () => {
     };
     const fetchBathModelData = useCallback(async () => {
         try {
-            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/bath_model/getAll");
+            const response = await fetch("https://backendaab.in/aabuilderDash/api/bath_model/getAll");
             if (!response.ok) {
                 throw new Error(`HTTP error! Status: ${response.status}`);
             }
@@ -365,7 +365,7 @@ const BathTableView = () => {
     }, []);
     const fetchBrandNames = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/brand_names/getAll');
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/brand_names/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setBrandNames(data);
@@ -382,7 +382,7 @@ const BathTableView = () => {
     }, []);
     const fetchTypes = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/bath_types/getAll');
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/bath_types/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setTypes(data);
@@ -399,7 +399,7 @@ const BathTableView = () => {
     }, []);
     const fetchItemNames = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/bath/getAll/item');
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/bath/getAll/item');
             if (response.ok) {
                 const data = await response.json();
                 setItemNames(data);

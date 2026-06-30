@@ -106,7 +106,7 @@ const MonthlyReport = () => {
     };
     useEffect(() => {
         axios
-            .get('https://backendaab.in/demoAabuildersDash/api/rental_forms/monthly_report')
+            .get('https://backendaab.in/aabuildersDash/api/rental_forms/monthly_report')
             .then((response) => {
                 const sortedRents = response.data.sort((a, b) => new Date(b.date) - new Date(a.date));
                 const uniqueUrls = [

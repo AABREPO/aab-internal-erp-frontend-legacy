@@ -60,7 +60,7 @@ const AddInput = () => {
   // Fetch group names from API (same as InputData page but independent)
   const fetchGroupNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/group_name/getAll');
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/group_name/getAll');
       if (response.ok) {
         const data = await response.json();
         const options = (data || []).map(item => item.groupName || '').filter(Boolean);
@@ -78,7 +78,7 @@ const AddInput = () => {
   // Fetch categories with IDs from API
   const fetchPoCategory = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll');
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
       if (response.ok) {
         const data = await response.json();
         const options = (data || []).map(item => ({
@@ -143,7 +143,7 @@ const AddInput = () => {
       return;
     }
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -170,7 +170,7 @@ const AddInput = () => {
       return;
     }
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/group_name/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/group_name/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -214,7 +214,7 @@ const AddInput = () => {
   useEffect(() => {
     const fetchOutgoingSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -275,7 +275,7 @@ const AddInput = () => {
   // Refresh site data from API
   const refreshSiteData = async () => {
     try {
-      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+      const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
         method: "GET",
         credentials: "include",
         headers: {
@@ -310,7 +310,7 @@ const AddInput = () => {
           const wasSelected = previousSelectedLocators.includes(site.value);
           // Only update if the status needs to change
           if (shouldBeSelected !== wasSelected) {
-            const url = `https://backendaab.in/demoAabuilderDash/api/project_Names/${site.id}/stocking-location?markedAsStockingLocation=${shouldBeSelected}`;
+            const url = `https://backendaab.in/aabuilderDash/api/project_Names/${site.id}/stocking-location?markedAsStockingLocation=${shouldBeSelected}`;
             const updatePromise = fetch(url, {
               method: 'PUT',
               credentials: 'include',
@@ -363,7 +363,7 @@ const AddInput = () => {
   // Fetch item names from API
   const fetchPoItemName = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_itemNames/getAll');
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll');
       if (response.ok) {
         const data = await response.json();
         // Store full data for otherPOEntityList lookup
@@ -400,7 +400,7 @@ const AddInput = () => {
   // Fetch models from API
   const fetchPoModel = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_model/getAll');
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoModel(data);
@@ -437,7 +437,7 @@ const AddInput = () => {
   // Fetch brands from API
   const fetchPoBrand = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_brand/getAll');
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_brand/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoBrand(data);
@@ -488,7 +488,7 @@ const AddInput = () => {
   // Fetch types from API
   const fetchPoType = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_type/getAll');
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoType(data);
@@ -561,7 +561,7 @@ const AddInput = () => {
     };
 
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_itemNames/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -599,7 +599,7 @@ const AddInput = () => {
     };
 
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_model/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -638,7 +638,7 @@ const AddInput = () => {
     };
 
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_brand/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_brand/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -677,7 +677,7 @@ const AddInput = () => {
     };
 
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_type/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -950,7 +950,7 @@ const AddInput = () => {
     }
 
     try {
-      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/po_itemNames/edit/${poItemNameId}`, {
+      const response = await fetch(`https://backendaab.in/aabuildersDash/api/po_itemNames/edit/${poItemNameId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1086,7 +1086,7 @@ const AddInput = () => {
 
       // Reload item names to get updated otherPOEntityList
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_itemNames/getAll');
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll');
         if (response.ok) {
           const data = await response.json();
           setPoItemNameData(data);
@@ -1201,7 +1201,7 @@ const AddInput = () => {
 
         // Reload item names to get updated otherPOEntityList
         try {
-          const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_itemNames/getAll');
+          const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll');
           if (response.ok) {
             const data = await response.json();
             setPoItemNameData(data);
@@ -1278,7 +1278,7 @@ const AddInput = () => {
 
         // Reload item names to get updated otherPOEntityList
         try {
-          const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_itemNames/getAll');
+          const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll');
           if (response.ok) {
             const data = await response.json();
             setPoItemNameData(data);

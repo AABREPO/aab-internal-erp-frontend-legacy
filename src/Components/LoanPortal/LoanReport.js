@@ -204,7 +204,7 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     const fetchVendorNames = async () => {
       try {
         setProgress(10);
-        const res = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
+        const res = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -227,7 +227,7 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     const fetchContractorNames = async () => {
       try {
         setProgress(30);
-        const res = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
+        const res = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -250,7 +250,7 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     const fetchEmployeeNames = async () => {
       try {
         setProgress(50);
-        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/employee_details/getAll", {
+        const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -279,7 +279,7 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     const fetchLabourNames = async () => {
       try {
         setProgress(60);
-        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/labours-details/getAll", {
+        const response = await fetch("https://backendaab.in/aabuildersDash/api/labours-details/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -308,7 +308,7 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     const fetchPurposeOptions = async () => {
       try {
         setProgress(70);
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loan-purposes/getAll', {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/loan-purposes/getAll', {
           method: "GET",
           credentials: "include",
           headers: {
@@ -340,7 +340,7 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     const fetchSites = async () => {
       try {
         setProgress(80);
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -372,7 +372,7 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     const fetchData = async () => {
       try {
         setProgress(90);
-        const res = await fetch("https://backendaab.in/demoAabuildersDash/api/loans/all", {
+        const res = await fetch("https://backendaab.in/aabuildersDash/api/loans/all", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" },

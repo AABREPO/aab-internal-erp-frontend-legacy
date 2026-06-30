@@ -1,4 +1,4 @@
-const API_BASE = 'https://backendaab.in/demoAabuildersDash/api';
+const API_BASE = 'https://backendaab.in/aabuildersDash/api';
 
 export const EXPENSE_ENTRY_MODULE_NAME = 'Expense Entry';
 export const RENT_MANAGEMENT_MODULE_NAME = 'Rent Management';

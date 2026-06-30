@@ -51,8 +51,8 @@ export const HandoverPaymentsModal = ({ show, onClose }) => {
             setLoading(true);
             try {
                 const [paymentsRes, branchesRes] = await Promise.all([
-                    axios.get("https://backendaab.in/demoAabuildersDash/api/payments-received/getAll"),
-                    axios.get("https://backendaab.in/demoAabuildersDash/api/branch/getAll", {
+                    axios.get("https://backendaab.in/aabuildersDash/api/payments-received/getAll"),
+                    axios.get("https://backendaab.in/aabuildersDash/api/branch/getAll", {
                         withCredentials: true,
                     }),
                 ]);

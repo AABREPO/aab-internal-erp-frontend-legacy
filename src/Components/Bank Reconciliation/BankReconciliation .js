@@ -70,19 +70,19 @@ const BankReconciliation = () => {
     const fetchAllOptions = async () => {
       try {
         // Vendors
-        const vRes = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll");
+        const vRes = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll");
         const vData = vRes.ok ? await vRes.json() : [];
         setVendorOptions(vData.map(item => ({ id: item.id, label: item.vendorName })));        
         // Contractors
-        const cRes = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll");
+        const cRes = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll");
         const cData = cRes.ok ? await cRes.json() : [];
         setContractorOptions(cData.map(item => ({ id: item.id, label: item.contractorName })));        
         // Employees
-        const eRes = await fetch("https://backendaab.in/demoAabuildersDash/api/employee_details/getAll");
+        const eRes = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll");
         const eData = eRes.ok ? await eRes.json() : [];
         setEmployeeOptions(eData.map(item => ({ id: item.id, label: item.employee_name })));        
         // Projects with predefined options
-        const pRes = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll");
+        const pRes = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll");
         const pData = pRes.ok ? await pRes.json() : [];
         const formattedProjects = pData.map(item => ({
           value: item.siteName,
@@ -106,7 +106,7 @@ const BankReconciliation = () => {
         setSiteOptions([...predefinedSiteOptions, ...formattedProjects]);
         
         // Purpose options
-        const purposeRes = await fetch('https://backendaab.in/demoAabuildersDash/api/loan-purposes/getAll');
+        const purposeRes = await fetch('https://backendaab.in/aabuildersDash/api/loan-purposes/getAll');
         const purposeData = purposeRes.ok ? await purposeRes.json() : [];
         setPurposeOptions(purposeData.map(purpose => ({
           value: purpose.purpose,
@@ -116,7 +116,7 @@ const BankReconciliation = () => {
         })));
         
         // Tenant options
-        const tenantRes = await fetch('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
+        const tenantRes = await fetch('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll');
         const tenantData = tenantRes.ok ? await tenantRes.json() : [];
         setTenantOptions(tenantData.map(tenant => ({
           value: tenant.tenantName,
@@ -566,7 +566,7 @@ const BankReconciliation = () => {
     const fetchAll = async () => {
       setLoading(true);
       try {
-        const res = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/all");
+        const res = await fetch("https://backendaab.in/aabuildersDash/api/weekly-payment-bills/all");
         if (res.ok) {
           const data = await res.json();
           // Map the data to match the table structure

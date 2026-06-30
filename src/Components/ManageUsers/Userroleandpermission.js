@@ -236,7 +236,7 @@ const Userroleandpermission = () => {
   const handleRoleChange = async (role) => {
     setSelectedRole(role);
     try {
-      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/user_roles/all");
+      const response = await fetch("https://backendaab.in/aabuilderDash/api/user_roles/all");
       const allRoles = await response.json();
       console.log('All roles from backend:', allRoles);
       const existingRole = allRoles.find((r) => r.userRoles === role);
@@ -338,17 +338,17 @@ const Userroleandpermission = () => {
         })),
     };
     try {
-      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/user_roles/all");
+      const response = await fetch("https://backendaab.in/aabuilderDash/api/user_roles/all");
       const allRoles = await response.json();
       const existingRole = allRoles.find((r) => r.userRoles === selectedRole);
       if (existingRole) {
-        await fetch(`https://backendaab.in/demoAabuilderDash/api/user_roles/edit/${existingRole.id}`, {
+        await fetch(`https://backendaab.in/aabuilderDash/api/user_roles/edit/${existingRole.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formattedData),
         });
       } else {
-        await fetch("https://backendaab.in/demoAabuilderDash/api/user_roles/save", {
+        await fetch("https://backendaab.in/aabuilderDash/api/user_roles/save", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formattedData),
@@ -398,7 +398,7 @@ const Userroleandpermission = () => {
   const handleSubmitRoleName = async () => {
     const newRoleName = { roleName };
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/roles/save', {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/roles/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -418,7 +418,7 @@ const Userroleandpermission = () => {
   };
   const fetchRoleNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/roles/all');
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/roles/all');
       if (response.ok) {
         const data = await response.json();
         setAllRoles(data);

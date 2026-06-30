@@ -5,7 +5,7 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
-const AMC_EXPENSES_ENDPOINT = 'https://backendaab.in/demoAabuilderDash/expenses_form/utility/amc';
+const AMC_EXPENSES_ENDPOINT = 'https://backendaab.in/aabuilderDash/expenses_form/utility/amc';
 
 const AMCDatabase = ({ username, userRoles = [] }) => {
     const [amcData, setAmcData] = useState([]);

@@ -34,7 +34,7 @@ const RcHistory = () => {
     const [fileOptions, setFileOptions] = useState([]);
     const fetchCalculations = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/all');
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/all');
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
@@ -59,7 +59,7 @@ const RcHistory = () => {
     };
     const fetchLatestEno = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/all');
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/all');
             if (!response.ok) {
                 throw new Error('Failed to fetch ENo');
             }
@@ -105,7 +105,7 @@ const RcHistory = () => {
     // Function to fetch tile floor types
     const fetchTileFloorTypes = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/floorType');
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/floorType');
             if (response.ok) {
                 const data = await response.json();
                 setTileFloorTypes(data);
@@ -126,7 +126,7 @@ const RcHistory = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/areaName');
+                const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/areaName');
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -142,7 +142,7 @@ const RcHistory = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/floorName');
+                const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/floorName');
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -157,7 +157,7 @@ const RcHistory = () => {
     }, []);
     const fetchTileData = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/quantity/size');
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/quantity/size');
             const data = await response.json();
             setTileList(data);
         } catch (error) {
@@ -178,7 +178,7 @@ const RcHistory = () => {
     useEffect(() => {
         const fetchSites = async () => {
             try {
-                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/expenses/sites", {
+                const response = await fetch("https://backendaab.in/aabuilderDash/api/expenses/sites", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -322,7 +322,7 @@ const RcHistory = () => {
             return;
         }
         try {
-            const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
+            const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
             if (!clientResponse.ok) {
                 throw new Error("Failed to fetch calculations from the backend");
             }
@@ -341,7 +341,7 @@ const RcHistory = () => {
             const clientId = clientSNo || 0;
             const getRevisionNumber = async (clientName) => {
                 try {
-                    const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
+                    const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
                     if (!clientResponse.ok) {
                         throw new Error("Failed to fetch calculations from the backend");
                     }
@@ -400,7 +400,7 @@ const RcHistory = () => {
             const uploadPdf = async (pdf, name) => {
                 const singleFormData = new FormData();
                 singleFormData.append("files", pdf, name);
-                const pdfUploadResponse = await fetch(`https://backendaab.in/demoAabuilderDash/googleUploader/pdfs`, {
+                const pdfUploadResponse = await fetch(`https://backendaab.in/aabuilderDash/googleUploader/pdfs`, {
                     method: "POST",
                     body: singleFormData,
                 });
@@ -413,7 +413,7 @@ const RcHistory = () => {
             await uploadPdf(customerCopyPdf, `TMS CC ${clientId} - ${selectedDate} - ${revisionNumber}.pdf`);
             await uploadPdf(summaryPdf, `TMS OC ${clientId} - ${selectedDate} - ${revisionNumber}.pdf`);
             await uploadPdf(StockingPdf, `TMS SC ${clientId} - ${selectedDate} - ${revisionNumber}.pdf`);
-            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/tile/save", {
+            const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/tile/save", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -541,7 +541,7 @@ const RcHistory = () => {
     useEffect(() => {
         const fetchTiles = async () => {
             try {
-                const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tiles/all/data');
+                const response = await fetch('https://backendaab.in/aabuilderDash/api/tiles/all/data');
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -642,7 +642,7 @@ const RcHistory = () => {
         const clientId = clientSNo || 0;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -853,7 +853,7 @@ const RcHistory = () => {
         const clientId = clientSNo || 0;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -1005,7 +1005,7 @@ const RcHistory = () => {
         const clientId = clientSNo || 0;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -1133,7 +1133,7 @@ const RcHistory = () => {
         const clientId = clientSNo || 0;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -1491,7 +1491,7 @@ const RcHistory = () => {
         // Get the revision number from the backend
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -1507,7 +1507,7 @@ const RcHistory = () => {
         const getIncrement = async (fileLabel) => {
             try {
 
-                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -1522,7 +1522,7 @@ const RcHistory = () => {
         // Post increment data to the backend
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1704,7 +1704,7 @@ const RcHistory = () => {
         const fileLabel = selectedFile && selectedFile.label ? selectedFile.label : `${selectedDate}`;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -1720,7 +1720,7 @@ const RcHistory = () => {
         const getIncrement = async (fileLabel) => {
             try {
 
-                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -1733,7 +1733,7 @@ const RcHistory = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1835,7 +1835,7 @@ const RcHistory = () => {
         const fileLabel = selectedFile && selectedFile.label ? selectedFile.label : `${selectedDate}`;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -1852,7 +1852,7 @@ const RcHistory = () => {
         const getIncrement = async (fileLabel) => {
             try {
 
-                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -1866,7 +1866,7 @@ const RcHistory = () => {
         // Post increment data to the backend
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -2001,7 +2001,7 @@ const RcHistory = () => {
         // Get the revision number from the backend
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -2018,7 +2018,7 @@ const RcHistory = () => {
         const getIncrement = async (fileLabel) => {
             try {
 
-                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -2032,7 +2032,7 @@ const RcHistory = () => {
         // Post increment data to the backend
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

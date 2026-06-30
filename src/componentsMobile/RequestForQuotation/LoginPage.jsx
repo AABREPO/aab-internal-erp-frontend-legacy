@@ -6,7 +6,7 @@ import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid';
 const LoginPage = ({ 
     onLogin, 
     redirectPath = '/purchase-order', // Configurable redirect path after login
-    apiBaseUrl = 'https://backendaab.in/demoAabuilderDash/api', // Configurable API base URL
+    apiBaseUrl = 'https://backendaab.in/aabuilderDash/api', // Configurable API base URL
     logo = null // Optional logo image
 }) => {
     const [email, setEmail] = useState('');

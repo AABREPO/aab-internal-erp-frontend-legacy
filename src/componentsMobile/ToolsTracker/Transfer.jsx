@@ -15,10 +15,10 @@ import DropdownIcon from '../Images/Dropdown F.svg'
 import Search from '../Images/Search.png'
 import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 const Transfer = ({ user }) => {
-  const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_item_name';
-  const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_brand';
-  const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_item_id';
-  const FILE_UPLOAD_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/files';
+  const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
+  const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_brand';
+  const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_id';
+  const FILE_UPLOAD_BASE_URL = 'https://backendaab.in/aabuildersDash/api/files';
   const [entryNo, setEntryNo] = useState(0);
   const [date, setDate] = useState(() => {
     const today = new Date();
@@ -166,10 +166,10 @@ const Transfer = ({ user }) => {
   const [uploadDescription, setUploadDescription] = useState('');
   const [statusOptions] = useState(['Working', 'Not Working', 'Under Repair', 'Machine Dead']);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
-  const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_tracker_stock_management';
-  const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_tracker_management';
-  const TOOLS_MACHINE_STATUS_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools-machine-status';
-  const TOOLS_MACHINE_NUMBER_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_machine_number';
+  const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_stock_management';
+  const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
+  const TOOLS_MACHINE_STATUS_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools-machine-status';
+  const TOOLS_MACHINE_NUMBER_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_machine_number';
   const [isSaving, setIsSaving] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -243,7 +243,7 @@ const Transfer = ({ user }) => {
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -271,7 +271,7 @@ const Transfer = ({ user }) => {
   useEffect(() => {
     const fetchServiceStoreVendors = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll', {
+        const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll', {
           method: "GET",
           credentials: "include",
           headers: {
@@ -307,7 +307,7 @@ const Transfer = ({ user }) => {
   useEffect(() => {
     const fetchSiteIncharge = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/site_engineers');
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/site_engineers');
         if (response.ok) {
           const data = await response.json();
           const formatted = data.map((item) => ({

@@ -173,7 +173,7 @@ const UtilityDashboard = () => {
     setLoadingElectricity(true)
     setErrorElectricity(null)
     try {
-      const res = await axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/utility/electricity')
+      const res = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/electricity')
       setElectricityData(Array.isArray(res.data) ? res.data : [])
     } catch (err) {
       setErrorElectricity('Failed to load electricity data')
@@ -186,7 +186,7 @@ const UtilityDashboard = () => {
     setLoadingPropertyTax(true)
     setErrorPropertyTax(null)
     try {
-      const res = await axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/utility/property')
+      const res = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/property')
       setPropertyTaxData(Array.isArray(res.data) ? res.data : [])
     } catch (err) {
       setErrorPropertyTax('Failed to load property tax data')
@@ -199,7 +199,7 @@ const UtilityDashboard = () => {
     setLoadingWaterTax(true)
     setErrorWaterTax(null)
     try {
-      const res = await axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/utility/water')
+      const res = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/water')
       setWaterTaxData(Array.isArray(res.data) ? res.data : [])
     } catch (err) {
       setErrorWaterTax('Failed to load water tax data')
@@ -213,8 +213,8 @@ const UtilityDashboard = () => {
     setErrorTelecom(null)
     try {
       const [directoryRes, expensesRes] = await Promise.all([
-        axios.get('https://backendaab.in/demoAabuildersDash/api/utility-telecom/getAll'),
-        axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/utility/telecom').catch((err) => {
+        axios.get('https://backendaab.in/aabuildersDash/api/utility-telecom/getAll'),
+        axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/telecom').catch((err) => {
           console.error('Error fetching telecom expense payments:', err)
           return { data: [] }
         }),
@@ -240,7 +240,7 @@ const UtilityDashboard = () => {
   useEffect(() => {
     const fetchFrequencyHistory = async () => {
       try {
-        const response = await axios.get('https://backendaab.in/demoAabuilderDash/api/frequency-history/getAll')
+        const response = await axios.get('https://backendaab.in/aabuilderDash/api/frequency-history/getAll')
         setFrequencyHistory(response.data || [])
       } catch (error) {
         console.error('Error fetching frequency history:', error)
@@ -252,7 +252,7 @@ const UtilityDashboard = () => {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const response = await axios.get('https://backendaab.in/demoAabuilderDash/api/projects/getAll')
+        const response = await axios.get('https://backendaab.in/aabuilderDash/api/projects/getAll')
         setAllProjectRecords(Array.isArray(response.data) ? response.data : [])
         const projectsWithUtilities = response.data.filter(project =>
           Array.isArray(project.propertyDetails) &&
@@ -287,7 +287,7 @@ const UtilityDashboard = () => {
   useEffect(() => {
     const loadTenantShopLinks = async () => {
       try {
-        const res = await axios.get('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll')
+        const res = await axios.get('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll')
         setTenantShopData(Array.isArray(res.data) ? res.data : [])
       } catch (e) {
         console.error('UtilityDashboard: failed to load tenant–shop links', e)

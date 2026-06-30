@@ -3,8 +3,8 @@ import Select from 'react-select';
 import filterIcon from '../Images/filter (3).png';
 import cross from '../Images/cross.png';
 
-const PROJECTS_API = 'https://backendaab.in/demoAabuilderDash/api/projects/getAll';
-const PROPERTY_TYPES_API = 'https://backendaab.in/demoAabuildersDash/api/property_types/getAll';
+const PROJECTS_API = 'https://backendaab.in/aabuilderDash/api/projects/getAll';
+const PROPERTY_TYPES_API = 'https://backendaab.in/aabuildersDash/api/property_types/getAll';
 
 const EMPTY_OWNER = {
   clientName: '',
@@ -50,7 +50,7 @@ const roInputProps = {
 };
 
 const DirectoryProfession = () => {
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL ?? 'https://backendaab.in/demoAabuildersDash';
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL ?? 'https://backendaab.in/aabuildersDash';
   const [isFilterRowVisible, setIsFilterRowVisible] = useState(false);
   const [isProfessionProjectFormOpen, setIsProfessionProjectFormOpen] = useState(false);
   const [projectsList, setProjectsList] = useState([]);
@@ -424,7 +424,7 @@ const DirectoryProfession = () => {
 
     try {
       const response = await fetch(
-        `https://backendaab.in/demoAabuilderDash/api/projects/edit/${editingProjectDbId}`,
+        `https://backendaab.in/aabuilderDash/api/projects/edit/${editingProjectDbId}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },

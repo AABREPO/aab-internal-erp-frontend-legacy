@@ -30,27 +30,27 @@ export async function downloadExpensesReport() {
         purposesResponse,
         vendorPaymentsTrackerResponse
       ] = await Promise.all([
-        axios.get("https://backendaab.in/aabuilderDash/expenses_form/get_form"),
-        axios.get("https://backendaab.in/aabuilderDash/api/project_Names/getAll", { withCredentials: true }),
-        axios.get("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", { withCredentials: true }),
-        axios.get("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", { withCredentials: true }),
-        axios.get("https://backendaab.in/aabuildersDash/api/advance_portal/getAll"),
-        axios.get("https://backendaab.in/aabuildersDash/api/loans/all"),
-        axios.get("https://backendaab.in/aabuildersDash/api/loan-purposes/getAll", { withCredentials: true }),
-        axios.get("https://backendaab.in/aabuilderDash/api/projects/getAll", { withCredentials: true }),
-        axios.get("https://backendaab.in/aabuildersDash/api/rental_forms/getAll"),
-        axios.get("https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll"),
+        axios.get("https://backendaab.in/demoAabuilderDash/expenses_form/get_form"),
+        axios.get("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", { withCredentials: true }),
+        axios.get("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", { withCredentials: true }),
+        axios.get("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", { withCredentials: true }),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/loans/all"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/loan-purposes/getAll", { withCredentials: true }),
+        axios.get("https://backendaab.in/demoAabuilderDash/api/projects/getAll", { withCredentials: true }),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll"),
         // MasterData API calls
-        axios.get("https://backendaab.in/aabuilderDash/api/expenses_categories/getAll"),
-        axios.get("https://backendaab.in/aabuilderDash/api/machine_tools/getAll"),
-        axios.get("https://backendaab.in/aabuildersDash/api/employee_details/getAll", { withCredentials: true }),
-        axios.get("https://backendaab.in/aabuildersDash/api/labours-details/getAll", { withCredentials: true }),
-        axios.get("https://backendaab.in/aabuildersDash/api/account-details/getAll"),
-        axios.get("https://backendaab.in/aabuildersDash/api/bank_type/getAll"),
-        axios.get("https://backendaab.in/aabuildersDash/api/eb-service-no/getAll"),
-        axios.get("https://backendaab.in/aabuildersDash/api/staff-advance/all"),
-        axios.get("https://backendaab.in/aabuildersDash/api/purposes/getAll"),
-        axios.get("https://backendaab.in/aabuildersDash/api/vendor-payments/trackers", { withCredentials: true })
+        axios.get("https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll"),
+        axios.get("https://backendaab.in/demoAabuilderDash/api/machine_tools/getAll"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/employee_details/getAll", { withCredentials: true }),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/labours-details/getAll", { withCredentials: true }),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/account-details/getAll"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/bank_type/getAll"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/eb-service-no/getAll"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/staff-advance/all"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/purposes/getAll"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/vendor-payments/trackers", { withCredentials: true })
       ]);
       const buildLookup = (items = [], idKey, labelKey) => {
         if (!Array.isArray(items)) return {};
@@ -625,7 +625,7 @@ export async function downloadExpensesReport() {
         const allBillEntries = [];
         for (const tracker of vendorPaymentsTrackerData) {
           try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/bill-entry/get/${tracker.id}`, {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/bill-entry/get/${tracker.id}`, {
               method: "GET",
               credentials: "include",
               headers: { "Content-Type": "application/json" }
@@ -649,7 +649,7 @@ export async function downloadExpensesReport() {
         const allPaymentDetails = [];
         for (const tracker of vendorPaymentsTrackerData) {
           try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/get/${tracker.id}`, {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/vendor-bill-tracker/get/${tracker.id}`, {
               method: 'GET',
               credentials: 'include',
               headers: { 'Content-Type': 'application/json' }

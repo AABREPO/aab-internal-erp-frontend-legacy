@@ -19,7 +19,7 @@ const PropertyDatabase = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchPropertyData = async () => {
             try {
-                const response = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/property');
+                const response = await axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/utility/property');
                 setPropertyData(response.data || []);
                 setFilteredData(response.data || []);
             } catch (error) {

@@ -14,7 +14,7 @@ const ToolsTrackerPendingItems = () => {
     const fetchData = async () => {
       try {
         // TODO: Replace with actual API endpoint when available
-        // const response = await fetch('https://backendaab.in/aabuilderDash/api/tools_tracker/pending');
+        // const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tools_tracker/pending');
         // if (response.ok) {
         //   const data = await response.json();
         //   setTableData(data);

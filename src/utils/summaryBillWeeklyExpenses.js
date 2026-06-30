@@ -1,4 +1,4 @@
-const EXPENSES_FORM_BASE_URL = 'https://backendaab.in/aabuilderDash/expenses_form';
+const EXPENSES_FORM_BASE_URL = 'https://backendaab.in/demoAabuilderDash/expenses_form';
 
 export const SUMMARY_BILL_PROJECT_ID = 7;
 export const SUMMARY_BILL_PROJECT_LABEL = 'Summary Bill';
@@ -127,7 +127,7 @@ export async function clearLinkedExpensesOnWeeklyTypeChange(
 export async function clearWeeklyExpenseBillCopyUrl(weeklyExpenseId, editedBy) {
     if (weeklyExpenseId == null) return false;
     const response = await fetch(
-        `https://backendaab.in/aabuildersDash/api/weekly-expenses/${weeklyExpenseId}/remove-bill`,
+        `https://backendaab.in/demoAabuildersDash/api/weekly-expenses/${weeklyExpenseId}/remove-bill`,
         {
             method: 'PUT',
             credentials: 'include',

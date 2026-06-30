@@ -33,7 +33,7 @@ const Ebno = () => {
 
     const fetchProjects = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
                 // Filter for "own project" category
@@ -93,7 +93,7 @@ const Ebno = () => {
     useEffect(() => {
         const loadTenantLinkShop = async () => {
             try {
-                const response = await axios.get('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll');
+                const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
                 setTenantLinkList(Array.isArray(response.data) ? response.data : []);
             } catch (error) {
                 console.error('Error fetching tenant link with shop:', error);

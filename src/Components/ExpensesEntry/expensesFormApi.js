@@ -1,4 +1,4 @@
-const EXPENSES_FORM_BASE_URL = 'https://backendaab.in/aabuilderDash/expenses_form';
+const EXPENSES_FORM_BASE_URL = 'https://backendaab.in/demoAabuilderDash/expenses_form';
 
 export const normalizeExpenseRecord = (expense) => {
     if (!expense || typeof expense !== 'object') return expense;

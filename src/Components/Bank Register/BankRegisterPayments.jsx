@@ -213,7 +213,7 @@ const pickExistingBillField = (existing, snakeKey, camelKey, fallback = null) =>
 
 const updateWeeklyPaymentBill = async (id, payload) => {
   const response = await fetch(
-    `https://backendaab.in/aabuildersDash/api/weekly-payment-bills/update/${id}`,
+    `https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/update/${id}`,
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -230,7 +230,7 @@ const updateWeeklyPaymentBill = async (id, payload) => {
 
 const deleteWeeklyPaymentBill = async (id) => {
   const response = await fetch(
-    `https://backendaab.in/aabuildersDash/api/weekly-payment-bills/delete/${id}`,
+    `https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/delete/${id}`,
     {
       method: "DELETE",
       credentials: "include",
@@ -2077,7 +2077,7 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
   }, [activeBranchId]);
 
   const fetchBillPayments = useCallback(async () => {
-    const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-payment-bills/all", {
+    const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/all", {
       method: "GET",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -2102,7 +2102,7 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
   useEffect(() => {
     const fetchAccountDetails = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
         if (!response.ok) return;
         const data = await response.json();
         console.log("[BankRegisterPayments] account-details/getAll raw:", data);
@@ -2146,7 +2146,7 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
   useEffect(() => {
     const fetchVendorOptions = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -2164,7 +2164,7 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
 
     const fetchContractorOptions = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -2182,7 +2182,7 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
 
     const fetchEmployeeOptions = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/employee_details/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -2200,7 +2200,7 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
 
     const fetchProjectOptions = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -2234,7 +2234,7 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
 
     const fetchPurposeOptions = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/loan-purposes/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/loan-purposes/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -2253,7 +2253,7 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
 
     const fetchStaffPurposeOptions = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/purposes/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/purposes/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -2272,7 +2272,7 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
 
     const fetchTenantOptions = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -2707,7 +2707,7 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
       };
 
       const saveUrl = buildBranchUrl(
-        "https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save",
+        "https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save",
         branchId
       );
       const response = await fetch(saveUrl, {
@@ -2811,7 +2811,7 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
       };
 
       const saveUrl = buildBranchUrl(
-        "https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save",
+        "https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save",
         branchId
       );
       const response = await fetch(saveUrl, {

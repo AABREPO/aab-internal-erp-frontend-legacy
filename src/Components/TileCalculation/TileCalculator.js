@@ -722,7 +722,7 @@ const DesignTool = () => {
     useEffect(() => {
         const fetchSites = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -747,7 +747,7 @@ const DesignTool = () => {
     }, []);
     const fetchCalculations = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/all');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/all');
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
@@ -775,7 +775,7 @@ const DesignTool = () => {
     }, []);
     const fetchPaintCalculation = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/paint_calculation/all/paints');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/paint_calculation/all/paints');
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
@@ -897,7 +897,7 @@ const DesignTool = () => {
     }, []);
     const fetchTileFloorTypes = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/floorType');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/floorType');
             if (response.ok) {
                 const data = await response.json();
                 setTileFloorTypes(data);
@@ -991,7 +991,7 @@ const DesignTool = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/areaName');
+                const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/areaName');
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -1007,7 +1007,7 @@ const DesignTool = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/vendor/getAll');
+                const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/vendor/getAll');
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -1023,7 +1023,7 @@ const DesignTool = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/floorName');
+                const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/floorName');
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -1038,7 +1038,7 @@ const DesignTool = () => {
     }, []);
     const fetchTileData = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/quantity/size');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/quantity/size');
             const data = await response.json();
             setTileList(data);
         } catch (error) {
@@ -1302,7 +1302,7 @@ const DesignTool = () => {
             return;
         }
         try {
-            const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+            const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
             if (!clientResponse.ok) {
                 throw new Error("Failed to fetch calculations from the backend");
             }
@@ -1321,7 +1321,7 @@ const DesignTool = () => {
             const clientId = clientSNo || 0;
             const getRevisionNumber = async (clientName) => {
                 try {
-                    const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                    const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                     if (!clientResponse.ok) {
                         throw new Error("Failed to fetch calculations from the backend");
                     }
@@ -1409,7 +1409,7 @@ const DesignTool = () => {
                 singleFormData.append("files", pdf, name);
                 singleFormData.append("folder", "FileUpload / Tile_Calculator");
                 singleFormData.append("fileName", name);
-                const pdfUploadResponse = await fetch(`https://backendaab.in/aabuildersDash/api/files/upload`, {
+                const pdfUploadResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/files/upload`, {
                     method: "POST",
                     body: singleFormData,
                 });
@@ -1421,7 +1421,7 @@ const DesignTool = () => {
             await uploadPdf(customerCopyPdf, `TMS CC ${clientId} - ${selectedDate} - ${revisionNumber}.pdf`);
             await uploadPdf(summaryPdf, `TMS OC ${clientId} - ${selectedDate} - ${revisionNumber}.pdf`);
             await uploadPdf(StockingPdf, `TMS SC ${clientId} - ${selectedDate} - ${revisionNumber}.pdf`);
-            const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/tile/save", {
+            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/tile/save", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -1465,7 +1465,7 @@ const DesignTool = () => {
             return;
         }
         try {
-            const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+            const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
             if (!clientResponse.ok) {
                 throw new Error("Failed to fetch calculations from the backend");
             }
@@ -1535,7 +1535,7 @@ const DesignTool = () => {
                     })),
                 })),
             };
-            const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/tile/save", {
+            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/tile/save", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -1752,7 +1752,7 @@ const DesignTool = () => {
     useEffect(() => {
         const fetchTiles = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuilderDash/api/tiles/all/data');
+                const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tiles/all/data');
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -1849,7 +1849,7 @@ const DesignTool = () => {
         const clientId = clientSNo || 0;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -2072,7 +2072,7 @@ const DesignTool = () => {
         pdf.addFont("ArialNovaCond.ttf", "ArialNovaCond", "normal");
         const getRevisionNumber = async (clientName) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch revision data");
                 }
@@ -2231,7 +2231,7 @@ const DesignTool = () => {
         const clientId = clientSNo || 0;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -2424,7 +2424,7 @@ const DesignTool = () => {
         const clientId = clientSNo || 0;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -3110,7 +3110,7 @@ const DesignTool = () => {
         const fileLabel = selectedFile && selectedFile.label ? selectedFile.label : `${selectedDate}`;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -3125,7 +3125,7 @@ const DesignTool = () => {
         };
         const getIncrement = async (fileLabel) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -3138,7 +3138,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -3378,7 +3378,7 @@ const DesignTool = () => {
         const fileLabel = selectedFile && selectedFile.label ? selectedFile.label : `${selectedDate}`;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -3393,7 +3393,7 @@ const DesignTool = () => {
         };
         const getIncrement = async (fileLabel) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -3406,7 +3406,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -3709,7 +3709,7 @@ const DesignTool = () => {
         const fileLabel = selectedFile && selectedFile.label ? selectedFile.label : `${selectedDate}`;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -3725,7 +3725,7 @@ const DesignTool = () => {
         const getIncrement = async (fileLabel) => {
             try {
 
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -3738,7 +3738,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -3929,7 +3929,7 @@ const DesignTool = () => {
         const fileLabel = selectedFile && selectedFile.label ? selectedFile.label : `${selectedDate}`;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -3945,7 +3945,7 @@ const DesignTool = () => {
         const getIncrement = async (fileLabel) => {
             try {
 
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -3958,7 +3958,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -4179,7 +4179,7 @@ const DesignTool = () => {
         const fileLabel = selectedFile && selectedFile.label ? selectedFile.label : `${selectedDate}`;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -4194,7 +4194,7 @@ const DesignTool = () => {
         };
         const getIncrement = async (fileLabel) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -4207,7 +4207,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -4412,7 +4412,7 @@ const DesignTool = () => {
         const fileLabel = selectedFile && selectedFile.label ? selectedFile.label : `${selectedDate}`;
         const getRevisionNumber = async (clientName) => {
             try {
-                const clientResponse = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/all`);
+                const clientResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/all`);
                 if (!clientResponse.ok) {
                     throw new Error("Failed to fetch calculations from the backend");
                 }
@@ -4427,7 +4427,7 @@ const DesignTool = () => {
         };
         const getIncrement = async (fileLabel) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -4440,7 +4440,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -4653,7 +4653,7 @@ const DesignTool = () => {
     };
     const getRevisionNumber = async (clientName) => {
         try {
-            const clientResponse = await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/all');
+            const clientResponse = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/all');
             if (!clientResponse.ok) {
                 throw new Error("Failed to fetch calculations from the backend");
             }
@@ -4804,7 +4804,7 @@ const DesignTool = () => {
         const fileLabel = selectedFile && selectedFile.label ? selectedFile.label : `${selectedDate}`;
         const getIncrement = async (fileLabel) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -4817,7 +4817,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

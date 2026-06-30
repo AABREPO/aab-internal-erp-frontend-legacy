@@ -10,7 +10,7 @@ import {
   buildEditPaymentModalDataFromWeeklyBill,
 } from './advancePortalWeeklyPaymentBill';
 
-const TOOLS_API_BASE = 'https://backendaab.in/aabuildersDash';
+const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
 const STAFF_ADVANCE_SOURCE = 'Staff Portal';
 
 const normalizeWeeklyBillNullableId = (value) => {

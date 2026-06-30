@@ -1,6 +1,6 @@
 import { isPaymentModeRequiringBankRegisterLog } from './bankRegisterLogBeforeWeeklyBill';
 
-export const EXPENSES_WEEKLY_BILLS_API_BASE = 'https://backendaab.in/aabuildersDash';
+export const EXPENSES_WEEKLY_BILLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
 
 export const resolveWeeklyBillExpensesEntryId = (bill) => {
   const id = bill?.expenses_entry_id ?? bill?.expensesEntryId;
@@ -376,7 +376,7 @@ export const syncWeeklyExpensesForExpensesEntryEdit = async (
   }
 };
 
-const EXPENSES_FORM_API_BASE = 'https://backendaab.in/aabuilderDash';
+const EXPENSES_FORM_API_BASE = 'https://backendaab.in/demoAabuilderDash';
 
 export const resolveWeeklyExpenseExpensesEntryId = (row) => {
   const id = row?.expenses_entry_id ?? row?.expensesEntryId;

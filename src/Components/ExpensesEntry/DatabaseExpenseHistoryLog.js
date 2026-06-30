@@ -11,9 +11,9 @@ import {
     useEdbcExpandedCells,
 } from './databaseExpensesSharedColumns';
 
-const GET_FORM_URL = 'https://backendaab.in/aabuilderDash/expenses_form/get_form';
+const GET_FORM_URL = 'https://backendaab.in/demoAabuilderDash/expenses_form/get_form';
 /** Bulk audit log — single response (see ExpensesController GET /expenses_form/get/full_history). */
-const FULL_HISTORY_URL = 'https://backendaab.in/aabuilderDash/expenses_form/get/full_history';
+const FULL_HISTORY_URL = 'https://backendaab.in/demoAabuilderDash/expenses_form/get/full_history';
 
 const formatLogTimestamp = (dateString) => {
     if (!dateString) return '';
@@ -350,23 +350,23 @@ const DatabaseExpenseHistoryLog = ({ username: _username, userRoles: _userRoles 
             ] = await Promise.all([
                 axios.get(FULL_HISTORY_URL),
                 axios.get(GET_FORM_URL, { params: formParams }),
-                fetchLookupOptions('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll', (item) => ({
+                fetchLookupOptions('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll', (item) => ({
                     id: item.id,
                     label: item.vendorName,
                 })),
-                fetchLookupOptions('https://backendaab.in/aabuilderDash/api/contractor_Names/getAll', (item) => ({
+                fetchLookupOptions('https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll', (item) => ({
                     id: item.id,
                     label: item.contractorName,
                 })),
-                fetchLookupOptions('https://backendaab.in/aabuildersDash/api/employee_details/getAll', (item) => ({
+                fetchLookupOptions('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll', (item) => ({
                     id: item.id,
                     label: item.employee_name,
                 })),
-                fetchLookupOptions('https://backendaab.in/aabuildersDash/api/labours-details/getAll', (item) => ({
+                fetchLookupOptions('https://backendaab.in/demoAabuildersDash/api/labours-details/getAll', (item) => ({
                     id: item.id,
                     label: item.labour_name,
                 })),
-                fetchLookupOptions('https://backendaab.in/aabuildersDash/api/branch/getAll', (item) => ({
+                fetchLookupOptions('https://backendaab.in/demoAabuildersDash/api/branch/getAll', (item) => ({
                     id: item.id,
                     label: item.branch,
                 })),

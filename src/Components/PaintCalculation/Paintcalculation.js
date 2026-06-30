@@ -985,7 +985,7 @@ const DesignTool = () => {
     };
     const fetchLatestEno = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/paint_calculation/all/paints');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/paint_calculation/all/paints');
             if (!response.ok) {
                 throw new Error('Failed to fetch ENo');
             }
@@ -1061,7 +1061,7 @@ const DesignTool = () => {
     }, []);
     const fetchPaintType = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/paint_type/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/paint_type/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setPaintItems(data);
@@ -1081,7 +1081,7 @@ const DesignTool = () => {
     }, []);
     const fectOthersTable = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/paintData/allExtra');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/paintData/allExtra');
             if (response.ok) {
                 const data = await response.json();
                 setOtherTable(data);
@@ -1309,7 +1309,7 @@ const DesignTool = () => {
     };
     const fetchPaintData = useCallback(async () => {
         try {
-            const response = await fetch("https://backendaab.in/aabuilderDash/api/paints/all/data");
+            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paints/all/data");
             if (!response.ok) {
                 throw new Error(`HTTP error! Status: ${response.status}`);
             }
@@ -1355,7 +1355,7 @@ const DesignTool = () => {
 
     const fetchCalculation = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/all');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/all');
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
@@ -1369,14 +1369,14 @@ const DesignTool = () => {
         fetchPaintData();
     }, [fetchPaintData]);
     useEffect(() => {
-        fetch("https://backendaab.in/aabuilderDash/api/paint/variant/get/all")
+        fetch("https://backendaab.in/demoAabuilderDash/api/paint/variant/get/all")
             .then((response) => response.json())
             .then((data) => setPaintVariants(data))
             .catch((error) => console.error("Error fetching paint variants:", error));
     }, []);
     const fetchCalculations = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/paint_calculation/all/paints');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/paint_calculation/all/paints');
 
             if (!response.ok) {
                 throw new Error('Network response was not ok');
@@ -1402,7 +1402,7 @@ const DesignTool = () => {
     }, []);
     const fetchPaints = async () => {
         try {
-            const response = await fetch("https://backendaab.in/aabuilderDash/api/paints/all/data");
+            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paints/all/data");
             const data = await response.json();
             setPaints(data);
         } catch (error) {
@@ -1486,7 +1486,7 @@ const DesignTool = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/areaName");
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/areaName");
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -1502,7 +1502,7 @@ const DesignTool = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/floorName');
+                const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/floorName');
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -1592,7 +1592,7 @@ const DesignTool = () => {
     }, []);
     const getRevisionNumber = async (clientName) => {
         try {
-            const clientResponse = await fetch("https://backendaab.in/aabuilderDash/api/paint_calculation/all/paints");
+            const clientResponse = await fetch("https://backendaab.in/demoAabuilderDash/api/paint_calculation/all/paints");
             if (!clientResponse.ok) {
                 throw new Error("Failed to fetch calculations from the backend");
             }
@@ -2871,7 +2871,7 @@ const DesignTool = () => {
             const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
             const getIncrement = async (fileLabel) => {
                 try {
-                    const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                    const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                     if (!response.ok) {
                         throw new Error("Failed to fetch increment from the backend");
                     }
@@ -2884,7 +2884,7 @@ const DesignTool = () => {
             };
             const postIncrement = async (fileLabel, fileType) => {
                 try {
-                    await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                    await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -3054,7 +3054,7 @@ const DesignTool = () => {
             const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
             const getIncrement = async (fileLabel) => {
                 try {
-                    const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                    const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                     if (!response.ok) {
                         throw new Error("Failed to fetch increment from the backend");
                     }
@@ -3067,7 +3067,7 @@ const DesignTool = () => {
             };
             const postIncrement = async (fileLabel, fileType) => {
                 try {
-                    await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                    await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -3238,7 +3238,7 @@ const DesignTool = () => {
             const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
             const getIncrement = async (fileLabel) => {
                 try {
-                    const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                    const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                     if (!response.ok) {
                         throw new Error("Failed to fetch increment from the backend");
                     }
@@ -3251,7 +3251,7 @@ const DesignTool = () => {
             };
             const postIncrement = async (fileLabel, fileType) => {
                 try {
-                    await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                    await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -3523,7 +3523,7 @@ const DesignTool = () => {
             const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
             const getIncrement = async (fileLabel) => {
                 try {
-                    const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                    const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                     if (!response.ok) {
                         throw new Error("Failed to fetch increment from the backend");
                     }
@@ -3536,7 +3536,7 @@ const DesignTool = () => {
             };
             const postIncrement = async (fileLabel, fileType) => {
                 try {
-                    await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                    await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -3739,7 +3739,7 @@ const DesignTool = () => {
             const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
             const getIncrement = async (fileLabel) => {
                 try {
-                    const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                    const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                     if (!response.ok) {
                         throw new Error("Failed to fetch increment from the backend");
                     }
@@ -3752,7 +3752,7 @@ const DesignTool = () => {
             };
             const postIncrement = async (fileLabel, fileType) => {
                 try {
-                    await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                    await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -3919,7 +3919,7 @@ const DesignTool = () => {
             const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
             const getIncrement = async (fileLabel) => {
                 try {
-                    const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                    const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                     if (!response.ok) {
                         throw new Error("Failed to fetch increment from the backend");
                     }
@@ -3932,7 +3932,7 @@ const DesignTool = () => {
             };
             const postIncrement = async (fileLabel, fileType) => {
                 try {
-                    await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                    await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -4141,7 +4141,7 @@ const DesignTool = () => {
             const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
             const getIncrement = async (fileLabel) => {
                 try {
-                    const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                    const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                     if (!response.ok) {
                         throw new Error("Failed to fetch increment from the backend");
                     }
@@ -4154,7 +4154,7 @@ const DesignTool = () => {
             };
             const postIncrement = async (fileLabel, fileType) => {
                 try {
-                    await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                    await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -4329,7 +4329,7 @@ const DesignTool = () => {
             const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
             const getIncrement = async (fileLabel) => {
                 try {
-                    const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                    const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                     if (!response.ok) {
                         throw new Error("Failed to fetch increment from the backend");
                     }
@@ -4342,7 +4342,7 @@ const DesignTool = () => {
             };
             const postIncrement = async (fileLabel, fileType) => {
                 try {
-                    await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                    await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -4691,7 +4691,7 @@ const DesignTool = () => {
             const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
             const getIncrement = async (fileLabel) => {
                 try {
-                    const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                    const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                     if (!response.ok) {
                         throw new Error("Failed to fetch increment from the backend");
                     }
@@ -4704,7 +4704,7 @@ const DesignTool = () => {
             };
             const postIncrement = async (fileLabel, fileType) => {
                 try {
-                    await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                    await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -4980,7 +4980,7 @@ const DesignTool = () => {
             const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
             const getIncrement = async (fileLabel) => {
                 try {
-                    const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                    const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                     if (!response.ok) {
                         throw new Error("Failed to fetch increment from the backend");
                     }
@@ -4993,7 +4993,7 @@ const DesignTool = () => {
             };
             const postIncrement = async (fileLabel, fileType) => {
                 try {
-                    await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                    await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -5158,7 +5158,7 @@ const DesignTool = () => {
             const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
             const getIncrement = async (fileLabel) => {
                 try {
-                    const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                    const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                     if (!response.ok) {
                         throw new Error("Failed to fetch increment from the backend");
                     }
@@ -5171,7 +5171,7 @@ const DesignTool = () => {
             };
             const postIncrement = async (fileLabel, fileType) => {
                 try {
-                    await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                    await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -5368,7 +5368,7 @@ const DesignTool = () => {
             const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
             const getIncrement = async (fileLabel) => {
                 try {
-                    const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                    const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                     if (!response.ok) {
                         throw new Error("Failed to fetch increment from the backend");
                     }
@@ -5381,7 +5381,7 @@ const DesignTool = () => {
             };
             const postIncrement = async (fileLabel, fileType) => {
                 try {
-                    await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                    await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -5544,7 +5544,7 @@ const DesignTool = () => {
             const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
             const getIncrement = async (fileLabel) => {
                 try {
-                    const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                    const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                     if (!response.ok) {
                         throw new Error("Failed to fetch increment from the backend");
                     }
@@ -5557,7 +5557,7 @@ const DesignTool = () => {
             };
             const postIncrement = async (fileLabel, fileType) => {
                 try {
-                    await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                    await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -5744,7 +5744,7 @@ const DesignTool = () => {
             const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
             const getIncrement = async (fileLabel) => {
                 try {
-                    const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                    const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                     if (!response.ok) {
                         throw new Error("Failed to fetch increment from the backend");
                     }
@@ -5757,7 +5757,7 @@ const DesignTool = () => {
             };
             const postIncrement = async (fileLabel, fileType) => {
                 try {
-                    await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                    await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -6029,7 +6029,7 @@ const DesignTool = () => {
             const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
             const getIncrement = async (fileLabel) => {
                 try {
-                    const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                    const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                     if (!response.ok) {
                         throw new Error("Failed to fetch increment from the backend");
                     }
@@ -6042,7 +6042,7 @@ const DesignTool = () => {
             };
             const postIncrement = async (fileLabel, fileType) => {
                 try {
-                    await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                    await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -6349,7 +6349,7 @@ const DesignTool = () => {
         const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
         const getIncrement = async (fileLabel) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -6362,7 +6362,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -6596,7 +6596,7 @@ const DesignTool = () => {
         const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
         const getIncrement = async (fileLabel) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -6609,7 +6609,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -6843,7 +6843,7 @@ const DesignTool = () => {
         const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
         const getIncrement = async (fileLabel) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -6856,7 +6856,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -7243,7 +7243,7 @@ const DesignTool = () => {
     useEffect(() => {
         const fetchSites = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -7488,7 +7488,7 @@ const DesignTool = () => {
             return;
         }
         try {
-            const clientResponse = await fetch("https://backendaab.in/aabuilderDash/api/paint_calculation/all/paints");
+            const clientResponse = await fetch("https://backendaab.in/demoAabuilderDash/api/paint_calculation/all/paints");
             if (!clientResponse.ok) {
                 throw new Error("Failed to fetch calculations from the backend");
             }
@@ -7534,7 +7534,7 @@ const DesignTool = () => {
                 });
                 return paintDataArray;
             };
-            const responses = await fetch('https://backendaab.in/aabuilderDash/api/ceiling_coat/save', {
+            const responses = await fetch('https://backendaab.in/demoAabuilderDash/api/ceiling_coat/save', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -7545,7 +7545,7 @@ const DesignTool = () => {
                 throw new Error("Failed to upload CeilingCoat: ");
             }
             const preparedData = preparePaintDataForBackend(tilesData);
-            const dataResponse = await fetch('https://backendaab.in/aabuilderDash/api/paintData/extra', {
+            const dataResponse = await fetch('https://backendaab.in/demoAabuilderDash/api/paintData/extra', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -7591,7 +7591,7 @@ const DesignTool = () => {
                 singleFormData.append("files", pdf, name);
                 singleFormData.append("folder", "FileUpload / Paint_Calculation");
                 singleFormData.append("fileName", name);
-                const pdfUploadResponse = await fetch(`https://backendaab.in/aabuildersDash/api/files/upload`, {
+                const pdfUploadResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/files/upload`, {
                     method: "POST",
                     body: singleFormData,
                 });
@@ -7603,7 +7603,7 @@ const DesignTool = () => {
             await uploadPdf(summaryPdf, `PMS OC ${clientId} - ${selectedDate} - ${revisionNumber}.pdf`);
             await uploadPdf(StockingPdf, `PMS SC ${clientId} - ${selectedDate} - ${revisionNumber}.pdf`);
             await uploadPdf(customerCopyPdf, `PMS CC ${clientId} - ${selectedDate} - ${revisionNumber}.pdf`);
-            const response = await fetch("https://backendaab.in/aabuilderDash/api/paint_calculation/save/paints", {
+            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paint_calculation/save/paints", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -8334,7 +8334,7 @@ const DesignTool = () => {
     };
     useEffect(() => {
         const fetchCeilingCoats = async () => {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/ceiling_coat/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/ceiling_coat/getAll');
             const data = await response.json();
             setCeilingCoatData(data);
         };
@@ -9559,7 +9559,7 @@ const DesignTool = () => {
         const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
         const getIncrement = async (fileLabel) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -9572,7 +9572,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -9865,7 +9865,7 @@ const DesignTool = () => {
         const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
         const getIncrement = async (fileLabel) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -9878,7 +9878,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -10154,7 +10154,7 @@ const DesignTool = () => {
         const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
         const getIncrement = async (fileLabel) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -10167,7 +10167,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -10549,7 +10549,7 @@ const DesignTool = () => {
         const fileLabel = paintSelectedFile && paintSelectedFile.label ? paintSelectedFile.label : `${selectedDate}`;
         const getIncrement = async (fileLabel) => {
             try {
-                const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
+                const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/pdf/increment?fileLabel=${encodeURIComponent(fileLabel)}&fileType=${encodeURIComponent(fileType)}&clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch increment from the backend");
                 }
@@ -10562,7 +10562,7 @@ const DesignTool = () => {
         };
         const postIncrement = async (fileLabel, fileType) => {
             try {
-                await fetch('https://backendaab.in/aabuilderDash/api/paint/pdf/updateIncrement', {
+                await fetch('https://backendaab.in/demoAabuilderDash/api/paint/pdf/updateIncrement', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

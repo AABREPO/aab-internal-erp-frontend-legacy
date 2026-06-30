@@ -67,7 +67,7 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
 
   const fetchPoItemName = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_itemNames/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoItemName(data);
@@ -89,7 +89,7 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
 
   const fetchPoModel = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_model/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoModel(data);
@@ -111,7 +111,7 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
 
   const fetchPoBrand = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_brand/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_brand/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoBrand(data);
@@ -133,7 +133,7 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
 
   const fetchPoType = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_type/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoType(data);
@@ -150,7 +150,7 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
   useEffect(() => {
     const fetchPoCategory = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll');
         if (response.ok) {
           const data = await response.json();
           const options = (data || []).map(item => ({
@@ -368,7 +368,7 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
       return;
     }
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/save', {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -378,7 +378,7 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
       if (response.ok) {
         console.log('Category saved successfully!');
         // Reload categories from API
-        const fetchResponse = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
+        const fetchResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll');
         if (fetchResponse.ok) {
           const data = await fetchResponse.json();
           const options = (data || []).map(item => ({
@@ -476,7 +476,7 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
     };
 
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/save', {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_itemNames/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -517,7 +517,7 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
     };
 
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/save', {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_model/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -559,7 +559,7 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
     };
 
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_brand/save', {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_brand/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -601,7 +601,7 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
     };
 
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/save', {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_type/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

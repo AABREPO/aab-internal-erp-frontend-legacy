@@ -198,7 +198,7 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
     useEffect(() => {
         const fetchBranches = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuildersDash/api/branch/getAll', {
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/branch/getAll', {
                     method: 'GET',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
@@ -219,7 +219,7 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
     }, []);
     const fetchProjects = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
                 const ownProjects = Array.isArray(data)
@@ -260,7 +260,7 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
     useEffect(() => {
         const fetchUserRoles = async () => {
             try {
-                const response = await axios.get("https://backendaab.in/aabuilderDash/api/user_roles/all");
+                const response = await axios.get("https://backendaab.in/demoAabuilderDash/api/user_roles/all");
                 const allRoles = response.data;
                 const userRoleNames = userRoles.map(r => r.roles);
                 const matchedRoles = allRoles.filter(role =>
@@ -321,7 +321,7 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
     useEffect(() => {
         const fetchAccountDetails = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
                 if (response.ok) {
                     const data = await response.json();
                     setAccountDetails(data);
@@ -556,7 +556,7 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
 
     const loadRentForms = useCallback(() => {
         axios
-            .get('https://backendaab.in/aabuildersDash/api/rental_forms/getAll')
+            .get('https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll')
             .then((response) => applyRentFormsResponse(response.data))
             .catch((error) => {
                 console.error('Error fetching expenses:', error);
@@ -675,7 +675,7 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
     }, [projects]);
     const fetchTenants = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
@@ -791,7 +791,7 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
     };
     const fetchAuditDetails = async (rentFormId) => {
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/rental_forms/audit/${rentFormId}`);
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/rental_forms/audit/${rentFormId}`);
             const data = await response.json();
             setAudits(data);
             console.log(data);
@@ -854,7 +854,7 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
         };
         setIsSubmitting(true);
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/rental_forms/update/${editId}`, {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/rental_forms/update/${editId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -942,7 +942,7 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
                 editedBy: username,
             };
 
-            const rentalUpdateUrl = `https://backendaab.in/aabuildersDash/api/rental_forms/update/${editId}`;
+            const rentalUpdateUrl = `https://backendaab.in/demoAabuildersDash/api/rental_forms/update/${editId}`;
             if (isPaymentModeRequiringBankRegisterLog(paymentModalData.paymentMode)) {
                 await postBankRegisterLogSave(
                     bankRegisterLogSaveUrlMatchingRequest(rentalUpdateUrl),
@@ -1027,7 +1027,7 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
         const formData = new FormData();
         formData.append("file", selectedFile);
         try {
-            const response = await axios.post("https://backendaab.in/aabuildersDash/api/rental_forms/upload_old_data", formData, {
+            const response = await axios.post("https://backendaab.in/demoAabuildersDash/api/rental_forms/upload_old_data", formData, {
                 headers: {
                     "Content-Type": "multipart/form-data",
                 },
@@ -1150,7 +1150,7 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
         if (window.confirm('Are you sure you want to delete this Rent?')) {
             try {
                 const response = await fetch(
-                    `https://backendaab.in/aabuildersDash/api/rental_forms/delete/${id}?editedBy=${encodeURIComponent(username)}`,
+                    `https://backendaab.in/demoAabuildersDash/api/rental_forms/delete/${id}?editedBy=${encodeURIComponent(username)}`,
                     {
                         method: 'POST',
                     }

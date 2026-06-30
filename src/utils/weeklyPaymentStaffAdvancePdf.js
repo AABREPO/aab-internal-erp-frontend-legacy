@@ -68,7 +68,7 @@ const WAGE_ADVANCE_PURPOSE = 'wage advance';
 
 export async function fetchStaffPurposeOptions() {
     try {
-        const res = await fetch('https://backendaab.in/aabuildersDash/api/purposes/getAll');
+        const res = await fetch('https://backendaab.in/demoAabuildersDash/api/purposes/getAll');
         if (!res.ok) return [];
         const data = await res.json();
         return (Array.isArray(data) ? data : []).map((item) => ({

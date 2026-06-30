@@ -5,7 +5,7 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
-const PROFESSION_EXPENSES_ENDPOINT = 'https://backendaab.in/aabuilderDash/expenses_form/utility/profession';
+const PROFESSION_EXPENSES_ENDPOINT = 'https://backendaab.in/demoAabuilderDash/expenses_form/utility/profession';
 
 const ProfessionDatabase = ({ username, userRoles = [] }) => {
     const [professionData, setProfessionData] = useState([]);

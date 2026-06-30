@@ -37,7 +37,7 @@ export const isChequePaymentMode = (paymentMode) =>
  * Bank log lives on aabuildersDash; copy query params (e.g. branchId) from the main request URL.
  */
 export function bankRegisterLogSaveUrlMatchingRequest(referenceAbsoluteUrl) {
-  const base = 'https://backendaab.in/aabuildersDash/api/bank_register_log/save';
+  const base = 'https://backendaab.in/demoAabuildersDash/api/bank_register_log/save';
   try {
     const ref = new URL(referenceAbsoluteUrl);
     const out = new URL(base);

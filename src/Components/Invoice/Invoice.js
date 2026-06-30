@@ -326,7 +326,7 @@ function InvoiceTable() {
   useEffect(() => {
     async function fetchAllInvoices() {
       try {
-        const res = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
+        const res = await axios.get("https://backendaab.in/demoAabuildersDash/api/invoices/all-with-items");
         // res.data is an array of objects with shape {invoice: {...}, items: [...]}
         setAllInvoices(res.data);
       } catch (error) {
@@ -338,7 +338,7 @@ function InvoiceTable() {
   useEffect(() => {
     const fetchProjectNames = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -479,7 +479,7 @@ function InvoiceTable() {
 
     try {
       const res = await axios.get(
-        `https://backendaab.in/aabuildersDash/api/invoices/versions/${encodeURIComponent(baseInvoiceNumber)}`
+        `https://backendaab.in/demoAabuildersDash/api/invoices/versions/${encodeURIComponent(baseInvoiceNumber)}`
       );
 
       const data = Array.isArray(res.data) ? res.data : [];
@@ -542,7 +542,7 @@ function InvoiceTable() {
 
     // Fetch and display the invoice data for the last saved invoice
     axios
-      .get(`https://backendaab.in/aabuildersDash/api/invoices/${encodeURIComponent(lastInvoiceNumber)}`)
+      .get(`https://backendaab.in/demoAabuildersDash/api/invoices/${encodeURIComponent(lastInvoiceNumber)}`)
       .then(res => {
         const { invoice, items } = res.data || {};
         if (invoice) {
@@ -614,7 +614,7 @@ function InvoiceTable() {
     refreshInvoiceVersions(baseInvNum);
 
     axios
-      .get(`https://backendaab.in/aabuildersDash/api/invoices/${encodeURIComponent(invoiceNumber)}`)
+      .get(`https://backendaab.in/demoAabuildersDash/api/invoices/${encodeURIComponent(invoiceNumber)}`)
       .then(res => {
         if (!active) return;
         const { invoice, items } = res.data || {};
@@ -785,7 +785,7 @@ function InvoiceTable() {
   useEffect(() => {
     async function initializeInvoices() {
       try {
-        const res = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
+        const res = await axios.get("https://backendaab.in/demoAabuildersDash/api/invoices/all-with-items");
         const invoices = res.data || [];
         setAllInvoices(invoices);
         setInvoiceVersions([]);
@@ -863,7 +863,7 @@ function InvoiceTable() {
         String(invoiceData.invoice.invoice_number).includes(" D");
       if (hasExistingInvoice) {
         const existingRes = await axios.get(
-          `https://backendaab.in/aabuildersDash/api/invoices/with-items/${invoiceData.invoice.invoice_id}`
+          `https://backendaab.in/demoAabuildersDash/api/invoices/with-items/${invoiceData.invoice.invoice_id}`
         );
         const existingInvoice = existingRes.data;
         const oldItems = Array.isArray(existingInvoice.items) ? existingInvoice.items : [];
@@ -881,13 +881,13 @@ function InvoiceTable() {
         ];
         const mergedPayload = { ...invoiceData, items: mergedItems };
         res = await axios.put(
-          "https://backendaab.in/aabuildersDash/api/invoices/update-keep-existing",
+          "https://backendaab.in/demoAabuildersDash/api/invoices/update-keep-existing",
           mergedPayload,
           { headers: { "Content-Type": "application/json" } }
         );
       } else {
         res = await axios.post(
-          "https://backendaab.in/aabuildersDash/api/invoices/save-online",
+          "https://backendaab.in/demoAabuildersDash/api/invoices/save-online",
           invoiceData,
           { headers: { "Content-Type": "application/json" } }
         );
@@ -930,7 +930,7 @@ function InvoiceTable() {
       localStorage.removeItem("invoiceDate");
       localStorage.removeItem("invoiceAmountPaid");
       try {
-        const resAll = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
+        const resAll = await axios.get("https://backendaab.in/demoAabuildersDash/api/invoices/all-with-items");
         const allInvoicesData = Array.isArray(resAll.data) ? resAll.data : [];
         setAllInvoices(allInvoicesData);
       } catch (err) {
@@ -948,7 +948,7 @@ function InvoiceTable() {
     }
     try {
       await axios.post(
-        'https://backendaab.in/aabuildersDash/api/invoices/finalize',
+        'https://backendaab.in/demoAabuildersDash/api/invoices/finalize',
         null,
         {
           params: { invoiceNumber }
@@ -1012,7 +1012,7 @@ function InvoiceTable() {
     };
     try {
       const response = await axios.post(
-        "https://backendaab.in/aabuildersDash/api/invoices/make-copy",
+        "https://backendaab.in/demoAabuildersDash/api/invoices/make-copy",
         currentInvoicePayload,
         { headers: { "Content-Type": "application/json" } }
       );
@@ -1056,7 +1056,7 @@ function InvoiceTable() {
     if (!window.confirm(confirmMessage)) return;
     if (!Array.isArray(allInvoices) || allInvoices.length === 0) {
       try {
-        const res = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
+        const res = await axios.get("https://backendaab.in/demoAabuildersDash/api/invoices/all-with-items");
         setAllInvoices(res.data || []);
       } catch (err) {
         alert("Failed to refresh invoices, cannot clone.");
@@ -1084,7 +1084,7 @@ function InvoiceTable() {
         newProjectId: Number(cloneProjectName.value),
         newProjectName: cloneProjectName.label,
       };
-      const response = await axios.post("https://backendaab.in/aabuildersDash/api/invoices/clone", clonePayload);
+      const response = await axios.post("https://backendaab.in/demoAabuildersDash/api/invoices/clone", clonePayload);
       const clonedInvoice = response.data;
       setSelectedProjectName(cloneProjectName);
       setProjectType(cloneProjectName.project_type || "");

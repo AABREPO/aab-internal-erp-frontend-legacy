@@ -5,7 +5,7 @@ import {
 } from './bankRegisterLogBeforeWeeklyBill';
 import { fetchWeeklyPaymentBillsByExpensesEntryId } from './expensesEntryWeeklyPaymentBill';
 
-const TOOLS_API_BASE = 'https://backendaab.in/aabuildersDash';
+const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
 
 /** Parse /api/files/upload JSON — supports urls[], url, and legacy shapes (same as AdvancePortal.js). */
 export const resolveFilesUploadResponseUrl = (uploadResult) => {
@@ -496,7 +496,7 @@ export const deleteRelatedWeeklyPaymentBillsForAdvancePortal = async (advancePor
   return { deletedCount, failedCount: deleteResults.length - deletedCount };
 };
 
-const EXPENSES_API_BASE = 'https://backendaab.in/aabuilderDash';
+const EXPENSES_API_BASE = 'https://backendaab.in/demoAabuilderDash';
 
 export const resolveAdvancePortalExpensesEntryId = (record) => {
   const id = record?.expenses_entry_id ?? record?.expensesEntryId;

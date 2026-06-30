@@ -112,7 +112,7 @@ const Incoming = ({ username, userRoles = [] }) => {
     }, []);
     const fetchPoModel = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_model/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setPoModel(data);
@@ -133,7 +133,7 @@ const Incoming = ({ username, userRoles = [] }) => {
     }, []);
     const fetchPoType = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_type/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setPoType(data);
@@ -225,7 +225,7 @@ const Incoming = ({ username, userRoles = [] }) => {
     }, []);
     const fetchVendorNames = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll');
             if (response.ok) {
                 const data = await response.json();
                 const formattedData = data.map(item => ({
@@ -244,7 +244,7 @@ const Incoming = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchSites = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -272,7 +272,7 @@ const Incoming = ({ username, userRoles = [] }) => {
     }, []);
     const fetchSiteIncharge = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/site_incharge/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/site_incharge/getAll');
             if (response.ok) {
                 const data = await response.json();
                 const formatted = data.map((item) => ({
@@ -293,7 +293,7 @@ const Incoming = ({ username, userRoles = [] }) => {
     }, [selectedVendorName]);
     const fetchPoOrders = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/purchase_orders/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/purchase_orders/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setAllPurchaseOrders(data);
@@ -331,7 +331,7 @@ const Incoming = ({ username, userRoles = [] }) => {
     }, []);
     const fetchPoCategory = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll');
             if (response.ok) {
                 const data = await response.json();
                 const options = data.map(item => ({
@@ -351,7 +351,7 @@ const Incoming = ({ username, userRoles = [] }) => {
     }, []);
     const fetchPoItemName = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_itemNames/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setPoItemName(data);
@@ -690,7 +690,7 @@ const Incoming = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchSavedLocations = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuildersDash/api/stocking_location/all", {
+                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/stocking_location/all", {
                     method: "GET",
                     credentials: "include",
                     headers: { "Content-Type": "application/json" }
@@ -708,7 +708,7 @@ const Incoming = ({ username, userRoles = [] }) => {
     }, []);
     const handleSubmit = async () => {
         try {
-            const response = await fetch("https://backendaab.in/aabuildersDash/api/stocking_location/save", {
+            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/stocking_location/save", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(selectedOptions)

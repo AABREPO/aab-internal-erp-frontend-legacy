@@ -12,9 +12,9 @@ const vendorCache = { data: null };
 const projectCache = { data: null };
 const siteEngineersCache = { data: null };
 const supportStaffCache = { data: null };
-const basePurchaseOrdersUrl = 'https://backendaab.in/aabuildersDash/api/purchase_orders';
-const GRN_IMAGES_BASE_URL = 'https://backendaab.in/aabuildersDash/api/grn-images';
-const baseLookupsUrl = 'https://backendaab.in/aabuildersDash/api';
+const basePurchaseOrdersUrl = 'https://backendaab.in/demoAabuildersDash/api/purchase_orders';
+const GRN_IMAGES_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/grn-images';
+const baseLookupsUrl = 'https://backendaab.in/demoAabuildersDash/api';
 
 const findNameById = (dataArray, id, fieldNames = []) => {
   if (!id || !Array.isArray(dataArray)) return '';
@@ -255,7 +255,7 @@ const Verify = ({ user, onLogout }) => {
   useEffect(() => {
     const fetchVendorNames = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll', {
+        const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll', {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -323,7 +323,7 @@ const Verify = ({ user, onLogout }) => {
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/getAll', {
+        const response = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/getAll', {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -355,14 +355,14 @@ const Verify = ({ user, onLogout }) => {
     const fetchBothLists = async () => {
       try {
         const [employeeResponse, supportStaffResponse] = await Promise.all([
-          fetch('https://backendaab.in/aabuildersDash/api/employee_details/site_engineers', {
+          fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/site_engineers', {
             method: 'GET',
             credentials: 'include',
             headers: {
               'Content-Type': 'application/json'
             }
           }),
-          fetch('https://backendaab.in/aabuildersDash/api/support_staff/getAll', {
+          fetch('https://backendaab.in/demoAabuildersDash/api/support_staff/getAll', {
             method: 'GET',
             credentials: 'include',
             headers: {

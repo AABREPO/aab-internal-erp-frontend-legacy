@@ -381,7 +381,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
   useEffect(() => {
     const fetchVendors = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
+        const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll');
         if (response.ok) {
           const data = await response.json();
           setVendorData(data);
@@ -397,7 +397,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -419,7 +419,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
   useEffect(() => {
     const fetchPurchaseOrders = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/purchase_orders/getAll');
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/purchase_orders/getAll');
         if (response.ok) {
           const data = await response.json();
           setAllPurchaseOrders(data);
@@ -448,11 +448,11 @@ const IncomingTracker = ({ user, onTabChange }) => {
     const fetchPOData = async () => {
       try {
         const [itemNamesRes, brandsRes, modelsRes, typesRes, categoriesRes] = await Promise.all([
-          fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll'),
-          fetch('https://backendaab.in/aabuildersDash/api/po_brand/getAll'),
-          fetch('https://backendaab.in/aabuildersDash/api/po_model/getAll'),
-          fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll'),
-          fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll')
+          fetch('https://backendaab.in/demoAabuildersDash/api/po_itemNames/getAll'),
+          fetch('https://backendaab.in/demoAabuildersDash/api/po_brand/getAll'),
+          fetch('https://backendaab.in/demoAabuildersDash/api/po_model/getAll'),
+          fetch('https://backendaab.in/demoAabuildersDash/api/po_type/getAll'),
+          fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll')
         ]);
 
         if (itemNamesRes.ok) {
@@ -540,7 +540,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
     return null;
   };
   const getIncomingEndpointByStatus = (status) => {
-    const baseUrl = 'https://backendaab.in/aabuildersDash/api/inventory';
+    const baseUrl = 'https://backendaab.in/demoAabuildersDash/api/inventory';
     if (status === 'live' || status === 'closed') {
       const vendorId = resolveVendorIdForIncomingApi();
       if (vendorId !== null && vendorId !== undefined && String(vendorId).trim() !== '') {
@@ -794,7 +794,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
   // Function to close PO
   const closePO = async (recordId, purchaseNo, vendorId) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/inventory/close_po/${recordId}?poClosedStatus=true`, {
+      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/inventory/close_po/${recordId}?poClosedStatus=true`, {
         method: 'PUT',
         credentials: 'include',
         headers: {
@@ -809,7 +809,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
 
         if (canCreate) {
           try {
-            await fetch('https://backendaab.in/aabuildersDash/api/closed_po_records/save', {
+            await fetch('https://backendaab.in/demoAabuildersDash/api/closed_po_records/save', {
               method: 'POST',
               credentials: 'include',
               headers: {
@@ -1895,7 +1895,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   const closePromises = entriesToClose.map(async (entry) => {
                     const recordIdToClose = entry.id || entry._id;
                     if (recordIdToClose) {
-                      const response = await fetch(`https://backendaab.in/aabuildersDash/api/inventory/close_po/${recordIdToClose}?poClosedStatus=true`, {
+                      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/inventory/close_po/${recordIdToClose}?poClosedStatus=true`, {
                         method: 'PUT',
                         credentials: 'include',
                         headers: {
@@ -1911,7 +1911,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   if (purchaseNo) {
                     if (canCreate) {
                       try {
-                        await fetch('https://backendaab.in/aabuildersDash/api/closed_po_records/save', {
+                        await fetch('https://backendaab.in/demoAabuildersDash/api/closed_po_records/save', {
                           method: 'POST',
                           credentials: 'include',
                           headers: {

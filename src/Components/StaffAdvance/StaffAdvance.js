@@ -321,7 +321,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
     // Fetch employee details
     const fetchEmployeeDetails = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/employee_details/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -351,7 +351,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
   }, []);
   const fetchLaboursList = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/labours-details/getAll');
       if (response.ok) {
         const data = await response.json();
         const formattedData = data.map(item => ({
@@ -399,7 +399,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
   useEffect(() => {
     const fetchPurposeOptions = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/purposes/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/purposes/getAll", {
           method: "GET",
           headers: { "Content-Type": "application/json" }
         });
@@ -591,7 +591,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
   useEffect(() => {
     const fetchAccountDetails = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll', {
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll', {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -631,7 +631,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
   // Fetch all records and update table data state
   const fetchRecords = useCallback(async () => {
     try {
-      const res = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
+      const res = await fetch('https://backendaab.in/demoAabuildersDash/api/staff-advance/all');
       if (!res.ok) {
         console.warn('Staff advance API not available, using empty data');
         setTableData([]);
@@ -924,7 +924,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
           formData.append('files', selectedFile);
           formData.append('folder', 'FileUpload / Staff_Advances');
           formData.append('fileName', finalName);          
-          const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
+          const uploadResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/files/upload", {
             method: "POST",
             body: formData,
           });
@@ -941,7 +941,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
         }
       }
 
-      const resAll = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
+      const resAll = await fetch('https://backendaab.in/demoAabuildersDash/api/staff-advance/all');
       let allData = [];
       if (resAll.ok) {
         allData = await resAll.json();
@@ -977,7 +977,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
         payload.to_purpose_id = null;
         payload.amount = dataToSubmit.selectedType === 'Advance' ? parseFloat(dataToSubmit.amountGivenInput) || 0 : 0;
       }
-      const staffAdvanceSaveUrl = withBranchUrl('https://backendaab.in/aabuildersDash/api/staff-advance/save');
+      const staffAdvanceSaveUrl = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/staff-advance/save');
       if (paymentDetails && isPaymentModeRequiringBankRegisterLog(paymentDetails.paymentMode)) {
         await postBankRegisterLogSave(
           bankRegisterLogSaveUrlMatchingRequest(staffAdvanceSaveUrl),
@@ -1035,7 +1035,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
           source: "Staff Portal",
         };
         try {
-          const weeklyBillSaveUrl = withBranchUrl("https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save");
+          const weeklyBillSaveUrl = withBranchUrl("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save");
           const weeklyPaymentBillResponse = await axios.post(
             weeklyBillSaveUrl,
             weeklyPaymentBillPayload,
@@ -1802,7 +1802,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
         updatePayload.to_purpose_id = editFormData.transferPurpose?.id;
         updatePayload.amount = editFormData.transferAmount;
       }
-      const res = await fetch(withBranchUrl(`https://backendaab.in/aabuildersDash/api/staff-advance/${editingId}`), {
+      const res = await fetch(withBranchUrl(`https://backendaab.in/demoAabuildersDash/api/staff-advance/${editingId}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload)

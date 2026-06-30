@@ -129,7 +129,7 @@ const MasterData = ({ user, onLogout }) => {
     // Used to resolve IDs like `siteEngineerId` -> employee name in Project Name view.
     const fetchEmployeeIdToName = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll', {
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll', {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -228,8 +228,8 @@ const MasterData = ({ user, onLogout }) => {
 
     const isEdit = vendorFormMode === 'edit' && String(vendorForm.vendorId || '').trim() !== '';
     const url = isEdit
-      ? `https://backendaab.in/aabuilderDash/api/vendor_Names/edit/${vendorForm.vendorId}`
-      : 'https://backendaab.in/aabuilderDash/api/vendor_Names/save';
+      ? `https://backendaab.in/demoAabuilderDash/api/vendor_Names/edit/${vendorForm.vendorId}`
+      : 'https://backendaab.in/demoAabuilderDash/api/vendor_Names/save';
 
     const res = await fetch(url, {
       method: isEdit ? 'PUT' : 'POST',
@@ -294,8 +294,8 @@ const MasterData = ({ user, onLogout }) => {
 
     const isEdit = contractorFormMode === 'edit' && String(contractorForm.contractorId || '').trim() !== '';
     const url = isEdit
-      ? `https://backendaab.in/aabuilderDash/api/contractor_Names/edit/${contractorForm.contractorId}`
-      : 'https://backendaab.in/aabuilderDash/api/contractor_Names/save';
+      ? `https://backendaab.in/demoAabuilderDash/api/contractor_Names/edit/${contractorForm.contractorId}`
+      : 'https://backendaab.in/demoAabuilderDash/api/contractor_Names/save';
 
     const res = await fetch(url, {
       method: isEdit ? 'PUT' : 'POST',
@@ -311,8 +311,8 @@ const MasterData = ({ user, onLogout }) => {
   const submitCategoryToBackend = async () => {
     const isEdit = categoryFormMode === 'edit' && String(categoryForm.categoryId || '').trim() !== '';
     const url = isEdit
-      ? `https://backendaab.in/aabuilderDash/api/expenses_categories/update/${categoryForm.categoryId}`
-      : 'https://backendaab.in/aabuilderDash/api/expenses_categories/save';
+      ? `https://backendaab.in/demoAabuilderDash/api/expenses_categories/update/${categoryForm.categoryId}`
+      : 'https://backendaab.in/demoAabuilderDash/api/expenses_categories/save';
 
     const res = await fetch(url, {
       method: isEdit ? 'PUT' : 'POST',
@@ -329,8 +329,8 @@ const MasterData = ({ user, onLogout }) => {
   const submitMachineToBackend = async () => {
     const isEdit = machineFormMode === 'edit' && String(machineForm.machineId || '').trim() !== '';
     const url = isEdit
-      ? `https://backendaab.in/aabuilderDash/api/machine_tools/update/${machineForm.machineId}`
-      : 'https://backendaab.in/aabuilderDash/api/machine_tools/save';
+      ? `https://backendaab.in/demoAabuilderDash/api/machine_tools/update/${machineForm.machineId}`
+      : 'https://backendaab.in/demoAabuilderDash/api/machine_tools/save';
 
     const res = await fetch(url, {
       method: isEdit ? 'PUT' : 'POST',
@@ -410,8 +410,8 @@ const MasterData = ({ user, onLogout }) => {
 
     const isEdit = employeeFormMode === 'edit' && String(employeeForm.employeeDbId || '').trim() !== '';
     const url = isEdit
-      ? `https://backendaab.in/aabuildersDash/api/employee_details/edit/${employeeForm.employeeDbId}`
-      : 'https://backendaab.in/aabuildersDash/api/employee_details/save';
+      ? `https://backendaab.in/demoAabuildersDash/api/employee_details/edit/${employeeForm.employeeDbId}`
+      : 'https://backendaab.in/demoAabuildersDash/api/employee_details/save';
 
     const res = await fetch(url, {
       method: isEdit ? 'PUT' : 'POST',
@@ -456,7 +456,7 @@ const MasterData = ({ user, onLogout }) => {
     formData.append("folder", "FileUpload/Master_Data_Files");
     formData.append("fileName", safeFinalName);
 
-    const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
+    const uploadResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/files/upload", {
       method: "POST",
       body: formData,
     });
@@ -547,7 +547,7 @@ const MasterData = ({ user, onLogout }) => {
       branch: branch || ''
     };
 
-    const projectNamesRes = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/getAll', {
+    const projectNamesRes = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/getAll', {
       method: 'GET',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' }
@@ -563,7 +563,7 @@ const MasterData = ({ user, onLogout }) => {
     const existingSiteName = existingById || existingBySiteNo;
 
     if (existingSiteName?.id) {
-      const editRes = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
+      const editRes = await fetch(`https://backendaab.in/demoAabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -576,7 +576,7 @@ const MasterData = ({ user, onLogout }) => {
       return;
     }
 
-    const saveRes = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/save', {
+    const saveRes = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/save', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -606,8 +606,8 @@ const MasterData = ({ user, onLogout }) => {
 
     const isEdit = projectFormMode === 'edit' && String(projectForm.projectDbId || '').trim() !== '';
     const url = isEdit
-      ? `https://backendaab.in/aabuilderDash/api/projects/edit/${projectForm.projectDbId}`
-      : 'https://backendaab.in/aabuilderDash/api/projects/save';
+      ? `https://backendaab.in/demoAabuilderDash/api/projects/edit/${projectForm.projectDbId}`
+      : 'https://backendaab.in/demoAabuilderDash/api/projects/save';
 
     const res = await fetch(url, {
       method: isEdit ? 'PUT' : 'POST',
@@ -633,7 +633,7 @@ const MasterData = ({ user, onLogout }) => {
   };
 
   const fetchProjectsData = async () => {
-    const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll', {
+    const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll', {
       method: 'GET',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' }
@@ -726,22 +726,22 @@ const MasterData = ({ user, onLogout }) => {
   const getListApiUrl = (item) => {
     switch (item) {
       case 'Vendor Name':
-        return 'https://backendaab.in/aabuilderDash/api/vendor_Names/getAll';
+        return 'https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll';
       case 'Contractor Name':
-        return 'https://backendaab.in/aabuilderDash/api/contractor_Names/getAll';
+        return 'https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll';
       case 'Categories':
-        return 'https://backendaab.in/aabuilderDash/api/expenses_categories/getAll';
+        return 'https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll';
       case 'Machine tools':
-        return 'https://backendaab.in/aabuilderDash/api/machine_tools/getAll';
+        return 'https://backendaab.in/demoAabuilderDash/api/machine_tools/getAll';
       case 'Employee Details':
-        return 'https://backendaab.in/aabuildersDash/api/employee_details/getAll';
+        return 'https://backendaab.in/demoAabuildersDash/api/employee_details/getAll';
       case 'Company Labour':
-        return 'https://backendaab.in/aabuildersDash/api/labours-details/getAll';
+        return 'https://backendaab.in/demoAabuildersDash/api/labours-details/getAll';
       case 'Account Details':
       case 'Bank Details':
-        return 'https://backendaab.in/aabuildersDash/api/account-details/getAll';
+        return 'https://backendaab.in/demoAabuildersDash/api/account-details/getAll';
       case 'Support Associate Name':
-        return 'https://backendaab.in/aabuildersDash/api/support_staff/getAll';
+        return 'https://backendaab.in/demoAabuildersDash/api/support_staff/getAll';
       default:
         return null;
     }
@@ -1135,7 +1135,7 @@ const MasterData = ({ user, onLogout }) => {
       }
 
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll', {
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll', {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -1437,7 +1437,7 @@ const MasterData = ({ user, onLogout }) => {
       setIsProjectsLoading(true);
 
       try {
-        const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
+        const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
         if (!response.ok) {
           throw new Error('Failed to fetch projects');
         }
@@ -1469,7 +1469,7 @@ const MasterData = ({ user, onLogout }) => {
     let isMounted = true;
     const fetchExpenseCategories = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuilderDash/api/expenses_categories/getAll', {
+        const response = await fetch('https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll', {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -1554,7 +1554,7 @@ const MasterData = ({ user, onLogout }) => {
     const fetchBankTypes = async () => {
       setIsBankTypesLoading(true);
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/bank_type/getAll');
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/bank_type/getAll');
         if (!response.ok) throw new Error('Failed to fetch bank account types');
         const data = await response.json();
         if (isMounted) setBankAccountTypes(Array.isArray(data) ? data : []);
@@ -1685,7 +1685,7 @@ const MasterData = ({ user, onLogout }) => {
     async (onSelect) => {
       projectSiteEngineerSelectRef.current = typeof onSelect === 'function' ? onSelect : null;
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll', {
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll', {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }

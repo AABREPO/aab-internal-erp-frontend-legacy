@@ -517,7 +517,7 @@ const RccCalculator = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/floorName');
+                const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/floorName');
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -684,7 +684,7 @@ const RccCalculator = () => {
     useEffect(() => {
         const fetchSites = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -1817,7 +1817,7 @@ const RccCalculator = () => {
     }, []);
     const fetchCalculation = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/all');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/all');
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
@@ -2046,7 +2046,7 @@ const RccCalculator = () => {
     }, []);
     const fetchBeamTypes = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/beam_types/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/beam_types/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setRccBeamTypes(data);
@@ -2063,7 +2063,7 @@ const RccCalculator = () => {
     }, []);
     const fetchRccSize = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/rcc/size/get');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/rcc/size/get');
             if (response.ok) {
                 const data = await response.json();
                 setRccSizeList(data);
@@ -2983,7 +2983,7 @@ const RccCalculator = () => {
     };
     const fetchRccBeamData = useCallback(async () => {
         try {
-            const response = await fetch("https://backendaab.in/aabuilderDash/api/rcc/all/beamNameData");
+            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/rcc/all/beamNameData");
             if (!response.ok) {
                 throw new Error(`HTTP error! Status: ${response.status}`);
             }
@@ -3017,7 +3017,7 @@ const RccCalculator = () => {
     }, [fetchRccBeamData]);
     const fetchRccCalculations = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/rcc_formWork/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/rcc_formWork/getAll');
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
@@ -3134,7 +3134,7 @@ const RccCalculator = () => {
         };
         let lastValidFloorName = null;
         try {
-            const response = await fetch("https://backendaab.in/aabuilderDash/api/rcc_formWork/getAll");
+            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/rcc_formWork/getAll");
             const data = await response.json();
             const validData = data.filter((item) => item.clientName !== null && item.clientName !== undefined);
             const clientNameCount = validData.filter(
@@ -3244,7 +3244,7 @@ const RccCalculator = () => {
     const handleSubmit = async () => {
         const payload = await preparePayload();
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/rcc_formWork/save/form_work', {
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/rcc_formWork/save/form_work', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -3383,7 +3383,7 @@ const RccCalculator = () => {
     };
     const getRevisionNumber = async (clientName) => {
         try {
-            const clientResponse = await fetch("https://backendaab.in/aabuilderDash/api/paint_calculation/all/paints");
+            const clientResponse = await fetch("https://backendaab.in/demoAabuilderDash/api/paint_calculation/all/paints");
             if (!clientResponse.ok) {
                 throw new Error("Failed to fetch calculations from the backend");
             }

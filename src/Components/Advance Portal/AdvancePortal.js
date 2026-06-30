@@ -339,7 +339,7 @@ const AdvancePortal = ({
   const putWeeklyExpenseBillCopyUrl = async (weeklyExpenseId, url) => {
     if (weeklyExpenseId == null || url == null || String(url).trim() === '') return false;
     const res = await fetch(
-      `https://backendaab.in/aabuildersDash/api/weekly-expenses/${weeklyExpenseId}/bill-copy-url`,
+      `https://backendaab.in/demoAabuildersDash/api/weekly-expenses/${weeklyExpenseId}/bill-copy-url`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -485,7 +485,7 @@ const AdvancePortal = ({
   useEffect(() => {
     const fetchVendorNames = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -513,7 +513,7 @@ const AdvancePortal = ({
   useEffect(() => {
     const fetchContractorNames = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -556,7 +556,7 @@ const AdvancePortal = ({
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -615,7 +615,7 @@ const AdvancePortal = ({
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/expenses_categories/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -642,7 +642,7 @@ const AdvancePortal = ({
   useEffect(() => {
     const fetchAccountDetails = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/account-details/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/account-details/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -682,7 +682,7 @@ const AdvancePortal = ({
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll');
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
@@ -856,7 +856,7 @@ const AdvancePortal = ({
   };
   const fetchAdvanceData = async () => {
     try {
-      const res = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
+      const res = await fetch('https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll');
       const json = await res.json();
       setAdvanceData(json);
     } catch (error) {
@@ -1084,7 +1084,7 @@ const AdvancePortal = ({
     </div>
   );
   const saveAdvancePortalWithLogs = async (payload, context = 'Advance Portal Save') => {
-    const url = withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save');
+    const url = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save');
     const bodyPayload =
       payload && typeof payload === 'object'
         ? { ...payload, entered_by: enteredBy, source: 'Advance Portal' }
@@ -1147,7 +1147,7 @@ const AdvancePortal = ({
     return payload;
   };
   const saveExpensesFormEntry = async (expensesPayload) => {
-    const expensesResponse = await fetch(withBranchUrl('https://backendaab.in/aabuilderDash/expenses_form/save'), {
+    const expensesResponse = await fetch(withBranchUrl('https://backendaab.in/demoAabuilderDash/expenses_form/save'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(expensesPayload),
@@ -1223,7 +1223,7 @@ const AdvancePortal = ({
           formData.append('files', selectedAdvanceFile);
           formData.append('folder', 'FileUpload / Advance_Portal');
           formData.append('fileName', finalName);
-          const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
+          const uploadResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/files/upload", {
             method: "POST",
             body: formData,
           });
@@ -1239,7 +1239,7 @@ const AdvancePortal = ({
           return;
         }
       }
-      const res = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
+      const res = await fetch('https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll');
       if (!res.ok) throw new Error('Failed to fetch entry numbers');
       const allData = await res.json();
       const maxEntryNo = allData.length > 0 ? Math.max(...allData.map(item => item.entry_no || 0)) : 0;
@@ -1295,7 +1295,7 @@ const AdvancePortal = ({
             source: "Advance Portal",
           };
           // Save to LoanPortal
-          const loanResponse = await fetch(withBranchUrl("https://backendaab.in/aabuildersDash/api/loans/save"), {
+          const loanResponse = await fetch(withBranchUrl("https://backendaab.in/demoAabuildersDash/api/loans/save"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(loanPayload)
@@ -1330,7 +1330,7 @@ const AdvancePortal = ({
             source: "Advance Portal",
           };
           // Save to VendorCarryForwardAmountManagement
-          const vendorCarryForwardResponse = await fetch("https://backendaab.in/aabuildersDash/api/vendor_carry_forward/save", {
+          const vendorCarryForwardResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/vendor_carry_forward/save", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(vendorCarryForwardPayload)
@@ -1754,7 +1754,7 @@ const AdvancePortal = ({
           formData.append('files', selectedAdvanceFile);
           formData.append('folder', 'FileUpload / Advance_Portal');
           formData.append('fileName', finalName);
-          const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
+          const uploadResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/files/upload", {
             method: "POST",
             body: formData,
           });
@@ -1771,7 +1771,7 @@ const AdvancePortal = ({
         }
       }
       // Get entry number
-      const res = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
+      const res = await fetch('https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll');
       if (!res.ok) throw new Error('Failed to fetch entry numbers');
       const allData = await res.json();
       const maxEntryNo = allData.length > 0 ? Math.max(...allData.map(item => item.entry_no || 0)) : 0;
@@ -1812,7 +1812,7 @@ const AdvancePortal = ({
         source: "Advance Portal",
         ...buildAdvancePortalExpensesEntryLinkFields(expensesEntryId),
       };
-      const advanceSaveUrl = withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save');
+      const advanceSaveUrl = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save');
       if (isPaymentModeRequiringBankRegisterLog(paymentModalData.paymentMode)) {
         await postBankRegisterLogSave(
           bankRegisterLogSaveUrlMatchingRequest(advanceSaveUrl),
@@ -1877,7 +1877,7 @@ const AdvancePortal = ({
           source: "Advance Portal",
         };
         // Save to weekly payment bills
-        const weeklyBillSaveUrl = withBranchUrl('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save');
+        const weeklyBillSaveUrl = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save');
         const weeklyResponse = await fetch(weeklyBillSaveUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1952,12 +1952,12 @@ const AdvancePortal = ({
           };
           // Send both PUT requests
           await Promise.all([
-            fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${editedRecord.advancePortalId}?editedBy=${encodeURIComponent(enteredBy)}`, {
+            fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${editedRecord.advancePortalId}?editedBy=${encodeURIComponent(enteredBy)}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(updatedEdited)
             }),
-            fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${otherRecord.advancePortalId}?editedBy=${encodeURIComponent(enteredBy)}`, {
+            fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${otherRecord.advancePortalId}?editedBy=${encodeURIComponent(enteredBy)}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(updatedOther)
@@ -1992,7 +1992,7 @@ const AdvancePortal = ({
           setShowEditPaymentModal(true);
           return;
         }
-        const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${editingId}?editedBy=${encodeURIComponent(enteredBy)}`, {
+        const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${editingId}?editedBy=${encodeURIComponent(enteredBy)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -2024,7 +2024,7 @@ const AdvancePortal = ({
     setIsEditPaymentSubmitting(true);
     try {
       const payload = pending.payload;
-      const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${editingId}?editedBy=${encodeURIComponent(enteredBy)}`, {
+      const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${editingId}?editedBy=${encodeURIComponent(enteredBy)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

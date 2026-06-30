@@ -47,7 +47,7 @@ const Summary = ({ username, userRoles = [] }) => {
   }, []);
   useEffect(() => {
     axios
-      .get('https://backendaab.in/aabuildersDash/api/rental_forms/getAll')
+      .get('https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll')
       .then((response) => {
         const sortedExpenses = response.data.sort((a, b) => {
           const enoA = parseInt(a.eno, 10);
@@ -62,7 +62,7 @@ const Summary = ({ username, userRoles = [] }) => {
   }, []);
   const fetchProjects = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
       if (response.ok) {
         const data = await response.json();
         const ownProjects = Array.isArray(data)
@@ -89,7 +89,7 @@ const Summary = ({ username, userRoles = [] }) => {
   };
   const fetchTenants = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
       if (response.ok) {
         const data = await response.json();
         const tenantNameIdMap = {};
@@ -715,7 +715,7 @@ const Summary = ({ username, userRoles = [] }) => {
     setIsGeneratingReport(true);
     try {
       const response = await axios.post(
-        'https://backendaab.in/aabuildersDash/api/rental_forms/generate-missed-report',
+        'https://backendaab.in/demoAabuildersDash/api/rental_forms/generate-missed-report',
         null,
         {
           params: {
@@ -727,7 +727,7 @@ const Summary = ({ username, userRoles = [] }) => {
       if (response.status === 200) {
         alert(`Success: ${response.data}`);
         // Optionally refresh the rent forms data
-        const refreshResponse = await axios.get('https://backendaab.in/aabuildersDash/api/rental_forms/getAll');
+        const refreshResponse = await axios.get('https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll');
         if (refreshResponse.data) {
           const sortedExpenses = refreshResponse.data.sort((a, b) => {
             const enoA = parseInt(a.eno, 10);

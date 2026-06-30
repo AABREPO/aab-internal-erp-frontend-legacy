@@ -234,7 +234,7 @@ const History = ({ onVendorClick, user } = {}) => {
 
   const fetchVendors = async () => {
     try {
-      const res = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
+      const res = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll');
       if (res.ok) {
         const data = await res.json();
         setVendorOptions(data.map((item) => ({ id: item.id, label: item.vendorName })));
@@ -246,7 +246,7 @@ const History = ({ onVendorClick, user } = {}) => {
 
   const fetchContractors = async () => {
     try {
-      const res = await fetch('https://backendaab.in/aabuilderDash/api/contractor_Names/getAll');
+      const res = await fetch('https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll');
       if (res.ok) {
         const data = await res.json();
         setContractorOptions(data.map((item) => ({ id: item.id, label: item.contractorName })));
@@ -258,7 +258,7 @@ const History = ({ onVendorClick, user } = {}) => {
 
   const fetchSites = async () => {
     try {
-      const res = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/getAll');
+      const res = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/getAll');
       if (res.ok) {
         const data = await res.json();
         const formatted = data.map((item) => ({
@@ -280,8 +280,8 @@ const History = ({ onVendorClick, user } = {}) => {
   const loadAdvanceData = useCallback(async () => {
     try {
       const endpoint = hasActiveFilters
-        ? 'https://backendaab.in/aabuildersDash/api/advance_portal/getAll'
-        : 'https://backendaab.in/aabuildersDash/api/advance_portal/getLast150';
+        ? 'https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll'
+        : 'https://backendaab.in/demoAabuildersDash/api/advance_portal/getLast150';
       const res = await fetch(withBranchUrl(endpoint));
       if (!res.ok) throw new Error('Failed to fetch advance data');
       const data = await res.json();
@@ -557,7 +557,7 @@ const History = ({ onVendorClick, user } = {}) => {
       const finalName = `${timestamp} ${site?.sNo || ''} ${entityName}`;
       formData.append('file', file);
       formData.append('file_name', finalName);
-      const uploadRes = await fetch('https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive', {
+      const uploadRes = await fetch('https://backendaab.in/demoAabuilderDash/expenses/googleUploader/uploadToGoogleDrive', {
         method: 'POST',
         body: formData,
       });
@@ -567,7 +567,7 @@ const History = ({ onVendorClick, user } = {}) => {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       const username = user?.username || user?.name || '';
       const payload = { ...item.entry, file_url: fileUrl };
-      const editRes = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${entryId}?editedBy=${username}`, {
+      const editRes = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${entryId}?editedBy=${username}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -603,7 +603,7 @@ const History = ({ onVendorClick, user } = {}) => {
         request_approval: false,
         request_completed: false,
       };
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/edit_requests/save', {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/edit_requests/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -820,7 +820,7 @@ const History = ({ onVendorClick, user } = {}) => {
           transferRecords.map(async (rec) => {
             const idToDelete = rec.advancePortalId || rec.id;
             if (!idToDelete) return;
-            const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${idToDelete}?editedBy=${username}`, {
+            const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${idToDelete}?editedBy=${username}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(clearedData),
@@ -831,7 +831,7 @@ const History = ({ onVendorClick, user } = {}) => {
       } else {
         const idToDelete = entry.advancePortalId || entry.id || entryToDelete.id;
         if (!idToDelete) return;
-        const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${idToDelete}?editedBy=${username}`, {
+        const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${idToDelete}?editedBy=${username}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(clearedData),

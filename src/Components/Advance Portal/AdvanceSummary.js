@@ -574,7 +574,7 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
     const fetchVendorNames = async () => {
       try {
         setProgress(10);
-        const res = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
+        const res = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -599,7 +599,7 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
     const fetchContractorNames = async () => {
       try {
         setProgress(35);
-        const res = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
+        const res = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -625,7 +625,7 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
     const fetchSites = async () => {
       try {
         setProgress(60);
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -702,7 +702,7 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
         setLoading(true);
       }
       setProgress(85);
-      const response = await fetch(buildBranchUrl("https://backendaab.in/aabuildersDash/api/advance_portal/getAll"), {
+      const response = await fetch(buildBranchUrl("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll"), {
         method: "GET",
         credentials: "include",
         headers: { "Content-Type": "application/json" }

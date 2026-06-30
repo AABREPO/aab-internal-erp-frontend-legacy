@@ -112,7 +112,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     }, []);
     const fetchPoModel = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_model/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setPoModel(data);
@@ -128,7 +128,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     }, []);
     const fetchPoType = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_type/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setPoType(data);
@@ -144,7 +144,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     }, []);
     const fetchPoBrand = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/po_brand/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_brand/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setPoBrand(data);
@@ -231,7 +231,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     }, []);
     const fetchVendorNames = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll');
             if (response.ok) {
                 const data = await response.json();
                 const formattedData = data.map(item => ({
@@ -269,7 +269,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             // GET /api/purchase_orders/countByVendor?vendorId=123  -> returns total count (Long)
             // Next eno should be count + 1.
             const response = await fetch(
-                `https://backendaab.in/aabuildersDash/api/purchase_orders/countByVendor?vendorId=${encodeURIComponent(String(vendorId))}`,
+                `https://backendaab.in/demoAabuildersDash/api/purchase_orders/countByVendor?vendorId=${encodeURIComponent(String(vendorId))}`,
                 {
                     method: "GET",
                     credentials: "include",
@@ -291,7 +291,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchSites = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -320,7 +320,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     }, []);
     const fetchSiteIncharge = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/site_incharge/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/site_incharge/getAll');
             if (response.ok) {
                 const data = await response.json();
                 const formatted = data.map((item) => ({
@@ -352,7 +352,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     }, []);
     const fetchPoCategory = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll');
             if (response.ok) {
                 const data = await response.json();
                 const options = data.map(item => ({
@@ -373,7 +373,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     }, []);
     const fetchMappedPoCategory = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/mapped/category/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/mapped/category/getAll');
             if (response.ok) {
                 const data = await response.json();
                 const options = data.map(item => ({
@@ -394,7 +394,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     }, []);
     const fetchPoItemName = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_itemNames/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setPoItemName(data);
@@ -859,7 +859,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                     amount: item.amount,
                 }))
             };
-            const response = await fetch("https://backendaab.in/aabuildersDash/api/purchase_orders/save", {
+            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/purchase_orders/save", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"

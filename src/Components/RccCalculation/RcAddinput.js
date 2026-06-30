@@ -178,7 +178,7 @@ const RcAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/paint/bulkUploadPaintVariants", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paint/bulkUploadPaintVariants", {
         method: "POST",
         body: formData,
       });
@@ -203,7 +203,7 @@ const RcAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/rcc/formulas/bulk_upload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/rcc/formulas/bulk_upload", {
         method: "POST",
         body: formData,
       });
@@ -229,7 +229,7 @@ const RcAddInput = () => {
   };
   const fetchRccBeamData = useCallback(async () => {
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/rcc/all/beamNameData");
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/rcc/all/beamNameData");
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
@@ -276,7 +276,7 @@ const RcAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/bulkUpload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/bulkUpload", {
         method: "POST",
         body: formData,
       });
@@ -296,7 +296,7 @@ const RcAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/paints/bulk-upload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paints/bulk-upload", {
         method: "POST",
         body: formData,
       });
@@ -316,7 +316,7 @@ const RcAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/floorNameBulkUpload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/floorNameBulkUpload", {
         method: "POST",
         body: formData,
       });
@@ -336,7 +336,7 @@ const RcAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/beam_types/bulkUpload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/beam_types/bulkUpload", {
         method: "POST",
         body: formData,
       });
@@ -356,7 +356,7 @@ const RcAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/paint_type/bulk_upload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paint_type/bulk_upload", {
         method: "POST",
         body: formData,
       });
@@ -376,7 +376,7 @@ const RcAddInput = () => {
   const handleEditFloorName = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/nameFloor/${selectedFloorId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/nameFloor/${selectedFloorId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -396,7 +396,7 @@ const RcAddInput = () => {
   const handleEditRccSize = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/rcc/size/edit/${selectedRccSizeId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/rcc/size/edit/${selectedRccSizeId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -416,7 +416,7 @@ const RcAddInput = () => {
   const handleEditBeamType = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/beam_types/edit/${selectedTypeId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/beam_types/edit/${selectedTypeId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -436,7 +436,7 @@ const RcAddInput = () => {
 
   const deleteFloor = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/nameFloor/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/nameFloor/${id}`, {
         method: 'DELETE',
       });
 
@@ -453,7 +453,7 @@ const RcAddInput = () => {
   };
   const deleteRccSize = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/rcc/size/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/rcc/size/delete/${id}`, {
         method: 'DELETE',
       });
 
@@ -470,7 +470,7 @@ const RcAddInput = () => {
   };
   const deleteBeamTyper = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/beam_types/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/beam_types/delete/${id}`, {
         method: 'DELETE',
       });
 
@@ -490,7 +490,7 @@ const RcAddInput = () => {
 
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/nameFloor/all", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/nameFloor/all", {
           method: "DELETE",
         });
 
@@ -514,7 +514,7 @@ const RcAddInput = () => {
 
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/rcc/size/deleteAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/rcc/size/deleteAll", {
           method: "DELETE",
         });
 
@@ -538,7 +538,7 @@ const RcAddInput = () => {
 
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/beam_types/delete/all", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/beam_types/delete/all", {
           method: "DELETE",
         });
 
@@ -563,7 +563,7 @@ const RcAddInput = () => {
 
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/rcc/delete/allRccBeamNames", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/rcc/delete/allRccBeamNames", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -583,7 +583,7 @@ const RcAddInput = () => {
   };
   const handleRccBeamDataDelete = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/rcc/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/rcc/delete/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -602,7 +602,7 @@ const RcAddInput = () => {
     if (!areaEdit) return;
 
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/nameArea/${areaEdit.id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/nameArea/${areaEdit.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -692,7 +692,7 @@ const RcAddInput = () => {
     }
 
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/rcc/edit/${selectedVariantId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/rcc/edit/${selectedVariantId}`, {
         method: "PUT",
         body: formData,
       });
@@ -716,7 +716,7 @@ const RcAddInput = () => {
   const handlePaintFormulasDeleteAll = async () => {
     if (window.confirm("Are you sure you want to delete all Formulas?")) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/rcc/formulas/delete/all", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/rcc/formulas/delete/all", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -735,7 +735,7 @@ const RcAddInput = () => {
   }, []);
   const fetchCalculationFormula = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/rcc/formulas/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/rcc/formulas/getAll');
       if (response.ok) {
         const data = await response.json();
         setCalculationFormulaOptions(data);
@@ -752,7 +752,7 @@ const RcAddInput = () => {
     e.preventDefault();
     const newTileArea = { formulas: calculationFormulas };
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/rcc/formulas/save', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/rcc/formulas/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -777,7 +777,7 @@ const RcAddInput = () => {
   }, []);
   const fetchTileFloorNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/floorName');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/floorName');
       if (response.ok) {
         const data = await response.json();
         setTileFloorNames(data);
@@ -794,7 +794,7 @@ const RcAddInput = () => {
   }, []);
   const fetchBeamTypes = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/beam_types/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/beam_types/getAll');
       if (response.ok) {
         const data = await response.json();
         setRccBeamTypes(data);
@@ -810,7 +810,7 @@ const RcAddInput = () => {
     e.preventDefault();
     const newTileFloor = { floorName };
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/nameFloor', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/nameFloor', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -836,7 +836,7 @@ const RcAddInput = () => {
   }, []);
   const fetchRccSize = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/rcc/size/get');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/rcc/size/get');
       if (response.ok) {
         const data = await response.json();
         setRccSizeList(data);
@@ -852,7 +852,7 @@ const RcAddInput = () => {
     e.preventDefault();
     const newRccSize = { size };
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/rcc/size/save', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/rcc/size/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -881,7 +881,7 @@ const RcAddInput = () => {
     };
     console.log(newBeamData);
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/beam_types/save', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/beam_types/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -920,7 +920,7 @@ const RcAddInput = () => {
     formData.append("steelConfiguration", steelConfiguration);
     if (measurementImage) formData.append("measurementImage", measurementImage);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/rcc/upload/beamName", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/rcc/upload/beamName", {
         method: "POST",
         body: formData,
       });
@@ -935,7 +935,7 @@ const RcAddInput = () => {
     e.preventDefault();
     try {
       const response = await fetch(
-        `https://backendaab.in/aabuilderDash/api/rcc/formulas/edit/${calculationFormulas.id}`,
+        `https://backendaab.in/demoAabuilderDash/api/rcc/formulas/edit/${calculationFormulas.id}`,
         {
           method: 'PUT',
           headers: {
@@ -958,7 +958,7 @@ const RcAddInput = () => {
 
   const handleDeleteFormula = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/rcc/formulas/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/rcc/formulas/delete/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {

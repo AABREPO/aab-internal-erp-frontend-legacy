@@ -24,7 +24,7 @@ const LoginPage = ({ onLogin }) => {
     const handleLogin = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post('https://backendaab.in/aabuilderDash/api/login', { email, password });
+            const response = await axios.post('https://backendaab.in/demoAabuilderDash/api/login', { email, password });
             const {
                 username,
                 userImage,
@@ -59,7 +59,7 @@ const LoginPage = ({ onLogin }) => {
     };
     const refreshUserData = async () => {
         try {
-            const response = await axios.get(`https://backendaab.in/aabuilderDash/api/user/id/${userId}`);
+            const response = await axios.get(`https://backendaab.in/demoAabuilderDash/api/user/id/${userId}`);
             const {
                 username,
                 userImage,
@@ -94,7 +94,7 @@ const LoginPage = ({ onLogin }) => {
     useEffect(() => {
         const fetchBranches = async () => {
             try {
-                const response = await axios.get('https://backendaab.in/aabuildersDash/api/branch/getAll', {
+                const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/branch/getAll', {
                     withCredentials: true
                 });
                 const branches = Array.isArray(response.data) ? response.data : [];
@@ -124,7 +124,7 @@ const LoginPage = ({ onLogin }) => {
             return;
         }
         try {
-            const response = await axios.post('https://backendaab.in/aabuilderDash/api/sign-in', {
+            const response = await axios.post('https://backendaab.in/demoAabuilderDash/api/sign-in', {
                 username,
                 email,
                 password,

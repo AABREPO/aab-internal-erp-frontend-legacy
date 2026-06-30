@@ -57,7 +57,7 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
   useEffect(() => {
     const fetchUserRoles = async () => {
       try {
-        const response = await axios.get("https://backendaab.in/aabuilderDash/api/user_roles/all");
+        const response = await axios.get("https://backendaab.in/demoAabuilderDash/api/user_roles/all");
         const allRoles = response.data;
         const userRoleNames = userRoles.map(r => r.roles);
         const matchedRoles = allRoles.filter(role =>
@@ -97,7 +97,7 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
     let isMounted = true;
     const fetchBranches = async () => {
       try {
-        const response = await axios.get('https://backendaab.in/aabuildersDash/api/branch/getAll', { withCredentials: true });
+        const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/branch/getAll', { withCredentials: true });
         if (!isMounted) return;
         const branches = Array.isArray(response.data) ? response.data : [];
         setBranchOptions(branches);
@@ -214,11 +214,11 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
     const fetchReferenceData = async () => {
       try {
         const [vendorsRes, contractorsRes, sitesRes, employeesRes, laboursRes] = await Promise.all([
-          axios.get("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", { withCredentials: true }),
-          axios.get("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", { withCredentials: true }),
-          axios.get("https://backendaab.in/aabuilderDash/api/project_Names/getAll", { withCredentials: true }),
-          axios.get("https://backendaab.in/aabuildersDash/api/employee_details/getAll", { withCredentials: true }),
-          axios.get("https://backendaab.in/aabuildersDash/api/labours-details/getAll", { withCredentials: true })
+          axios.get("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", { withCredentials: true }),
+          axios.get("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", { withCredentials: true }),
+          axios.get("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", { withCredentials: true }),
+          axios.get("https://backendaab.in/demoAabuildersDash/api/employee_details/getAll", { withCredentials: true }),
+          axios.get("https://backendaab.in/demoAabuildersDash/api/labours-details/getAll", { withCredentials: true })
         ]);
         const buildLookup = (items = [], idKey, labelKey) =>
           items.reduce((acc, item) => {
@@ -260,7 +260,7 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
   }, [canViewEditRequests]);
   const fetchEditRequests = async () => {
     try {
-      const response = await axios.get('https://backendaab.in/aabuildersDash/api/edit_requests/getAll', {
+      const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/edit_requests/getAll', {
         withCredentials: true
       });
       const allRequests = response.data || [];
@@ -279,17 +279,17 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
       let response;
       if (request.module_name === 'Advance Portal') {
         response = await axios.get(
-          `https://backendaab.in/aabuildersDash/api/advance_portal/get/${request.module_name_id}`,
+          `https://backendaab.in/demoAabuildersDash/api/advance_portal/get/${request.module_name_id}`,
           { withCredentials: true }
         );
       } else if (request.module_name === 'Staff Portal') {
         response = await axios.get(
-          `https://backendaab.in/aabuildersDash/api/staff-advance/${request.module_name_id}`,
+          `https://backendaab.in/demoAabuildersDash/api/staff-advance/${request.module_name_id}`,
           { withCredentials: true }
         );
       } else if (request.module_name === 'Loan Portal') {
         response = await axios.get(
-          `https://backendaab.in/aabuildersDash/api/loans/${request.module_name_id}`,
+          `https://backendaab.in/demoAabuildersDash/api/loans/${request.module_name_id}`,
           { withCredentials: true }
         );
       }else {
@@ -342,26 +342,26 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
       if (moduleNameId) {
         if (moduleName === 'Advance Portal') {
           await axios.put(
-            `https://backendaab.in/aabuildersDash/api/advance_portal/allow/${moduleNameId}?allow=true`,
+            `https://backendaab.in/demoAabuildersDash/api/advance_portal/allow/${moduleNameId}?allow=true`,
             {},
             { withCredentials: true }
           );
         } else if (moduleName === 'Staff Portal') {
           await axios.put(
-            `https://backendaab.in/aabuildersDash/api/staff-advance/allow/${moduleNameId}?allow=true`,
+            `https://backendaab.in/demoAabuildersDash/api/staff-advance/allow/${moduleNameId}?allow=true`,
             {},
             { withCredentials: true }
           );
         } else if (moduleName === 'Loan Portal') {
           await axios.put(
-            `https://backendaab.in/aabuildersDash/api/loans/allow/${moduleNameId}?allow=true`,
+            `https://backendaab.in/demoAabuildersDash/api/loans/allow/${moduleNameId}?allow=true`,
             {},
             { withCredentials: true }
           );
         }
       }
       await axios.put(
-        `https://backendaab.in/aabuildersDash/api/edit_requests/edit/${requestId}`,
+        `https://backendaab.in/demoAabuildersDash/api/edit_requests/edit/${requestId}`,
         {
           request_approval: true,
           request_completed: true,
@@ -379,7 +379,7 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
   };
   const handleRejectRequest = async (requestId) => {
     try {
-      await axios.put(`https://backendaab.in/aabuildersDash/api/edit_requests/edit/${requestId}`, {
+      await axios.put(`https://backendaab.in/demoAabuildersDash/api/edit_requests/edit/${requestId}`, {
         request_approval: false,
         request_completed: true
       }, {

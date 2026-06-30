@@ -13,9 +13,9 @@ const SYNC_STATUS_EVENT = 'orbitSyncStatusChanged';
 const SYNC_DATA_EVENT = 'orbitProjectDataSync';
 const PAGE_TABLE_REFRESH_EVENT = 'orbitPageTableRefresh';
 
-const BASE8081 = 'https://backendaab.in/aabuilderDash/api';
-const BASE8082 = 'https://backendaab.in/aabuildersDash/api';
-const EXP8081 = 'https://backendaab.in/aabuilderDash';
+const BASE8081 = 'https://backendaab.in/demoAabuilderDash/api';
+const BASE8082 = 'https://backendaab.in/demoAabuildersDash/api';
+const EXP8081 = 'https://backendaab.in/demoAabuilderDash';
 const PAYMENT_MODE_GET_ALL_URL = `${BASE8082}/payment_mode/getAll`;
 const PAYMENT_MODE_ARRANGEMENT_GET_ALL_URL = `${BASE8082}/payment_mode_arrangement/getAll`;
 

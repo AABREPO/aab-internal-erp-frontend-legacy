@@ -214,7 +214,7 @@ const History = () => {
   }, []);
   const deleteCalculation = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/delete/${id}`, {
         method: 'DELETE',
       });
 
@@ -233,7 +233,7 @@ const History = () => {
   };
   const fetchCalculations = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/all');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/all');
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
@@ -311,7 +311,7 @@ const History = () => {
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -394,7 +394,7 @@ const History = () => {
     console.log('Form Data before Save:', formData);
     const formattedDate = formatDates(formData.date);
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/tile/update/${formData.id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/tile/update/${formData.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

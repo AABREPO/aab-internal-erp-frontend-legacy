@@ -108,7 +108,7 @@ const Outgoing = ({ user }) => {
   useEffect(() => {
     const fetchOutgoingSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -143,7 +143,7 @@ const Outgoing = ({ user }) => {
   useEffect(() => {
     const fetchOutgoingEmployeeList = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/site_engineers');
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/site_engineers');
         if (response.ok) {
           const data = await response.json();
           setOutgoingEmployeeList(data);
@@ -251,7 +251,7 @@ const Outgoing = ({ user }) => {
   // Fetch PO item names from API
   const fetchPoItemName = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_itemNames/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoItemName(data);
@@ -263,7 +263,7 @@ const Outgoing = ({ user }) => {
   // Fetch PO brand from API
   const fetchPoBrand = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_brand/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_brand/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoBrand(data);
@@ -275,7 +275,7 @@ const Outgoing = ({ user }) => {
   // Fetch PO model from API
   const fetchPoModel = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_model/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoModel(data);
@@ -287,7 +287,7 @@ const Outgoing = ({ user }) => {
   // Fetch PO type from API
   const fetchPoType = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_type/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoType(data);
@@ -299,7 +299,7 @@ const Outgoing = ({ user }) => {
   // Fetch category options from API
   const fetchCategoryOptions = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll');
       if (response.ok) {
         const data = await response.json();
         setCategoryOptions(data);
@@ -730,7 +730,7 @@ const Outgoing = ({ user }) => {
     let itemPrice = 0; // Default price
     if (itemId !== null && itemId !== undefined) {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll');
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/inventory/getAll');
         if (response.ok) {
           const inventoryRecords = await response.json();
           // Filter out deleted records and filter by stocking location
@@ -1104,7 +1104,7 @@ const Outgoing = ({ user }) => {
       const clientId = projectSite.id;
       if ((outgoingType || '').toLowerCase() === 'dispatch' && !isEditMode) {
         try {
-          const inventoryResponse = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll');
+          const inventoryResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/inventory/getAll');
           if (inventoryResponse.ok) {
             const inventoryRecords = await inventoryResponse.json();
             const activeRecords = inventoryRecords.filter(record => {
@@ -1169,7 +1169,7 @@ const Outgoing = ({ user }) => {
       // Validate stock return: check if return quantity exceeds dispatch quantity for this client_id
       if ((outgoingType || '').toLowerCase() === 'stock return' || (outgoingType || '').toLowerCase() === 'stockreturn') {
         try {
-          const inventoryResponse = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll');
+          const inventoryResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/inventory/getAll');
           if (inventoryResponse.ok) {
             const inventoryRecords = await inventoryResponse.json();
             // Filter for outgoing records for this client_id (not deleted)
@@ -1267,7 +1267,7 @@ const Outgoing = ({ user }) => {
       if (!isUpdate) {
         // Get outgoing count for ENO only for new records
         const countResponse = await fetch(
-          `https://backendaab.in/aabuildersDash/api/inventory/outgoingCount?stockingLocationId=${stockingLocationId}`
+          `https://backendaab.in/demoAabuildersDash/api/inventory/outgoingCount?stockingLocationId=${stockingLocationId}`
         );
         if (!countResponse.ok) {
           throw new Error('Failed to fetch outgoing count');
@@ -1334,8 +1334,8 @@ const Outgoing = ({ user }) => {
         return;
       }
       const apiUrl = isUpdate
-        ? `https://backendaab.in/aabuildersDash/api/inventory/edit_with_history/${editingInventoryId}?changedBy=${encodeURIComponent(username)}`
-        : 'https://backendaab.in/aabuildersDash/api/inventory/save';
+        ? `https://backendaab.in/demoAabuildersDash/api/inventory/edit_with_history/${editingInventoryId}?changedBy=${encodeURIComponent(username)}`
+        : 'https://backendaab.in/demoAabuildersDash/api/inventory/save';
       const method = isUpdate ? 'PUT' : 'POST';
       // Save/Update to backend
       const response = await fetch(apiUrl, {

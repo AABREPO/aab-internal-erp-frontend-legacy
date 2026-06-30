@@ -342,7 +342,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
     const fetchVendorNames = async () => {
       try {
         setProgress(10);
-        const res = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
+        const res = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -365,7 +365,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
     const fetchContractorNames = async () => {
       try {
         setProgress(35);
-        const res = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
+        const res = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -388,7 +388,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
     const fetchSites = async () => {
       try {
         setProgress(60);
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -467,7 +467,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
       setError(null);
       setLoading(true);
       setProgress(85);
-      const res = await fetch(buildBranchUrl("https://backendaab.in/aabuildersDash/api/advance_portal/getAll"));
+      const res = await fetch(buildBranchUrl("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll"));
       const data = await res.json();
       setAdvanceData(Array.isArray(data) ? data : []);
       setProgress(100);
@@ -494,12 +494,12 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
     const loadProjectAndEmployeeMasters = async () => {
       try {
         const [projRes, empRes] = await Promise.all([
-          fetch("https://backendaab.in/aabuilderDash/api/projects/getAll", {
+          fetch("https://backendaab.in/demoAabuilderDash/api/projects/getAll", {
             method: "GET",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
           }),
-          fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
+          fetch("https://backendaab.in/demoAabuildersDash/api/employee_details/getAll", {
             method: "GET",
             credentials: "include",
             headers: { "Content-Type": "application/json" },

@@ -130,7 +130,7 @@ const DatabaseMobile = () => {
 			}
 			try {
 				// Backend already filters to only fully paid rows.
-				const res = await fetch('https://backendaab.in/aabuildersDash/api/vendor-payments/trackers/enriched/paid', {
+				const res = await fetch('https://backendaab.in/demoAabuildersDash/api/vendor-payments/trackers/enriched/paid', {
 					method: 'GET',
 					credentials: 'include',
 					headers: { 'Content-Type': 'application/json' }
@@ -159,7 +159,7 @@ const DatabaseMobile = () => {
 		let isMounted = true;
 		const loadVendors = async () => {
 			try {
-				const res = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll', {
+				const res = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll', {
 					method: 'GET',
 					credentials: 'include',
 					headers: { 'Content-Type': 'application/json' }
@@ -364,7 +364,7 @@ const DatabaseMobile = () => {
 	const fetchSelectedVendorAccountDetails = async (vendorId) => {
 		try {
 			setLoadingVendorBankDetails(true);
-			const res = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
+			const res = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
 				method: "GET",
 				credentials: "include",
 				headers: { "Content-Type": "application/json" }
@@ -448,12 +448,12 @@ const DatabaseMobile = () => {
 		const loadSupportData = async () => {
 			try {
 				const [beRes, exRes] = await Promise.all([
-					fetch('https://backendaab.in/aabuildersDash/api/bill-entry/getAll', {
+					fetch('https://backendaab.in/demoAabuildersDash/api/bill-entry/getAll', {
 						method: 'GET',
 						credentials: 'include',
 						headers: { 'Content-Type': 'application/json' }
 					}),
-					fetch('https://backendaab.in/aabuilderDash/expenses_form/get_form', {
+					fetch('https://backendaab.in/demoAabuilderDash/expenses_form/get_form', {
 						method: 'GET',
 						credentials: 'include',
 						headers: { 'Content-Type': 'application/json' }
@@ -539,7 +539,7 @@ const DatabaseMobile = () => {
 		const id = row?.id;
 		if (!id) return row;
 		try {
-			const res = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-payments/tracker/${id}`, {
+			const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/vendor-payments/tracker/${id}`, {
 				method: 'GET',
 				credentials: 'include',
 				headers: { 'Content-Type': 'application/json' }
@@ -574,7 +574,7 @@ const DatabaseMobile = () => {
 		setLoadingBankDetails(true);
 		setBankDetailsError(null);
 		try {
-			const res = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/get/${row?.id}`, {
+			const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/vendor-bill-tracker/get/${row?.id}`, {
 				method: 'GET',
 				credentials: 'include',
 				headers: { 'Content-Type': 'application/json' }
@@ -808,7 +808,7 @@ const DatabaseMobile = () => {
 				no_of_bills: bills,
 				total_amount: amount
 			};
-			const res = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-payments/tracker/${editTarget.id}/update-details`, {
+			const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/vendor-payments/tracker/${editTarget.id}/update-details`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(payload)

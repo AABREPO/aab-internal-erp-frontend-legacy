@@ -495,13 +495,13 @@ export const isStaffAdvanceRecordLocked = (entry) => Boolean(entry?.not_allow_to
 
 export const loadStaffAdvanceData = async (activeBranchId, { applyBranchFilter = true } = {}) => {
   const [employeeResult, labourResult, purposeResult, recordResult] = await Promise.allSettled([
-    fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll', {
+    fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll', {
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' }
     }),
-    fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll'),
-    fetch('https://backendaab.in/aabuildersDash/api/purposes/getAll'),
-    fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all')
+    fetch('https://backendaab.in/demoAabuildersDash/api/labours-details/getAll'),
+    fetch('https://backendaab.in/demoAabuildersDash/api/purposes/getAll'),
+    fetch('https://backendaab.in/demoAabuildersDash/api/staff-advance/all')
   ]);
 
   const [employees, labours, purposes, records] = await Promise.all([

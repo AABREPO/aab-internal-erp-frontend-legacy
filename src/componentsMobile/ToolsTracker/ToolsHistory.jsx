@@ -4,15 +4,15 @@ import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
-const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
-const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_brand';
-const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_id';
-const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_stock_management';
-const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
-const TOOLS_MACHINE_NUMBER_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_machine_number';
-const TOOLS_MACHINE_STATUS_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools-machine-status';
-const PROJECT_NAMES_BASE_URL = 'https://backendaab.in/aabuilderDash/api/project_Names';
-const VENDOR_NAMES_BASE_URL = 'https://backendaab.in/aabuilderDash/api/vendor_Names';
+const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_item_name';
+const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_brand';
+const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_item_id';
+const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_tracker_stock_management';
+const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_tracker_management';
+const TOOLS_MACHINE_NUMBER_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_machine_number';
+const TOOLS_MACHINE_STATUS_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools-machine-status';
+const PROJECT_NAMES_BASE_URL = 'https://backendaab.in/demoAabuilderDash/api/project_Names';
+const VENDOR_NAMES_BASE_URL = 'https://backendaab.in/demoAabuilderDash/api/vendor_Names';
 
 const ToolsHistory = ({ user }) => {
   const [activeSegment, setActiveSegment] = useState('item'); // 'item' or 'log'
@@ -1704,7 +1704,7 @@ const ToolsHistory = ({ user }) => {
       const finalName = `${timestamp} ${itemName} ${editFormData.machineNumber || ''}`.trim();
       formData.append('file', file);
       formData.append('file_name', finalName);
-      const uploadRes = await fetch('https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive', {
+      const uploadRes = await fetch('https://backendaab.in/demoAabuilderDash/expenses/googleUploader/uploadToGoogleDrive', {
         method: 'POST',
         credentials: 'include',
         body: formData

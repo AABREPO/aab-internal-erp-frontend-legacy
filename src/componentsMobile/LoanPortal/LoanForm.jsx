@@ -197,7 +197,7 @@ const LoanForm = () => {
     const fetchEntryNo = async () => {
       try {
         if (localStorage.getItem('editingLoanEntry')) return;
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loans/all');
         if (response.ok) {
           const data = await response.json();
           if (data.length > 0) {
@@ -216,7 +216,7 @@ const LoanForm = () => {
   useEffect(() => {
     const fetchPurposeOptions = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/loan-purposes/getAll', {
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loan-purposes/getAll', {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -242,7 +242,7 @@ const LoanForm = () => {
   useEffect(() => {
     const fetchVendorNames = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -268,7 +268,7 @@ const LoanForm = () => {
   useEffect(() => {
     const fetchContractorNames = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -294,7 +294,7 @@ const LoanForm = () => {
   useEffect(() => {
     const fetchEmployeeNames = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/employee_details/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -320,7 +320,7 @@ const LoanForm = () => {
   useEffect(() => {
     const fetchLabourNames = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/labours-details/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/labours-details/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -455,7 +455,7 @@ const LoanForm = () => {
     const fetchExistingFile = async () => {
       try {
         const response = await fetch(
-          `https://backendaab.in/aabuildersDash/api/loans/${editingLoanId}`,
+          `https://backendaab.in/demoAabuildersDash/api/loans/${editingLoanId}`,
           { credentials: 'include', headers: { 'Content-Type': 'application/json' } }
         );
         if (!response.ok) return;
@@ -494,7 +494,7 @@ const LoanForm = () => {
     ];
     const fetchSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -541,7 +541,7 @@ const LoanForm = () => {
     }
     const fetchLoanData = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loans/all');
         if (response.ok) {
           const data = await response.json();
           const associateEntries = data.filter((item) => {
@@ -693,7 +693,7 @@ const LoanForm = () => {
     }
     const run = (async () => {
       try {
-        const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/account-details/getAll'), {
+        const response = await fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/account-details/getAll'), {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -797,7 +797,7 @@ const LoanForm = () => {
     formData.append('files', selectedLoanFile);
     formData.append('folder', 'FileUpload / Loan_Portal');
     formData.append('fileName', finalName);
-    const uploadRes = await fetch('https://backendaab.in/aabuildersDash/api/files/upload', {
+    const uploadRes = await fetch('https://backendaab.in/demoAabuildersDash/api/files/upload', {
       method: 'POST',
       body: formData,
     });
@@ -875,7 +875,7 @@ const LoanForm = () => {
         };
         const username = encodeURIComponent(getEditedByUsername());
         const response = await fetch(
-          `https://backendaab.in/aabuildersDash/api/loans/${editingLoanId}?editedBy=${username}`,
+          `https://backendaab.in/demoAabuildersDash/api/loans/${editingLoanId}?editedBy=${username}`,
           {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -941,7 +941,7 @@ const LoanForm = () => {
             advance_portal_id: null,
             branch_id: activeBranchId
           };
-          const loanSaveUrl = withBranchUrl('https://backendaab.in/aabuildersDash/api/loans/save');
+          const loanSaveUrl = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/loans/save');
           const senderResponse = await fetch(loanSaveUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -979,7 +979,7 @@ const LoanForm = () => {
             advance_portal_id: null,
             branch_id: activeBranchId
           };
-          const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/loans/save'), {
+          const response = await fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/loans/save'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -1013,7 +1013,7 @@ const LoanForm = () => {
           advance_portal_id: null,
           branch_id: activeBranchId
         };
-        const loanSaveUrl = withBranchUrl('https://backendaab.in/aabuildersDash/api/loans/save');
+        const loanSaveUrl = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/loans/save');
         if (selectedLoanType === 'Loan' && paymentDetails && isPaymentModeRequiringBankRegisterLog(paymentDetails.paymentMode)) {
           await postBankRegisterLogSave(
             bankRegisterLogSaveUrlMatchingRequest(loanSaveUrl),
@@ -1079,7 +1079,7 @@ const LoanForm = () => {
             account_number: paymentDetails.accountNumber || null,
             branch_id: activeBranchId,
           };
-          const weeklyBillSaveUrl = withBranchUrl('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save');
+          const weeklyBillSaveUrl = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save');
           const weeklyResponse = await fetch(weeklyBillSaveUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

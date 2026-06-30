@@ -148,7 +148,7 @@ const InputData = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchUserRoles = async () => {
       try {
-        const response = await axios.get("https://backendaab.in/aabuilderDash/api/user_roles/all");
+        const response = await axios.get("https://backendaab.in/demoAabuilderDash/api/user_roles/all");
         const allRoles = response.data;
         const userRoleNames = userRoles.map(r => r.roles);
         const matchedRoles = allRoles.filter(role =>
@@ -168,7 +168,7 @@ const InputData = ({ username, userRoles = [] }) => {
   }, [userRoles]);
   const fetchProjects = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
       if (response.ok) {
         const data = await response.json();
         const ownProjects = Array.isArray(data)
@@ -877,7 +877,7 @@ const InputData = ({ username, userRoles = [] }) => {
   }, []);
   const fetchProperties = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/properties/all');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/properties/all');
       if (response.ok) {
         const data = await response.json();
         setProperties(data);
@@ -947,7 +947,7 @@ const InputData = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchTenants = async () => {
       try {
-        const response = await axios.get('https://backendaab.in/aabuildersDash/api/tenant-groups/all');
+        const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/tenant-groups/all');
         const updatedTenants = response.data.map((tenant) => {
           if (tenant.aadhaarFile) {
             return {
@@ -967,7 +967,7 @@ const InputData = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchTenantLinkWithShop = async () => {
       try {
-        const response = await axios.get('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll');
+        const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
         setTenantLinkList(response.data);
       } catch (error) {
         console.error('Error fetching tenant link with shop:', error);
@@ -979,7 +979,7 @@ const InputData = ({ username, userRoles = [] }) => {
     const confirmed = window.confirm("Are you sure you want to delete all Properties ?");
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/properties/deleteAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/properties/deleteAll", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -1000,7 +1000,7 @@ const InputData = ({ username, userRoles = [] }) => {
     const confirmed = window.confirm("Are you sure you want to delete all Payment Modes?");
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/payment_mode/deleteAll", {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/payment_mode/deleteAll", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -1023,7 +1023,7 @@ const InputData = ({ username, userRoles = [] }) => {
   }, []);
   const fetchSiteNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/getAll');
       if (response.ok) {
         const data = await response.json();
         setSiteNames(data);
@@ -1040,7 +1040,7 @@ const InputData = ({ username, userRoles = [] }) => {
   }, []);
   const fetchPaymentModes = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/payment_mode/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
       if (response.ok) {
         const data = await response.json();
         setPaymentMode(data);
@@ -1060,7 +1060,7 @@ const InputData = ({ username, userRoles = [] }) => {
       fetchPaymentModes(),
     ]);
     try {
-      const response = await axios.get('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll');
+      const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
       setTenantLinkList(response.data);
     } catch (error) {
       console.error('Error refreshing tenant link data:', error);
@@ -1071,7 +1071,7 @@ const InputData = ({ username, userRoles = [] }) => {
     e.preventDefault();
     const newAccountType = { modeOfPayment };
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/payment_mode/save', {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1094,7 +1094,7 @@ const InputData = ({ username, userRoles = [] }) => {
     const confirmed = window.confirm("Are you sure you want to delete This Payment Mode?");
     if (confirmed) {
       try {
-        const response = await fetch(`https://backendaab.in/aabuildersDash/api/payment_mode/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/payment_mode/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -1115,7 +1115,7 @@ const InputData = ({ username, userRoles = [] }) => {
   const handleNewSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch("https://backendaab.in/aabuildersDash/api/properties/save", {
+      const response = await fetch("https://backendaab.in/demoAabuildersDash/api/properties/save", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1153,7 +1153,7 @@ const InputData = ({ username, userRoles = [] }) => {
   const handleSubmitEdit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/properties/edit/${selectedPropertyId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/properties/edit/${selectedPropertyId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1176,7 +1176,7 @@ const InputData = ({ username, userRoles = [] }) => {
     const confirmed = window.confirm("Are you sure you want to delete This Property?");
     if (confirmed) {
       try {
-        const response = await fetch(`https://backendaab.in/aabuildersDash/api/properties/${id}`, {
+        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/properties/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -1305,7 +1305,7 @@ const InputData = ({ username, userRoles = [] }) => {
     const confirmed = window.confirm("Are you sure you want to delete This Tenant Link?");
     if (confirmed) {
       try {
-        const response = await fetch(`https://backendaab.in/aabuildersDash/api/tenant_link_shop/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -1325,7 +1325,7 @@ const InputData = ({ username, userRoles = [] }) => {
     const confirmed = window.confirm("Are you sure you want to delete all Tenant Links?");
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/tenant_link_shop/deleteAll", {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/deleteAll", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -1442,7 +1442,7 @@ const InputData = ({ username, userRoles = [] }) => {
         }))
       };
 
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/tenant_link_shop/save', {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1489,7 +1489,7 @@ const InputData = ({ username, userRoles = [] }) => {
         }))
       };
 
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/tenant_link_shop/edit/${selectedTenantLinkId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/edit/${selectedTenantLinkId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1514,7 +1514,7 @@ const InputData = ({ username, userRoles = [] }) => {
   const handleSubmitEditPaymentMode = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/payment_mode/edit/${selectedPaymentModeId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/payment_mode/edit/${selectedPaymentModeId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1615,7 +1615,7 @@ const InputData = ({ username, userRoles = [] }) => {
         ownerDetails: editProject.ownerDetailsList,       // mapped for backend
         propertyDetails: sortedPropertyDetails  // mapped for backend - sorted before submit
       };
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/projects/edit/${selectedProjectId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/projects/edit/${selectedProjectId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1631,7 +1631,7 @@ const InputData = ({ username, userRoles = [] }) => {
             siteNo: editProject.projectId
           };
           if (existingSiteName) {
-            const siteNameResponse = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
+            const siteNameResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(siteNamePayload),
@@ -1640,7 +1640,7 @@ const InputData = ({ username, userRoles = [] }) => {
               fetchSiteNames(); // Refresh site names list
             }
           } else {
-            const siteNameResponse = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/save', {
+            const siteNameResponse = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/save', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(siteNamePayload),
@@ -1736,7 +1736,7 @@ const InputData = ({ username, userRoles = [] }) => {
     if (window.confirm('Are you sure you want to delete this project?')) {
       try {
         const projectToDelete = projects.find(project => project.id === id);
-        const response = await fetch(`https://backendaab.in/aabuilderDash/api/projects/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/projects/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -1746,7 +1746,7 @@ const InputData = ({ username, userRoles = [] }) => {
               const existingSiteNameById = siteNames.find(site => site.id === id);
               const existingSiteName = existingSiteNameById || existingSiteNameBySiteNo;
               if (existingSiteName) {
-                const siteNameResponse = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/delete/${existingSiteName.id}`, {
+                const siteNameResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/project_Names/delete/${existingSiteName.id}`, {
                   method: 'DELETE',
                 });
                 if (siteNameResponse.ok) {
@@ -1777,7 +1777,7 @@ const InputData = ({ username, userRoles = [] }) => {
         ownerDetails: newProject.ownerDetailsList,      // map to backend
         propertyDetails: newProject.propertyDetailsList // map to backend
       };
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/save', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1790,7 +1790,7 @@ const InputData = ({ username, userRoles = [] }) => {
             siteNo: newProject.projectId
           };
           if (existingSiteName) {
-            const siteNameResponse = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
+            const siteNameResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(siteNamePayload),
@@ -1799,7 +1799,7 @@ const InputData = ({ username, userRoles = [] }) => {
               fetchSiteNames();
             }
           } else {
-            const siteNameResponse = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/save', {
+            const siteNameResponse = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/save', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(siteNamePayload),
@@ -1830,7 +1830,7 @@ const InputData = ({ username, userRoles = [] }) => {
     const formData = new FormData();
     formData.append('file', file);
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/upload-sql', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/upload-sql', {
         method: 'POST',
         body: formData,
       });

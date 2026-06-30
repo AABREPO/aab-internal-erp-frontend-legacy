@@ -104,7 +104,7 @@ const Table = ({ username = '', refreshSignal, isActive = true }) => {
     useEffect(() => {
         const fetchBranches = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuildersDash/api/branch/getAll', {
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/branch/getAll', {
                     method: 'GET',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
@@ -196,7 +196,7 @@ const Table = ({ username = '', refreshSignal, isActive = true }) => {
     // Fetch projects for allShops
     const fetchProjects = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
                 // Filter for "own project" category
@@ -241,7 +241,7 @@ const Table = ({ username = '', refreshSignal, isActive = true }) => {
     // Fetch tenant link data
     const fetchTenants = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
@@ -715,7 +715,7 @@ const Table = ({ username = '', refreshSignal, isActive = true }) => {
 
     const loadRentForms = useCallback(() => {
         axios
-            .get('https://backendaab.in/aabuildersDash/api/rental_forms/getAll')
+            .get('https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll')
             .then((response) => applyRentFormsResponse(response.data))
             .catch((error) => {
                 console.error('Error fetching expenses:', error);
@@ -853,7 +853,7 @@ const Table = ({ username = '', refreshSignal, isActive = true }) => {
     useEffect(() => {
         const fetchAccountDetails = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
                 if (response.ok) {
                     const data = await response.json();
                     setAccountDetails(data);
@@ -963,7 +963,7 @@ const Table = ({ username = '', refreshSignal, isActive = true }) => {
         };
         setIsSubmitting(true);
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/rental_forms/update/${editId}`, {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/rental_forms/update/${editId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1050,7 +1050,7 @@ const Table = ({ username = '', refreshSignal, isActive = true }) => {
                 attachedFile,
             };
 
-            const rentalUpdateUrl = `https://backendaab.in/aabuildersDash/api/rental_forms/update/${editId}`;
+            const rentalUpdateUrl = `https://backendaab.in/demoAabuildersDash/api/rental_forms/update/${editId}`;
             if (isPaymentModeRequiringBankRegisterLog(paymentModalData.paymentMode)) {
                 await postBankRegisterLogSave(
                     bankRegisterLogSaveUrlMatchingRequest(rentalUpdateUrl),

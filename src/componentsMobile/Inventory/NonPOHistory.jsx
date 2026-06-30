@@ -72,7 +72,7 @@ const NonPOHistory = ({ onTabChange }) => {
   useEffect(() => {
     const fetchVendors = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll');
+        const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
         if (response.ok) {
           const data = await response.json();
           setVendorData(data);
@@ -88,7 +88,7 @@ const NonPOHistory = ({ onTabChange }) => {
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -110,7 +110,7 @@ const NonPOHistory = ({ onTabChange }) => {
   useEffect(() => {
     const fetchPoCategory = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll');
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
         if (response.ok) {
           const data = await response.json();
           const options = (data || []).map(item => ({
@@ -141,7 +141,7 @@ const NonPOHistory = ({ onTabChange }) => {
     const fetchNonPORecords = async () => {
       try {
         setLoading(true);
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/inventory/getIncoming', {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getIncoming', {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -442,7 +442,7 @@ const NonPOHistory = ({ onTabChange }) => {
         (Array.isArray(inventoryData?.inventory_items) && inventoryData.inventory_items.length === 0)) {
         if (inventoryData?.id) {
           try {
-            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/inventory/edit_with_history/${inventoryData.id}`, {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/inventory/edit_with_history/${inventoryData.id}`, {
               method: 'GET',
               credentials: 'include',
               headers: {
@@ -512,7 +512,7 @@ const NonPOHistory = ({ onTabChange }) => {
     }
 
     try {
-      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/inventory/delete/${recordId}`, {
+      const response = await fetch(`https://backendaab.in/aabuildersDash/api/inventory/delete/${recordId}`, {
         method: 'PUT',
         credentials: 'include',
         headers: {
@@ -545,7 +545,7 @@ const NonPOHistory = ({ onTabChange }) => {
       return;
     }
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -555,7 +555,7 @@ const NonPOHistory = ({ onTabChange }) => {
       if (response.ok) {
         console.log('Category saved successfully!');
         // Reload categories from API
-        const fetchResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll');
+        const fetchResponse = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
         if (fetchResponse.ok) {
           const data = await fetchResponse.json();
           const options = (data || []).map(item => ({

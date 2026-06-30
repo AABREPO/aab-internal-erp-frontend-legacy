@@ -5,7 +5,7 @@ import search from '../Images/search.png'
 import imports from '../Images/Import.svg'
 
 const DirectoryAmc = () => {
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL ?? 'https://backendaab.in/demoAabuildersDash';
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL ?? 'https://backendaab.in/aabuildersDash';
   const [activeTab, setActiveTab] = useState('clients');
   const [isAmcCreateOpen, setIsAmcCreateOpen] = useState(false);
   const [isAmcInputsOpen, setIsAmcInputsOpen] = useState(false);

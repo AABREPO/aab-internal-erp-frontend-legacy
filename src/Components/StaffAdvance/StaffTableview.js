@@ -372,11 +372,11 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
     setError(null);
     try {
       const [recRes, empRes, purRes] = await Promise.allSettled([
-        fetch('https://backendaab.in/demoAabuildersDash/api/staff-advance/all'),
-        fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll', {
+        fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all'),
+        fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll', {
           credentials: 'include',
         }),
-        fetch('https://backendaab.in/demoAabuildersDash/api/purposes/getAll')
+        fetch('https://backendaab.in/aabuildersDash/api/purposes/getAll')
       ]);
       const recData = recRes.status === 'fulfilled' && recRes.value.ok
         ? await recRes.value.json()
@@ -410,7 +410,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
 
   const refreshStaffRecords = useCallback(async () => {
     try {
-      const recRes = await fetch('https://backendaab.in/demoAabuildersDash/api/staff-advance/all');
+      const recRes = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
       if (recRes.ok) {
         const recData = await recRes.json();
         setRecords(Array.isArray(recData) ? recData : []);
@@ -432,7 +432,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   }, []);
   const fetchLaboursList = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/labours-details/getAll');
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
       if (response.ok) {
         const data = await response.json();
         const formattedData = data.map(item => ({
@@ -456,7 +456,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   useEffect(() => {
     const fetchAccountDetails = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
         if (response.ok) {
           const data = await response.json();
           setAccountDetails(Array.isArray(data) ? data : []);
@@ -608,7 +608,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   useEffect(() => {
     const fetchVendorNames = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -635,7 +635,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   useEffect(() => {
     const fetchContractorNames = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -663,7 +663,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -748,7 +748,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
       const currentEntry = records.find(
         (r) => String(r.staffAdvancePortalId || r.id) === String(editingId)
       );
-      const url = `https://backendaab.in/demoAabuildersDash/api/staff-advance/${editingId}?editedBy=${username}`;
+      const url = `https://backendaab.in/aabuildersDash/api/staff-advance/${editingId}?editedBy=${username}`;
       const response = await fetch(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -1133,7 +1133,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
         request_approval: false,
         request_completed: false
       };
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/edit_requests/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/edit_requests/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

@@ -1,4 +1,4 @@
-const GET_FORM_URL = 'https://backendaab.in/demoAabuilderDash/expenses_form/get_form';
+const GET_FORM_URL = 'https://backendaab.in/aabuilderDash/expenses_form/get_form';
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_ENO = 54173;
 

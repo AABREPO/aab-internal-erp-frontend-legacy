@@ -42,7 +42,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
   useEffect(() => {
     const fetchUserRoles = async () => {
       try {
-        const response = await axios.get("https://backendaab.in/demoAabuilderDash/api/user_roles/all");
+        const response = await axios.get("https://backendaab.in/aabuilderDash/api/user_roles/all");
         const allRoles = response.data;
         // Normalize to support both ['Create'] and [{ roles: 'Create' }] shapes.
         const userRoleNames = (userRoles || [])

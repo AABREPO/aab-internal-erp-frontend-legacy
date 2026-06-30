@@ -38,7 +38,7 @@ const ProjectUsageReport = () => {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -66,7 +66,7 @@ const ProjectUsageReport = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll');
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
         if (response.ok) {
           const data = await response.json();
           const options = data.map(item => ({
@@ -88,11 +88,11 @@ const ProjectUsageReport = () => {
     const fetchPOData = async () => {
       try {
         const [itemNamesRes, brandsRes, modelsRes, typesRes, categoriesRes] = await Promise.all([
-          fetch('https://backendaab.in/demoAabuildersDash/api/po_itemNames/getAll'),
-          fetch('https://backendaab.in/demoAabuildersDash/api/po_brand/getAll'),
-          fetch('https://backendaab.in/demoAabuildersDash/api/po_model/getAll'),
-          fetch('https://backendaab.in/demoAabuildersDash/api/po_type/getAll'),
-          fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll')
+          fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll'),
+          fetch('https://backendaab.in/aabuildersDash/api/po_brand/getAll'),
+          fetch('https://backendaab.in/aabuildersDash/api/po_model/getAll'),
+          fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll'),
+          fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll')
         ]);
 
         if (itemNamesRes.ok) {
@@ -162,7 +162,7 @@ const ProjectUsageReport = () => {
     const fetchInventoryData = async () => {
       try {
         setLoading(true);
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/inventory/getAll', {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll', {
           method: 'GET',
           credentials: 'include',
           headers: {

@@ -175,7 +175,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
     }, []);
     const fetchProjects = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
                 const ownProjects = Array.isArray(data)
@@ -210,7 +210,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
     }, [selectedRentType, projects]);
     const fetchTenants = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
@@ -341,7 +341,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
     };
     const fetchLatestEno = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll');
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/rental_forms/getAll');
             if (!response.ok) {
                 throw new Error('Failed to fetch ENo');
             }
@@ -367,7 +367,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
     }, []);
     const fetchRentalForms = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll');
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/rental_forms/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setRentalFormsData(data);
@@ -378,7 +378,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
     };
     const fetchRentHistory = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/rent-history/getAll');
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/rent-history/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setRentHistoryData(data);
@@ -392,7 +392,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
     };
     const fetchAccountDetails = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setAccountDetails(data);
@@ -929,7 +929,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             if (isPaymentModeRequiringBankRegisterLog(weeklyPaymentData.paymentMode)) {
                 await postBankRegisterLogSave(
                     bankRegisterLogSaveUrlMatchingRequest(
-                        "https://backendaab.in/demoAabuildersDash/api/rental_forms/save"
+                        "https://backendaab.in/aabuildersDash/api/rental_forms/save"
                     ),
                     "Rent Management",
                     {
@@ -993,7 +993,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                 entered_by: enteredBy || null,
             };
             const weeklyPaymentBillResponse = await fetch(
-                "https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save",
+                "https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save",
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -1090,7 +1090,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             .replace(/\s/g, "-");
         const date = `${month} ${getOrdinal(day)} ${year}`;
         const formattedPaidOnDate = convertToDDMMYYYY(paidOnDate);
-        const rentFormsRes = await fetch("https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll");
+        const rentFormsRes = await fetch("https://backendaab.in/aabuildersDash/api/rental_forms/getAll");
         if (!rentFormsRes.ok) throw new Error("Failed to fetch existing rent forms");
         const rentForms = await rentFormsRes.json();
         let pdfUrl = '';
@@ -1099,7 +1099,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             formData.append('files', selectedRentFile);
             formData.append('folder', 'FileUpload / Rent_Management');
             formData.append('fileName', `${timestamp} `);
-            const uploadResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/files/upload", {
+            const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
                 method: "POST",
                 body: formData,
             });
@@ -1245,7 +1245,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
         }
         const submittedFormIds = [];
         for (const form of submissions) {
-            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/rental_forms/save", {
+            const response = await fetch("https://backendaab.in/aabuildersDash/api/rental_forms/save", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(form),
@@ -1280,7 +1280,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
         }
         if (submittedFormIds.length === 0 && submissions.length > 0) {
             try {
-                const allFormsRes = await fetch("https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll");
+                const allFormsRes = await fetch("https://backendaab.in/aabuildersDash/api/rental_forms/getAll");
                 if (allFormsRes.ok) {
                     const allForms = await allFormsRes.json();
                     const matchingForms = allForms.filter(f => {
@@ -1315,7 +1315,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                 created_at: new Date().toISOString(),
             };
             try {
-                const weeklyExpenseResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-expenses/save", {
+                const weeklyExpenseResponse = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/save", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(weeklyExpenseData),
@@ -1329,7 +1329,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
         }
         if (selectedRentType === "Shop Closure" && closureDate && formTenantName && formShopNo && formShopNoId) {
             try {
-                const updateClosureResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/updateClosureDate/${encodeURIComponent(formTenantName)}/${encodeURIComponent(formShopNoId)}`, {
+                const updateClosureResponse = await fetch(`https://backendaab.in/aabuildersDash/api/tenant_link_shop/updateClosureDate/${encodeURIComponent(formTenantName)}/${encodeURIComponent(formShopNoId)}`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ shopClosureDate: closureDate }),
@@ -1352,7 +1352,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
     };
     const vacateShop = async (tenantId, shopNoId) => {
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/vacateShop/${tenantId}/${shopNoId}`, {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/tenant_link_shop/vacateShop/${tenantId}/${shopNoId}`, {
                 method: 'PUT',
             });
             if (!response.ok) {
@@ -1481,7 +1481,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
         const formData = new FormData();
         formData.append('file', file);
         try {
-            const response = await axios.post('https://backendaab.in/demoAabuildersDash/api/rental_forms/upload_old_data', formData, {
+            const response = await axios.post('https://backendaab.in/aabuildersDash/api/rental_forms/upload_old_data', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },

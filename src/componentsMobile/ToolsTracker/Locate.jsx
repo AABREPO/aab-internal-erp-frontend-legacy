@@ -2,11 +2,11 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Close from '../Images/close.png';
 import Search from '../Images/Search.png';
 
-const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_tracker_management';
-const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_tracker_stock_management';
-const PROJECTS_BASE_URL = 'https://backendaab.in/demoAabuilderDash/api/projects';
-const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_item_name';
-const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_item_id';
+const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
+const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_stock_management';
+const PROJECTS_BASE_URL = 'https://backendaab.in/aabuilderDash/api/projects';
+const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
+const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_id';
 
 const extractArrayFromResponse = (raw) => {
   if (Array.isArray(raw)) return raw;

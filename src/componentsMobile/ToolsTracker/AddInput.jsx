@@ -8,13 +8,13 @@ import Search from '../Images/Search.png';
 import CloseIcon from '../Images/Close F.svg';
 import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 const AddInput = ({ user }) => {
-  const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_item_name';
-  const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_brand';
-  const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_item_id';
-  const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_tracker_stock_management';
-  const TOOLS_MACHINE_NUMBER_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_machine_number';
-  const TOOLS_MACHINE_STATUS_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools-machine-status';
-  const GOOGLE_UPLOAD_URL = 'https://backendaab.in/demoAabuilderDash/expenses/googleUploader/uploadToGoogleDrive';
+  const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
+  const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_brand';
+  const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_id';
+  const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_stock_management';
+  const TOOLS_MACHINE_NUMBER_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_machine_number';
+  const TOOLS_MACHINE_STATUS_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools-machine-status';
+  const GOOGLE_UPLOAD_URL = 'https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive';
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedItemName, setSelectedItemName] = useState(null);
   const [selectedBrand, setSelectedBrand] = useState(null);
@@ -857,7 +857,7 @@ const AddInput = ({ user }) => {
   useEffect(() => {
     const fetchServiceStoreVendors = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll', {
+        const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll', {
           method: "GET",
           credentials: "include",
           headers: {
@@ -884,7 +884,7 @@ const AddInput = ({ user }) => {
   useEffect(() => {
     const fetchHomeLocations = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -909,7 +909,7 @@ const AddInput = ({ user }) => {
   }, []);
   const fetchVendorNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll', {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll', {
         method: "GET",
         credentials: "include",
         headers: {
@@ -954,7 +954,7 @@ const AddInput = ({ user }) => {
   }, [vendorOptions]);
   const refreshVendorData = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll', {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll', {
         method: "GET",
         credentials: "include",
         headers: {
@@ -991,7 +991,7 @@ const AddInput = ({ user }) => {
           const shouldBeSelected = newSelectedVendors.includes(vendor.value);
           const wasSelected = previousSelectedVendors.includes(vendor.value);
           if (shouldBeSelected !== wasSelected) {
-            const url = `https://backendaab.in/demoAabuilderDash/api/vendor_Names/${vendor.id}/make-store?makeAsServiceStore=${shouldBeSelected}`;
+            const url = `https://backendaab.in/aabuilderDash/api/vendor_Names/${vendor.id}/make-store?makeAsServiceStore=${shouldBeSelected}`;
             const updatePromise = fetch(url, {
               method: 'PUT',
               credentials: 'include',

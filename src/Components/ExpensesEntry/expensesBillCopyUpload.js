@@ -1,4 +1,4 @@
-const EXPENSES_BILL_COPY_UPLOAD_URL = 'https://backendaab.in/demoAabuildersDash/api/files/upload';
+const EXPENSES_BILL_COPY_UPLOAD_URL = 'https://backendaab.in/aabuildersDash/api/files/upload';
 
 export async function uploadExpensesEntryBillCopy(file, { siteName = '', vendor = '', contractor = '' } = {}) {
     if (!file) {

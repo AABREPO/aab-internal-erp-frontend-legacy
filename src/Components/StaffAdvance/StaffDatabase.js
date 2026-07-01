@@ -16,20 +16,78 @@ import AdvancePortalEditPaymentModal from '../Advance Portal/AdvancePortalEditPa
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
-import Filter from '../Images/TableFilter.svg'
-import Search from '../Images/Searchnew.svg'
-import Reload from '../Images/Clear.svg'
-import Pdf from '../Images/pdf.png';
-import XL from '../Images/sheets.png';
-import { DATABASE_TABLE_FILTER_SELECT_STYLES, formatEdbcFilterDateDMY } from '../ExpensesEntry/databaseExpensesSharedColumns';
+import {
+  EDBC_IDS,
+  DATABASE_TABLE_FILTER_SELECT_STYLES,
+  formatEdbcFilterDateDMY,
+  getEdbcColumnConfig,
+  useEdbcExpandedCells,
+  EdbcTableHeaderRow,
+  EdbcTableFilterRow,
+  EdbcTableBodyRow,
+  EdbcColumnHeader,
+  EdbcTimestampFilter,
+  EdbcProjectNameFilter,
+  EdbcSelectFilter,
+  EdbcPaymentModeFilter,
+  EdbcPaymentModeFilterChip,
+  hasEdbcPaymentModeFilter,
+  matchesEdbcPaymentModeFilter,
+  EdbcEmptyFilterCell,
+  EdbcTotalAmountFilter,
+  EdbcTextInputFilter,
+  matchesEdbcAmountFilter,
+  EdbcTimestampBodyCell,
+  EdbcDateBodyCell,
+  EdbcExpandableBodyCell,
+  EdbcFileBodyCell,
+  EDBC_TABLE_EDGE_TABLE_CLASS,
+  EdbcFilterToggleButton,
+  EdbcTableToolbarRightActions,
+} from '../ExpensesEntry/databaseExpensesSharedColumns';
 import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
 
-const STAFF_FILTER_DATE_INPUT_CLASS =
-  'p-1 rounded-lg bg-transparent w-full border-2 border-[rgba(191,152,83,0.2)] focus:outline-none text-[14px] h-[34px]';
-const STAFF_FILTER_NATIVE_SELECT_CLASS =
-  'p-1 rounded-lg bg-transparent w-full h-[34px] font-normal border-2 border-[rgba(191,152,83,0.2)] focus:outline-none text-[14px]';
+const formatAmountDisplay = (value) => {
+  if (value === '' || value === null || value === undefined) return '';
+  const normalized = String(value).replace(/,/g, '');
+  const num = Number(normalized);
+  if (Number.isNaN(num)) return String(value);
+  return num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+const ADVANCE_PORTAL_FILTER_AMOUNT_INPUT_CLASS =
+  'pl-[12px] pr-2 border border-[#00000029] rounded-lg w-full h-full focus:outline-none bg-[#ededed] text-[14px] font-medium cursor-default';
+const AdvancePortalAmountOutput = ({ value, className = '' }) => {
+  const formattedValue = formatAmountDisplay(value);
+  const displayValue = formattedValue ? `₹${formattedValue}` : '';
+  return (
+    <div className={`relative lg:w-[150px] w-full h-[40px] ${className}`.trim()}>
+      <input
+        type="text"
+        readOnly
+        tabIndex={-1}
+        value={displayValue}
+        className={ADVANCE_PORTAL_FILTER_AMOUNT_INPUT_CLASS}
+      />
+    </div>
+  );
+};
+
+const formatStaffDatabaseAmount = (value) =>
+  value != null && value !== ''
+    ? Number(value).toLocaleString('en-IN', { maximumFractionDigits: 0 })
+    : '';
+
+const STAFF_TABLEVIEW_BLANK_VALUE = 'BLANK';
+const STAFF_TABLEVIEW_BLANK_LABEL = 'Blank';
+const staffTableviewBlankOption = { value: STAFF_TABLEVIEW_BLANK_VALUE, label: STAFF_TABLEVIEW_BLANK_LABEL };
+const isStaffTableviewBlankish = (value) =>
+  value === null ||
+  value === undefined ||
+  (typeof value === 'string' && value.trim() === '') ||
+  value === 0 ||
+  value === '0';
 
 const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const [records, setRecords] = useState([]);
@@ -42,11 +100,20 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
   const [staffAdvanceCombinedOptions, setStaffAdvanceCombinedOptions] = useState([]);
   // New state variables for advanced functionality
   const [selectDate, setSelectDate] = useState('');
+  const [selectDateEnd, setSelectDateEnd] = useState('');
+  const [timestampStartDate, setTimestampStartDate] = useState('');
+  const [timestampEndDate, setTimestampEndDate] = useState('');
+  const [showDateRangePicker, setShowDateRangePicker] = useState(false);
+  const [showExpenseDateRangePicker, setShowExpenseDateRangePicker] = useState(false);
   const [selectEmployeeName, setSelectEmployeeName] = useState('');
   const [selectPurpose, setSelectPurpose] = useState('');
   const [selectTransferTo, setSelectTransferTo] = useState('');
   const [selectType, setSelectType] = useState('');
-  const [selectMode, setSelectMode] = useState('');
+  const [selectedPaymentModes, setSelectedPaymentModes] = useState([]);
+  const [selectAmount, setSelectAmount] = useState('');
+  const [selectRefundAmount, setSelectRefundAmount] = useState('');
+  const [selectDescription, setSelectDescription] = useState('');
+  const [selectEntryNo, setSelectEntryNo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({});
@@ -70,6 +137,9 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
   const scrollRef = useRef(null);
   const filterRowRef = useRef(null);
   const filterNudgeUsedRef = useRef(false);
+  const filterChipsScrollRef = useRef(null);
+  const isFilterChipsDragging = useRef(false);
+  const filterChipsDragStart = useRef({ x: 0, scrollLeft: 0 });
   const [overallSearch, setOverallSearch] = useState('');
   const isDragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
@@ -283,15 +353,56 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
       return { key, direction: 'asc' };
     });
   };
+  const { expandedCells, toggleExpandedCell } = useEdbcExpandedCells();
+  const edbc8Config = getEdbcColumnConfig(EDBC_IDS.EDBC8);
+  const edbc19Config = getEdbcColumnConfig(EDBC_IDS.EDBC19);
+  const mapStaffSortKeyToEdbc = (key) => {
+    if (key === 'employee') return 'vendor';
+    if (key === 'purpose') return 'source';
+    if (key === 'transfer') return 'siteName';
+    if (key === 'mode') return 'paymentMode';
+    if (key === 'type') return 'accountType';
+    if (key === 'description') return 'comments';
+    if (key === 'entry_no') return 'eno';
+    if (key === 'amount') return 'amount';
+    if (key === 'timestamp') return 'timestamp';
+    return key;
+  };
+  const handleEdbcSort = (edbcField) => {
+    const fieldToKey = {
+      vendor: 'employee',
+      source: 'purpose',
+      siteName: 'transfer',
+      paymentMode: 'mode',
+      accountType: 'type',
+      comments: 'description',
+      eno: 'entry_no',
+      amount: 'amount',
+      date: 'date',
+      timestamp: 'timestamp',
+    };
+    handleSort(fieldToKey[edbcField] || edbcField);
+  };
+  const resolveEdbcSortField = (staffSortKey) =>
+    sortConfig.key === staffSortKey ? mapStaffSortKeyToEdbc(staffSortKey) : '';
 
   const clearFilters = () => {
     setSelectDate('');
+    setSelectDateEnd('');
+    setTimestampStartDate('');
+    setTimestampEndDate('');
     setSelectEmployeeName('');
     setSelectPurpose('');
     setSelectTransferTo('');
     setSelectType('');
-    setSelectMode('');
+    setSelectedPaymentModes([]);
+    setSelectAmount('');
+    setSelectRefundAmount('');
+    setSelectDescription('');
+    setSelectEntryNo('');
     setOverallSearch('');
+    setSortConfig({ key: null, direction: 'asc' });
+    setShowFilters(false);
   };
 
   const formatDateOnly = (dateString) => {
@@ -306,240 +417,323 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
   const getLabourName = (id) => laboursList.find(l => l.id === id)?.label || id;
   const getPurposeName = (id) => purposes.find(p => p.id === id)?.label || id;
 
-  // Get unique employee names from current table data for filter dropdown
+  const matchesStaffEntryDateFilter = useCallback((entry) => {
+    if (!selectDate && !selectDateEnd) return true;
+    const expenseDate = new Date(entry.date);
+    if (selectDate && selectDateEnd) {
+      const s = new Date(selectDate);
+      s.setHours(0, 0, 0, 0);
+      const e = new Date(selectDateEnd);
+      e.setHours(23, 59, 59, 999);
+      return expenseDate >= s && expenseDate <= e;
+    }
+    if (selectDate) {
+      const s = new Date(selectDate);
+      s.setHours(0, 0, 0, 0);
+      return expenseDate >= s;
+    }
+    const e = new Date(selectDateEnd);
+    e.setHours(23, 59, 59, 999);
+    return expenseDate <= e;
+  }, [selectDate, selectDateEnd]);
+
+  const matchesStaffTimestampFilter = useCallback((entry) => {
+    if (!timestampStartDate && !timestampEndDate) return true;
+    const expenseTs = entry.timestamp ? new Date(entry.timestamp) : null;
+    if (!expenseTs) return false;
+    if (timestampStartDate && timestampEndDate) {
+      const ts = new Date(timestampStartDate);
+      ts.setHours(0, 0, 0, 0);
+      const te = new Date(timestampEndDate);
+      te.setHours(23, 59, 59, 999);
+      return expenseTs >= ts && expenseTs <= te;
+    }
+    if (timestampStartDate) {
+      const ts = new Date(timestampStartDate);
+      ts.setHours(0, 0, 0, 0);
+      return expenseTs >= ts;
+    }
+    const te = new Date(timestampEndDate);
+    te.setHours(23, 59, 59, 999);
+    return expenseTs <= te;
+  }, [timestampStartDate, timestampEndDate]);
+
+  const matchesRecordsForFilterOptions = useCallback((entry, excludeField) => {
+    if (!matchesStaffTimestampFilter(entry)) return false;
+    if (!matchesStaffEntryDateFilter(entry)) return false;
+    if (excludeField !== 'employee' && selectEmployeeName) {
+      const employeeName = String(getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || '');
+      if (selectEmployeeName === STAFF_TABLEVIEW_BLANK_VALUE) {
+        if (!isStaffTableviewBlankish(employeeName)) return false;
+      } else if (employeeName.toLowerCase() !== selectEmployeeName.toLowerCase()) return false;
+    }
+    if (excludeField !== 'purpose' && selectPurpose) {
+      const purposeName = String(getPurposeName(entry.from_purpose_id) || '');
+      if (selectPurpose === STAFF_TABLEVIEW_BLANK_VALUE) {
+        if (!isStaffTableviewBlankish(purposeName)) return false;
+      } else if (purposeName.toLowerCase() !== selectPurpose.toLowerCase()) return false;
+    }
+    if (excludeField !== 'transfer' && selectTransferTo) {
+      const transferToName = String(getPurposeName(entry.to_purpose_id) || '');
+      if (selectTransferTo === STAFF_TABLEVIEW_BLANK_VALUE) {
+        if (!isStaffTableviewBlankish(transferToName)) return false;
+      } else if (transferToName.toLowerCase() !== selectTransferTo.toLowerCase()) return false;
+    }
+    if (excludeField !== 'type' && selectType) {
+      if (selectType === STAFF_TABLEVIEW_BLANK_VALUE) {
+        if (!isStaffTableviewBlankish(entry.type)) return false;
+      } else if (String(entry.type || '').toLowerCase() !== selectType.toLowerCase()) return false;
+    }
+    if (excludeField !== 'mode' && !matchesEdbcPaymentModeFilter(entry.staff_payment_mode, selectedPaymentModes, {
+      blankValue: STAFF_TABLEVIEW_BLANK_VALUE,
+      isBlankish: isStaffTableviewBlankish,
+    })) return false;
+    if (excludeField !== 'amount' && selectAmount.trim() && !matchesEdbcAmountFilter(entry.amount, selectAmount)) return false;
+    if (excludeField !== 'refund' && selectRefundAmount.trim() && !matchesEdbcAmountFilter(entry.staff_refund_amount, selectRefundAmount)) return false;
+    if (excludeField !== 'description' && selectDescription.trim()) {
+      if (!String(entry.description ?? '').toLowerCase().includes(selectDescription.toLowerCase().trim())) return false;
+    }
+    if (excludeField !== 'entryNo' && selectEntryNo) {
+      if (selectEntryNo === STAFF_TABLEVIEW_BLANK_VALUE) {
+        if (!isStaffTableviewBlankish(entry.entry_no)) return false;
+      } else if (!entry.entry_no?.toString().includes(selectEntryNo.toString())) return false;
+    }
+    return true;
+  }, [matchesStaffTimestampFilter, matchesStaffEntryDateFilter, selectEmployeeName, selectPurpose, selectTransferTo, selectType, selectedPaymentModes, selectAmount, selectRefundAmount, selectDescription, selectEntryNo, getEmployeeName, getLabourName, getPurposeName]);
+
+  const handleFilterChipsMouseDown = (e) => {
+    if (!filterChipsScrollRef.current || e.target.closest('button')) return;
+    isFilterChipsDragging.current = true;
+    filterChipsDragStart.current = {
+      x: e.clientX,
+      scrollLeft: filterChipsScrollRef.current.scrollLeft,
+    };
+    filterChipsScrollRef.current.style.cursor = 'grabbing';
+    filterChipsScrollRef.current.style.userSelect = 'none';
+  };
+  const handleFilterChipsMouseMove = (e) => {
+    if (!isFilterChipsDragging.current || !filterChipsScrollRef.current) return;
+    e.preventDefault();
+    const dx = e.clientX - filterChipsDragStart.current.x;
+    filterChipsScrollRef.current.scrollLeft =
+      filterChipsDragStart.current.scrollLeft - dx;
+  };
+  const handleFilterChipsMouseUp = () => {
+    if (!filterChipsScrollRef.current) return;
+    isFilterChipsDragging.current = false;
+    filterChipsScrollRef.current.style.cursor = 'grab';
+    filterChipsScrollRef.current.style.userSelect = '';
+  };
+
+  const hasActiveColumnFilters = Boolean(
+    selectDate ||
+    selectDateEnd ||
+    timestampStartDate ||
+    timestampEndDate ||
+    selectEmployeeName ||
+    selectPurpose ||
+    selectTransferTo ||
+    selectAmount.trim() ||
+    selectRefundAmount.trim() ||
+    selectDescription.trim() ||
+    selectType ||
+    hasEdbcPaymentModeFilter(selectedPaymentModes) ||
+    selectEntryNo
+  );
+
   const employeeNameOptions = useMemo(() => {
     const uniqueNames = new Set();
-    // Use filteredRecords but exclude employee filter to show all available employees in current view
-    records.filter((entry) => {
-      // Apply all filters except employee filter
-      if (selectDate) {
-        const [year, month, day] = selectDate.split("-");
-        const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
-        const entryDateObj = new Date(entry.date);
-        const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
-        if (formattedEntryDate !== formattedSelectDate) return false;
-      }
-      if (selectPurpose) {
-        const purposeName = String(getPurposeName(entry.from_purpose_id) || "");
-        if (purposeName.toLowerCase() !== selectPurpose.toLowerCase()) return false;
-      }
-      if (selectTransferTo) {
-        const transferToName = String(getPurposeName(entry.to_purpose_id) || "");
-        if (transferToName.toLowerCase() !== selectTransferTo.toLowerCase()) return false;
-      }
-      if (selectType) {
-        if (String(entry.type || "").toLowerCase() !== selectType.toLowerCase()) return false;
-      }
-      if (selectMode) {
-        if (String(entry.staff_payment_mode || "").toLowerCase() !== selectMode.toLowerCase()) return false;
-      }
-      return true;
-    }).forEach((entry) => {
-      const name = getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id);
-      if (name) {
-        uniqueNames.add(name);
+    let hasBlank = false;
+    records.filter((entry) => matchesRecordsForFilterOptions(entry, 'employee')).forEach((entry) => {
+      const name = getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || '';
+      if (isStaffTableviewBlankish(name)) {
+        hasBlank = true;
+      } else {
+        uniqueNames.add(String(name));
       }
     });
-    return Array.from(uniqueNames).map(name => ({ value: name, label: name }));
-  }, [records, selectDate, selectPurpose, selectTransferTo, selectType, selectMode, getEmployeeName, getLabourName, getPurposeName]);
+    const options = Array.from(uniqueNames)
+      .sort((a, b) => String(a).localeCompare(String(b)))
+      .map((name) => ({ value: name, label: name }));
+    if (hasBlank) options.unshift(staffTableviewBlankOption);
+    return options;
+  }, [records, matchesRecordsForFilterOptions, getEmployeeName, getLabourName]);
 
-  // Get unique purpose options from current table data
   const purposeOptions = useMemo(() => {
+    const scopedRecords = records.filter((entry) => matchesRecordsForFilterOptions(entry, 'purpose'));
     const uniquePurposes = new Set();
-    records.filter((entry) => {
-      // Apply all filters except purpose filter
-      if (selectDate) {
-        const [year, month, day] = selectDate.split("-");
-        const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
-        const entryDateObj = new Date(entry.date);
-        const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
-        if (formattedEntryDate !== formattedSelectDate) return false;
+    let hasBlank = false;
+    scopedRecords.forEach((entry) => {
+      if (!entry.from_purpose_id) {
+        hasBlank = true;
+        return;
       }
-      if (selectEmployeeName) {
-        const employeeName = String(getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "");
-        if (employeeName.toLowerCase() !== selectEmployeeName.toLowerCase()) return false;
-      }
-      if (selectTransferTo) {
-        const transferToName = String(getPurposeName(entry.to_purpose_id) || "");
-        if (transferToName.toLowerCase() !== selectTransferTo.toLowerCase()) return false;
-      }
-      if (selectType) {
-        if (String(entry.type || "").toLowerCase() !== selectType.toLowerCase()) return false;
-      }
-      if (selectMode) {
-        if (String(entry.staff_payment_mode || "").toLowerCase() !== selectMode.toLowerCase()) return false;
-      }
-      return true;
-    }).forEach((entry) => {
       const purposeName = getPurposeName(entry.from_purpose_id);
-      if (purposeName && purposeName !== entry.from_purpose_id) {
-        uniquePurposes.add(purposeName);
+      if (isStaffTableviewBlankish(purposeName) || purposeName === entry.from_purpose_id) {
+        hasBlank = true;
+      } else {
+        uniquePurposes.add(String(purposeName));
       }
     });
-    return Array.from(uniquePurposes).map(purpose => ({ 
-      value: purpose, 
-      label: purpose, 
-      id: records.find(r => getPurposeName(r.from_purpose_id) === purpose)?.from_purpose_id 
-    }));
-  }, [records, selectDate, selectEmployeeName, selectTransferTo, selectType, selectMode, getPurposeName, getEmployeeName, getLabourName]);
+    const options = Array.from(uniquePurposes)
+      .sort((a, b) => String(a).localeCompare(String(b)))
+      .map((purpose) => ({
+        value: purpose,
+        label: purpose,
+        id: scopedRecords.find((r) => getPurposeName(r.from_purpose_id) === purpose)?.from_purpose_id,
+      }));
+    if (hasBlank) options.unshift(staffTableviewBlankOption);
+    return options;
+  }, [records, matchesRecordsForFilterOptions, getPurposeName]);
 
-  // Get unique transfer to options from current table data
   const transferToOptions = useMemo(() => {
+    const scopedRecords = records.filter((entry) => matchesRecordsForFilterOptions(entry, 'transfer'));
     const uniqueTransferTo = new Set();
-    records.filter((entry) => {
-      // Apply all filters except transferTo filter
-      if (selectDate) {
-        const [year, month, day] = selectDate.split("-");
-        const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
-        const entryDateObj = new Date(entry.date);
-        const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
-        if (formattedEntryDate !== formattedSelectDate) return false;
+    let hasBlank = false;
+    scopedRecords.forEach((entry) => {
+      if (!entry.to_purpose_id) {
+        hasBlank = true;
+        return;
       }
-      if (selectEmployeeName) {
-        const employeeName = String(getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "");
-        if (employeeName.toLowerCase() !== selectEmployeeName.toLowerCase()) return false;
-      }
-      if (selectPurpose) {
-        const purposeName = String(getPurposeName(entry.from_purpose_id) || "");
-        if (purposeName.toLowerCase() !== selectPurpose.toLowerCase()) return false;
-      }
-      if (selectType) {
-        if (String(entry.type || "").toLowerCase() !== selectType.toLowerCase()) return false;
-      }
-      if (selectMode) {
-        if (String(entry.staff_payment_mode || "").toLowerCase() !== selectMode.toLowerCase()) return false;
-      }
-      return true;
-    }).forEach((entry) => {
       const transferToName = getPurposeName(entry.to_purpose_id);
-      if (transferToName && transferToName !== entry.to_purpose_id) {
-        uniqueTransferTo.add(transferToName);
+      if (isStaffTableviewBlankish(transferToName) || transferToName === entry.to_purpose_id) {
+        hasBlank = true;
+      } else {
+        uniqueTransferTo.add(String(transferToName));
       }
     });
-    return Array.from(uniqueTransferTo).map(transferTo => ({ 
-      value: transferTo, 
-      label: transferTo, 
-      id: records.find(r => getPurposeName(r.to_purpose_id) === transferTo)?.to_purpose_id 
-    }));
-  }, [records, selectDate, selectEmployeeName, selectPurpose, selectType, selectMode, getPurposeName, getEmployeeName, getLabourName]);
+    const options = Array.from(uniqueTransferTo)
+      .sort((a, b) => String(a).localeCompare(String(b)))
+      .map((transferTo) => ({
+        value: transferTo,
+        label: transferTo,
+        id: scopedRecords.find((r) => getPurposeName(r.to_purpose_id) === transferTo)?.to_purpose_id,
+      }));
+    if (hasBlank) options.unshift(staffTableviewBlankOption);
+    return options;
+  }, [records, matchesRecordsForFilterOptions, getPurposeName]);
 
-  // Get unique type options from current table data
   const typeOptions = useMemo(() => {
     const uniqueTypes = new Set();
-    records.filter((entry) => {
-      // Apply all filters except type filter
-      if (selectDate) {
-        const [year, month, day] = selectDate.split("-");
-        const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
-        const entryDateObj = new Date(entry.date);
-        const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
-        if (formattedEntryDate !== formattedSelectDate) return false;
-      }
-      if (selectEmployeeName) {
-        const employeeName = String(getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "");
-        if (employeeName.toLowerCase() !== selectEmployeeName.toLowerCase()) return false;
-      }
-      if (selectPurpose) {
-        const purposeName = String(getPurposeName(entry.from_purpose_id) || "");
-        if (purposeName.toLowerCase() !== selectPurpose.toLowerCase()) return false;
-      }
-      if (selectTransferTo) {
-        const transferToName = String(getPurposeName(entry.to_purpose_id) || "");
-        if (transferToName.toLowerCase() !== selectTransferTo.toLowerCase()) return false;
-      }
-      if (selectMode) {
-        if (String(entry.staff_payment_mode || "").toLowerCase() !== selectMode.toLowerCase()) return false;
-      }
-      return true;
-    }).forEach((entry) => {
-      if (entry.type) {
-        uniqueTypes.add(entry.type);
-      }
+    let hasBlank = false;
+    records.filter((entry) => matchesRecordsForFilterOptions(entry, 'type')).forEach((entry) => {
+      if (entry.type) uniqueTypes.add(entry.type);
+      else hasBlank = true;
     });
-    return Array.from(uniqueTypes).sort();
-  }, [records, selectDate, selectEmployeeName, selectPurpose, selectTransferTo, selectMode, getEmployeeName, getLabourName, getPurposeName]);
+    return (hasBlank ? [STAFF_TABLEVIEW_BLANK_VALUE] : []).concat(Array.from(uniqueTypes).sort());
+  }, [records, matchesRecordsForFilterOptions]);
 
-  // Get unique mode options from current table data
-  const modeOptions = useMemo(() => {
+  const modeFilterOptions = useMemo(() => {
     const uniqueModes = new Set();
-    records.filter((entry) => {
-      // Apply all filters except mode filter
-      if (selectDate) {
-        const [year, month, day] = selectDate.split("-");
-        const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
-        const entryDateObj = new Date(entry.date);
-        const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
-        if (formattedEntryDate !== formattedSelectDate) return false;
-      }
-      if (selectEmployeeName) {
-        const employeeName = String(getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "");
-        if (employeeName.toLowerCase() !== selectEmployeeName.toLowerCase()) return false;
-      }
-      if (selectPurpose) {
-        const purposeName = String(getPurposeName(entry.from_purpose_id) || "");
-        if (purposeName.toLowerCase() !== selectPurpose.toLowerCase()) return false;
-      }
-      if (selectTransferTo) {
-        const transferToName = String(getPurposeName(entry.to_purpose_id) || "");
-        if (transferToName.toLowerCase() !== selectTransferTo.toLowerCase()) return false;
-      }
-      if (selectType) {
-        if (String(entry.type || "").toLowerCase() !== selectType.toLowerCase()) return false;
-      }
-      return true;
-    }).forEach((entry) => {
-      if (entry.staff_payment_mode) {
-        uniqueModes.add(entry.staff_payment_mode);
-      }
+    let hasBlank = false;
+    records.filter((entry) => matchesRecordsForFilterOptions(entry, 'mode')).forEach((entry) => {
+      if (entry.staff_payment_mode) uniqueModes.add(entry.staff_payment_mode);
+      else hasBlank = true;
     });
-    return Array.from(uniqueModes).sort();
-  }, [records, selectDate, selectEmployeeName, selectPurpose, selectTransferTo, selectType, getEmployeeName, getLabourName, getPurposeName]);
+    const options = Array.from(uniqueModes)
+      .sort()
+      .map((mode) => ({ value: mode, label: mode }));
+    if (hasBlank) options.unshift(staffTableviewBlankOption);
+    return options;
+  }, [records, matchesRecordsForFilterOptions]);
 
   // Advanced filtering logic
   const filteredRecords = useMemo(() => {
     return records.filter((entry) => {
-      // Date filter (exact match since it's type="date")
-      if (selectDate) {
-        const [year, month, day] = selectDate.split("-");
-        const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
-        const entryDateObj = new Date(entry.date);
-        const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
-        if (formattedEntryDate !== formattedSelectDate) return false;
-      }
+      if (!matchesStaffTimestampFilter(entry)) return false;
+      if (!matchesStaffEntryDateFilter(entry)) return false;
 
       // Employee filter
       if (selectEmployeeName) {
         const employeeName = String(getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "");
-        if (employeeName.toLowerCase() !== selectEmployeeName.toLowerCase()) return false;
+        if (selectEmployeeName === STAFF_TABLEVIEW_BLANK_VALUE) {
+          if (!isStaffTableviewBlankish(employeeName)) return false;
+        } else if (employeeName.toLowerCase() !== selectEmployeeName.toLowerCase()) return false;
       }
 
-      // Purpose filter
       if (selectPurpose) {
         const purposeName = String(getPurposeName(entry.from_purpose_id) || "");
-        if (purposeName.toLowerCase() !== selectPurpose.toLowerCase()) return false;
+        if (selectPurpose === STAFF_TABLEVIEW_BLANK_VALUE) {
+          if (!isStaffTableviewBlankish(purposeName)) return false;
+        } else if (purposeName.toLowerCase() !== selectPurpose.toLowerCase()) return false;
       }
 
-      // Transfer To filter
       if (selectTransferTo) {
         const transferToName = String(getPurposeName(entry.to_purpose_id) || "");
-        if (transferToName.toLowerCase() !== selectTransferTo.toLowerCase()) return false;
+        if (selectTransferTo === STAFF_TABLEVIEW_BLANK_VALUE) {
+          if (!isStaffTableviewBlankish(transferToName)) return false;
+        } else if (transferToName.toLowerCase() !== selectTransferTo.toLowerCase()) return false;
       }
 
-      // Type filter
       if (selectType) {
-        if (String(entry.type || "").toLowerCase() !== selectType.toLowerCase()) return false;
+        if (selectType === STAFF_TABLEVIEW_BLANK_VALUE) {
+          if (!isStaffTableviewBlankish(entry.type)) return false;
+        } else if (String(entry.type || "").toLowerCase() !== selectType.toLowerCase()) return false;
       }
 
-      // Mode filter
-      if (selectMode) {
-        if (String(entry.staff_payment_mode || "").toLowerCase() !== selectMode.toLowerCase()) return false;
+      if (!matchesEdbcPaymentModeFilter(entry.staff_payment_mode, selectedPaymentModes, {
+        blankValue: STAFF_TABLEVIEW_BLANK_VALUE,
+        isBlankish: isStaffTableviewBlankish,
+      })) return false;
+
+      if (selectAmount.trim() && !matchesEdbcAmountFilter(entry.amount, selectAmount)) return false;
+      if (selectRefundAmount.trim() && !matchesEdbcAmountFilter(entry.staff_refund_amount, selectRefundAmount)) return false;
+      if (selectDescription.trim()) {
+        if (!String(entry.description ?? '').toLowerCase().includes(selectDescription.toLowerCase().trim())) return false;
+      }
+      if (selectEntryNo) {
+        if (selectEntryNo === STAFF_TABLEVIEW_BLANK_VALUE) {
+          if (!isStaffTableviewBlankish(entry.entry_no)) return false;
+        } else if (!entry.entry_no?.toString().includes(selectEntryNo.toString())) return false;
       }
 
-      return true; // passes all filters
+      if (overallSearch.trim()) {
+        const q = overallSearch.toLowerCase().trim();
+        const searchable = [
+          entry.timestamp ? formatDate(entry.timestamp) : '',
+          formatDateOnly(entry.date),
+          getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id),
+          getPurposeName(entry.from_purpose_id),
+          getPurposeName(entry.to_purpose_id),
+          entry.amount,
+          entry.staff_refund_amount,
+          entry.description,
+          entry.type,
+          entry.staff_payment_mode,
+          entry.entry_no,
+        ]
+          .map((v) => String(v ?? '').toLowerCase())
+          .join(' ');
+        if (!searchable.includes(q)) return false;
+      }
+
+      return true;
     });
-  }, [records, selectDate, selectEmployeeName, selectPurpose, selectTransferTo, selectType, selectMode]);
+  }, [records, selectEmployeeName, selectPurpose, selectTransferTo, selectType, selectedPaymentModes, selectAmount, selectRefundAmount, selectDescription, selectEntryNo, overallSearch, matchesStaffEntryDateFilter, matchesStaffTimestampFilter, getEmployeeName, getLabourName, getPurposeName]);
 
-  // Sorting logic
+  const filterColumnTotals = useMemo(() => filteredRecords.reduce(
+    (acc, entry) => {
+      acc.amount += Number(entry.amount) || 0;
+      acc.refund += Number(entry.staff_refund_amount) || 0;
+      return acc;
+    },
+    { amount: 0, refund: 0 }
+  ), [filteredRecords]);
+
+  const entryNoOptions = useMemo(() => {
+    const uniqueEntryNos = new Set();
+    let hasBlank = false;
+    records.filter((entry) => matchesRecordsForFilterOptions(entry, 'entryNo')).forEach((entry) => {
+      if (entry.entry_no != null && entry.entry_no !== '') {
+        uniqueEntryNos.add(String(entry.entry_no));
+      } else {
+        hasBlank = true;
+      }
+    });
+    return (hasBlank ? [STAFF_TABLEVIEW_BLANK_VALUE] : []).concat(
+      Array.from(uniqueEntryNos).sort((a, b) => Number(b) - Number(a)),
+    );
+  }, [records, matchesRecordsForFilterOptions]);
 
   // Sorting logic
   const sortedData = useMemo(() => {
@@ -550,6 +744,10 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
         let aValue, bValue;
 
         switch (sortConfig.key) {
+          case 'timestamp':
+            aValue = a.timestamp ? new Date(a.timestamp) : new Date(0);
+            bValue = b.timestamp ? new Date(b.timestamp) : new Date(0);
+            break;
           case 'date':
             aValue = new Date(a.date);
             bValue = new Date(b.date);
@@ -565,6 +763,18 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
           case 'transfer':
             aValue = getPurposeName(a.to_purpose_id);
             bValue = getPurposeName(b.to_purpose_id);
+            break;
+          case 'amount':
+            aValue = Number(a.amount) || 0;
+            bValue = Number(b.amount) || 0;
+            break;
+          case 'refund':
+            aValue = Number(a.staff_refund_amount) || 0;
+            bValue = Number(b.staff_refund_amount) || 0;
+            break;
+          case 'description':
+            aValue = a.description || '';
+            bValue = b.description || '';
             break;
           case 'type':
             aValue = a.type || '';
@@ -592,7 +802,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
     }
 
     return sortableData;
-  }, [filteredRecords, sortConfig]);
+  }, [filteredRecords, sortConfig, getEmployeeName, getLabourName, getPurposeName]);
 
 
 
@@ -605,7 +815,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectDate, selectEmployeeName, selectPurpose, selectTransferTo, selectType, selectMode]);
+  }, [selectDate, selectDateEnd, timestampStartDate, timestampEndDate, selectEmployeeName, selectPurpose, selectTransferTo, selectType, selectedPaymentModes, selectAmount, selectRefundAmount, selectDescription, selectEntryNo, overallSearch]);
 
   // Pagination handlers
   const goToPage = (page) => {
@@ -944,28 +1154,16 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
         <div className='w-full xl:w-auto xl:justify-between'>
           <div className='flex flex-wrap gap-[12px]'>
             <div>
-              <label className='block mb-[8px] font-semibold'>Advance Amount</label>
-              <input
-                className='lg:w-[150px] h-[40px] rounded-lg border border-[#00000029] font-semibold bg-[#ededed] focus:outline-none p-2'
-                value={`₹${advanceTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                readOnly
-              />
+              <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Advance Amount</label>
+              <AdvancePortalAmountOutput value={advanceTotal} />
             </div>
             <div>
-              <label className='block mb-[8px] font-semibold'>Transfer Amount</label>
-              <input
-                className='lg:w-[150px] h-[40px] rounded-lg border border-[#00000029] font-semibold bg-[#ededed] focus:outline-none p-2'
-                value={`₹${transferTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                readOnly
-              />
+              <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Transfer Amount</label>
+              <AdvancePortalAmountOutput value={transferTotal} />
             </div>
             <div>
-              <label className='block mb-[8px] font-semibold'>Refund Amount</label>
-              <input
-                className='lg:w-[150px] h-[40px] rounded-lg border border-[#00000029] font-semibold bg-[#ededed] focus:outline-none p-2'
-                value={`₹${refundTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                readOnly
-              />
+              <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Refund Amount</label>
+              <AdvancePortalAmountOutput value={refundTotal} />
             </div>
           </div>
         </div>
@@ -976,15 +1174,14 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
           <p>{error}</p>
         </div>
       )}
-      <div className="w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
+      <div className="w-full pt-[18px] px-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
         <div
-          className={`text-left flex ${selectDate || selectEmployeeName || selectPurpose || selectTransferTo || selectType || selectMode
+          className={`text-left flex ${hasActiveColumnFilters
             ? 'flex-col sm:flex-row sm:justify-between'
             : 'flex-row justify-between items-center'
             } mb-[12px] gap-[6px]`}>
           <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
-            <button
-              className=''
+            <EdbcFilterToggleButton
               onClick={() => {
                 const willOpen = !showFilters;
                 const scroller = scrollRef.current;
@@ -1014,248 +1211,323 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
                   });
                 });
               }}
-            >
-              <img
-                src={Filter}
-                alt="Toggle Filter"
-                className=" border rounded-md h-[34px]"
-              />
-            </button>
-            {(selectDate || selectEmployeeName || selectPurpose || selectTransferTo || selectType || selectMode) && (
-              <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
-                {selectDate && (
-                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
-                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
-                    <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(selectDate)}</span>
-                    <button onClick={() => setSelectDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+            />
+            {hasActiveColumnFilters && (
+                <div
+                  ref={filterChipsScrollRef}
+                  onMouseDown={handleFilterChipsMouseDown}
+                  onMouseMove={handleFilterChipsMouseMove}
+                  onMouseUp={handleFilterChipsMouseUp}
+                  onMouseLeave={handleFilterChipsMouseUp}
+                  className="flex min-w-0 flex-1 overflow-x-auto flex-nowrap items-center gap-2 no-scrollbar scrollbar-none cursor-grab select-none"
+                >
+                {timestampStartDate && (
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Timestamp: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{timestampEndDate ? (timestampStartDate === timestampEndDate ? formatEdbcFilterDateDMY(timestampStartDate) : `${formatEdbcFilterDateDMY(timestampStartDate)} – ${formatEdbcFilterDateDMY(timestampEndDate)}`) : `${formatEdbcFilterDateDMY(timestampStartDate)} onwards`}</span>
+                    <button type="button" onClick={() => { setTimestampStartDate(''); setTimestampEndDate(''); }} className="text-[#E4572E] ml-1 text-2xl">×</button>
                   </span>
                 )}
+                {timestampEndDate && !timestampStartDate && (
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Timestamp until: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{formatEdbcFilterDateDMY(timestampEndDate)}</span>
+                    <button type="button" onClick={() => setTimestampEndDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                  </span>
+                )}
+                {selectDate && selectDateEnd ? (
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Date: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">
+                      {selectDate === selectDateEnd
+                        ? formatEdbcFilterDateDMY(selectDate)
+                        : `${formatEdbcFilterDateDMY(selectDate)} – ${formatEdbcFilterDateDMY(selectDateEnd)}`}
+                    </span>
+                    <button type="button" onClick={() => { setSelectDate(''); setSelectDateEnd(''); }} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                  </span>
+                ) : selectDate ? (
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Date: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{formatEdbcFilterDateDMY(selectDate)} onwards</span>
+                    <button type="button" onClick={() => setSelectDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                  </span>
+                ) : selectDateEnd ? (
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Date until: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{formatEdbcFilterDateDMY(selectDateEnd)}</span>
+                    <button type="button" onClick={() => setSelectDateEnd('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                  </span>
+                ) : null}
                 {selectEmployeeName && (
-                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
-                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Employee: </span>
-                    <span className="font-semibold text-[14px] truncate min-w-0">{selectEmployeeName}</span>
-                    <button onClick={() => setSelectEmployeeName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Employee: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectEmployeeName === STAFF_TABLEVIEW_BLANK_VALUE ? STAFF_TABLEVIEW_BLANK_LABEL : selectEmployeeName}</span>
+                    <button type="button" onClick={() => setSelectEmployeeName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectPurpose && (
-                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
-                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Purpose: </span>
-                    <span className="font-semibold text-[14px] truncate min-w-0">{selectPurpose}</span>
-                    <button onClick={() => setSelectPurpose('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Purpose: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectPurpose === STAFF_TABLEVIEW_BLANK_VALUE ? STAFF_TABLEVIEW_BLANK_LABEL : selectPurpose}</span>
+                    <button type="button" onClick={() => setSelectPurpose('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectTransferTo && (
-                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
-                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Transfer To: </span>
-                    <span className="font-semibold text-[14px] truncate min-w-0">{selectTransferTo}</span>
-                    <button onClick={() => setSelectTransferTo('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Transfer To: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectTransferTo === STAFF_TABLEVIEW_BLANK_VALUE ? STAFF_TABLEVIEW_BLANK_LABEL : selectTransferTo}</span>
+                    <button type="button" onClick={() => setSelectTransferTo('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  </span>
+                )}
+                {selectAmount.trim() && (
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Advance: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectAmount}</span>
+                    <button type="button" onClick={() => setSelectAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  </span>
+                )}
+                {selectRefundAmount.trim() && (
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Refund: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectRefundAmount}</span>
+                    <button type="button" onClick={() => setSelectRefundAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  </span>
+                )}
+                {selectDescription.trim() && (
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Description: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectDescription}</span>
+                    <button type="button" onClick={() => setSelectDescription('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectType && (
-                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
-                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Type: </span>
-                    <span className="font-semibold text-[14px] truncate min-w-0">{selectType}</span>
-                    <button onClick={() => setSelectType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Type: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectType === STAFF_TABLEVIEW_BLANK_VALUE ? STAFF_TABLEVIEW_BLANK_LABEL : selectType}</span>
+                    <button type="button" onClick={() => setSelectType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
-                {selectMode && (
-                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
-                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Mode: </span>
-                    <span className="font-semibold text-[14px] truncate min-w-0">{selectMode}</span>
-                    <button onClick={() => setSelectMode('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                <EdbcPaymentModeFilterChip
+                  fieldLabel="Mode"
+                  selectedModes={selectedPaymentModes}
+                  blankValue={STAFF_TABLEVIEW_BLANK_VALUE}
+                  blankLabel={STAFF_TABLEVIEW_BLANK_LABEL}
+                  onClear={() => setSelectedPaymentModes([])}
+                />
+                {selectEntryNo && (
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Entry No: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{String(selectEntryNo) === STAFF_TABLEVIEW_BLANK_VALUE ? STAFF_TABLEVIEW_BLANK_LABEL : selectEntryNo}</span>
+                    <button type="button" onClick={() => setSelectEntryNo('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
-              </div>
+                </div>
             )}
           </div>
-          <div className='flex items-end gap-[6px]'>
-            <button onClick={clearFilters} className='flex h-[34px] w-[32px] shrink-0 items-center justify-center'>
-              <img className='w-full h-full' src={Reload} alt="Reload" />
-            </button>
-            <div className="w-[286px] min-w-[286px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
-              <input
-                type="text"
-                value={overallSearch}
-                onChange={(e) => setOverallSearch(e.target.value)}
-                placeholder="Search Transactions..."
-                className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
-              />
-              <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
-            </div>
-            <div className=' text-left md:text-right md:items-end items-end cursor-default flex justify-end max-w-screen-2xl table-auto overflow-auto w-full scrollbar-none no-scrollbar'>
-              <div className='flex items-end text-center '>
-                <span className='text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportPDF}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
-                <span className='text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportCSV}>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
-              </div>
-            </div>
-          </div>
+          <EdbcTableToolbarRightActions
+            onClearFilters={clearFilters}
+            overallSearch={overallSearch}
+            onOverallSearchChange={setOverallSearch}
+            searchPlaceholder="Search Transactions..."
+            showExportIcons
+            onExportPdf={exportPDF}
+            onExportCsv={exportCSV}
+          />
         </div>
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <div
             ref={scrollRef}
-            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none no-scrollbar scrollbar-none"
+            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none scrollbar-none no-scrollbar"
             onWheel={() => { filterNudgeUsedRef.current = false; }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
           >
-            <table className="w-full border-collapse">
-              <thead className="sticky top-0 z-10 bg-white ">
-                <tr className="bg-[#FAF6ED]">
+            <table className={`table-fixed min-w-[1920px] w-full border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS}`}>
+              <thead className="sticky top-0 z-20 bg-white ">
+                <EdbcTableHeaderRow>
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC1}
+                    label="Timestamp"
+                    sortField={resolveEdbcSortField('timestamp')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC2}
+                    label="Date"
+                    sortField={resolveEdbcSortField('date')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC4}
+                    label="Employee Name"
+                    sortField={resolveEdbcSortField('employee')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC14}
+                    label="Purpose"
+                    sortField={resolveEdbcSortField('purpose')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC3}
+                    label="Transfer To"
+                    sortField={resolveEdbcSortField('transfer')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC8}
+                    label="Advance"
+                    sortField={resolveEdbcSortField('amount')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
                   <th
-                    className="pt-2 pl-1 sm:pl-3 min-w-[80px] sm:min-w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
-                    onClick={() => handleSort('date')}
+                    id={EDBC_IDS.EDBC8}
+                    className={edbc8Config?.headerClass}
+                    onClick={() => handleSort('refund')}
                   >
-                    <span className="hidden sm:inline">Timestamp</span>
-                    <span className="sm:hidden">Time</span> {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    Refund
+                    {sortConfig.key === 'refund' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                   </th>
-                  <th
-                    className="pt-2 pl-1 sm:pl-3 min-w-[80px] sm:min-w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
-                    onClick={() => handleSort('date')}
-                  >
-                    Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th
-                    className="px-1 sm:px-2 min-w-[120px] sm:min-w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
-                    onClick={() => handleSort('employee')}
-                  >
-                    <span className="hidden sm:inline">Employee Name</span>
-                    <span className="sm:hidden">Employee</span> {sortConfig.key === 'employee' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th
-                    className="px-1 sm:px-2 min-w-[150px] sm:min-w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
-                    onClick={() => handleSort('purpose')}
-                  >
-                    Purpose {sortConfig.key === 'purpose' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th
-                    className="px-1 sm:px-2 min-w-[150px] sm:min-w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
-                    onClick={() => handleSort('transfer')}
-                  >
-                    <span className="hidden sm:inline">Transfer To</span>
-                    <span className="sm:hidden">Transfer</span> {sortConfig.key === 'transfer' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="px-1 sm:px-2 min-w-[60px] sm:min-w-[80px] font-bold text-left text-xs sm:text-sm">Advance</th>
-                  <th className="px-1 sm:px-2 min-w-[60px] sm:min-w-[80px] font-bold text-left text-xs sm:text-sm">Refund</th>
-                  <th
-                    className="px-1 sm:px-2 min-w-[60px] sm:min-w-[80px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
-                    onClick={() => handleSort('type')}
-                  >
-                    Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th
-                    className="px-1 sm:px-2 min-w-[80px] sm:min-w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
-                    onClick={() => handleSort('mode')}
-                  >
-                    Mode {sortConfig.key === 'mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="px-1 sm:px-2 min-w-[80px] sm:min-w-[100px] font-bold text-left text-xs sm:text-sm">
-                    <span className="hidden sm:inline">Description</span>
-                    <span className="sm:hidden">Desc</span>
-                  </th>
-                  <th className="px-1 sm:px-2 min-w-[60px] sm:min-w-[80px] font-bold text-left text-xs sm:text-sm">
-                    <span className="hidden sm:inline">Attached file</span>
-                    <span className="sm:hidden">File</span>
-                  </th>
-                  <th
-                    className="px-1 sm:px-2 min-w-[50px] sm:min-w-[60px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
-                    onClick={() => handleSort('entry_no')}
-                  >
-                    E.No {sortConfig.key === 'entry_no' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="px-1 sm:px-2 min-w-[60px] sm:min-w-[80px] font-bold text-left text-xs sm:text-sm">Activity</th>
-                </tr>
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC9}
+                    label="Description"
+                    sortField={resolveEdbcSortField('description')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC12}
+                    label="Type"
+                    sortField={resolveEdbcSortField('type')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC13}
+                    label="Mode"
+                    sortField={resolveEdbcSortField('mode')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC17}
+                    label="Entry No"
+                    sortField={resolveEdbcSortField('entry_no')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader columnId={EDBC_IDS.EDBC19} label="Activity" />
+                  <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="File" />
+                </EdbcTableHeaderRow>
                 {showFilters && (
-                  <tr ref={filterRowRef} className="bg-white border-b border-gray-200">
-                    <th className="pt-2 pb-2 min-w-[120px] sm:w-44">
-                      <input
-                        type="date"
-                        className={STAFF_FILTER_DATE_INPUT_CLASS}
-                      />
-                    </th>
-                    <th className="pt-2 pb-2 min-w-[120px] sm:w-44">
-                      <input
-                        type="date"
-                        value={selectDate}
-                        onChange={(e) => setSelectDate(e.target.value)}
-                        className={STAFF_FILTER_DATE_INPUT_CLASS}
-                        placeholder="Search Date..."
-                      />
-                    </th>
-                    <th className="pt-2 pb-2 min-w-[150px] sm:w-[220px]">
-                      <Select
-                        options={employeeNameOptions}
-                        value={selectEmployeeName ? { value: selectEmployeeName, label: selectEmployeeName } : null}
-                        onChange={(opt) => setSelectEmployeeName(opt ? opt.value : "")}
-                        className="text-xs focus:outline-none"
-                        placeholder="Employee..."
-                        isSearchable
-                        isClearable
-                        styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                      />
-                    </th>
-                    <th className="pt-2 pb-2 min-w-[180px] sm:w-[300px]">
-                      <Select
-                        options={purposeOptions}
-                        value={selectPurpose ? { value: selectPurpose, label: selectPurpose } : null}
-                        onChange={(opt) => setSelectPurpose(opt ? opt.value : "")}
-                        className="focus:outline-none text-xs"
-                        placeholder="Purpose..."
-                        isSearchable
-                        isClearable
-                        styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                      />
-                    </th>
-                    <th className="pt-2 pb-2 min-w-[200px] sm:w-[350px]">
-                      <Select
-                        options={transferToOptions}
-                        value={selectTransferTo ? { value: selectTransferTo, label: selectTransferTo } : null}
-                        onChange={(opt) => setSelectTransferTo(opt ? opt.value : "")}
-                        className="focus:outline-none text-xs"
-                        placeholder="Transfer To..."
-                        isSearchable
-                        isClearable
-                        styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                      />
-                    </th>
-                    <th className=' pt-2 pb-2'></th>
-                    <th className=' pt-2 pb-2'></th>
-                    <th className="pt-2 pb-2 min-w-[100px]">
-                      <select
-                        value={selectType}
-                        onChange={(e) => setSelectType(e.target.value)}
-                        className={STAFF_FILTER_NATIVE_SELECT_CLASS}
-                        placeholder="Type..."
-                      >
-                        <option value=''>Select Type...</option>
-                        {typeOptions.map((type) => (
-                          <option key={type} value={type}>
-                            {type}
-                          </option>
-                        ))}
-                      </select>
-                    </th>
-                    <th className="pt-2 pb-2 min-w-[100px]">
-                      <select
-                        value={selectMode}
-                        onChange={(e) => setSelectMode(e.target.value)}
-                        className={STAFF_FILTER_NATIVE_SELECT_CLASS}
-                        placeholder="Mode..."
-                      >
-                        <option value=''>Select</option>
-                        {modeOptions.map((mode) => (
-                          <option key={mode} value={mode}>
-                            {mode}
-                          </option>
-                        ))}
-                      </select>
-                    </th>
-                    <th className="pt-2 pb-2"></th>
-                    <th className=' pt-2 pb-2'></th>
-                    <th className=' pt-2 pb-2'></th>
-                    <th className=' pt-2 pb-2'></th>
-                  </tr>
+                  <EdbcTableFilterRow ref={filterRowRef}>
+                    <EdbcTimestampFilter
+                      placeholder="Timestamp"
+                      timestampStartDate={timestampStartDate}
+                      timestampEndDate={timestampEndDate}
+                      isOpen={showDateRangePicker}
+                      onOpen={() => setShowDateRangePicker(true)}
+                      onClose={() => setShowDateRangePicker(false)}
+                      onApply={(from, to) => {
+                        setTimestampStartDate(from || '');
+                        setTimestampEndDate(to || '');
+                      }}
+                    />
+                    <EdbcTimestampFilter
+                      columnId={EDBC_IDS.EDBC2}
+                      placeholder="Date"
+                      timestampStartDate={selectDate}
+                      timestampEndDate={selectDateEnd}
+                      isOpen={showExpenseDateRangePicker}
+                      onOpen={() => setShowExpenseDateRangePicker(true)}
+                      onClose={() => setShowExpenseDateRangePicker(false)}
+                      onApply={(from, to) => {
+                        setSelectDate(from || '');
+                        setSelectDateEnd(to || '');
+                      }}
+                    />
+                    <EdbcSelectFilter
+                      columnId={EDBC_IDS.EDBC4}
+                      placeholder="Employee Name"
+                      options={employeeNameOptions}
+                      value={selectEmployeeName}
+                      onChange={setSelectEmployeeName}
+                      blankOption={staffTableviewBlankOption}
+                      blankValue={STAFF_TABLEVIEW_BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcSelectFilter
+                      columnId={EDBC_IDS.EDBC14}
+                      placeholder="Purpose"
+                      options={purposeOptions}
+                      value={selectPurpose}
+                      onChange={setSelectPurpose}
+                      blankOption={staffTableviewBlankOption}
+                      blankValue={STAFF_TABLEVIEW_BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcProjectNameFilter
+                      placeholder="Transfer To"
+                      options={transferToOptions}
+                      value={selectTransferTo}
+                      onChange={setSelectTransferTo}
+                      blankOption={staffTableviewBlankOption}
+                      blankValue={STAFF_TABLEVIEW_BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={filterColumnTotals.amount} value={selectAmount} onChange={(e) => setSelectAmount(e.target.value)} />
+                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={filterColumnTotals.refund} value={selectRefundAmount} onChange={(e) => setSelectRefundAmount(e.target.value)} />
+                    <EdbcTextInputFilter
+                      columnId={EDBC_IDS.EDBC9}
+                      placeholder="Description"
+                      value={selectDescription}
+                      onChange={(e) => setSelectDescription(e.target.value)}
+                    />
+                    <EdbcSelectFilter
+                      columnId={EDBC_IDS.EDBC12}
+                      placeholder="Type"
+                      options={typeOptions.map((type) =>
+                        type === STAFF_TABLEVIEW_BLANK_VALUE ? staffTableviewBlankOption : { value: type, label: type }
+                      )}
+                      value={selectType}
+                      onChange={setSelectType}
+                      blankOption={staffTableviewBlankOption}
+                      blankValue={STAFF_TABLEVIEW_BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcPaymentModeFilter
+                      columnId={EDBC_IDS.EDBC13}
+                      placeholder="Mode"
+                      options={modeFilterOptions}
+                      value={selectedPaymentModes}
+                      onChange={setSelectedPaymentModes}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcSelectFilter
+                      columnId={EDBC_IDS.EDBC17}
+                      placeholder="Entry No"
+                      options={entryNoOptions.map((n) =>
+                        n === STAFF_TABLEVIEW_BLANK_VALUE ? staffTableviewBlankOption : { value: n, label: n }
+                      )}
+                      value={selectEntryNo}
+                      onChange={setSelectEntryNo}
+                      blankOption={staffTableviewBlankOption}
+                      blankValue={STAFF_TABLEVIEW_BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                      textAlign="right"
+                    />
+                    <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC19} />
+                    <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                  </EdbcTableFilterRow>
                 )}
               </thead>
               <tbody>
@@ -1267,89 +1539,135 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
                     </td>
                   </tr>
                 ) : currentData.length > 0 ? (
-                  currentData.map((entry) => (
-                    <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[80px] sm:min-w-[100px] font-semibold">
-                        <span className="hidden sm:inline">{formatDate(entry.timestamp)}</span>
-                        <span className="sm:hidden">{formatDate(entry.timestamp).split(' ')[1]}</span>
-                      </td>
-                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[80px] sm:min-w-[100px] font-semibold">{formatDateOnly(entry.date)}</td>
-                      {/* Employee Name */}
-                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[120px] sm:min-w-[150px] font-semibold">
-                        <span className="truncate block max-w-[120px] sm:max-w-[150px]" title={getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id)}>
-                          {getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id)}
+                  currentData.map((entry, index) => (
+                    <EdbcTableBodyRow key={entry.id}>
+                      <EdbcTimestampBodyCell
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        formatValue={formatDate}
+                      />
+                      <EdbcDateBodyCell
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        formatValue={formatDateOnly}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC4}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) =>
+                          getEmployeeName(row.employee_id) || getLabourName(row.labour_id)
+                        }
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC14}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => getPurposeName(row.from_purpose_id)}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC3}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => getPurposeName(row.to_purpose_id)}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC8}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        textAlignClass="text-right"
+                        getDisplayValue={(row) => formatStaffDatabaseAmount(row.amount)}
+                      />
+                      <td className={edbc8Config?.tdClass}>
+                        <span
+                          onClick={() => toggleExpandedCell(`${entry.id ?? index}-refund_amount`)}
+                          className={`block w-full cursor-pointer text-right ${expandedCells[`${entry.id ?? index}-refund_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                          title={formatStaffDatabaseAmount(entry.staff_refund_amount)}
+                        >
+                          {formatStaffDatabaseAmount(entry.staff_refund_amount)}
                         </span>
                       </td>
-                      {/* Purpose */}
-                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[150px] sm:min-w-[200px] font-semibold">
-                        <span className="truncate block max-w-[150px] sm:max-w-[200px]" title={getPurposeName(entry.from_purpose_id)}>
-                          {getPurposeName(entry.from_purpose_id)}
-                        </span>
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC9}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => row.description || ''}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC12}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => row.type}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC13}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => row.staff_payment_mode}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC17}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        textAlignClass="text-right"
+                        getDisplayValue={(row) => row.entry_no}
+                      />
+                      <td id={EDBC_IDS.EDBC19} className={edbc19Config?.tdClass}>
+                        <button
+                          type="button"
+                          onClick={entry.not_allow_to_edit ? undefined : () => handleEditClick(entry)}
+                          disabled={entry.not_allow_to_edit}
+                          className={`rounded-full transition duration-200 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <img
+                            src={edit}
+                            alt="Edit"
+                            className={`w-4 h-6 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
+                          />
+                        </button>
+                        <button type="button" className="" disabled={entry.not_allow_to_edit}>
+                          <img
+                            src={remove}
+                            alt="delete"
+                            onClick={entry.not_allow_to_edit ? undefined : () => handleDelete(entry.staffAdvancePortalId || entry.id)}
+                            className={`w-4 h-4 transition duration-200 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : 'transform hover:scale-110 hover:brightness-110'}`}
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={entry.not_allow_to_edit ? undefined : () => fetchAuditDetails(entry.staffAdvancePortalId || entry.id)}
+                          disabled={entry.not_allow_to_edit}
+                          className={`rounded-full transition duration-200 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <img
+                            src={history}
+                            alt="history"
+                            className={`w-4 h-5 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
+                          />
+                        </button>
                       </td>
-                      {/* Transfer Purpose */}
-                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[150px] sm:min-w-[200px] font-semibold">
-                        <span className="truncate block max-w-[150px] sm:max-w-[200px]" title={getPurposeName(entry.to_purpose_id)}>
-                          {getPurposeName(entry.to_purpose_id)}
-                        </span>
-                      </td>
-                      {/* Amount */}
-                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[60px] sm:min-w-[80px] font-semibold">
-                        {entry.amount != null && entry.amount !== ""
-                          ? Number(entry.amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
-                          : ""}
-                      </td>
-                      {/* Refund Amount */}
-                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[60px] sm:min-w-[80px] font-semibold">
-                        {entry.staff_refund_amount != null && entry.staff_refund_amount !== ""
-                          ? Number(entry.staff_refund_amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
-                          : ""}
-                      </td>
-                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[60px] sm:min-w-[80px] font-semibold">{entry.type}</td>
-                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[80px] sm:min-w-[100px] font-semibold">{entry.staff_payment_mode}</td>
-                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[80px] sm:min-w-[100px] font-semibold">
-                        <span className="truncate block max-w-[80px] sm:max-w-[100px]" title={entry.description}>
-                          {entry.description}
-                        </span>
-                      </td>
-                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[60px] sm:min-w-[80px]"></td>
-                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[50px] sm:min-w-[60px] font-semibold">{entry.entry_no}</td>
-                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[60px] sm:min-w-[80px]">
-                        <div className="flex justify-between items-center">
-                          <button
-                            className={`rounded-full transition duration-200 ml-2 mr-3 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            disabled={entry.not_allow_to_edit}
-                          >
-                            <img
-                              src={edit}
-                              onClick={entry.not_allow_to_edit ? undefined : () => handleEditClick(entry)}
-                              alt="Edit"
-                              className={`w-4 h-6 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
-                            />
-                          </button>
-                          <button 
-                            className={`-ml-5 -mr-2 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            disabled={entry.not_allow_to_edit}
-                          >
-                            <img
-                              src={remove}
-                              alt='delete'
-                              onClick={entry.not_allow_to_edit ? undefined : () => handleDelete(entry.staffAdvancePortalId || entry.id)}
-                              className={`w-4 h-4 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`} />
-                          </button>
-                          <button 
-                            onClick={entry.not_allow_to_edit ? undefined : () => fetchAuditDetails(entry.staffAdvancePortalId || entry.id)} 
-                            className={`rounded-full transition duration-200 -mr-1 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            disabled={entry.not_allow_to_edit}
-                          >
-                            <img
-                              src={history}
-                              alt="history"
-                              className={`w-4 h-5 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
-                            />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                      <EdbcFileBodyCell columnId={EDBC_IDS.EDBC20} expense={{ ...entry, billCopy: entry.file_url }} />
+                    </EdbcTableBodyRow>
                   ))
                 ) : (
                   <tr>

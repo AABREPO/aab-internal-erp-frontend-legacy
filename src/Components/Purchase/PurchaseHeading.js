@@ -24,7 +24,11 @@ const PurchaseHeading = ({ username, userRoles = [] }) => {
     });
 
     useEffect(() => {
-        // Prevent infinite re-renders by checking if the value actually changed
+        const handleEditPOTabSwitch = () => setActiveTab('purchaseorder');
+        window.addEventListener('editPO', handleEditPOTabSwitch);
+        return () => window.removeEventListener('editPO', handleEditPOTabSwitch);
+    }, []);
+    useEffect(() => {
         const storedTab = localStorage.getItem('activeTab');
         if (storedTab !== activeTab) {
             localStorage.setItem('activeTab', activeTab);

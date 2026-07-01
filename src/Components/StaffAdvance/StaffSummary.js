@@ -1037,7 +1037,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                             sortDirection={sortConfig.direction}
                             onSort={handlePurposeEdbcSort}
                           />
-                          <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Refund Amount" />
+                          <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Refund" />
                           <EdbcColumnHeader
                             columnId={EDBC_IDS.EDBC13}
                             label="Status"
@@ -1185,7 +1185,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                             sortDirection={purposeSortConfig.direction}
                             onSort={handleEmpEdbcSort}
                           />
-                          <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Refund Amount" />
+                          <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Refund" />
                           <EdbcColumnHeader
                             columnId={EDBC_IDS.EDBC13}
                             label="Status"

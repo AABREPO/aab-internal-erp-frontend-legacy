@@ -22,12 +22,17 @@ import {
   EdbcDateFilter,
   EdbcProjectNameFilter,
   EdbcSelectFilter,
+  EdbcPaymentModeFilter,
+  EdbcPaymentModeFilterChip,
+  hasEdbcPaymentModeFilter,
+  matchesEdbcPaymentModeFilter,
   EdbcTextInputFilter,
   EdbcTotalAmountFilter,
   matchesEdbcAmountFilter,
   EdbcEmptyFilterCell,
   EdbcDateBodyCell,
   EdbcExpandableBodyCell,
+  EdbcFileBodyCell,
   EDBC_TABLE_EDGE_TABLE_CLASS,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
 
@@ -41,6 +46,12 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const BLANK_VALUE = 'BLANK';
   const BLANK_LABEL = '(Blank)';
   const blankOption = { value: BLANK_VALUE, label: BLANK_LABEL };
+  const isReportBlankish = (value) =>
+    value === null ||
+    value === undefined ||
+    (typeof value === 'string' && value.trim() === '') ||
+    value === 0 ||
+    value === '0';
 
   const [week, setWeek] = useState("");
   const [year, setYear] = useState(new Date().getFullYear().toString());
@@ -59,7 +70,7 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const [selectReportPurpose, setSelectReportPurpose] = useState("");
   const [selectReportTransfer, setSelectReportTransfer] = useState("");
   const [selectReportType, setSelectReportType] = useState("");
-  const [selectReportMode, setSelectReportMode] = useState("");
+  const [selectedPaymentModes, setSelectedPaymentModes] = useState([]);
   const [selectReportDescription, setSelectReportDescription] = useState("");
   const [selectReportAmount, setSelectReportAmount] = useState("");
   const [selectReportRefundAmount, setSelectReportRefundAmount] = useState("");
@@ -472,14 +483,12 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         return (item.type || "").toString().toLowerCase() === selectReportType.toLowerCase();
       });
     }
-    if (selectReportMode) {
-      filtered = filtered.filter((item) => {
-        if (selectReportMode === BLANK_VALUE) {
-          return !item.staff_payment_mode || !String(item.staff_payment_mode).trim();
-        }
-        return (item.staff_payment_mode || "").toString().toLowerCase() === selectReportMode.toLowerCase();
-      });
-    }
+    filtered = filtered.filter((item) =>
+      matchesEdbcPaymentModeFilter(item.staff_payment_mode, selectedPaymentModes, {
+        blankValue: BLANK_VALUE,
+        isBlankish: isReportBlankish,
+      })
+    );
     if (selectReportDescription.trim()) {
       filtered = filtered.filter((item) =>
         String(item.description ?? "").toLowerCase().includes(selectReportDescription.toLowerCase().trim())
@@ -515,7 +524,7 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     }
 
     setFilteredData(filtered);
-  }, [advanceData, startDate, endDate, week, year, paymentModeFilter, typeFilter, selectReportDate, selectReportEmployeeName, selectReportPurpose, selectReportTransfer, selectReportType, selectReportMode, selectReportDescription, selectReportAmount, selectReportRefundAmount, overallSearch, employees, laboursList, purposeOptions, siteOptions]);
+  }, [advanceData, startDate, endDate, week, year, paymentModeFilter, typeFilter, selectReportDate, selectReportEmployeeName, selectReportPurpose, selectReportTransfer, selectReportType, selectedPaymentModes, selectReportDescription, selectReportAmount, selectReportRefundAmount, overallSearch, employees, laboursList, purposeOptions, siteOptions]);
 
   // fromDate/toDate/totalAdvance computations
   const fromDate = filteredData.length
@@ -641,7 +650,10 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     if (hasBlankTransfer) transferOptions.unshift({ value: BLANK_VALUE, label: 'Blank' });
 
     const typeOptions = (hasBlankType ? [BLANK_VALUE] : []).concat(Array.from(uniqueTypes).sort());
-    const modeOptions = (hasBlankMode ? [BLANK_VALUE] : []).concat(Array.from(uniqueModes).sort());
+    const modeOptions = Array.from(uniqueModes)
+      .sort()
+      .map((mode) => ({ value: mode, label: mode }));
+    if (hasBlankMode) modeOptions.unshift(blankOption);
 
     return {
       employeeOptions,
@@ -671,10 +683,11 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     setSelectReportPurpose("");
     setSelectReportTransfer("");
     setSelectReportType("");
-    setSelectReportMode("");
+    setSelectedPaymentModes([]);
     setSelectReportDescription("");
     setSelectReportAmount("");
     setSelectReportRefundAmount("");
+    setSortConfig({ key: null, direction: "asc" });
   }, []);
 
   // Sorting helpers and memoized sorted rows for rendering
@@ -736,19 +749,25 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           const timestampB = dateKey(b.date);
           return timestampA - timestampB;
         case "cv": {
-          va = getLabelById(employees, a.employee_id);
-          vb = getLabelById(employees, b.employee_id);
+          va = normStr(getReportEmployeeName(a));
+          vb = normStr(getReportEmployeeName(b));
           break;
         }
         case "project": {
-          va = getLabelById(purposeOptions, a.from_purpose_id);
-          vb = getLabelById(purposeOptions, b.from_purpose_id);
+          va = normStr(getReportPurposeName(a));
+          vb = normStr(getReportPurposeName(b));
           break;
         }
         case "transfer": {
-          va = getLabelById(purposeOptions, a.to_purpose_id);
-          vb = getLabelById(purposeOptions, b.to_purpose_id);
+          va = normStr(getReportTransferName(a));
+          vb = normStr(getReportTransferName(b));
           break;
+        }
+        case "amount": {
+          return (Number(a.amount) || 0) - (Number(b.amount) || 0);
+        }
+        case "refund": {
+          return (Number(a.staff_refund_amount) || 0) - (Number(b.staff_refund_amount) || 0);
         }
         case "type":
           va = normStr(a.type);
@@ -774,7 +793,7 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       return direction === "asc" ? c : -c;
     });
     return data;
-  }, [filteredData, sortConfig, employees, purposeOptions]);
+  }, [filteredData, sortConfig, employees, laboursList, purposeOptions, siteOptions]);
 
   // Pagination logic
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
@@ -787,35 +806,39 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const currentData = paginatedData;
   const { expandedCells, toggleExpandedCell } = useEdbcExpandedCells();
   const edbc8Config = getEdbcColumnConfig(EDBC_IDS.EDBC8);
-  const edbc3Config = getEdbcColumnConfig(EDBC_IDS.EDBC3);
   const edbc21Config = getEdbcColumnConfig(EDBC_IDS.EDBC21);
   const mapReportSortKeyToEdbc = (key) => {
     if (key === "cv") return "vendor";
-    if (key === "project" || key === "transfer") return "siteName";
+    if (key === "project") return "source";
+    if (key === "transfer") return "siteName";
     if (key === "payment_mode") return "paymentMode";
     if (key === "type") return "accountType";
     if (key === "description") return "comments";
+    if (key === "amount" || key === "refund") return "amount";
     return key;
   };
   const handleEdbcSort = (edbcField) => {
     const fieldToKey = {
       vendor: "cv",
-      siteName: "project",
+      source: "project",
+      siteName: "transfer",
+      amount: "amount",
       paymentMode: "payment_mode",
       accountType: "type",
       comments: "description",
+      date: "date",
     };
     requestSort(fieldToKey[edbcField] || edbcField);
   };
   const resolveEdbcSortField = (reportSortKey) =>
     sortConfig.key === reportSortKey ? mapReportSortKeyToEdbc(reportSortKey) : "";
 
-  const hasActiveColumnFilters = selectReportDate || selectReportEmployeeName || selectReportPurpose || selectReportTransfer || selectReportAmount.trim() || selectReportRefundAmount.trim() || selectReportType || selectReportMode || selectReportDescription.trim();
+  const hasActiveColumnFilters = selectReportDate || selectReportEmployeeName || selectReportPurpose || selectReportTransfer || selectReportAmount.trim() || selectReportRefundAmount.trim() || selectReportType || hasEdbcPaymentModeFilter(selectedPaymentModes) || selectReportDescription.trim();
 
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [startDate, endDate, week, year, paymentModeFilter, typeFilter, selectReportDate, selectReportEmployeeName, selectReportPurpose, selectReportTransfer, selectReportType, selectReportMode, selectReportDescription, selectReportAmount, selectReportRefundAmount, overallSearch]);
+  }, [startDate, endDate, week, year, paymentModeFilter, typeFilter, selectReportDate, selectReportEmployeeName, selectReportPurpose, selectReportTransfer, selectReportType, selectedPaymentModes, selectReportDescription, selectReportAmount, selectReportRefundAmount, overallSearch]);
 
   // Pagination handlers (moved after totalPages calculation)
   const goToPage = useCallback((page) => {
@@ -1109,10 +1132,11 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                     setStartDate("");
                     setEndDate("");
                   }}
-                  options={Array.from({ length: getCurrentWeekNumber() }, (_, i) => ({
-                    label: `Week ${String(i + 1).padStart(2, "0")}`,
-                    value: `Week ${String(i + 1).padStart(2, "0")}`,
-                  }))}
+                  options={Array.from({ length: getCurrentWeekNumber() }, (_, i) => {
+                    const w = getCurrentWeekNumber() - i;
+                    const label = `Week ${String(w).padStart(2, "0")}`;
+                    return { label, value: label };
+                  })}
                   placeholder="Week No"
                   isSearchable
                   isClearable
@@ -1126,7 +1150,7 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                 <Select
                   value={year ? { value: year, label: year } : null}
                   onChange={(selectedOption) => setYear(selectedOption ? selectedOption.value : "")}
-                  options={years.map((y) => ({
+                  options={[...years].reverse().map((y) => ({
                     value: y.toString(),
                     label: y.toString(),
                   }))}
@@ -1246,22 +1270,23 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         </div>
 
         <div className="w-full max-w-[1850px] mx-auto pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
-          <div
-            className={`text-left flex ${hasActiveColumnFilters
-              ? 'flex-col sm:flex-row sm:justify-between'
-              : 'flex-row justify-between items-center'
-              } mb-[12px] gap-[6px] shrink-0`}
-          >
-            <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
-              <button className="" type="button" onClick={() => setShowFilters((prev) => !prev)}>
-                <img
-                  src={Filter}
-                  alt="Toggle Filter"
-                  className="border rounded-md h-[34px]"
-                />
-              </button>
-              {hasActiveColumnFilters && (
-                <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
+          <div className="w-fit max-w-full flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div
+              className={`text-left flex ${hasActiveColumnFilters
+                ? 'flex-col sm:flex-row sm:justify-between'
+                : 'flex-row justify-between items-center'
+                } mb-[12px] gap-[6px] shrink-0 w-full`}
+            >
+              <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
+                <button className="" type="button" onClick={() => setShowFilters((prev) => !prev)}>
+                  <img
+                    src={Filter}
+                    alt="Toggle Filter"
+                    className="border rounded-md h-[34px]"
+                  />
+                </button>
+                {hasActiveColumnFilters && (
+                  <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
                   {selectReportDate && (
                     <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                       <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
@@ -1311,13 +1336,13 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                       <button type="button" onClick={() => setSelectReportType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                     </span>
                   )}
-                  {selectReportMode && (
-                    <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
-                      <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Mode: </span>
-                      <span className="font-semibold text-[14px] truncate min-w-0">{selectReportMode === BLANK_VALUE ? BLANK_LABEL : selectReportMode}</span>
-                      <button type="button" onClick={() => setSelectReportMode('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                    </span>
-                  )}
+                  <EdbcPaymentModeFilterChip
+                    fieldLabel="Mode"
+                    selectedModes={selectedPaymentModes}
+                    blankValue={BLANK_VALUE}
+                    blankLabel={BLANK_LABEL}
+                    onClear={() => setSelectedPaymentModes([])}
+                  />
                   {selectReportDescription.trim() && (
                     <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                       <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Description: </span>
@@ -1327,40 +1352,38 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                   )}
                 </div>
               )}
-            </div>
-            <div className="flex items-end gap-[6px]">
-              <button type="button" onClick={clearFilters} className="flex h-[34px] w-[32px] shrink-0 items-center justify-center">
-                <img className="w-full h-full" src={Reload} alt="Reload" />
-              </button>
-              <div className="w-[286px] min-w-[286px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
-                <input
-                  type="text"
-                  value={overallSearch}
-                  onChange={(e) => setOverallSearch(e.target.value)}
-                  placeholder="Search Transactions..."
-                  className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
-                />
-                <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
               </div>
-              <div className="text-left md:text-right md:items-end items-end cursor-default flex justify-end">
-                <div className="flex items-end text-center">
-                  <span className="text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer" onClick={handleExportPDF}>PDF<img src={Pdf} alt="Pdf" className="w-4 h-4" /></span>
-                  <span className="text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer" onClick={handleExportExcel}>XL<img src={XL} alt="XL" className="w-4 h-4" /></span>
+              <div className="flex items-end gap-[6px] shrink-0">
+                <button type="button" onClick={clearFilters} className="flex h-[34px] w-[32px] shrink-0 items-center justify-center">
+                  <img className="w-full h-full" src={Reload} alt="Reload" />
+                </button>
+                <div className="w-[286px] min-w-[286px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
+                  <input
+                    type="text"
+                    value={overallSearch}
+                    onChange={(e) => setOverallSearch(e.target.value)}
+                    placeholder="Search Transactions..."
+                    className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
+                  />
+                  <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
+                </div>
+                <div className="text-left md:text-right md:items-end items-end cursor-default flex justify-end">
+                  <div className="flex items-end text-center">
+                    <span className="text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer" onClick={handleExportPDF}>PDF<img src={Pdf} alt="Pdf" className="w-4 h-4" /></span>
+                    <span className="text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer" onClick={handleExportExcel}>XL<img src={XL} alt="XL" className="w-4 h-4" /></span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
             <div
               ref={scrollRef}
-              className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none scrollbar-none no-scrollbar"
+              className="w-full rounded-lg  border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none scrollbar-none no-scrollbar"
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
             >
-              <table ref={tableRef} className={`table-fixed min-w-[1400px] w-full border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_thead_th]:!p-0 [&_thead_th]:align-middle [&_thead_th#EDBC-8]:!pr-[9px] ${showFilters ? '[&_thead_tr:first-child_th]:!border-b-0' : ''}`}>
+              <table ref={tableRef} className={`table-fixed w-px shrink-0 border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_thead_tr>th#EDBC-13]:!pr-[1px] [&_tbody_tr>td#EDBC-13]:!pr-[1px]`}>
                 <thead className="sticky top-0 z-20 bg-[#FAF6ED]">
                   <EdbcTableHeaderRow>
                     <EdbcColumnHeader columnId={EDBC_IDS.EDBC21} label="S.No" />
@@ -1379,9 +1402,16 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                       onSort={handleEdbcSort}
                     />
                     <EdbcColumnHeader
-                      columnId={EDBC_IDS.EDBC3}
+                      columnId={EDBC_IDS.EDBC14}
                       label="Purpose"
                       sortField={resolveEdbcSortField("project")}
+                      sortDirection={sortConfig.direction}
+                      onSort={handleEdbcSort}
+                    />
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC3}
+                      label="Transfer To"
+                      sortField={resolveEdbcSortField("transfer")}
                       sortDirection={sortConfig.direction}
                       onSort={handleEdbcSort}
                     />
@@ -1392,15 +1422,21 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                       sortDirection={sortConfig.direction}
                       onSort={handleEdbcSort}
                     />
-                    <th className={edbc8Config?.headerClass}>
-                      Refund Amount
-                    </th>
                     <th
-                      className={edbc3Config?.headerClass}
-                      onClick={() => requestSort("transfer")}
+                      id={EDBC_IDS.EDBC8}
+                      className={edbc8Config?.headerClass}
+                      onClick={() => requestSort("refund")}
                     >
-                      Transfer {sortConfig.key === "transfer" && (sortConfig.direction === "asc" ? " ↑" : " ↓")}
+                      Refund
+                      {sortConfig.key === "refund" ? (sortConfig.direction === "asc" ? " ↑" : " ↓") : ""}
                     </th>
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC9}
+                      label="Description"
+                      sortField={resolveEdbcSortField("description")}
+                      sortDirection={sortConfig.direction}
+                      onSort={handleEdbcSort}
+                    />
                     <EdbcColumnHeader
                       columnId={EDBC_IDS.EDBC12}
                       label="Type"
@@ -1415,13 +1451,7 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                       sortDirection={sortConfig.direction}
                       onSort={handleEdbcSort}
                     />
-                    <EdbcColumnHeader
-                      columnId={EDBC_IDS.EDBC9}
-                      label="Description"
-                      sortField={resolveEdbcSortField("description")}
-                      sortDirection={sortConfig.direction}
-                      onSort={handleEdbcSort}
-                    />
+                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="File" />
                   </EdbcTableHeaderRow>
                   {showFilters && (
                     <EdbcTableFilterRow>
@@ -1441,7 +1471,8 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                         blankValue={BLANK_VALUE}
                         selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                       />
-                      <EdbcProjectNameFilter
+                      <EdbcSelectFilter
+                        columnId={EDBC_IDS.EDBC14}
                         placeholder="Purpose"
                         options={reportFilterOptions.purposeOptions}
                         value={selectReportPurpose}
@@ -1450,16 +1481,22 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                         blankValue={BLANK_VALUE}
                         selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                       />
-                      <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={reportTotals.amount} value={selectReportAmount} onChange={(e) => setSelectReportAmount(e.target.value)} />
-                      <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={reportTotals.refund_amount} value={selectReportRefundAmount} onChange={(e) => setSelectReportRefundAmount(e.target.value)} />
                       <EdbcProjectNameFilter
-                        placeholder="Transfer"
+                        placeholder="Transfer To"
                         options={reportFilterOptions.transferOptions}
                         value={selectReportTransfer}
                         onChange={setSelectReportTransfer}
                         blankOption={blankOption}
                         blankValue={BLANK_VALUE}
                         selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                      />
+                      <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={reportTotals.amount} value={selectReportAmount} onChange={(e) => setSelectReportAmount(e.target.value)} />
+                      <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={reportTotals.refund_amount} value={selectReportRefundAmount} onChange={(e) => setSelectReportRefundAmount(e.target.value)} />
+                      <EdbcTextInputFilter
+                        columnId={EDBC_IDS.EDBC9}
+                        placeholder="Description"
+                        value={selectReportDescription}
+                        onChange={(e) => setSelectReportDescription(e.target.value)}
                       />
                       <EdbcSelectFilter
                         columnId={EDBC_IDS.EDBC12}
@@ -1473,31 +1510,22 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                         blankValue={BLANK_VALUE}
                         selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                       />
-                      <EdbcSelectFilter
+                      <EdbcPaymentModeFilter
                         columnId={EDBC_IDS.EDBC13}
                         placeholder="Mode"
-                        options={reportFilterOptions.modeOptions.map((m) =>
-                          m === BLANK_VALUE ? blankOption : { value: m, label: m }
-                        )}
-                        value={selectReportMode}
-                        onChange={setSelectReportMode}
-                        blankOption={blankOption}
-                        blankValue={BLANK_VALUE}
+                        options={reportFilterOptions.modeOptions}
+                        value={selectedPaymentModes}
+                        onChange={setSelectedPaymentModes}
                         selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                       />
-                      <EdbcTextInputFilter
-                        columnId={EDBC_IDS.EDBC9}
-                        placeholder="Description"
-                        value={selectReportDescription}
-                        onChange={(e) => setSelectReportDescription(e.target.value)}
-                      />
+                      <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
                     </EdbcTableFilterRow>
                   )}
                 </thead>
                 <tbody>
                   {currentData.length === 0 ? (
                     <tr>
-                      <td colSpan="10" className="text-center py-4 text-gray-500 font-semibold">No Entry is available</td>
+                      <td colSpan="11" className="text-center py-4 text-gray-500 font-semibold">No Entry is available</td>
                     </tr>
                   ) : (
                     currentData.map((row, index) => (
@@ -1521,12 +1549,20 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                           getDisplayValue={getReportEmployeeName}
                         />
                         <EdbcExpandableBodyCell
-                          columnId={EDBC_IDS.EDBC3}
+                          columnId={EDBC_IDS.EDBC14}
                           expense={row}
                           rowIndex={index}
                           expandedCells={expandedCells}
                           onToggleExpanded={toggleExpandedCell}
                           getDisplayValue={getReportPurposeName}
+                        />
+                        <EdbcExpandableBodyCell
+                          columnId={EDBC_IDS.EDBC3}
+                          expense={row}
+                          rowIndex={index}
+                          expandedCells={expandedCells}
+                          onToggleExpanded={toggleExpandedCell}
+                          getDisplayValue={getReportTransferName}
                         />
                         <EdbcExpandableBodyCell
                           columnId={EDBC_IDS.EDBC8}
@@ -1537,7 +1573,7 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                           textAlignClass="text-right"
                           getDisplayValue={(entry) => formatReportAmount(entry.amount)}
                         />
-                        <td className={`${edbc8Config?.tdClass || ""} text-right`.trim()}>
+                        <td className={edbc8Config?.tdClass}>
                           <span
                             onClick={() => toggleExpandedCell(`${row.staffAdvancePortalId ?? index}-refund_amount`)}
                             className={`block w-full cursor-pointer text-right ${expandedCells[`${row.staffAdvancePortalId ?? index}-refund_amount`] ? "whitespace-normal break-words" : "truncate whitespace-nowrap overflow-hidden"}`}
@@ -1546,15 +1582,14 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                             {formatReportAmount(row.staff_refund_amount)}
                           </span>
                         </td>
-                        <td className={edbc3Config?.tdClass}>
-                          <span
-                            onClick={() => toggleExpandedCell(`${row.staffAdvancePortalId ?? index}-transfer`)}
-                            className={`block w-full cursor-pointer ${expandedCells[`${row.staffAdvancePortalId ?? index}-transfer`] ? "whitespace-normal break-words" : "truncate whitespace-nowrap overflow-hidden"}`}
-                            title={getReportTransferName(row)}
-                          >
-                            {getReportTransferName(row) || ""}
-                          </span>
-                        </td>
+                        <EdbcExpandableBodyCell
+                          columnId={EDBC_IDS.EDBC9}
+                          expense={row}
+                          rowIndex={index}
+                          expandedCells={expandedCells}
+                          onToggleExpanded={toggleExpandedCell}
+                          getDisplayValue={(entry) => (entry.description && entry.description !== "-") ? entry.description : ""}
+                        />
                         <EdbcExpandableBodyCell
                           columnId={EDBC_IDS.EDBC12}
                           expense={row}
@@ -1571,14 +1606,7 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                           onToggleExpanded={toggleExpandedCell}
                           getDisplayValue={(entry) => (entry.staff_payment_mode && entry.staff_payment_mode !== "-") ? entry.staff_payment_mode : ""}
                         />
-                        <EdbcExpandableBodyCell
-                          columnId={EDBC_IDS.EDBC9}
-                          expense={row}
-                          rowIndex={index}
-                          expandedCells={expandedCells}
-                          onToggleExpanded={toggleExpandedCell}
-                          getDisplayValue={(entry) => (entry.description && entry.description !== "-") ? entry.description : ""}
-                        />
+                        <EdbcFileBodyCell columnId={EDBC_IDS.EDBC20} expense={{ ...row, billCopy: row.file_url }} />
                       </EdbcTableBodyRow>
                     ))
                   )}

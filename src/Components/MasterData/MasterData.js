@@ -3842,9 +3842,7 @@ const MasterData = ({ username, userRoles = [] }) => {
             </div>
           </div>
           {getReorderedTableData().map((table, index) => (
-            <div key={table.id}
-              className={selectedTable === table.id ? 'ring-4 ring-[#faf9f8] ring-opacity-50 rounded-lg shadow-lg' : ''}
-            >
+            <div key={table.id} className={selectedTable === table.id ? 'ring-4 ring-[#faf9f8] ring-opacity-50 rounded-lg shadow-lg' : ''}>
               {table.id === 'project-management' && (
                 <div>
                   <div className="flex items-center mb-[6px] lg:mt-0 mt-3">
@@ -3892,11 +3890,10 @@ const MasterData = ({ username, userRoles = [] }) => {
                                         ? 'Show all projects'
                                         : 'Show On Going projects only'
                                     }
-                                    className={`text-xl leading-none transition-colors ${
-                                      showOnGoingProjectsOnly
+                                    className={`text-xl leading-none transition-colors ${showOnGoingProjectsOnly
                                         ? 'text-[#BF9853]'
                                         : 'text-gray-400 hover:text-[#BF9853]'
-                                    }`}
+                                      }`}
                                     aria-pressed={showOnGoingProjectsOnly}
                                     aria-label="Filter On Going projects"
                                   >
@@ -3929,11 +3926,10 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0 gap-1.5">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-projectName`)}
-                                    className={`min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-projectName`]
+                                    className={`min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-projectName`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.projectName || ''}
                                   >
                                     {item.projectName || ''}
@@ -4015,13 +4011,13 @@ const MasterData = ({ username, userRoles = [] }) => {
                           <tr className="border-b h-[40px]">
                             <th className="pl-[12px] pr-[12px] text-left w-16 text-[16px] font-bold">S.No</th>
                             <th className="pl-0 pr-[8px] text-left text-[16px] font-bold">
-                            <div className="flex items-center justify-between gap-[12px]">
-                              <span>Vendor Name</span>
-                              <button type="button" onClick={() => handleDownloadIconClick('vendor')} className="inline-flex shrink-0 items-center justify-center">
-                                <img src={DownloadIcon} alt='download' className='w-6 h-6 cursor-pointer hover:opacity-75' />
-                              </button>
-                            </div>
-                          </th>
+                              <div className="flex items-center justify-between gap-[12px]">
+                                <span>Vendor Name</span>
+                                <button type="button" onClick={() => handleDownloadIconClick('vendor')} className="inline-flex shrink-0 items-center justify-center">
+                                  <img src={DownloadIcon} alt='download' className='w-6 h-6 cursor-pointer hover:opacity-75' />
+                                </button>
+                              </div>
+                            </th>
                           </tr>
                         </thead>
                       </table>
@@ -4038,30 +4034,29 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-vendorName`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-vendorName`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-vendorName`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.vendorName}
                                   >
                                     {item.vendorName}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleVendorShare(item)}>
-                                    <img src={share} alt='Share' className='w-4 h-4' />
-                                  </button>
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditVendorName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    <button onClick={() => handleVendorShare(item)}>
+                                      <img src={share} alt='Share' className='w-4 h-4' />
                                     </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteVendorName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditVendorName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteVendorName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4107,13 +4102,13 @@ const MasterData = ({ username, userRoles = [] }) => {
                           <tr className="border-b h-[40px]">
                             <th className="pl-[12px] pr-[12px] text-left w-16 text-[16px] font-bold">S.No</th>
                             <th className="pl-0 pr-[8px] text-left text-[16px] font-bold">
-                            <div className="flex items-center justify-between gap-[12px]">
-                              <span>Contractor Name</span>
-                              <button type="button" onClick={() => handleDownloadIconClick('contractor')} className="inline-flex shrink-0 items-center justify-center">
-                                <img src={DownloadIcon} alt='download' className='w-6 h-6 cursor-pointer hover:opacity-75' />
-                              </button>
-                            </div>
-                          </th>
+                              <div className="flex items-center justify-between gap-[12px]">
+                                <span>Contractor Name</span>
+                                <button type="button" onClick={() => handleDownloadIconClick('contractor')} className="inline-flex shrink-0 items-center justify-center">
+                                  <img src={DownloadIcon} alt='download' className='w-6 h-6 cursor-pointer hover:opacity-75' />
+                                </button>
+                              </div>
+                            </th>
                           </tr>
                         </thead>
                       </table>
@@ -4130,30 +4125,29 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-contractorName`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-contractorName`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-contractorName`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.contractorName}
                                   >
                                     {item.contractorName}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleContractorShare(item)}>
-                                    <img src={share} alt='Share' className='w-4 h-4' />
-                                  </button>
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditContractorName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    <button onClick={() => handleContractorShare(item)}>
+                                      <img src={share} alt='Share' className='w-4 h-4' />
                                     </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteContractorName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditContractorName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteContractorName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4216,27 +4210,26 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-category`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-category`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-category`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.category}
                                   >
                                     {item.category}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditCategory(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteCategory(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditCategory(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteCategory(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4298,27 +4291,26 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-machineTool`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-machineTool`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-machineTool`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.machineTool}
                                   >
                                     {item.machineTool}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditMachineTool(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteMachineTool(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditMachineTool(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteMachineTool(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4366,13 +4358,13 @@ const MasterData = ({ username, userRoles = [] }) => {
                           <tr className="border-b h-[40px]">
                             <th className="pl-[12px] pr-[12px] text-left w-16 text-[16px] font-bold">S.No</th>
                             <th className="pl-0 pr-[8px] text-left text-[16px] font-bold">
-                            <div className="flex items-center justify-between gap-[12px]">
-                              <span>Employee Name</span>
-                              <button type="button" onClick={() => handleDownloadIconClick('employee')} className="inline-flex shrink-0 items-center justify-center">
-                                <img src={DownloadIcon} alt='download' className='w-6 h-6 cursor-pointer hover:opacity-75' />
-                              </button>
-                            </div>
-                          </th>
+                              <div className="flex items-center justify-between gap-[12px]">
+                                <span>Employee Name</span>
+                                <button type="button" onClick={() => handleDownloadIconClick('employee')} className="inline-flex shrink-0 items-center justify-center">
+                                  <img src={DownloadIcon} alt='download' className='w-6 h-6 cursor-pointer hover:opacity-75' />
+                                </button>
+                              </div>
+                            </th>
                           </tr>
                         </thead>
                       </table>
@@ -4389,30 +4381,29 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-employee_name`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-employee_name`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-employee_name`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.employee_name}
                                   >
                                     {item.employee_name}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleEmployeeShare(item)}>
-                                    <img src={share} alt='Share' className='w-4 h-4' />
-                                  </button>
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditEmployeeData(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    <button onClick={() => handleEmployeeShare(item)}>
+                                      <img src={share} alt='Share' className='w-4 h-4' />
                                     </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteEmployeeData(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditEmployeeData(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteEmployeeData(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4474,27 +4465,26 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-labour_name`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-labour_name`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-labour_name`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.labour_name}
                                   >
                                     {item.labour_name}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditLabourData(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteLabourData(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditLabourData(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteLabourData(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4556,32 +4546,31 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-account_number`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer cursor-help ${
-                                      expandedCells[`${item.id}-account_number`]
+                                    className={`block min-w-0 flex-1 ${expandedCells[`${item.id}-account_number`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.account_number}
                                     onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
                                     onMouseLeave={handleAccountMouseLeave}
                                   >
                                     {item.account_number}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleAccountShare(item)}>
-                                    <img src={share} alt='Share' className='w-4 h-4' />
-                                  </button>
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditAccountDetails(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    <button onClick={() => handleAccountShare(item)}>
+                                      <img src={share} alt='Share' className='w-4 h-4' />
                                     </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteAccountDetails(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditAccountDetails(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteAccountDetails(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4643,27 +4632,26 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-bank_account_type`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-bank_account_type`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-bank_account_type`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.bank_account_type}
                                   >
                                     {item.bank_account_type}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditBankAccountType(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteBankAccountType(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditBankAccountType(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteBankAccountType(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4715,27 +4703,26 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-support_staff_name`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-support_staff_name`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-support_staff_name`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.support_staff_name || ''}
                                   >
                                     {item.support_staff_name || ''}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditSupportStaffName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteSupportStaffName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditSupportStaffName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteSupportStaffName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4793,27 +4780,26 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-propertyType`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-propertyType`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-propertyType`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.propertyType || ''}
                                   >
                                     {item.propertyType || ''}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditPropertyType(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeletePropertyType(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditPropertyType(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeletePropertyType(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4880,11 +4866,10 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   <div className="flex items-center min-w-0">
                                     <span
                                       onClick={() => toggleExpandedCell(`${item.id}-modeOfPayment`)}
-                                      className={`block min-w-0 flex-1 cursor-pointer ${
-                                        expandedCells[`${item.id}-modeOfPayment`]
+                                      className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-modeOfPayment`]
                                           ? 'whitespace-normal break-words'
                                           : 'truncate whitespace-nowrap overflow-hidden'
-                                      }`}
+                                        }`}
                                       title={item.modeOfPayment || ''}
                                     >
                                       {item.modeOfPayment || ''}
@@ -4973,27 +4958,27 @@ const MasterData = ({ username, userRoles = [] }) => {
                                     {getArrangementModuleName(item)}
                                   </span>
                                   <div className="absolute right-[8px] top-1/2 -translate-y-1/2 flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                      {hasEditPermission && (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleEditPaymentModeArrangement(item)}
-                                          className="text-blue-600 hover:text-blue-800"
-                                          title="Edit"
-                                        >
-                                          <img src={edit} alt="Edit" className="w-4 h-4" />
-                                        </button>
-                                      )}
-                                      {hasDeletePermission && (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDeletePaymentModeArrangement(item.id)}
-                                          className="text-red-600 hover:text-red-800"
-                                          title="Delete"
-                                        >
-                                          <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                        </button>
-                                      )}
-                                    </div>
+                                    {hasEditPermission && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleEditPaymentModeArrangement(item)}
+                                        className="text-blue-600 hover:text-blue-800"
+                                        title="Edit"
+                                      >
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeletePaymentModeArrangement(item.id)}
+                                        className="text-red-600 hover:text-red-800"
+                                        title="Delete"
+                                      >
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                             ))
@@ -7360,217 +7345,216 @@ const MasterData = ({ username, userRoles = [] }) => {
       )}
       {(isPaymentModeArrangementOpen || isPaymentModeArrangementEditOpen) && (
         <>
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
-          <div className="bg-white rounded-md w-full max-w-2xl max-h-[90vh] overflow-y-auto px-4 py-3">
-            <div className="flex justify-end">
-              <button
-                type="button"
-                className="text-red-500"
-                onClick={isPaymentModeArrangementEditOpen ? closePaymentModeArrangementEdit : closePaymentModeArrangement}
-              >
-                <img src={cross} alt='close' className='w-5 h-5' />
-              </button>
-            </div>
-            <form
-              onSubmit={
-                isPaymentModeArrangementEditOpen
-                  ? handleSubmitEditPaymentModeArrangement
-                  : handleSubmitPaymentModeArrangement
-              }
-            >
-              <h2 className="text-lg font-semibold mb-4 text-[#BF9853]">
-                {isPaymentModeArrangementEditOpen ? 'Edit Payment Mode Arrangement' : 'Add Payment Mode Arrangement'}
-              </h2>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Module Name</label>
-                {isPaymentModeArrangementEditOpen ? (
-                  <div className="w-full max-w-md rounded border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] bg-[#FAF6ED] p-2 h-12 flex items-center text-gray-700">
-                    {arrangementModuleName}
-                  </div>
-                ) : (
-                  <Select
-                    className="max-w-md"
-                    placeholder="Select module..."
-                    options={availableModulesForArrangementAdd.map((moduleName) => ({
-                      value: moduleName,
-                      label: moduleName,
-                    }))}
-                    value={
-                      arrangementModuleName
-                        ? { value: arrangementModuleName, label: arrangementModuleName }
-                        : null
-                    }
-                    onChange={(option) => setArrangementModuleName(option ? option.value : '')}
-                    isClearable
-                  />
-                )}
-              </div>
-              <div className="mb-4">
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <div>
-                    <label className="block text-sm font-medium">Selected Order</label>
-                    <p className="text-xs text-gray-500 mt-1">Drag and drop to change order</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={openArrangementModePicker}
-                    disabled={
-                      allPaymentModeLabels.length === 0 || availablePaymentModesForArrangement.length === 0
-                    }
-                    className="flex h-8 w-8 items-center justify-center rounded-full border border-[#BF9853] text-lg font-semibold text-[#BF9853] transition-colors hover:bg-[#FFFDF9] disabled:cursor-not-allowed disabled:opacity-40"
-                    title="Add payment mode"
-                  >
-                    +
-                  </button>
-                </div>
-                <div className="rounded-lg border border-gray-200 max-h-72 overflow-y-auto p-2 bg-white">
-                  {arrangementSelectedModeIds.length === 0 ? (
-                    <p className="text-sm text-gray-500 p-2">Click + to add payment modes.</p>
-                  ) : (
-                    arrangementSelectedModeIds.map((modeId, index) => (
-                      <div
-                        key={`${modeId}-${index}`}
-                        draggable
-                        onDragStart={(e) => handleArrangementDragStart(e, index)}
-                        onDragOver={(e) => handleArrangementDragOver(e, index)}
-                        onDrop={(e) => handleArrangementDrop(e, index)}
-                        onDragEnd={handleArrangementDragEnd}
-                        className={`mb-2 flex items-center justify-between rounded-md border bg-white px-2 py-2 cursor-grab active:cursor-grabbing select-none ${
-                          arrangementDragIndex === index
-                            ? 'opacity-50 border-[#BF9853]'
-                            : arrangementDragOverIndex === index
-                              ? 'border-[#BF9853] border-2 bg-[#FFFDF9]'
-                              : 'border-[#BF9853] border-opacity-20'
-                        }`}
-                      >
-                        <span className="text-sm font-medium flex items-center gap-2">
-                          <span className="text-gray-400 text-base leading-none" aria-hidden="true">
-                            ⋮⋮
-                          </span>
-                          <span className="text-[#BF9853]">{index + 1}.</span>
-                          {getPaymentModeLabelById(modeId)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeModeFromArrangement(modeId)}
-                          className="px-2 py-1 text-xs border rounded text-red-600 shrink-0"
-                          title="Remove"
-                          onMouseDown={(e) => e.stopPropagation()}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-              <div className="flex justify-end space-x-2 mt-6">
-                <button
-                  type="submit"
-                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                >
-                  {isPaymentModeArrangementEditOpen ? 'Update' : 'Submit'}
-                </button>
-                <button
-                  type="button"
-                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                  onClick={isPaymentModeArrangementEditOpen ? closePaymentModeArrangementEdit : closePaymentModeArrangement}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-        {isArrangementModePickerOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-            <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
-              <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-                <h3 className="text-lg font-semibold text-[#BF9853]">Select Payment Modes</h3>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+            <div className="bg-white rounded-md w-full max-w-2xl max-h-[90vh] overflow-y-auto px-4 py-3">
+              <div className="flex justify-end">
                 <button
                   type="button"
                   className="text-red-500"
-                  onClick={closeArrangementModePicker}
+                  onClick={isPaymentModeArrangementEditOpen ? closePaymentModeArrangementEdit : closePaymentModeArrangement}
                 >
-                  <img src={cross} alt="close" className="w-5 h-5" />
+                  <img src={cross} alt='close' className='w-5 h-5' />
                 </button>
               </div>
-              <div className="p-4 text-left">
-                <label className="mb-2 block text-sm font-medium">Payment Modes</label>
-                {allPaymentModeLabels.length === 0 ? (
-                  <p className="text-sm text-gray-500">
-                    No payment modes found. Add them in Rent Management Input Data.
-                  </p>
-                ) : availablePaymentModesForArrangement.length === 0 ? (
-                  <p className="text-sm text-gray-500">All payment modes are already selected.</p>
-                ) : (
-                  <Select
-                    isMulti
-                    options={arrangementModePickerOptions}
-                    value={arrangementModesPendingAdd.map((modeId) => {
-                      const numericId = Number(modeId);
-                      const option = arrangementModePickerOptions.find((item) => item.value === numericId);
-                      return option || { value: numericId, label: getPaymentModeLabelById(numericId) };
-                    })}
-                    onChange={(selected) =>
-                      setArrangementModesPendingAdd(
-                        selected ? selected.map((option) => Number(option.value)) : []
-                      )
-                    }
-                    placeholder="Choose payment modes..."
-                    isClearable
-                    closeMenuOnSelect={false}
-                    menuPortalTarget={document.body}
-                    styles={{
-                      menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                      control: (base) => ({
-                        ...base,
-                        minHeight: '48px',
-                        borderColor: 'rgba(191, 152, 83, 0.3)',
-                        boxShadow: 'none',
-                        '&:hover': { borderColor: '#BF9853' },
-                      }),
-                      multiValue: (base) => ({
-                        ...base,
-                        backgroundColor: '#FAF6ED',
-                      }),
-                      multiValueLabel: (base) => ({
-                        ...base,
-                        color: '#BF9853',
-                        fontWeight: 500,
-                      }),
-                      option: (base, state) => ({
-                        ...base,
-                        backgroundColor: state.isSelected ? '#BF9853' : state.isFocused ? '#FFFDF9' : 'white',
-                        color: state.isSelected ? 'white' : 'black',
-                      }),
-                    }}
-                  />
-                )}
-                <p className="mt-2 text-xs text-gray-500">
-                  Select one or more payment modes, then click Add.
-                </p>
-              </div>
-              <div className="flex justify-end gap-2 border-t border-gray-100 px-4 py-3">
-                <button
-                  type="button"
-                  className="rounded-lg border border-[#BF9853] px-6 py-2 text-[#BF9853]"
-                  onClick={closeArrangementModePicker}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg bg-[#BF9853] px-6 py-2 font-semibold text-white hover:bg-yellow-800 disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={confirmArrangementModesAdd}
-                  disabled={arrangementModesPendingAdd.length === 0}
-                >
-                  Add
-                </button>
-              </div>
+              <form
+                onSubmit={
+                  isPaymentModeArrangementEditOpen
+                    ? handleSubmitEditPaymentModeArrangement
+                    : handleSubmitPaymentModeArrangement
+                }
+              >
+                <h2 className="text-lg font-semibold mb-4 text-[#BF9853]">
+                  {isPaymentModeArrangementEditOpen ? 'Edit Payment Mode Arrangement' : 'Add Payment Mode Arrangement'}
+                </h2>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">Module Name</label>
+                  {isPaymentModeArrangementEditOpen ? (
+                    <div className="w-full max-w-md rounded border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] bg-[#FAF6ED] p-2 h-12 flex items-center text-gray-700">
+                      {arrangementModuleName}
+                    </div>
+                  ) : (
+                    <Select
+                      className="max-w-md"
+                      placeholder="Select module..."
+                      options={availableModulesForArrangementAdd.map((moduleName) => ({
+                        value: moduleName,
+                        label: moduleName,
+                      }))}
+                      value={
+                        arrangementModuleName
+                          ? { value: arrangementModuleName, label: arrangementModuleName }
+                          : null
+                      }
+                      onChange={(option) => setArrangementModuleName(option ? option.value : '')}
+                      isClearable
+                    />
+                  )}
+                </div>
+                <div className="mb-4">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div>
+                      <label className="block text-sm font-medium">Selected Order</label>
+                      <p className="text-xs text-gray-500 mt-1">Drag and drop to change order</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={openArrangementModePicker}
+                      disabled={
+                        allPaymentModeLabels.length === 0 || availablePaymentModesForArrangement.length === 0
+                      }
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-[#BF9853] text-lg font-semibold text-[#BF9853] transition-colors hover:bg-[#FFFDF9] disabled:cursor-not-allowed disabled:opacity-40"
+                      title="Add payment mode"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 max-h-72 overflow-y-auto p-2 bg-white">
+                    {arrangementSelectedModeIds.length === 0 ? (
+                      <p className="text-sm text-gray-500 p-2">Click + to add payment modes.</p>
+                    ) : (
+                      arrangementSelectedModeIds.map((modeId, index) => (
+                        <div
+                          key={`${modeId}-${index}`}
+                          draggable
+                          onDragStart={(e) => handleArrangementDragStart(e, index)}
+                          onDragOver={(e) => handleArrangementDragOver(e, index)}
+                          onDrop={(e) => handleArrangementDrop(e, index)}
+                          onDragEnd={handleArrangementDragEnd}
+                          className={`mb-2 flex items-center justify-between rounded-md border bg-white px-2 py-2 cursor-grab active:cursor-grabbing select-none ${arrangementDragIndex === index
+                              ? 'opacity-50 border-[#BF9853]'
+                              : arrangementDragOverIndex === index
+                                ? 'border-[#BF9853] border-2 bg-[#FFFDF9]'
+                                : 'border-[#BF9853] border-opacity-20'
+                            }`}
+                        >
+                          <span className="text-sm font-medium flex items-center gap-2">
+                            <span className="text-gray-400 text-base leading-none" aria-hidden="true">
+                              ⋮⋮
+                            </span>
+                            <span className="text-[#BF9853]">{index + 1}.</span>
+                            {getPaymentModeLabelById(modeId)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeModeFromArrangement(modeId)}
+                            className="px-2 py-1 text-xs border rounded text-red-600 shrink-0"
+                            title="Remove"
+                            onMouseDown={(e) => e.stopPropagation()}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2 mt-6">
+                  <button
+                    type="submit"
+                    className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                  >
+                    {isPaymentModeArrangementEditOpen ? 'Update' : 'Submit'}
+                  </button>
+                  <button
+                    type="button"
+                    className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                    onClick={isPaymentModeArrangementEditOpen ? closePaymentModeArrangementEdit : closePaymentModeArrangement}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
-        )}
+          {isArrangementModePickerOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+              <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
+                <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+                  <h3 className="text-lg font-semibold text-[#BF9853]">Select Payment Modes</h3>
+                  <button
+                    type="button"
+                    className="text-red-500"
+                    onClick={closeArrangementModePicker}
+                  >
+                    <img src={cross} alt="close" className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="p-4 text-left">
+                  <label className="mb-2 block text-sm font-medium">Payment Modes</label>
+                  {allPaymentModeLabels.length === 0 ? (
+                    <p className="text-sm text-gray-500">
+                      No payment modes found. Add them in Rent Management Input Data.
+                    </p>
+                  ) : availablePaymentModesForArrangement.length === 0 ? (
+                    <p className="text-sm text-gray-500">All payment modes are already selected.</p>
+                  ) : (
+                    <Select
+                      isMulti
+                      options={arrangementModePickerOptions}
+                      value={arrangementModesPendingAdd.map((modeId) => {
+                        const numericId = Number(modeId);
+                        const option = arrangementModePickerOptions.find((item) => item.value === numericId);
+                        return option || { value: numericId, label: getPaymentModeLabelById(numericId) };
+                      })}
+                      onChange={(selected) =>
+                        setArrangementModesPendingAdd(
+                          selected ? selected.map((option) => Number(option.value)) : []
+                        )
+                      }
+                      placeholder="Choose payment modes..."
+                      isClearable
+                      closeMenuOnSelect={false}
+                      menuPortalTarget={document.body}
+                      styles={{
+                        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                        control: (base) => ({
+                          ...base,
+                          minHeight: '48px',
+                          borderColor: 'rgba(191, 152, 83, 0.3)',
+                          boxShadow: 'none',
+                          '&:hover': { borderColor: '#BF9853' },
+                        }),
+                        multiValue: (base) => ({
+                          ...base,
+                          backgroundColor: '#FAF6ED',
+                        }),
+                        multiValueLabel: (base) => ({
+                          ...base,
+                          color: '#BF9853',
+                          fontWeight: 500,
+                        }),
+                        option: (base, state) => ({
+                          ...base,
+                          backgroundColor: state.isSelected ? '#BF9853' : state.isFocused ? '#FFFDF9' : 'white',
+                          color: state.isSelected ? 'white' : 'black',
+                        }),
+                      }}
+                    />
+                  )}
+                  <p className="mt-2 text-xs text-gray-500">
+                    Select one or more payment modes, then click Add.
+                  </p>
+                </div>
+                <div className="flex justify-end gap-2 border-t border-gray-100 px-4 py-3">
+                  <button
+                    type="button"
+                    className="rounded-lg border border-[#BF9853] px-6 py-2 text-[#BF9853]"
+                    onClick={closeArrangementModePicker}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-lg bg-[#BF9853] px-6 py-2 font-semibold text-white hover:bg-yellow-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={confirmArrangementModesAdd}
+                    disabled={arrangementModesPendingAdd.length === 0}
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
       {isProjectManagementOpen && (
@@ -7782,7 +7766,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                     </div>
                     <div className="">
                       <label className="block mb-1 text-lg font-medium">Project Type</label>
-                      <select value={detail.projectType} onChange={(e) =>handleNewDetailChange(index, 'projectType', e.target.value)}
+                      <select value={detail.projectType} onChange={(e) => handleNewDetailChange(index, 'projectType', e.target.value)}
                         className="w-40 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                       >
                         <option value="">Select Type</option>
@@ -9099,9 +9083,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
       {tooltipData && (
         <div
-          className={`fixed z-50 bg-white text-black p-3 rounded shadow-lg text-sm border ${
-            tooltipAlign === 'left' ? 'min-w-[10rem] text-left' : 'max-w-xs'
-          }`}
+          className={`fixed z-50 bg-white text-black p-3 rounded shadow-lg text-sm border ${tooltipAlign === 'left' ? 'min-w-[10rem] text-left' : 'max-w-xs'
+            }`}
           style={{
             left: tooltipAlign === 'left' ? tooltipPosition.x : tooltipPosition.x + 10,
             top: tooltipAlign === 'left' ? tooltipPosition.y : tooltipPosition.y - 10,

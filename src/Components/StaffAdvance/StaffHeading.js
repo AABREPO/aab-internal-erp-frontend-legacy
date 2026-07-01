@@ -120,7 +120,7 @@ const StaffHeading = ({ username, userRoles = [] }) => {
                     active={activeTab === 'staffInput'}
                     onClick={() => handleTabChange('staffInput')}
                 >
-                    Add Input
+                    Input Data
                 </ModuleHeadingTab>
                 <ModuleHeadingTab
                     active={activeTab === 'staffReport'}

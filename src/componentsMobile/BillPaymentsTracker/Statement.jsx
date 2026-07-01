@@ -75,7 +75,7 @@ const StatementRow = ({
 );
 
 const StatementMobile = ({ paymentModeLabels: paymentModeLabelsFromProps = [] }) => {
-	const API_BASE = 'https://backendaab.in/demoAabuildersDash/api';
+	const API_BASE = 'https://backendaab.in/aabuildersDash/api';
 
 	const [query, setQuery] = useState('');
 	const [loading, setLoading] = useState(false);
@@ -238,7 +238,7 @@ const StatementMobile = ({ paymentModeLabels: paymentModeLabelsFromProps = [] })
 		let isMounted = true;
 		const loadVendors = async () => {
 			try {
-				const res = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll', {
+				const res = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll', {
 					method: 'GET',
 					credentials: 'include',
 					headers: { 'Content-Type': 'application/json' }

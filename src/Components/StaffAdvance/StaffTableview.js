@@ -11,62 +11,82 @@ import {
   isStaffAdvanceChequePaymentMode,
 } from '../../utils/staffAdvanceWeeklyPaymentBill';
 import AdvancePortalEditPaymentModal from '../Advance Portal/AdvancePortalEditPaymentModal';
-import { DATABASE_TABLE_FILTER_SELECT_STYLES, formatEdbcFilterDateDMY } from '../ExpensesEntry/databaseExpensesSharedColumns';
+import {
+  EDBC_IDS,
+  DATABASE_TABLE_FILTER_SELECT_STYLES,
+  formatEdbcFilterDateDMY,
+  getEdbcColumnConfig,
+  useEdbcExpandedCells,
+  EdbcTableHeaderRow,
+  EdbcTableFilterRow,
+  EdbcTableBodyRow,
+  EdbcColumnHeader,
+  EdbcTimestampFilter,
+  EdbcProjectNameFilter,
+  EdbcSelectFilter,
+  EdbcPaymentModeFilter,
+  EdbcPaymentModeFilterChip,
+  hasEdbcPaymentModeFilter,
+  matchesEdbcPaymentModeFilter,
+  EdbcEmptyFilterCell,
+  EdbcTotalAmountFilter,
+  EdbcTextInputFilter,
+  matchesEdbcAmountFilter,
+  EdbcDateBodyCell,
+  EdbcExpandableBodyCell,
+  EdbcFileBodyCell,
+  EDBC_TABLE_EDGE_TABLE_CLASS,
+  EDBC2_FIRST_COLUMN_WIDTH_CLASS,
+  EdbcFilterToggleButton,
+  EdbcTableToolbarRightActions,
+} from '../ExpensesEntry/databaseExpensesSharedColumns';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
-import Filter from '../Images/TableFilter.svg';
-import Search from '../Images/Searchnew.svg';
-import Reload from '../Images/Clear.svg';
-import Pdf from '../Images/pdf.png';
-import XL from '../Images/sheets.png';
 import edit from '../Images/Edit.svg';
+
+const STAFF_TABLEVIEW_BLANK_VALUE = 'BLANK';
+const STAFF_TABLEVIEW_BLANK_LABEL = 'Blank';
+const staffTableviewBlankOption = { value: STAFF_TABLEVIEW_BLANK_VALUE, label: STAFF_TABLEVIEW_BLANK_LABEL };
+const isStaffTableviewBlankish = (value) =>
+  value === null ||
+  value === undefined ||
+  (typeof value === 'string' && value.trim() === '') ||
+  value === 0 ||
+  value === '0';
+
+const formatAmountDisplay = (value) => {
+  if (value === '' || value === null || value === undefined) return '';
+  const normalized = String(value).replace(/,/g, '');
+  const num = Number(normalized);
+  if (Number.isNaN(num)) return String(value);
+  return num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+const ADVANCE_PORTAL_FILTER_AMOUNT_INPUT_CLASS =
+  'pl-[12px] pr-2 border border-[#00000029] rounded-lg w-full h-full focus:outline-none bg-[#ededed] text-[14px] font-medium cursor-default';
+const AdvancePortalAmountOutput = ({ value, className = '' }) => {
+  const formattedValue = formatAmountDisplay(value);
+  const displayValue = formattedValue ? `₹${formattedValue}` : '';
+  return (
+    <div className={`relative lg:w-[150px] w-full h-[40px] ${className}`.trim()}>
+      <input
+        type="text"
+        readOnly
+        tabIndex={-1}
+        value={displayValue}
+        className={ADVANCE_PORTAL_FILTER_AMOUNT_INPUT_CLASS}
+      />
+    </div>
+  );
+};
 
 // EditModal is now inline - no need for lazy loading
 
-// Memoized components for better performance
-const TableRow = memo(({ entry, index, onEditClick, getEmployeeName, getLabourName, getPurposeName, formatDateOnly }) => (
-  <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
-    <td className="text-sm text-left p-2 w-40 font-semibold">{formatDateOnly(entry.date)}</td>
-    <td className="text-sm text-left w-[150px] font-semibold">
-      {getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "0"}
-    </td>
-    <td className="text-sm text-left w-[250px] font-semibold">
-      {getPurposeName(entry.from_purpose_id)}
-    </td>
-    <td className="text-sm text-left font-semibold">
-      {getPurposeName(entry.to_purpose_id)}
-    </td>
-    <td className="text-sm text-left pl-2 font-semibold">
-      {entry.amount != null && entry.amount !== ""
-        ? Number(entry.amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
-        : ""}
-    </td>
-    <td className="text-sm text-left pl-2 font-semibold">
-      {entry.staff_refund_amount != null && entry.staff_refund_amount !== ""
-        ? Number(entry.staff_refund_amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
-        : ""}
-    </td>
-    <td className="text-sm text-left font-semibold">{entry.type}</td>
-    <td className="text-sm text-left font-semibold">{entry.staff_payment_mode}</td>
-    <td className="text-sm text-left font-semibold">{entry.description}</td>
-    <td></td>
-    <td className="text-sm text-left pl-3 font-semibold">{entry.entry_no}</td>
-    <td className="flex py-2">
-      <button
-        className={`rounded-full transition duration-200 ml-2 mr-3 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
-        disabled={entry.not_allow_to_edit}
-      >
-        <img
-          src={edit}
-          onClick={entry.not_allow_to_edit ? undefined : () => onEditClick(entry)}
-          alt="Edit"
-          className={`w-4 h-6 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
-        />
-      </button>
-    </td>
-  </tr>
-));
+const formatStaffTableAmount = (value) =>
+  value != null && value !== ''
+    ? Number(value).toLocaleString('en-IN', { maximumFractionDigits: 0 })
+    : '';
+
 const EditModal = memo(({
   isOpen,
   editFormData,
@@ -330,11 +350,17 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectDate, setSelectDate] = useState('');
+  const [selectDateEnd, setSelectDateEnd] = useState('');
+  const [showTableDateRangePicker, setShowTableDateRangePicker] = useState(false);
   const [selectEmployeeName, setSelectEmployeeName] = useState('');
   const [selectPurpose, setSelectPurpose] = useState('');
   const [selectTransferTo, setSelectTransferTo] = useState('');
   const [selectType, setSelectType] = useState('');
-  const [selectMode, setSelectMode] = useState('');
+  const [selectedPaymentModes, setSelectedPaymentModes] = useState([]);
+  const [selectAmount, setSelectAmount] = useState('');
+  const [selectRefundAmount, setSelectRefundAmount] = useState('');
+  const [selectDescription, setSelectDescription] = useState('');
+  const [selectEntryNo, setSelectEntryNo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [overallSearch, setOverallSearch] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -356,6 +382,9 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   const scrollRef = useRef(null);
   const filterRowRef = useRef(null);
   const filterNudgeUsedRef = useRef(false);
+  const filterChipsScrollRef = useRef(null);
+  const isFilterChipsDragging = useRef(false);
+  const filterChipsDragStart = useRef({ x: 0, scrollLeft: 0 });
   const [staffAdvanceCombinedOptions, setStaffAdvanceCombinedOptions] = useState([]);
   const adminUsernames = ['Mahalingam M', 'Admin'];
   const normalizedUsername = (username || '').trim().toLowerCase();
@@ -372,11 +401,11 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
     setError(null);
     try {
       const [recRes, empRes, purRes] = await Promise.allSettled([
-        fetch('https://backendaab.in/demoAabuildersDash/api/staff-advance/all'),
-        fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll', {
+        fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all'),
+        fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll', {
           credentials: 'include',
         }),
-        fetch('https://backendaab.in/demoAabuildersDash/api/purposes/getAll')
+        fetch('https://backendaab.in/aabuildersDash/api/purposes/getAll')
       ]);
       const recData = recRes.status === 'fulfilled' && recRes.value.ok
         ? await recRes.value.json()
@@ -410,7 +439,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
 
   const refreshStaffRecords = useCallback(async () => {
     try {
-      const recRes = await fetch('https://backendaab.in/demoAabuildersDash/api/staff-advance/all');
+      const recRes = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
       if (recRes.ok) {
         const recData = await recRes.json();
         setRecords(Array.isArray(recData) ? recData : []);
@@ -432,7 +461,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   }, []);
   const fetchLaboursList = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/labours-details/getAll');
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
       if (response.ok) {
         const data = await response.json();
         const formattedData = data.map(item => ({
@@ -456,7 +485,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   useEffect(() => {
     const fetchAccountDetails = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
         if (response.ok) {
           const data = await response.json();
           setAccountDetails(Array.isArray(data) ? data : []);
@@ -549,54 +578,155 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   const getEmployeeName = useCallback((id) => employees.find(e => e.id === id)?.label || id, [employees]);
   const getLabourName = useCallback((id) => laboursList.find(l => l.id === id)?.label || id, [laboursList]);
   const getPurposeName = useCallback((id) => purposes.find(p => p.id === id)?.label || id, [purposes]);
+  const matchesRecordsForFilterOptions = useCallback((entry, excludeField) => {
+    if (selectDate || selectDateEnd) {
+      const entryDate = new Date(entry.date);
+      if (selectDate && selectDateEnd) {
+        const start = new Date(selectDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(selectDateEnd);
+        end.setHours(23, 59, 59, 999);
+        if (entryDate < start || entryDate > end) return false;
+      } else if (selectDate) {
+        const start = new Date(selectDate);
+        start.setHours(0, 0, 0, 0);
+        if (entryDate < start) return false;
+      } else if (selectDateEnd) {
+        const end = new Date(selectDateEnd);
+        end.setHours(23, 59, 59, 999);
+        if (entryDate > end) return false;
+      }
+    }
+    if (excludeField !== 'employee' && selectEmployeeName) {
+      const employeeName = String(getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || '');
+      if (selectEmployeeName === STAFF_TABLEVIEW_BLANK_VALUE) {
+        if (!isStaffTableviewBlankish(employeeName)) return false;
+      } else if (employeeName.toLowerCase() !== selectEmployeeName.toLowerCase()) return false;
+    }
+    if (excludeField !== 'purpose' && selectPurpose) {
+      const purposeName = String(getPurposeName(entry.from_purpose_id) || '');
+      if (selectPurpose === STAFF_TABLEVIEW_BLANK_VALUE) {
+        if (!isStaffTableviewBlankish(purposeName)) return false;
+      } else if (purposeName.toLowerCase() !== selectPurpose.toLowerCase()) return false;
+    }
+    if (excludeField !== 'transfer' && selectTransferTo) {
+      const transferToName = String(getPurposeName(entry.to_purpose_id) || '');
+      if (selectTransferTo === STAFF_TABLEVIEW_BLANK_VALUE) {
+        if (!isStaffTableviewBlankish(transferToName)) return false;
+      } else if (transferToName.toLowerCase() !== selectTransferTo.toLowerCase()) return false;
+    }
+    if (excludeField !== 'type' && selectType) {
+      if (selectType === STAFF_TABLEVIEW_BLANK_VALUE) {
+        if (!isStaffTableviewBlankish(entry.type)) return false;
+      } else if (String(entry.type || '').toLowerCase() !== selectType.toLowerCase()) return false;
+    }
+    if (excludeField !== 'mode' && !matchesEdbcPaymentModeFilter(entry.staff_payment_mode, selectedPaymentModes, {
+      blankValue: STAFF_TABLEVIEW_BLANK_VALUE,
+      isBlankish: isStaffTableviewBlankish,
+    })) return false;
+    if (excludeField !== 'amount' && selectAmount.trim() && !matchesEdbcAmountFilter(entry.amount, selectAmount)) return false;
+    if (excludeField !== 'refund' && selectRefundAmount.trim() && !matchesEdbcAmountFilter(entry.staff_refund_amount, selectRefundAmount)) return false;
+    if (excludeField !== 'description' && selectDescription.trim()) {
+      if (!String(entry.description ?? '').toLowerCase().includes(selectDescription.toLowerCase().trim())) return false;
+    }
+    if (excludeField !== 'entryNo' && selectEntryNo) {
+      if (selectEntryNo === STAFF_TABLEVIEW_BLANK_VALUE) {
+        if (!isStaffTableviewBlankish(entry.entry_no)) return false;
+      } else if (!entry.entry_no?.toString().includes(selectEntryNo.toString())) return false;
+    }
+    return true;
+  }, [selectDate, selectDateEnd, selectEmployeeName, selectPurpose, selectTransferTo, selectType, selectedPaymentModes, selectAmount, selectRefundAmount, selectDescription, selectEntryNo, getEmployeeName, getLabourName, getPurposeName]);
   const employeeNameOptions = useMemo(() => {
     const uniqueNames = new Set();
-    records.forEach((entry) => {
-      const name = getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id);
-      if (name) {
-        uniqueNames.add(name);
+    let hasBlank = false;
+    records.filter((entry) => matchesRecordsForFilterOptions(entry, 'employee')).forEach((entry) => {
+      const name = getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || '';
+      if (isStaffTableviewBlankish(name)) {
+        hasBlank = true;
+      } else {
+        uniqueNames.add(String(name));
       }
     });
-    return Array.from(uniqueNames).map(name => ({ value: name, label: name }));
-  }, [records, getEmployeeName, getLabourName]);
+    const options = Array.from(uniqueNames)
+      .sort((a, b) => String(a).localeCompare(String(b)))
+      .map((name) => ({ value: name, label: name }));
+    if (hasBlank) options.unshift(staffTableviewBlankOption);
+    return options;
+  }, [records, matchesRecordsForFilterOptions, getEmployeeName, getLabourName]);
   const purposeOptions = useMemo(() => {
+    const scopedRecords = records.filter((entry) => matchesRecordsForFilterOptions(entry, 'purpose'));
     const uniquePurposes = new Set();
-    records.forEach((entry) => {
+    let hasBlank = false;
+    scopedRecords.forEach((entry) => {
+      if (!entry.from_purpose_id) {
+        hasBlank = true;
+        return;
+      }
       const purposeName = getPurposeName(entry.from_purpose_id);
-      if (purposeName && purposeName !== entry.from_purpose_id) {
-        uniquePurposes.add(purposeName);
+      if (isStaffTableviewBlankish(purposeName) || purposeName === entry.from_purpose_id) {
+        hasBlank = true;
+      } else {
+        uniquePurposes.add(String(purposeName));
       }
     });
-    return Array.from(uniquePurposes).map(purpose => ({ value: purpose, label: purpose, id: records.find(r => getPurposeName(r.from_purpose_id) === purpose)?.from_purpose_id }));
-  }, [records, getPurposeName]);
+    const options = Array.from(uniquePurposes)
+      .sort((a, b) => String(a).localeCompare(String(b)))
+      .map((purpose) => ({
+        value: purpose,
+        label: purpose,
+        id: scopedRecords.find((r) => getPurposeName(r.from_purpose_id) === purpose)?.from_purpose_id,
+      }));
+    if (hasBlank) options.unshift(staffTableviewBlankOption);
+    return options;
+  }, [records, matchesRecordsForFilterOptions, getPurposeName]);
   const transferToOptions = useMemo(() => {
+    const scopedRecords = records.filter((entry) => matchesRecordsForFilterOptions(entry, 'transfer'));
     const uniqueTransferTo = new Set();
-    records.forEach((entry) => {
+    let hasBlank = false;
+    scopedRecords.forEach((entry) => {
+      if (!entry.to_purpose_id) {
+        hasBlank = true;
+        return;
+      }
       const transferToName = getPurposeName(entry.to_purpose_id);
-      if (transferToName && transferToName !== entry.to_purpose_id) {
-        uniqueTransferTo.add(transferToName);
+      if (isStaffTableviewBlankish(transferToName) || transferToName === entry.to_purpose_id) {
+        hasBlank = true;
+      } else {
+        uniqueTransferTo.add(String(transferToName));
       }
     });
-    return Array.from(uniqueTransferTo).map(transferTo => ({ value: transferTo, label: transferTo, id: records.find(r => getPurposeName(r.to_purpose_id) === transferTo)?.to_purpose_id }));
-  }, [records, getPurposeName]);
+    const options = Array.from(uniqueTransferTo)
+      .sort((a, b) => String(a).localeCompare(String(b)))
+      .map((transferTo) => ({
+        value: transferTo,
+        label: transferTo,
+        id: scopedRecords.find((r) => getPurposeName(r.to_purpose_id) === transferTo)?.to_purpose_id,
+      }));
+    if (hasBlank) options.unshift(staffTableviewBlankOption);
+    return options;
+  }, [records, matchesRecordsForFilterOptions, getPurposeName]);
   const typeOptions = useMemo(() => {
     const uniqueTypes = new Set();
-    records.forEach((entry) => {
-      if (entry.type) {
-        uniqueTypes.add(entry.type);
-      }
+    let hasBlank = false;
+    records.filter((entry) => matchesRecordsForFilterOptions(entry, 'type')).forEach((entry) => {
+      if (entry.type) uniqueTypes.add(entry.type);
+      else hasBlank = true;
     });
-    return Array.from(uniqueTypes).sort();
-  }, [records]);
-  const modeOptions = useMemo(() => {
+    return (hasBlank ? [STAFF_TABLEVIEW_BLANK_VALUE] : []).concat(Array.from(uniqueTypes).sort());
+  }, [records, matchesRecordsForFilterOptions]);
+  const modeFilterOptions = useMemo(() => {
     const uniqueModes = new Set();
-    records.forEach((entry) => {
-      if (entry.staff_payment_mode) {
-        uniqueModes.add(entry.staff_payment_mode);
-      }
+    let hasBlank = false;
+    records.filter((entry) => matchesRecordsForFilterOptions(entry, 'mode')).forEach((entry) => {
+      if (entry.staff_payment_mode) uniqueModes.add(entry.staff_payment_mode);
+      else hasBlank = true;
     });
-    return Array.from(uniqueModes).sort();
-  }, [records]);
+    const options = Array.from(uniqueModes)
+      .sort()
+      .map((mode) => ({ value: mode, label: mode }));
+    if (hasBlank) options.unshift(staffTableviewBlankOption);
+    return options;
+  }, [records, matchesRecordsForFilterOptions]);
   const handleSort = useCallback((key) => {
     setSortConfig((prev) => {
       if (prev.key === key) {
@@ -605,10 +735,38 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
       return { key, direction: 'asc' };
     });
   }, []);
+  const { expandedCells, toggleExpandedCell } = useEdbcExpandedCells();
+  const edbc8Config = getEdbcColumnConfig(EDBC_IDS.EDBC8);
+  const edbc19Config = getEdbcColumnConfig(EDBC_IDS.EDBC19);
+  const mapStaffSortKeyToEdbc = (key) => {
+    if (key === 'employee') return 'vendor';
+    if (key === 'purpose') return 'source';
+    if (key === 'transfer') return 'siteName';
+    if (key === 'mode') return 'paymentMode';
+    if (key === 'type') return 'accountType';
+    if (key === 'description') return 'comments';
+    if (key === 'entryNo') return 'eno';
+    return key;
+  };
+  const handleEdbcSort = (edbcField) => {
+    const fieldToKey = {
+      vendor: 'employee',
+      source: 'purpose',
+      siteName: 'transfer',
+      paymentMode: 'mode',
+      accountType: 'type',
+      comments: 'description',
+      eno: 'entryNo',
+      amount: 'amount',
+    };
+    handleSort(fieldToKey[edbcField] || edbcField);
+  };
+  const resolveEdbcSortField = (staffSortKey) =>
+    sortConfig.key === staffSortKey ? mapStaffSortKeyToEdbc(staffSortKey) : '';
   useEffect(() => {
     const fetchVendorNames = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -635,7 +793,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   useEffect(() => {
     const fetchContractorNames = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -663,7 +821,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -718,7 +876,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectDate, selectEmployeeName, selectPurpose, selectTransferTo, selectType, selectMode]);
+  }, [selectDate, selectDateEnd, selectEmployeeName, selectPurpose, selectTransferTo, selectType, selectedPaymentModes, selectAmount, selectRefundAmount, selectDescription, selectEntryNo]);
   // Memoized edit handlers
   const handleEditClick = useCallback((entry) => {
     if (!isAdmin && (entry.not_allow_to_edit || entry.allow_to_edit === false)) {
@@ -748,7 +906,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
       const currentEntry = records.find(
         (r) => String(r.staffAdvancePortalId || r.id) === String(editingId)
       );
-      const url = `https://backendaab.in/demoAabuildersDash/api/staff-advance/${editingId}?editedBy=${username}`;
+      const url = `https://backendaab.in/aabuildersDash/api/staff-advance/${editingId}?editedBy=${username}`;
       const response = await fetch(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -826,51 +984,91 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   };
   const [debouncedFilters, setDebouncedFilters] = useState({
     selectDate: '',
+    selectDateEnd: '',
     selectEmployeeName: '',
     selectPurpose: '',
     selectTransferTo: '',
     selectType: '',
-    selectMode: ''
+    selectedPaymentModes: [],
+    selectAmount: '',
+    selectRefundAmount: '',
+    selectDescription: '',
+    selectEntryNo: ''
   });
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedFilters({
         selectDate,
+        selectDateEnd,
         selectEmployeeName,
         selectPurpose,
         selectTransferTo,
         selectType,
-        selectMode
+        selectedPaymentModes,
+        selectAmount,
+        selectRefundAmount,
+        selectDescription,
+        selectEntryNo
       });
     }, 300);
     return () => clearTimeout(timer);
-  }, [selectDate, selectEmployeeName, selectPurpose, selectTransferTo, selectType, selectMode]);
+  }, [selectDate, selectDateEnd, selectEmployeeName, selectPurpose, selectTransferTo, selectType, selectedPaymentModes, selectAmount, selectRefundAmount, selectDescription, selectEntryNo]);
   const filteredRecords = useMemo(() => {
     return records.filter((entry) => {
-      if (debouncedFilters.selectDate) {
-        const [year, month, day] = debouncedFilters.selectDate.split("-");
-        const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
-        const entryDateObj = new Date(entry.date);
-        const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
-        if (formattedEntryDate !== formattedSelectDate) return false;
+      if (debouncedFilters.selectDate || debouncedFilters.selectDateEnd) {
+        const entryDate = new Date(entry.date);
+        if (debouncedFilters.selectDate && debouncedFilters.selectDateEnd) {
+          const start = new Date(debouncedFilters.selectDate);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(debouncedFilters.selectDateEnd);
+          end.setHours(23, 59, 59, 999);
+          if (entryDate < start || entryDate > end) return false;
+        } else if (debouncedFilters.selectDate) {
+          const start = new Date(debouncedFilters.selectDate);
+          start.setHours(0, 0, 0, 0);
+          if (entryDate < start) return false;
+        } else if (debouncedFilters.selectDateEnd) {
+          const end = new Date(debouncedFilters.selectDateEnd);
+          end.setHours(23, 59, 59, 999);
+          if (entryDate > end) return false;
+        }
       }
       if (debouncedFilters.selectEmployeeName) {
         const employeeName = String(getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "");
-        if (employeeName.toLowerCase() !== debouncedFilters.selectEmployeeName.toLowerCase()) return false;
+        if (debouncedFilters.selectEmployeeName === STAFF_TABLEVIEW_BLANK_VALUE) {
+          if (!isStaffTableviewBlankish(employeeName)) return false;
+        } else if (employeeName.toLowerCase() !== debouncedFilters.selectEmployeeName.toLowerCase()) return false;
       }
       if (debouncedFilters.selectPurpose) {
         const purposeName = String(getPurposeName(entry.from_purpose_id) || "");
-        if (purposeName.toLowerCase() !== debouncedFilters.selectPurpose.toLowerCase()) return false;
+        if (debouncedFilters.selectPurpose === STAFF_TABLEVIEW_BLANK_VALUE) {
+          if (!isStaffTableviewBlankish(purposeName)) return false;
+        } else if (purposeName.toLowerCase() !== debouncedFilters.selectPurpose.toLowerCase()) return false;
       }
       if (debouncedFilters.selectTransferTo) {
         const transferToName = String(getPurposeName(entry.to_purpose_id) || "");
-        if (transferToName.toLowerCase() !== debouncedFilters.selectTransferTo.toLowerCase()) return false;
+        if (debouncedFilters.selectTransferTo === STAFF_TABLEVIEW_BLANK_VALUE) {
+          if (!isStaffTableviewBlankish(transferToName)) return false;
+        } else if (transferToName.toLowerCase() !== debouncedFilters.selectTransferTo.toLowerCase()) return false;
       }
       if (debouncedFilters.selectType) {
-        if (String(entry.type || "").toLowerCase() !== debouncedFilters.selectType.toLowerCase()) return false;
+        if (debouncedFilters.selectType === STAFF_TABLEVIEW_BLANK_VALUE) {
+          if (!isStaffTableviewBlankish(entry.type)) return false;
+        } else if (String(entry.type || "").toLowerCase() !== debouncedFilters.selectType.toLowerCase()) return false;
       }
-      if (debouncedFilters.selectMode) {
-        if (String(entry.staff_payment_mode || "").toLowerCase() !== debouncedFilters.selectMode.toLowerCase()) return false;
+      if (!matchesEdbcPaymentModeFilter(entry.staff_payment_mode, debouncedFilters.selectedPaymentModes, {
+        blankValue: STAFF_TABLEVIEW_BLANK_VALUE,
+        isBlankish: isStaffTableviewBlankish,
+      })) return false;
+      if (debouncedFilters.selectAmount.trim() && !matchesEdbcAmountFilter(entry.amount, debouncedFilters.selectAmount)) return false;
+      if (debouncedFilters.selectRefundAmount.trim() && !matchesEdbcAmountFilter(entry.staff_refund_amount, debouncedFilters.selectRefundAmount)) return false;
+      if (debouncedFilters.selectDescription.trim()) {
+        if (!String(entry.description ?? '').toLowerCase().includes(debouncedFilters.selectDescription.toLowerCase().trim())) return false;
+      }
+      if (debouncedFilters.selectEntryNo) {
+        if (debouncedFilters.selectEntryNo === STAFF_TABLEVIEW_BLANK_VALUE) {
+          if (!isStaffTableviewBlankish(entry.entry_no)) return false;
+        } else if (!entry.entry_no?.toString().includes(debouncedFilters.selectEntryNo.toString())) return false;
       }
       if (overallSearch.trim()) {
         const q = overallSearch.toLowerCase().trim();
@@ -902,6 +1100,28 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   const refundTotal = filteredRecords
     .filter(r => r.type === 'Refund')
     .reduce((acc, r) => acc + (r.staff_refund_amount || 0), 0);
+  const filterColumnTotals = useMemo(() => filteredRecords.reduce(
+    (acc, entry) => {
+      acc.amount += Number(entry.amount) || 0;
+      acc.refund += Number(entry.staff_refund_amount) || 0;
+      return acc;
+    },
+    { amount: 0, refund: 0 }
+  ), [filteredRecords]);
+  const entryNoOptions = useMemo(() => {
+    const uniqueEntryNos = new Set();
+    let hasBlank = false;
+    records.filter((entry) => matchesRecordsForFilterOptions(entry, 'entryNo')).forEach((entry) => {
+      if (entry.entry_no != null && entry.entry_no !== '') {
+        uniqueEntryNos.add(String(entry.entry_no));
+      } else {
+        hasBlank = true;
+      }
+    });
+    return (hasBlank ? [STAFF_TABLEVIEW_BLANK_VALUE] : []).concat(
+      Array.from(uniqueEntryNos).sort((a, b) => Number(b) - Number(a)),
+    );
+  }, [records, matchesRecordsForFilterOptions]);
   const sortedData = useMemo(() => {
     let sortableData = [...filteredRecords];
     if (sortConfig.key) {
@@ -913,8 +1133,8 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
             bValue = new Date(b.date);
             break;
           case 'employee':
-            aValue = getEmployeeName(a.employee_id);
-            bValue = getEmployeeName(b.employee_id) || getLabourName(b.labour_id);
+            aValue = String(getEmployeeName(a.employee_id) || getLabourName(a.labour_id) || '');
+            bValue = String(getEmployeeName(b.employee_id) || getLabourName(b.labour_id) || '');
             break;
           case 'purpose':
             aValue = getPurposeName(a.from_purpose_id);
@@ -932,6 +1152,22 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
             aValue = a.staff_payment_mode || '';
             bValue = b.staff_payment_mode || '';
             break;
+          case 'amount':
+            aValue = Number(a.amount) || 0;
+            bValue = Number(b.amount) || 0;
+            break;
+          case 'refund':
+            aValue = Number(a.staff_refund_amount) || 0;
+            bValue = Number(b.staff_refund_amount) || 0;
+            break;
+          case 'description':
+            aValue = a.description || '';
+            bValue = b.description || '';
+            break;
+          case 'entryNo':
+            aValue = Number(a.entry_no) || 0;
+            bValue = Number(b.entry_no) || 0;
+            break;
           default:
             return 0;
         }
@@ -943,7 +1179,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
       sortableData.sort((a, b) => Number(b.entry_no) - Number(a.entry_no));
     }
     return sortableData;
-  }, [filteredRecords, sortConfig, getEmployeeName, getPurposeName]);
+  }, [filteredRecords, sortConfig, getEmployeeName, getLabourName, getPurposeName]);
   const exportPDF = useCallback(() => {
     const doc = new jsPDF("l", "pt", "a4");
     const headers = [
@@ -1103,14 +1339,56 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   },[]);
   const clearFilters = () => {
     setSelectDate('');
+    setSelectDateEnd('');
+    setShowTableDateRangePicker(false);
     setSelectEmployeeName('');
     setSelectPurpose('');
     setSelectTransferTo('');
     setSelectType('');
-    setSelectMode('');
+    setSelectedPaymentModes([]);
+    setSelectAmount('');
+    setSelectRefundAmount('');
+    setSelectDescription('');
+    setSelectEntryNo('');
     setOverallSearch('');
+    setSortConfig({ key: null, direction: 'asc' });
     setShowFilters(false);
   };
+  const handleFilterChipsMouseDown = (e) => {
+    if (!filterChipsScrollRef.current || e.target.closest('button')) return;
+    isFilterChipsDragging.current = true;
+    filterChipsDragStart.current = {
+      x: e.clientX,
+      scrollLeft: filterChipsScrollRef.current.scrollLeft,
+    };
+    filterChipsScrollRef.current.style.cursor = 'grabbing';
+    filterChipsScrollRef.current.style.userSelect = 'none';
+  };
+  const handleFilterChipsMouseMove = (e) => {
+    if (!isFilterChipsDragging.current || !filterChipsScrollRef.current) return;
+    e.preventDefault();
+    const dx = e.clientX - filterChipsDragStart.current.x;
+    filterChipsScrollRef.current.scrollLeft =
+      filterChipsDragStart.current.scrollLeft - dx;
+  };
+  const handleFilterChipsMouseUp = () => {
+    if (!filterChipsScrollRef.current) return;
+    isFilterChipsDragging.current = false;
+    filterChipsScrollRef.current.style.cursor = 'grab';
+    filterChipsScrollRef.current.style.userSelect = '';
+  };
+  const hasActiveColumnFilters =
+    selectDate ||
+    selectDateEnd ||
+    selectEmployeeName ||
+    selectPurpose ||
+    selectTransferTo ||
+    selectAmount.trim() ||
+    selectRefundAmount.trim() ||
+    selectDescription.trim() ||
+    selectType ||
+    hasEdbcPaymentModeFilter(selectedPaymentModes) ||
+    selectEntryNo;
   if (error && error.startsWith('Failed to load')) {
     return (
       <div className='flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]'>
@@ -1133,7 +1411,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
         request_approval: false,
         request_completed: false
       };
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/edit_requests/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/edit_requests/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -1159,28 +1437,16 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
           <div className='w-full xl:w-auto xl:justify-between'>
             <div className='flex flex-wrap gap-[12px]'>
               <div>
-                <label className='block mb-[8px] font-semibold'>Advance Amount</label>
-                <input
-                  className='lg:w-[150px] h-[40px] rounded-lg border border-[#00000029] font-semibold bg-[#ededed] focus:outline-none p-2'
-                  value={`₹${advanceTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                  readOnly
-                />
+                <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Advance Amount</label>
+                <AdvancePortalAmountOutput value={advanceTotal} />
               </div>
               <div>
-                <label className='block mb-[8px] font-semibold'>Transfer Amount</label>
-                <input
-                  className='lg:w-[150px] h-[40px] rounded-lg border border-[#00000029] font-semibold bg-[#ededed] focus:outline-none p-2'
-                  value={`₹${transferTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                  readOnly
-                />
+                <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Transfer Amount</label>
+                <AdvancePortalAmountOutput value={transferTotal} />
               </div>
               <div>
-                <label className='block mb-[8px] font-semibold'>Refund Amount</label>
-                <input
-                  className='lg:w-[150px] h-[40px] rounded-lg border border-[#00000029] font-semibold bg-[#ededed] focus:outline-none p-2'
-                  value={`₹${refundTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                  readOnly
-                />
+                <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Refund Amount</label>
+                <AdvancePortalAmountOutput value={refundTotal} />
               </div>
             </div>
           </div>
@@ -1193,13 +1459,9 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
         )}
         <div className="w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
           <div
-            className={`text-left flex ${selectDate || selectEmployeeName || selectPurpose || selectTransferTo || selectType || selectMode
-              ? 'flex-col sm:flex-row sm:justify-between'
-              : 'flex-row justify-between items-center'
-              } mb-[12px] gap-[6px]`}>
+            className={`text-left flex ${hasActiveColumnFilters ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'} mb-[12px] gap-[6px]`}>
             <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
-              <button
-                className=''
+              <EdbcFilterToggleButton
                 onClick={() => {
                   const willOpen = !showFilters;
                   const scroller = scrollRef.current;
@@ -1229,81 +1491,114 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
                     });
                   });
                 }}
-              >
-                <img
-                  src={Filter}
-                  alt="Toggle Filter"
-                  className="border rounded-md h-[34px]"
-                />
-              </button>
-              {(selectDate || selectEmployeeName || selectPurpose || selectTransferTo || selectType || selectMode) && (
-                <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
-                  {selectDate && (
-                    <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
-                      <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
-                      <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(selectDate)}</span>
+              />
+              {hasActiveColumnFilters && (
+                <div
+                  ref={filterChipsScrollRef}
+                  onMouseDown={handleFilterChipsMouseDown}
+                  onMouseMove={handleFilterChipsMouseMove}
+                  onMouseUp={handleFilterChipsMouseUp}
+                  onMouseLeave={handleFilterChipsMouseUp}
+                  className="flex min-w-0 flex-1 overflow-x-auto flex-nowrap items-center gap-2 no-scrollbar scrollbar-none cursor-grab select-none"
+                >
+                  {selectDate && selectDateEnd ? (
+                    <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-semibold shrink-0 whitespace-nowrap">Date: </span>
+                      <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">
+                        {selectDate === selectDateEnd
+                          ? formatEdbcFilterDateDMY(selectDate)
+                          : `${formatEdbcFilterDateDMY(selectDate)} – ${formatEdbcFilterDateDMY(selectDateEnd)}`}
+                      </span>
+                      <button onClick={() => { setSelectDate(''); setSelectDateEnd(''); }} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                    </span>
+                  ) : selectDate ? (
+                    <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-semibold shrink-0 whitespace-nowrap">Date: </span>
+                      <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{formatEdbcFilterDateDMY(selectDate)} onwards</span>
                       <button onClick={() => setSelectDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                     </span>
-                  )}
+                  ) : selectDateEnd ? (
+                    <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-semibold shrink-0 whitespace-nowrap">Date until: </span>
+                      <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{formatEdbcFilterDateDMY(selectDateEnd)}</span>
+                      <button onClick={() => setSelectDateEnd('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                    </span>
+                  ) : null}
                   {selectEmployeeName && (
-                    <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
-                      <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Employee: </span>
-                      <span className="font-semibold text-[14px] truncate min-w-0">{selectEmployeeName}</span>
+                    <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-semibold shrink-0 whitespace-nowrap">Employee: </span>
+                      <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectEmployeeName === STAFF_TABLEVIEW_BLANK_VALUE ? STAFF_TABLEVIEW_BLANK_LABEL : selectEmployeeName}</span>
                       <button onClick={() => setSelectEmployeeName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                     </span>
                   )}
                   {selectPurpose && (
-                    <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
-                      <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Purpose: </span>
-                      <span className="font-semibold text-[14px] truncate min-w-0">{selectPurpose}</span>
+                    <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-semibold shrink-0 whitespace-nowrap">Purpose: </span>
+                      <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectPurpose === STAFF_TABLEVIEW_BLANK_VALUE ? STAFF_TABLEVIEW_BLANK_LABEL : selectPurpose}</span>
                       <button onClick={() => setSelectPurpose('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                     </span>
                   )}
                   {selectTransferTo && (
-                    <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
-                      <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Transfer To: </span>
-                      <span className="font-semibold text-[14px] truncate min-w-0">{selectTransferTo}</span>
+                    <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-semibold shrink-0 whitespace-nowrap">Transfer To: </span>
+                      <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectTransferTo === STAFF_TABLEVIEW_BLANK_VALUE ? STAFF_TABLEVIEW_BLANK_LABEL : selectTransferTo}</span>
                       <button onClick={() => setSelectTransferTo('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                     </span>
                   )}
+                  {selectAmount.trim() && (
+                    <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-semibold shrink-0 whitespace-nowrap">Advance: </span>
+                      <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectAmount}</span>
+                      <button onClick={() => setSelectAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                    </span>
+                  )}
+                  {selectRefundAmount.trim() && (
+                    <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-semibold shrink-0 whitespace-nowrap">Refund: </span>
+                      <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectRefundAmount}</span>
+                      <button onClick={() => setSelectRefundAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                    </span>
+                  )}
+                  {selectDescription.trim() && (
+                    <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-semibold shrink-0 whitespace-nowrap">Description: </span>
+                      <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectDescription}</span>
+                      <button onClick={() => setSelectDescription('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                    </span>
+                  )}
                   {selectType && (
-                    <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
-                      <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Type: </span>
-                      <span className="font-semibold text-[14px] truncate min-w-0">{selectType}</span>
+                    <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-semibold shrink-0 whitespace-nowrap">Type: </span>
+                      <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectType === STAFF_TABLEVIEW_BLANK_VALUE ? STAFF_TABLEVIEW_BLANK_LABEL : selectType}</span>
                       <button onClick={() => setSelectType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                     </span>
                   )}
-                  {selectMode && (
-                    <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
-                      <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Mode: </span>
-                      <span className="font-semibold text-[14px] truncate min-w-0">{selectMode}</span>
-                      <button onClick={() => setSelectMode('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  <EdbcPaymentModeFilterChip
+                    fieldLabel="Mode"
+                    selectedModes={selectedPaymentModes}
+                    blankValue={STAFF_TABLEVIEW_BLANK_VALUE}
+                    blankLabel={STAFF_TABLEVIEW_BLANK_LABEL}
+                    onClear={() => setSelectedPaymentModes([])}
+                  />
+                  {selectEntryNo && (
+                    <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-semibold shrink-0 whitespace-nowrap">Entry No: </span>
+                      <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{String(selectEntryNo) === STAFF_TABLEVIEW_BLANK_VALUE ? STAFF_TABLEVIEW_BLANK_LABEL : selectEntryNo}</span>
+                      <button onClick={() => setSelectEntryNo('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                     </span>
                   )}
                 </div>
               )}
             </div>
-            <div className='flex items-end gap-[6px]'>
-              <button onClick={clearFilters} className='flex h-[34px] w-[32px] shrink-0 items-center justify-center'>
-                <img className='w-full h-full' src={Reload} alt="Reload" />
-              </button>
-              <div className="w-[286px] min-w-[286px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
-                <input
-                  type="text"
-                  value={overallSearch}
-                  onChange={(e) => setOverallSearch(e.target.value)}
-                  placeholder="Search Transactions..."
-                  className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
-                />
-                <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
-              </div>
-              <div className='text-left md:text-right md:items-end items-end cursor-default flex justify-end max-w-screen-2xl table-auto overflow-auto w-full scrollbar-none no-scrollbar'>
-                <div className='flex items-end text-center'>
-                  <span className='text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportPDF}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
-                  <span className='text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportCSV}>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
-                </div>
-              </div>
-            </div>
+            <EdbcTableToolbarRightActions
+              onClearFilters={clearFilters}
+              overallSearch={overallSearch}
+              onOverallSearchChange={setOverallSearch}
+              searchPlaceholder="Search Transactions..."
+              showExportIcons
+              onExportPdf={exportPDF}
+              onExportCsv={exportCSV}
+            />
           </div>
           <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
             <div
@@ -1315,122 +1610,172 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
             >
-            <table className="w-full border-collapse">
-              <thead className="sticky top-0 z-10 bg-white ">
-                <tr className="bg-[#FAF6ED]">
-                  <th className="pt-2 pl-3 min-w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort('date')}
+            <table className={`table-fixed min-w-[1790px] w-full border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS}`}>
+              <thead className="sticky top-0 z-20 bg-white">
+                <EdbcTableHeaderRow>
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC2}
+                    label="Date"
+                    sortField={resolveEdbcSortField('date')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                    columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC4}
+                    label="Employee Name"
+                    sortField={resolveEdbcSortField('employee')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC14}
+                    label="Purpose"
+                    sortField={resolveEdbcSortField('purpose')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC3}
+                    label="Transfer To"
+                    sortField={resolveEdbcSortField('transfer')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC8}
+                    label="Advance"
+                    sortField={resolveEdbcSortField('amount')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <th
+                    id={EDBC_IDS.EDBC8}
+                    className={edbc8Config?.headerClass}
+                    onClick={() => handleSort('refund')}
                   >
-                    Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    Refund
+                    {sortConfig.key === 'refund' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                   </th>
-                  <th className="px-2 min-w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort('employee')}
-                  >
-                    Employee Name {sortConfig.key === 'employee' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="px-2 min-w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort('purpose')}
-                  >
-                    Purpose {sortConfig.key === 'purpose' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="px-2 min-w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort('transfer')}
-                  >
-                    Transfer To {sortConfig.key === 'transfer' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="px-2 min-w-[80px] font-bold text-left">Advance</th>
-                  <th className="px-2 min-w-[80px] font-bold text-left">Refund</th>
-                  <th className="px-2 min-w-[80px] font-bold text-left cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort('type')}
-                  >
-                    Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="px-2 min-w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 pl-3"
-                    onClick={() => handleSort('mode')}
-                  >
-                    Mode {sortConfig.key === 'mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="px-2 min-w-[100px] font-bold text-left">Description</th>
-                  <th className="px-2 min-w-[80px] font-bold text-left">Attached file</th>
-                  <th className="px-2 min-w-[60px] font-bold text-left">E.No</th>
-                  <th className="px-2 min-w-[80px] font-bold text-left">Activity</th>
-                </tr>
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC9}
+                    label="Description"
+                    sortField={resolveEdbcSortField('description')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC12}
+                    label="Type"
+                    sortField={resolveEdbcSortField('type')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC13}
+                    label="Mode"
+                    sortField={resolveEdbcSortField('mode')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC17}
+                    label="Entry No"
+                    sortField={resolveEdbcSortField('entryNo')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader columnId={EDBC_IDS.EDBC19} label="Activity" />
+                  <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="File" />
+                </EdbcTableHeaderRow>
                 {showFilters && (
-                  <tr ref={filterRowRef} className="bg-white border-b border-gray-200">
-                    <th className="pt-2 pb-2 w-44">
-                      <input
-                        type="date"
-                        value={selectDate}
-                        onChange={(e) => setSelectDate(e.target.value)}
-                        className="p-1 rounded-lg bg-transparent w-32 border-2 border-[rgba(191,152,83,0.2)] focus:outline-none"
-                        placeholder="Search Date..."
-                      />
-                    </th>
-                    <th className="pt-2 pb-2 w-[220px]">
-                      <Select
-                        options={employeeNameOptions}
-                        value={selectEmployeeName ? { value: selectEmployeeName, label: selectEmployeeName } : null}
-                        onChange={(opt) => setSelectEmployeeName(opt ? opt.value : "")}
-                        className="text-xs focus:outline-none"
-                        placeholder="Employee..."
-                        isSearchable
-                        isClearable
-                        styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                      />
-                    </th>
-                    <th className="pt-2 pb-2 w-[300px]">
-                      <Select
-                        options={purposeOptions}
-                        value={selectPurpose ? { value: selectPurpose, label: selectPurpose } : null}
-                        onChange={(opt) => setSelectPurpose(opt ? opt.value : "")}
-                        className="focus:outline-none text-xs"
-                        placeholder="Purpose..."
-                        isSearchable
-                        isClearable
-                        styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                      />
-                    </th>
-                    <th className="pt-2 pb-2 w-[350px]">
-                      <Select
-                        options={transferToOptions}
-                        value={selectTransferTo ? { value: selectTransferTo, label: selectTransferTo } : null}
-                        onChange={(opt) => setSelectTransferTo(opt ? opt.value : "")}
-                        className="focus:outline-none text-xs"
-                        placeholder="Transfer To..."
-                        isSearchable
-                        isClearable
-                        styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                      />
-                    </th>
-                    <th className='pt-2 pb-2'></th>
-                    <th className='pt-2 pb-2'></th>
-                    <th className="pt-2 pb-2">
-                      <Select
-                        options={typeOptions.map((type) => ({ value: type, label: type }))}
-                        value={selectType ? { value: selectType, label: selectType } : null}
-                        onChange={(opt) => setSelectType(opt ? opt.value : "")}
-                        className="focus:outline-none text-xs"
-                        placeholder="Type..."
-                        isClearable
-                        styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                      />
-                    </th>
-                    <th className="pt-2 pb-2">
-                      <Select
-                        options={modeOptions.map((mode) => ({ value: mode, label: mode }))}
-                        value={selectMode ? { value: selectMode, label: selectMode } : null}
-                        onChange={(opt) => setSelectMode(opt ? opt.value : "")}
-                        className="focus:outline-none text-xs"
-                        placeholder="Mode..."
-                        isClearable
-                        styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                      />
-                    </th>
-                    <th className="pt-2 pb-2"></th>
-                    <th className='pt-2 pb-2'></th>
-                    <th className='pt-2 pb-2'></th>
-                    <th className='pt-2 pb-2'></th>
-                  </tr>
+                  <EdbcTableFilterRow ref={filterRowRef}>
+                    <EdbcTimestampFilter
+                      columnId={EDBC_IDS.EDBC2}
+                      placeholder="Date"
+                      timestampStartDate={selectDate}
+                      timestampEndDate={selectDateEnd}
+                      isOpen={showTableDateRangePicker}
+                      onOpen={() => setShowTableDateRangePicker(true)}
+                      onClose={() => setShowTableDateRangePicker(false)}
+                      onApply={(from, to) => {
+                        setSelectDate(from || '');
+                        setSelectDateEnd(to || '');
+                      }}
+                    />
+                    <EdbcSelectFilter
+                      columnId={EDBC_IDS.EDBC4}
+                      placeholder="Employee Name"
+                      options={employeeNameOptions}
+                      value={selectEmployeeName}
+                      onChange={setSelectEmployeeName}
+                      blankOption={staffTableviewBlankOption}
+                      blankValue={STAFF_TABLEVIEW_BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcSelectFilter
+                      columnId={EDBC_IDS.EDBC14}
+                      placeholder="Purpose"
+                      options={purposeOptions}
+                      value={selectPurpose}
+                      onChange={setSelectPurpose}
+                      blankOption={staffTableviewBlankOption}
+                      blankValue={STAFF_TABLEVIEW_BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcProjectNameFilter
+                      placeholder="Transfer To"
+                      options={transferToOptions}
+                      value={selectTransferTo}
+                      onChange={setSelectTransferTo}
+                      blankOption={staffTableviewBlankOption}
+                      blankValue={STAFF_TABLEVIEW_BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={filterColumnTotals.amount} value={selectAmount} onChange={(e) => setSelectAmount(e.target.value)} />
+                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={filterColumnTotals.refund} value={selectRefundAmount} onChange={(e) => setSelectRefundAmount(e.target.value)} />
+                    <EdbcTextInputFilter
+                      columnId={EDBC_IDS.EDBC9}
+                      placeholder="Description"
+                      value={selectDescription}
+                      onChange={(e) => setSelectDescription(e.target.value)}
+                    />
+                    <EdbcSelectFilter
+                      columnId={EDBC_IDS.EDBC12}
+                      placeholder="Type"
+                      options={typeOptions.map((type) =>
+                        type === STAFF_TABLEVIEW_BLANK_VALUE ? staffTableviewBlankOption : { value: type, label: type }
+                      )}
+                      value={selectType}
+                      onChange={setSelectType}
+                      blankOption={staffTableviewBlankOption}
+                      blankValue={STAFF_TABLEVIEW_BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcPaymentModeFilter
+                      columnId={EDBC_IDS.EDBC13}
+                      placeholder="Mode"
+                      options={modeFilterOptions}
+                      value={selectedPaymentModes}
+                      onChange={setSelectedPaymentModes}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcSelectFilter
+                      columnId={EDBC_IDS.EDBC17}
+                      placeholder="Entry No"
+                      options={entryNoOptions.map((n) =>
+                        n === STAFF_TABLEVIEW_BLANK_VALUE ? staffTableviewBlankOption : { value: n, label: n }
+                      )}
+                      value={selectEntryNo}
+                      onChange={setSelectEntryNo}
+                      blankOption={staffTableviewBlankOption}
+                      blankValue={STAFF_TABLEVIEW_BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                      textAlign="right"
+                    />
+                    <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC19} />
+                    <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                  </EdbcTableFilterRow>
                 )}
               </thead>
               <tbody>
@@ -1442,16 +1787,108 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
                   </tr>
                 ) : currentData.length > 0 ? (
                   currentData.map((entry, index) => (
-                    <TableRow
-                      key={entry.id}
-                      entry={entry}
-                      index={index}
-                      onEditClick={handleEditClick}
-                      getEmployeeName={getEmployeeName}
-                      getPurposeName={getPurposeName}
-                      getLabourName={getLabourName}
-                      formatDateOnly={formatDateOnly}
-                    />
+                    <EdbcTableBodyRow key={entry.id}>
+                      <EdbcDateBodyCell
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        formatValue={formatDateOnly}
+                        columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC4}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) =>
+                          getEmployeeName(row.employee_id) || getLabourName(row.labour_id) || '0'
+                        }
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC14}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => getPurposeName(row.from_purpose_id)}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC3}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => getPurposeName(row.to_purpose_id)}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC8}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        textAlignClass="text-right"
+                        getDisplayValue={(row) => formatStaffTableAmount(row.amount)}
+                      />
+                      <td className={edbc8Config?.tdClass}>
+                        <span
+                          onClick={() => toggleExpandedCell(`${entry.id ?? index}-refund_amount`)}
+                          className={`block w-full cursor-pointer text-right ${expandedCells[`${entry.id ?? index}-refund_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                          title={formatStaffTableAmount(entry.staff_refund_amount)}
+                        >
+                          {formatStaffTableAmount(entry.staff_refund_amount)}
+                        </span>
+                      </td>
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC9}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => row.description || ''}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC12}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => row.type}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC13}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => row.staff_payment_mode}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC17}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        textAlignClass="text-right"
+                        getDisplayValue={(row) => row.entry_no}
+                      />
+                      <td id={EDBC_IDS.EDBC19} className={`${edbc19Config?.tdClass || ''} !justify-center`}>
+                        <button
+                          type="button"
+                          className={`rounded-full transition duration-200 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          disabled={entry.not_allow_to_edit}
+                          onClick={entry.not_allow_to_edit ? undefined : () => handleEditClick(entry)}
+                        >
+                          <img
+                            src={edit}
+                            alt="Edit"
+                            className={`w-4 h-6 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
+                          />
+                        </button>
+                      </td>
+                      <EdbcFileBodyCell columnId={EDBC_IDS.EDBC20} expense={{ ...entry, billCopy: entry.file_url }} />
+                    </EdbcTableBodyRow>
                   ))
                 ) : (
                   <tr>

@@ -317,7 +317,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   useEffect(() => {
     const fetchBranches = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/branch/getAll', {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/branch/getAll', {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -336,7 +336,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   useEffect(() => {
     const fetchAccountDetails = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
         if (response.ok) {
           const data = await response.json();
           setAccountDetails(Array.isArray(data) ? data : []);
@@ -590,7 +590,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     const fetchVendorNames = async () => {
       try {
         setProgress(10);
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -620,7 +620,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     const fetchContractorNames = async () => {
       try {
         setProgress(35);
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -650,7 +650,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/expenses_categories/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -799,7 +799,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     const fetchSites = async () => {
       try {
         setProgress(60);
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -874,7 +874,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       setError(null);
       setLoading(true);
       setProgress(85);
-      const response = await fetch(buildBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll'));
+      const response = await fetch(buildBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
@@ -983,7 +983,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const response = await fetch("https://backendaab.in/demoAabuildersDash/api/advance_portal/upload-sql", {
+      const response = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/upload-sql", {
         method: "POST",
         body: formData,
       });
@@ -1554,7 +1554,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       return;
     }
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll');
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
       if (!response.ok) {
         throw new Error('Failed to fetch data');
       }
@@ -1599,7 +1599,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   }, 0);
   const fetchAuditDetails = async (advancePortalId) => {
     try {
-      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/history/${advancePortalId}`);
+      const response = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/history/${advancePortalId}`);
       const data = await response.json();
       setAdvancePortalAudits(data);
       setShowAdvancePortalModal(true);
@@ -1655,7 +1655,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
         request_approval: false,
         request_completed: false
       };
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/edit_requests/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/edit_requests/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -1711,7 +1711,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           formData.append('files', selectedFile);          
           formData.append('folder', 'FileUpload / Advance_Portal');
           formData.append('fileName', finalName);
-          const uploadResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/files/upload", {
+          const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
             method: "POST",
             body: formData,
           });
@@ -1784,7 +1784,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
         return payload;
       };
       const updateRecord = async (id, payload, modalPaymentData = null) => {
-        const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${id}?editedBy=${username}`, {
+        const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${id}?editedBy=${username}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -1834,7 +1834,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       };
       const setAllowToEdit = async (id, allow) => {
         try {
-          const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/allow/${id}?allow=${allow}`, {
+          const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/allow/${id}?allow=${allow}`, {
             method: 'PUT',
             credentials: 'include'
           });
@@ -1972,7 +1972,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     setIsEditPaymentSubmitting(true);
     try {
       const payload = pending.payload;
-      const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${editingId}?editedBy=${username}`, {
+      const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${editingId}?editedBy=${username}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -2014,7 +2014,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
         }
       }
       try {
-        const allowRes = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/allow/${editingId}?allow=${false}`, {
+        const allowRes = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/allow/${editingId}?allow=${false}`, {
           method: 'PUT',
           credentials: 'include',
         });
@@ -2097,7 +2097,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       }
       let loanDeleteMessage = '';
       try {
-        const loansRes = await fetch('https://backendaab.in/demoAabuildersDash/api/loans/all', {
+        const loansRes = await fetch('https://backendaab.in/aabuildersDash/api/loans/all', {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -2135,7 +2135,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
               };
 
               const res = await fetch(
-                `https://backendaab.in/demoAabuildersDash/api/loans/${loanId}?editedBy=${encodeURIComponent(username)}`,
+                `https://backendaab.in/aabuildersDash/api/loans/${loanId}?editedBy=${encodeURIComponent(username)}`,
                 {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },

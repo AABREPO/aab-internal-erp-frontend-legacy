@@ -308,7 +308,7 @@ const History = ({ user }) => {
     if (!vId) return [];
     try {
       const response = await fetch(
-        `https://backendaab.in/demoAabuildersDash/api/vendor-payments/vendor/${encodeURIComponent(vId)}`,
+        `https://backendaab.in/aabuildersDash/api/vendor-payments/vendor/${encodeURIComponent(vId)}`,
         { credentials: 'include', headers: { 'Content-Type': 'application/json' } }
       );
       if (!response.ok) return [];
@@ -491,9 +491,9 @@ const History = ({ user }) => {
   const fetchBillTrackersList = async () => {
     if (billTrackersCacheRef.current) return billTrackersCacheRef.current;
     const endpoints = [
-      'https://backendaab.in/demoAabuildersDash/api/vendor-payments/trackers/enriched/paid',
-      withBranchUrl('https://backendaab.in/demoAabuildersDash/api/vendor-payments/trackers/pending'),
-      'https://backendaab.in/demoAabuildersDash/api/vendor-payments/trackers',
+      'https://backendaab.in/aabuildersDash/api/vendor-payments/trackers/enriched/paid',
+      withBranchUrl('https://backendaab.in/aabuildersDash/api/vendor-payments/trackers/pending'),
+      'https://backendaab.in/aabuildersDash/api/vendor-payments/trackers',
     ];
     const merged = [];
     for (const endpoint of endpoints) {
@@ -517,8 +517,8 @@ const History = ({ user }) => {
     const key = String(trackerId);
     if (billPaymentsCacheRef.current[key]) return billPaymentsCacheRef.current[key];
     const requestUrls = [
-      withBranchUrl(`https://backendaab.in/demoAabuildersDash/api/vendor-bill-tracker/get/${trackerId}`),
-      `https://backendaab.in/demoAabuildersDash/api/vendor-bill-tracker/get/${trackerId}`,
+      withBranchUrl(`https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/get/${trackerId}`),
+      `https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/get/${trackerId}`,
     ];
     for (const requestUrl of requestUrls) {
       try {
@@ -568,8 +568,8 @@ const History = ({ user }) => {
       return weeklyExpenseRowsCacheRef.current[key];
     }
     const weekUrls = [
-      withBranchUrl(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${weekNo}`),
-      `https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${weekNo}`,
+      withBranchUrl(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${weekNo}`),
+      `https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${weekNo}`,
     ];
     for (const weekUrl of weekUrls) {
       try {
@@ -626,8 +626,8 @@ const History = ({ user }) => {
       return dailyPaymentsByDateCacheRef.current[dateStr];
     }
     const urls = [
-      withBranchUrl(`https://backendaab.in/demoAabuildersDash/api/daily-payments/date/${dateStr}`),
-      `https://backendaab.in/demoAabuildersDash/api/daily-payments/date/${dateStr}`,
+      withBranchUrl(`https://backendaab.in/aabuildersDash/api/daily-payments/date/${dateStr}`),
+      `https://backendaab.in/aabuildersDash/api/daily-payments/date/${dateStr}`,
     ];
     for (const requestUrl of urls) {
       try {
@@ -699,7 +699,7 @@ const History = ({ user }) => {
     if (!entryId) return '';
     try {
       const response = await fetch(
-        `https://backendaab.in/demoAabuildersDash/api/loans/audit/history/${entryId}`,
+        `https://backendaab.in/aabuildersDash/api/loans/audit/history/${entryId}`,
         { credentials: 'include', headers: { 'Content-Type': 'application/json' } }
       );
       if (!response.ok) return '';
@@ -732,8 +732,8 @@ const History = ({ user }) => {
     const entryId = getEntryLoanId(entry);
     if (!entryId) return '';
     const detailUrls = [
-      withBranchUrl(`https://backendaab.in/demoAabuildersDash/api/loans/${entryId}`),
-      `https://backendaab.in/demoAabuildersDash/api/loans/${entryId}`,
+      withBranchUrl(`https://backendaab.in/aabuildersDash/api/loans/${entryId}`),
+      `https://backendaab.in/aabuildersDash/api/loans/${entryId}`,
     ];
     for (const detailUrl of detailUrls) {
       try {
@@ -918,8 +918,8 @@ const History = ({ user }) => {
       dailyPaymentsByDateCacheRef.current = {};
       try {
         const listUrls = [
-          withBranchUrl('https://backendaab.in/demoAabuildersDash/api/loans/all'),
-          'https://backendaab.in/demoAabuildersDash/api/loans/all',
+          withBranchUrl('https://backendaab.in/aabuildersDash/api/loans/all'),
+          'https://backendaab.in/aabuildersDash/api/loans/all',
         ];
         const fetchedLists = [];
         for (const listUrl of listUrls) {
@@ -968,7 +968,7 @@ const History = ({ user }) => {
   useEffect(() => {
     const fetchVendors = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -988,7 +988,7 @@ const History = ({ user }) => {
   useEffect(() => {
     const fetchContractors = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -1008,7 +1008,7 @@ const History = ({ user }) => {
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/employee_details/getAll", {
+        const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -1028,7 +1028,7 @@ const History = ({ user }) => {
   useEffect(() => {
     const fetchLabour = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/labours-details/getAll", {
+        const response = await fetch("https://backendaab.in/aabuildersDash/api/labours-details/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -1048,7 +1048,7 @@ const History = ({ user }) => {
   useEffect(() => {
     const fetchPurposes = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loan-purposes/getAll', {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/loan-purposes/getAll', {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -1386,7 +1386,7 @@ const History = ({ user }) => {
           transferRecords.map(async (rec) => {
             const transferId = getEntryLoanId(rec);
             const res = await fetch(
-              `https://backendaab.in/demoAabuildersDash/api/loans/${transferId}?editedBy=${username}`,
+              `https://backendaab.in/aabuildersDash/api/loans/${transferId}?editedBy=${username}`,
               {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -1403,7 +1403,7 @@ const History = ({ user }) => {
         );
       } else {
         const res = await fetch(
-          `https://backendaab.in/demoAabuildersDash/api/loans/${idToDelete}?editedBy=${username}`,
+          `https://backendaab.in/aabuildersDash/api/loans/${idToDelete}?editedBy=${username}`,
           {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },

@@ -53,7 +53,7 @@ const Report = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loans/all');
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
         if (response.ok) {
           const data = await response.json();
           setLoanData(data);
@@ -82,7 +82,7 @@ const Report = () => {
   useEffect(() => {
     const fetchVendors = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -102,7 +102,7 @@ const Report = () => {
   useEffect(() => {
     const fetchContractors = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -122,7 +122,7 @@ const Report = () => {
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/employee_details/getAll", {
+        const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -142,7 +142,7 @@ const Report = () => {
   useEffect(() => {
     const fetchLabour = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/labours-details/getAll", {
+        const response = await fetch("https://backendaab.in/aabuildersDash/api/labours-details/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -162,7 +162,7 @@ const Report = () => {
   useEffect(() => {
     const fetchPurposes = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loan-purposes/getAll', {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/loan-purposes/getAll', {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }

@@ -47,7 +47,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchUserPermissions = async () => {
       try {
-        const response = await axios.get("https://backendaab.in/demoAabuilderDash/api/user_roles/all");
+        const response = await axios.get("https://backendaab.in/aabuilderDash/api/user_roles/all");
         const allRoles = response.data || [];
         const matchedRoles = allRoles.filter(role =>
           roleNames.includes(role.userRoles)
@@ -913,7 +913,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   // Fetch functions
   const fetchSiteNames = async () => {
     try {
-      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuilderDash/api/project_Names/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/aabuilderDash/api/project_Names/getAll');
       if (response.ok) {
         const data = await response.json();
         setSiteNames(data);
@@ -924,7 +924,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchVendorNames = async () => {
     try {
-      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
       if (response.ok) {
         const data = await response.json();
         setVendorNames(data);
@@ -938,7 +938,7 @@ const MasterData = ({ username, userRoles = [] }) => {
 
   const fetchContractorNames = async () => {
     try {
-      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/aabuilderDash/api/contractor_Names/getAll');
       if (response.ok) {
         const data = await response.json();
         setContractorNames(data);
@@ -949,7 +949,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchCategories = async () => {
     try {
-      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/aabuilderDash/api/expenses_categories/getAll');
       if (response.ok) {
         const data = await response.json();
         setExpensesCategory(data);
@@ -960,7 +960,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchMachinTools = async () => {
     try {
-      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuilderDash/api/machine_tools/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/aabuilderDash/api/machine_tools/getAll');
       if (response.ok) {
         const data = await response.json();
         setMachineToolsOptions(data);
@@ -971,7 +971,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchEmployeeList = async () => {
     try {
-      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/aabuildersDash/api/employee_details/getAll');
       if (response.ok) {
         const data = await response.json();
         setEmployeeList(data);
@@ -983,7 +983,7 @@ const MasterData = ({ username, userRoles = [] }) => {
 
   const fetchUsernames = async () => {
     try {
-      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuilderDash/api/user/usernames');
+      const response = await fetchMasterDataGet('https://backendaab.in/aabuilderDash/api/user/usernames');
       if (!response.ok) {
         console.error('Failed to fetch usernames:', response.status, response.statusText);
         return;
@@ -1014,7 +1014,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchLaboursList = async () => {
     try {
-      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuildersDash/api/labours-details/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
       if (response.ok) {
         const data = await response.json();
         setLaboursList(data);
@@ -1025,7 +1025,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchAccountDetails = async () => {
     try {
-      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/aabuildersDash/api/account-details/getAll');
       if (response.ok) {
         const data = await response.json();
         setAccountDetails(data);
@@ -1036,7 +1036,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchBankAccountTypes = async () => {
     try {
-      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuildersDash/api/bank_type/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/aabuildersDash/api/bank_type/getAll');
       if (response.ok) {
         const data = await response.json();
         setBankAccountTypes(data);
@@ -1047,7 +1047,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchEbServiceLinks = async () => {
     try {
-      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuildersDash/api/eb-service-no/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/aabuildersDash/api/eb-service-no/getAll');
       if (response.ok) {
         const data = await response.json();
         setEbServiceLinks(data);
@@ -1058,7 +1058,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchSupportStaffNameList = async () => {
     try {
-      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuildersDash/api/support_staff/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/aabuildersDash/api/support_staff/getAll');
       if (response.ok) {
         const data = await response.json();
         setSupportStaffNameList(data);
@@ -1069,7 +1069,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchPropertyTypes = async () => {
     try {
-      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuildersDash/api/property_types/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/aabuildersDash/api/property_types/getAll');
       if (response.ok) {
         const data = await response.json();
         setPropertyTypes(Array.isArray(data) ? data : []);
@@ -1084,7 +1084,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchProjects = async () => {
     try {
-      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/aabuilderDash/api/projects/getAll');
       if (response.ok) {
         const data = await response.json();
         setProjects(data);
@@ -1095,7 +1095,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchPaymentModesMasterList = async () => {
     try {
-      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/aabuildersDash/api/payment_mode/getAll');
       if (response.ok) {
         const data = await response.json();
         setPaymentModesMasterList(Array.isArray(data) ? data : []);
@@ -1109,7 +1109,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchPaymentModeArrangements = async () => {
     try {
-      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuildersDash/api/payment_mode_arrangement/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/aabuildersDash/api/payment_mode_arrangement/getAll');
       if (response.ok) {
         const data = await response.json();
         setPaymentModeArrangements(Array.isArray(data) ? data : []);
@@ -1278,7 +1278,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     e.preventDefault();
     const newSiteNames = { siteName, siteNo };
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/save', {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSiteNames),
@@ -1320,7 +1320,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       for (let [key, value] of formData.entries()) {
         console.log(key, value);
       }
-      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/save", {
+      const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/save", {
         method: "POST",
         body: formData
       });
@@ -1378,7 +1378,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       formData.append('file', contractorQrImage);
     }
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/contractor_Names/save', {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/contractor_Names/save', {
         method: 'POST',
         body: formData, // No Content-Type header needed, browser sets it automatically for FormData
       });
@@ -1413,7 +1413,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     e.preventDefault();
     const newCategory = { category };
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/expenses_categories/save', {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/expenses_categories/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newCategory),
@@ -1432,7 +1432,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     e.preventDefault();
     const newMachineTool = { machineTool };
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/machine_tools/save', {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/machine_tools/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newMachineTool),
@@ -1454,7 +1454,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       const finalName = `${employeeName}_Aadhaar_${new Date().toISOString().split('T')[0]}`;
       formData.append('file', file);
       formData.append('file_name', finalName);
-      const uploadResponse = await fetch("https://backendaab.in/demoAabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+      const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
         method: "POST",
         body: formData,
       });
@@ -1535,7 +1535,7 @@ const MasterData = ({ username, userRoles = [] }) => {
 
     try {
       console.log('Sending save request to backend...');
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/save', {
         method: 'POST',
         body: formData,
       });
@@ -1574,7 +1574,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     e.preventDefault();
     const newLaboursList = { labour_name: labourName, labour_salary: labourSalary };
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/labours-details/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newLaboursList),
@@ -1610,7 +1610,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       upi_qr_image: qrImageBase64
     };
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newAccountDetails),
@@ -1638,7 +1638,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     e.preventDefault();
     const newBankAccountType = { bank_account_type: bankAccountType };
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/bank_type/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/bank_type/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newBankAccountType),
@@ -1662,7 +1662,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       eb_service_no: ebServiceNo
     };
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/eb-service-no/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/eb-service-no/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newEbServiceLink),
@@ -1686,7 +1686,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       mobile_number: supportStaffMobileNumber
     };
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/support_staff/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/support_staff/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSupportStaffName),
@@ -1720,7 +1720,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         ownerDetails: newProject.ownerDetailsList,      // map to backend
         propertyDetails: newProject.propertyDetailsList // map to backend
       };
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/save', {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1740,7 +1740,7 @@ const MasterData = ({ username, userRoles = [] }) => {
 
           if (existingSiteName) {
             // Update existing Project Names record
-            const siteNameResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
+            const siteNameResponse = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(siteNamePayload),
@@ -1751,7 +1751,7 @@ const MasterData = ({ username, userRoles = [] }) => {
             }
           } else {
             // Create new Project Names record
-            const siteNameResponse = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/save', {
+            const siteNameResponse = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/save', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(siteNamePayload),
@@ -2027,7 +2027,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       return;
     }
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode_arrangement/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/payment_mode_arrangement/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2063,7 +2063,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     }
     try {
       const response = await fetch(
-        `https://backendaab.in/demoAabuildersDash/api/payment_mode_arrangement/edit/${selectedPaymentModeArrangementId}`,
+        `https://backendaab.in/aabuildersDash/api/payment_mode_arrangement/edit/${selectedPaymentModeArrangementId}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -2148,7 +2148,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     if (window.confirm('Are you sure you want to delete this project?')) {
       try {
         const projectToDelete = projects.find(project => project.id === id);
-        const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/projects/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/aabuilderDash/api/projects/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -2158,7 +2158,7 @@ const MasterData = ({ username, userRoles = [] }) => {
               const existingSiteNameById = siteNames.find(site => site.id === id);
               const existingSiteName = existingSiteNameById || existingSiteNameBySiteNo;
               if (existingSiteName) {
-                const siteNameResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/project_Names/delete/${existingSiteName.id}`, {
+                const siteNameResponse = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/delete/${existingSiteName.id}`, {
                   method: 'DELETE',
                 });
                 if (siteNameResponse.ok) {
@@ -2195,7 +2195,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         ownerDetails: editProject.ownerDetailsList,       // mapped for backend
         propertyDetails: sortedPropertyDetails  // mapped for backend - sorted before submit
       };
-      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/projects/edit/${selectedProjectId}`, {
+      const response = await fetch(`https://backendaab.in/aabuilderDash/api/projects/edit/${selectedProjectId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -2212,7 +2212,7 @@ const MasterData = ({ username, userRoles = [] }) => {
             branch: editProject.branch
           };
           if (existingSiteName) {
-            const siteNameResponse = await fetch(`https://backendaab.in/demoAabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
+            const siteNameResponse = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(siteNamePayload),
@@ -2221,7 +2221,7 @@ const MasterData = ({ username, userRoles = [] }) => {
               fetchSiteNames(); // Refresh site names list
             }
           } else {
-            const siteNameResponse = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/save', {
+            const siteNameResponse = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/save', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(siteNamePayload),
@@ -2308,7 +2308,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleDeleteSiteName = async (id) => {
     if (window.confirm('Are you sure you want to delete this site name?')) {
       try {
-        const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/project_Names/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -2323,7 +2323,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleDeleteVendorName = async (id) => {
     if (window.confirm('Are you sure you want to delete this vendor name?')) {
       try {
-        const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/vendor_Names/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/aabuilderDash/api/vendor_Names/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -2338,7 +2338,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleDeleteAllVendorNames = async () => {
     if (window.confirm('Are you sure you want to delete ALL vendor names? This action cannot be undone.')) {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/deleteAll', {
+        const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/deleteAll', {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -2359,7 +2359,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     const formData = new FormData();
     formData.append('file', vendorBulkUploadFile);
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/bulk_upload', {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/bulk_upload', {
         method: 'POST',
         body: formData,
       });
@@ -2400,47 +2400,47 @@ const MasterData = ({ username, userRoles = [] }) => {
 
     switch (tableType) {
       case 'siteNames':
-        apiEndpoint = 'https://backendaab.in/demoAabuilderDash/api/project_Names/bulkUpload';
+        apiEndpoint = 'https://backendaab.in/aabuilderDash/api/project_Names/bulkUpload';
         refreshFunction = fetchSiteNames;
         break;
       case 'vendorNames':
-        apiEndpoint = 'https://backendaab.in/demoAabuilderDash/api/vendor_Names/bulkUpload';
+        apiEndpoint = 'https://backendaab.in/aabuilderDash/api/vendor_Names/bulkUpload';
         refreshFunction = fetchVendorNames;
         break;
       case 'contractorNames':
-        apiEndpoint = 'https://backendaab.in/demoAabuilderDash/api/contractor_Names/bulkUpload';
+        apiEndpoint = 'https://backendaab.in/aabuilderDash/api/contractor_Names/bulkUpload';
         refreshFunction = fetchContractorNames;
         break;
       case 'categories':
-        apiEndpoint = 'https://backendaab.in/demoAabuilderDash/api/expenses_categories/bulkUpload';
+        apiEndpoint = 'https://backendaab.in/aabuilderDash/api/expenses_categories/bulkUpload';
         refreshFunction = fetchCategories;
         break;
       case 'machineTools':
-        apiEndpoint = 'https://backendaab.in/demoAabuilderDash/api/machine_tools/bulkUpload';
+        apiEndpoint = 'https://backendaab.in/aabuilderDash/api/machine_tools/bulkUpload';
         refreshFunction = fetchMachinTools;
         break;
       case 'employeeDetails':
-        apiEndpoint = 'https://backendaab.in/demoAabuildersDash/api/employee_details/bulkUpload';
+        apiEndpoint = 'https://backendaab.in/aabuildersDash/api/employee_details/bulkUpload';
         refreshFunction = fetchEmployeeList;
         break;
       case 'labourDetails':
-        apiEndpoint = 'https://backendaab.in/demoAabuildersDash/api/labours-details/bulkUpload';
+        apiEndpoint = 'https://backendaab.in/aabuildersDash/api/labours-details/bulkUpload';
         refreshFunction = fetchLaboursList;
         break;
       case 'accountDetails':
-        apiEndpoint = 'https://backendaab.in/demoAabuildersDash/api/account-details/bulkUpload';
+        apiEndpoint = 'https://backendaab.in/aabuildersDash/api/account-details/bulkUpload';
         refreshFunction = fetchAccountDetails;
         break;
       case 'bankAccountType':
-        apiEndpoint = 'https://backendaab.in/demoAabuildersDash/api/bank_type/bulkUpload';
+        apiEndpoint = 'https://backendaab.in/aabuildersDash/api/bank_type/bulkUpload';
         refreshFunction = fetchBankAccountTypes;
         break;
       case 'ebServiceLink':
-        apiEndpoint = 'https://backendaab.in/demoAabuildersDash/api/eb-service-no/upload';
+        apiEndpoint = 'https://backendaab.in/aabuildersDash/api/eb-service-no/upload';
         refreshFunction = fetchEbServiceLinks;
         break;
       case 'projectManagement':
-        apiEndpoint = 'https://backendaab.in/demoAabuilderDash/api/projects/upload-sql';
+        apiEndpoint = 'https://backendaab.in/aabuilderDash/api/projects/upload-sql';
         refreshFunction = fetchProjects;
         break;
       default:
@@ -2479,7 +2479,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     formData.append('file', file);
 
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/upload-sql', {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/upload-sql', {
         method: 'POST',
         body: formData,
       });
@@ -2503,7 +2503,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleDeleteContractorName = async (id) => {
     if (window.confirm('Are you sure you want to delete this contractor name?')) {
       try {
-        const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/contractor_Names/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/aabuilderDash/api/contractor_Names/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -2518,7 +2518,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleDeleteCategory = async (id) => {
     if (window.confirm('Are you sure you want to delete this category?')) {
       try {
-        const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/expenses_categories/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/aabuilderDash/api/expenses_categories/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -2533,7 +2533,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleDeleteMachineTool = async (id) => {
     if (window.confirm('Are you sure you want to delete this machine tool?')) {
       try {
-        const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/machine_tools/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/aabuilderDash/api/machine_tools/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -2548,7 +2548,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleDeleteEmployeeData = async (id) => {
     if (window.confirm('Are you sure you want to delete this employee data?')) {
       try {
-        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/employee_details/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/aabuildersDash/api/employee_details/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -2563,7 +2563,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleDeleteLabourData = async (id) => {
     if (window.confirm('Are you sure you want to delete this labour data?')) {
       try {
-        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/labours-details/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/aabuildersDash/api/labours-details/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -2578,7 +2578,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleDeleteAccountDetails = async (id) => {
     if (window.confirm('Are you sure you want to delete this account details?')) {
       try {
-        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/account-details/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/aabuildersDash/api/account-details/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -2593,7 +2593,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleDeleteBankAccountType = async (id) => {
     if (window.confirm('Are you sure you want to delete this bank account type?')) {
       try {
-        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/bank_type/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/aabuildersDash/api/bank_type/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -2609,7 +2609,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleDeleteEbServiceLink = async (id) => {
     if (window.confirm('Are you sure you want to delete this EB Service Link?')) {
       try {
-        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/eb-service-no/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/aabuildersDash/api/eb-service-no/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -2624,7 +2624,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleDeleteSupportStaffName = async (id) => {
     if (window.confirm('Are you sure you want to delete this support staff name?')) {
       try {
-        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/support_staff/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/aabuildersDash/api/support_staff/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -2640,7 +2640,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleDeletePaymentModeArrangement = async (id) => {
     if (!window.confirm('Delete this payment mode arrangement?')) return;
     try {
-      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/payment_mode_arrangement/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/aabuildersDash/api/payment_mode_arrangement/delete/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -2659,7 +2659,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleDeletePropertyType = async (id) => {
     if (window.confirm('Are you sure you want to delete this property type?')) {
       try {
-        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/property_types/delete/${id}`, {
+        const response = await fetch(`https://backendaab.in/aabuildersDash/api/property_types/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -2676,7 +2676,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleDeletePaymentMode = async (id) => {
     if (!window.confirm('Are you sure you want to delete this payment mode?')) return;
     try {
-      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/payment_mode/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/aabuildersDash/api/payment_mode/delete/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -3842,9 +3842,7 @@ const MasterData = ({ username, userRoles = [] }) => {
             </div>
           </div>
           {getReorderedTableData().map((table, index) => (
-            <div key={table.id}
-              className={selectedTable === table.id ? 'ring-4 ring-[#faf9f8] ring-opacity-50 rounded-lg shadow-lg' : ''}
-            >
+            <div key={table.id} className={selectedTable === table.id ? 'ring-4 ring-[#faf9f8] ring-opacity-50 rounded-lg shadow-lg' : ''}>
               {table.id === 'project-management' && (
                 <div>
                   <div className="flex items-center mb-[6px] lg:mt-0 mt-3">
@@ -3892,11 +3890,10 @@ const MasterData = ({ username, userRoles = [] }) => {
                                         ? 'Show all projects'
                                         : 'Show On Going projects only'
                                     }
-                                    className={`text-xl leading-none transition-colors ${
-                                      showOnGoingProjectsOnly
+                                    className={`text-xl leading-none transition-colors ${showOnGoingProjectsOnly
                                         ? 'text-[#BF9853]'
                                         : 'text-gray-400 hover:text-[#BF9853]'
-                                    }`}
+                                      }`}
                                     aria-pressed={showOnGoingProjectsOnly}
                                     aria-label="Filter On Going projects"
                                   >
@@ -3929,11 +3926,10 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0 gap-1.5">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-projectName`)}
-                                    className={`min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-projectName`]
+                                    className={`min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-projectName`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.projectName || ''}
                                   >
                                     {item.projectName || ''}
@@ -4015,13 +4011,13 @@ const MasterData = ({ username, userRoles = [] }) => {
                           <tr className="border-b h-[40px]">
                             <th className="pl-[12px] pr-[12px] text-left w-16 text-[16px] font-bold">S.No</th>
                             <th className="pl-0 pr-[8px] text-left text-[16px] font-bold">
-                            <div className="flex items-center justify-between gap-[12px]">
-                              <span>Vendor Name</span>
-                              <button type="button" onClick={() => handleDownloadIconClick('vendor')} className="inline-flex shrink-0 items-center justify-center">
-                                <img src={DownloadIcon} alt='download' className='w-6 h-6 cursor-pointer hover:opacity-75' />
-                              </button>
-                            </div>
-                          </th>
+                              <div className="flex items-center justify-between gap-[12px]">
+                                <span>Vendor Name</span>
+                                <button type="button" onClick={() => handleDownloadIconClick('vendor')} className="inline-flex shrink-0 items-center justify-center">
+                                  <img src={DownloadIcon} alt='download' className='w-6 h-6 cursor-pointer hover:opacity-75' />
+                                </button>
+                              </div>
+                            </th>
                           </tr>
                         </thead>
                       </table>
@@ -4038,30 +4034,29 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-vendorName`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-vendorName`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-vendorName`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.vendorName}
                                   >
                                     {item.vendorName}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleVendorShare(item)}>
-                                    <img src={share} alt='Share' className='w-4 h-4' />
-                                  </button>
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditVendorName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    <button onClick={() => handleVendorShare(item)}>
+                                      <img src={share} alt='Share' className='w-4 h-4' />
                                     </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteVendorName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditVendorName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteVendorName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4107,13 +4102,13 @@ const MasterData = ({ username, userRoles = [] }) => {
                           <tr className="border-b h-[40px]">
                             <th className="pl-[12px] pr-[12px] text-left w-16 text-[16px] font-bold">S.No</th>
                             <th className="pl-0 pr-[8px] text-left text-[16px] font-bold">
-                            <div className="flex items-center justify-between gap-[12px]">
-                              <span>Contractor Name</span>
-                              <button type="button" onClick={() => handleDownloadIconClick('contractor')} className="inline-flex shrink-0 items-center justify-center">
-                                <img src={DownloadIcon} alt='download' className='w-6 h-6 cursor-pointer hover:opacity-75' />
-                              </button>
-                            </div>
-                          </th>
+                              <div className="flex items-center justify-between gap-[12px]">
+                                <span>Contractor Name</span>
+                                <button type="button" onClick={() => handleDownloadIconClick('contractor')} className="inline-flex shrink-0 items-center justify-center">
+                                  <img src={DownloadIcon} alt='download' className='w-6 h-6 cursor-pointer hover:opacity-75' />
+                                </button>
+                              </div>
+                            </th>
                           </tr>
                         </thead>
                       </table>
@@ -4130,30 +4125,29 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-contractorName`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-contractorName`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-contractorName`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.contractorName}
                                   >
                                     {item.contractorName}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleContractorShare(item)}>
-                                    <img src={share} alt='Share' className='w-4 h-4' />
-                                  </button>
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditContractorName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    <button onClick={() => handleContractorShare(item)}>
+                                      <img src={share} alt='Share' className='w-4 h-4' />
                                     </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteContractorName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditContractorName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteContractorName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4216,27 +4210,26 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-category`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-category`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-category`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.category}
                                   >
                                     {item.category}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditCategory(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteCategory(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditCategory(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteCategory(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4298,27 +4291,26 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-machineTool`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-machineTool`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-machineTool`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.machineTool}
                                   >
                                     {item.machineTool}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditMachineTool(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteMachineTool(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditMachineTool(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteMachineTool(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4366,13 +4358,13 @@ const MasterData = ({ username, userRoles = [] }) => {
                           <tr className="border-b h-[40px]">
                             <th className="pl-[12px] pr-[12px] text-left w-16 text-[16px] font-bold">S.No</th>
                             <th className="pl-0 pr-[8px] text-left text-[16px] font-bold">
-                            <div className="flex items-center justify-between gap-[12px]">
-                              <span>Employee Name</span>
-                              <button type="button" onClick={() => handleDownloadIconClick('employee')} className="inline-flex shrink-0 items-center justify-center">
-                                <img src={DownloadIcon} alt='download' className='w-6 h-6 cursor-pointer hover:opacity-75' />
-                              </button>
-                            </div>
-                          </th>
+                              <div className="flex items-center justify-between gap-[12px]">
+                                <span>Employee Name</span>
+                                <button type="button" onClick={() => handleDownloadIconClick('employee')} className="inline-flex shrink-0 items-center justify-center">
+                                  <img src={DownloadIcon} alt='download' className='w-6 h-6 cursor-pointer hover:opacity-75' />
+                                </button>
+                              </div>
+                            </th>
                           </tr>
                         </thead>
                       </table>
@@ -4389,30 +4381,29 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-employee_name`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-employee_name`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-employee_name`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.employee_name}
                                   >
                                     {item.employee_name}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleEmployeeShare(item)}>
-                                    <img src={share} alt='Share' className='w-4 h-4' />
-                                  </button>
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditEmployeeData(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    <button onClick={() => handleEmployeeShare(item)}>
+                                      <img src={share} alt='Share' className='w-4 h-4' />
                                     </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteEmployeeData(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditEmployeeData(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteEmployeeData(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4474,27 +4465,26 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-labour_name`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-labour_name`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-labour_name`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.labour_name}
                                   >
                                     {item.labour_name}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditLabourData(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteLabourData(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditLabourData(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteLabourData(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4556,32 +4546,31 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-account_number`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer cursor-help ${
-                                      expandedCells[`${item.id}-account_number`]
+                                    className={`block min-w-0 flex-1 ${expandedCells[`${item.id}-account_number`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.account_number}
                                     onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
                                     onMouseLeave={handleAccountMouseLeave}
                                   >
                                     {item.account_number}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleAccountShare(item)}>
-                                    <img src={share} alt='Share' className='w-4 h-4' />
-                                  </button>
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditAccountDetails(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    <button onClick={() => handleAccountShare(item)}>
+                                      <img src={share} alt='Share' className='w-4 h-4' />
                                     </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteAccountDetails(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditAccountDetails(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteAccountDetails(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4643,27 +4632,26 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-bank_account_type`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-bank_account_type`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-bank_account_type`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.bank_account_type}
                                   >
                                     {item.bank_account_type}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditBankAccountType(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteBankAccountType(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditBankAccountType(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteBankAccountType(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4715,27 +4703,26 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-support_staff_name`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-support_staff_name`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-support_staff_name`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.support_staff_name || ''}
                                   >
                                     {item.support_staff_name || ''}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditSupportStaffName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeleteSupportStaffName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditSupportStaffName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeleteSupportStaffName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4793,27 +4780,26 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 <div className="flex items-center min-w-0">
                                   <span
                                     onClick={() => toggleExpandedCell(`${item.id}-propertyType`)}
-                                    className={`block min-w-0 flex-1 cursor-pointer ${
-                                      expandedCells[`${item.id}-propertyType`]
+                                    className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-propertyType`]
                                         ? 'whitespace-normal break-words'
                                         : 'truncate whitespace-nowrap overflow-hidden'
-                                    }`}
+                                      }`}
                                     title={item.propertyType || ''}
                                   >
                                     {item.propertyType || ''}
                                   </span>
-                                <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  {hasEditPermission && (
-                                    <button onClick={() => handleEditPropertyType(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                      <img src={edit} alt="Edit" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                  {hasDeletePermission && (
-                                    <button onClick={() => handleDeletePropertyType(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                  <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    {hasEditPermission && (
+                                      <button onClick={() => handleEditPropertyType(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button onClick={() => handleDeletePropertyType(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -4880,11 +4866,10 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   <div className="flex items-center min-w-0">
                                     <span
                                       onClick={() => toggleExpandedCell(`${item.id}-modeOfPayment`)}
-                                      className={`block min-w-0 flex-1 cursor-pointer ${
-                                        expandedCells[`${item.id}-modeOfPayment`]
+                                      className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-modeOfPayment`]
                                           ? 'whitespace-normal break-words'
                                           : 'truncate whitespace-nowrap overflow-hidden'
-                                      }`}
+                                        }`}
                                       title={item.modeOfPayment || ''}
                                     >
                                       {item.modeOfPayment || ''}
@@ -4973,27 +4958,27 @@ const MasterData = ({ username, userRoles = [] }) => {
                                     {getArrangementModuleName(item)}
                                   </span>
                                   <div className="absolute right-[8px] top-1/2 -translate-y-1/2 flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                      {hasEditPermission && (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleEditPaymentModeArrangement(item)}
-                                          className="text-blue-600 hover:text-blue-800"
-                                          title="Edit"
-                                        >
-                                          <img src={edit} alt="Edit" className="w-4 h-4" />
-                                        </button>
-                                      )}
-                                      {hasDeletePermission && (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDeletePaymentModeArrangement(item.id)}
-                                          className="text-red-600 hover:text-red-800"
-                                          title="Delete"
-                                        >
-                                          <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                        </button>
-                                      )}
-                                    </div>
+                                    {hasEditPermission && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleEditPaymentModeArrangement(item)}
+                                        className="text-blue-600 hover:text-blue-800"
+                                        title="Edit"
+                                      >
+                                        <img src={edit} alt="Edit" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasDeletePermission && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeletePaymentModeArrangement(item.id)}
+                                        className="text-red-600 hover:text-red-800"
+                                        title="Delete"
+                                      >
+                                        <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                             ))
@@ -5957,7 +5942,7 @@ const MasterData = ({ username, userRoles = [] }) => {
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 try {
-                  const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/project_Names/edit/${selectedSiteId}`, {
+                  const response = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/edit/${selectedSiteId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ siteName: editSiteName, siteNo: editSiteNo }),
@@ -6044,7 +6029,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                         console.log(key, typeof value, value);
                       }
                       try {
-                        const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/vendor_Names/edit/${selectedVendorId}`, {
+                        const response = await fetch(`https://backendaab.in/aabuilderDash/api/vendor_Names/edit/${selectedVendorId}`, {
                           method: 'PUT',
                           body: formData,
                         });
@@ -6425,7 +6410,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                         formData.append('file', editContractorQrImage);
                       }
                       try {
-                        const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/contractor_Names/edit/${selectedContractorId}`, {
+                        const response = await fetch(`https://backendaab.in/aabuilderDash/api/contractor_Names/edit/${selectedContractorId}`, {
                           method: 'PUT',
                           body: formData,
                         });
@@ -6738,7 +6723,7 @@ const MasterData = ({ username, userRoles = [] }) => {
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 try {
-                  const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/expenses_categories/update/${selectedCategoryId}`, {
+                  const response = await fetch(`https://backendaab.in/aabuilderDash/api/expenses_categories/update/${selectedCategoryId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ category: editCategory }),
@@ -6788,7 +6773,7 @@ const MasterData = ({ username, userRoles = [] }) => {
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 try {
-                  const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/machine_tools/update/${selectedMachineId}`, {
+                  const response = await fetch(`https://backendaab.in/aabuilderDash/api/machine_tools/update/${selectedMachineId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ machineTool: editMachineTool }),
@@ -6871,7 +6856,7 @@ const MasterData = ({ username, userRoles = [] }) => {
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 try {
-                  const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/bank_type/edit/${selectedBankAccountTypeId}`, {
+                  const response = await fetch(`https://backendaab.in/aabuildersDash/api/bank_type/edit/${selectedBankAccountTypeId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ bank_account_type: editBankAccountType }),
@@ -6983,7 +6968,7 @@ const MasterData = ({ username, userRoles = [] }) => {
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 try {
-                  const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/eb-service-no/update/${selectedEbServiceLinkId}`, {
+                  const response = await fetch(`https://backendaab.in/aabuildersDash/api/eb-service-no/update/${selectedEbServiceLinkId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -7106,7 +7091,7 @@ const MasterData = ({ username, userRoles = [] }) => {
             <form onSubmit={async (e) => {
               e.preventDefault();
               try {
-                const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/support_staff/edit/${selectedSupportStaffNameId}`, {
+                const response = await fetch(`https://backendaab.in/aabuildersDash/api/support_staff/edit/${selectedSupportStaffNameId}`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ support_staff_name: editSupportStaffName, mobile_number: editSupportStaffMobileNumber }),
@@ -7165,7 +7150,7 @@ const MasterData = ({ username, userRoles = [] }) => {
             <form onSubmit={async (e) => {
               e.preventDefault();
               try {
-                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/property_types/save', {
+                const response = await fetch('https://backendaab.in/aabuildersDash/api/property_types/save', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ propertyType: propertyType }),
@@ -7215,7 +7200,7 @@ const MasterData = ({ username, userRoles = [] }) => {
             <form onSubmit={async (e) => {
               e.preventDefault();
               try {
-                const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/property_types/edit/${selectedPropertyTypeId}`, {
+                const response = await fetch(`https://backendaab.in/aabuildersDash/api/property_types/edit/${selectedPropertyTypeId}`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ propertyType: editPropertyType }),
@@ -7265,7 +7250,7 @@ const MasterData = ({ username, userRoles = [] }) => {
             <form onSubmit={async (e) => {
               e.preventDefault();
               try {
-                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/save', {
+                const response = await fetch('https://backendaab.in/aabuildersDash/api/payment_mode/save', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ modeOfPayment }),
@@ -7317,7 +7302,7 @@ const MasterData = ({ username, userRoles = [] }) => {
             <form onSubmit={async (e) => {
               e.preventDefault();
               try {
-                const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/payment_mode/edit/${selectedPaymentModeId}`, {
+                const response = await fetch(`https://backendaab.in/aabuildersDash/api/payment_mode/edit/${selectedPaymentModeId}`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ modeOfPayment: editModeOfPayment }),
@@ -7360,217 +7345,216 @@ const MasterData = ({ username, userRoles = [] }) => {
       )}
       {(isPaymentModeArrangementOpen || isPaymentModeArrangementEditOpen) && (
         <>
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
-          <div className="bg-white rounded-md w-full max-w-2xl max-h-[90vh] overflow-y-auto px-4 py-3">
-            <div className="flex justify-end">
-              <button
-                type="button"
-                className="text-red-500"
-                onClick={isPaymentModeArrangementEditOpen ? closePaymentModeArrangementEdit : closePaymentModeArrangement}
-              >
-                <img src={cross} alt='close' className='w-5 h-5' />
-              </button>
-            </div>
-            <form
-              onSubmit={
-                isPaymentModeArrangementEditOpen
-                  ? handleSubmitEditPaymentModeArrangement
-                  : handleSubmitPaymentModeArrangement
-              }
-            >
-              <h2 className="text-lg font-semibold mb-4 text-[#BF9853]">
-                {isPaymentModeArrangementEditOpen ? 'Edit Payment Mode Arrangement' : 'Add Payment Mode Arrangement'}
-              </h2>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Module Name</label>
-                {isPaymentModeArrangementEditOpen ? (
-                  <div className="w-full max-w-md rounded border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] bg-[#FAF6ED] p-2 h-12 flex items-center text-gray-700">
-                    {arrangementModuleName}
-                  </div>
-                ) : (
-                  <Select
-                    className="max-w-md"
-                    placeholder="Select module..."
-                    options={availableModulesForArrangementAdd.map((moduleName) => ({
-                      value: moduleName,
-                      label: moduleName,
-                    }))}
-                    value={
-                      arrangementModuleName
-                        ? { value: arrangementModuleName, label: arrangementModuleName }
-                        : null
-                    }
-                    onChange={(option) => setArrangementModuleName(option ? option.value : '')}
-                    isClearable
-                  />
-                )}
-              </div>
-              <div className="mb-4">
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <div>
-                    <label className="block text-sm font-medium">Selected Order</label>
-                    <p className="text-xs text-gray-500 mt-1">Drag and drop to change order</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={openArrangementModePicker}
-                    disabled={
-                      allPaymentModeLabels.length === 0 || availablePaymentModesForArrangement.length === 0
-                    }
-                    className="flex h-8 w-8 items-center justify-center rounded-full border border-[#BF9853] text-lg font-semibold text-[#BF9853] transition-colors hover:bg-[#FFFDF9] disabled:cursor-not-allowed disabled:opacity-40"
-                    title="Add payment mode"
-                  >
-                    +
-                  </button>
-                </div>
-                <div className="rounded-lg border border-gray-200 max-h-72 overflow-y-auto p-2 bg-white">
-                  {arrangementSelectedModeIds.length === 0 ? (
-                    <p className="text-sm text-gray-500 p-2">Click + to add payment modes.</p>
-                  ) : (
-                    arrangementSelectedModeIds.map((modeId, index) => (
-                      <div
-                        key={`${modeId}-${index}`}
-                        draggable
-                        onDragStart={(e) => handleArrangementDragStart(e, index)}
-                        onDragOver={(e) => handleArrangementDragOver(e, index)}
-                        onDrop={(e) => handleArrangementDrop(e, index)}
-                        onDragEnd={handleArrangementDragEnd}
-                        className={`mb-2 flex items-center justify-between rounded-md border bg-white px-2 py-2 cursor-grab active:cursor-grabbing select-none ${
-                          arrangementDragIndex === index
-                            ? 'opacity-50 border-[#BF9853]'
-                            : arrangementDragOverIndex === index
-                              ? 'border-[#BF9853] border-2 bg-[#FFFDF9]'
-                              : 'border-[#BF9853] border-opacity-20'
-                        }`}
-                      >
-                        <span className="text-sm font-medium flex items-center gap-2">
-                          <span className="text-gray-400 text-base leading-none" aria-hidden="true">
-                            ⋮⋮
-                          </span>
-                          <span className="text-[#BF9853]">{index + 1}.</span>
-                          {getPaymentModeLabelById(modeId)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeModeFromArrangement(modeId)}
-                          className="px-2 py-1 text-xs border rounded text-red-600 shrink-0"
-                          title="Remove"
-                          onMouseDown={(e) => e.stopPropagation()}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-              <div className="flex justify-end space-x-2 mt-6">
-                <button
-                  type="submit"
-                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                >
-                  {isPaymentModeArrangementEditOpen ? 'Update' : 'Submit'}
-                </button>
-                <button
-                  type="button"
-                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                  onClick={isPaymentModeArrangementEditOpen ? closePaymentModeArrangementEdit : closePaymentModeArrangement}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-        {isArrangementModePickerOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-            <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
-              <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-                <h3 className="text-lg font-semibold text-[#BF9853]">Select Payment Modes</h3>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+            <div className="bg-white rounded-md w-full max-w-2xl max-h-[90vh] overflow-y-auto px-4 py-3">
+              <div className="flex justify-end">
                 <button
                   type="button"
                   className="text-red-500"
-                  onClick={closeArrangementModePicker}
+                  onClick={isPaymentModeArrangementEditOpen ? closePaymentModeArrangementEdit : closePaymentModeArrangement}
                 >
-                  <img src={cross} alt="close" className="w-5 h-5" />
+                  <img src={cross} alt='close' className='w-5 h-5' />
                 </button>
               </div>
-              <div className="p-4 text-left">
-                <label className="mb-2 block text-sm font-medium">Payment Modes</label>
-                {allPaymentModeLabels.length === 0 ? (
-                  <p className="text-sm text-gray-500">
-                    No payment modes found. Add them in Rent Management Input Data.
-                  </p>
-                ) : availablePaymentModesForArrangement.length === 0 ? (
-                  <p className="text-sm text-gray-500">All payment modes are already selected.</p>
-                ) : (
-                  <Select
-                    isMulti
-                    options={arrangementModePickerOptions}
-                    value={arrangementModesPendingAdd.map((modeId) => {
-                      const numericId = Number(modeId);
-                      const option = arrangementModePickerOptions.find((item) => item.value === numericId);
-                      return option || { value: numericId, label: getPaymentModeLabelById(numericId) };
-                    })}
-                    onChange={(selected) =>
-                      setArrangementModesPendingAdd(
-                        selected ? selected.map((option) => Number(option.value)) : []
-                      )
-                    }
-                    placeholder="Choose payment modes..."
-                    isClearable
-                    closeMenuOnSelect={false}
-                    menuPortalTarget={document.body}
-                    styles={{
-                      menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                      control: (base) => ({
-                        ...base,
-                        minHeight: '48px',
-                        borderColor: 'rgba(191, 152, 83, 0.3)',
-                        boxShadow: 'none',
-                        '&:hover': { borderColor: '#BF9853' },
-                      }),
-                      multiValue: (base) => ({
-                        ...base,
-                        backgroundColor: '#FAF6ED',
-                      }),
-                      multiValueLabel: (base) => ({
-                        ...base,
-                        color: '#BF9853',
-                        fontWeight: 500,
-                      }),
-                      option: (base, state) => ({
-                        ...base,
-                        backgroundColor: state.isSelected ? '#BF9853' : state.isFocused ? '#FFFDF9' : 'white',
-                        color: state.isSelected ? 'white' : 'black',
-                      }),
-                    }}
-                  />
-                )}
-                <p className="mt-2 text-xs text-gray-500">
-                  Select one or more payment modes, then click Add.
-                </p>
-              </div>
-              <div className="flex justify-end gap-2 border-t border-gray-100 px-4 py-3">
-                <button
-                  type="button"
-                  className="rounded-lg border border-[#BF9853] px-6 py-2 text-[#BF9853]"
-                  onClick={closeArrangementModePicker}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg bg-[#BF9853] px-6 py-2 font-semibold text-white hover:bg-yellow-800 disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={confirmArrangementModesAdd}
-                  disabled={arrangementModesPendingAdd.length === 0}
-                >
-                  Add
-                </button>
-              </div>
+              <form
+                onSubmit={
+                  isPaymentModeArrangementEditOpen
+                    ? handleSubmitEditPaymentModeArrangement
+                    : handleSubmitPaymentModeArrangement
+                }
+              >
+                <h2 className="text-lg font-semibold mb-4 text-[#BF9853]">
+                  {isPaymentModeArrangementEditOpen ? 'Edit Payment Mode Arrangement' : 'Add Payment Mode Arrangement'}
+                </h2>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">Module Name</label>
+                  {isPaymentModeArrangementEditOpen ? (
+                    <div className="w-full max-w-md rounded border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] bg-[#FAF6ED] p-2 h-12 flex items-center text-gray-700">
+                      {arrangementModuleName}
+                    </div>
+                  ) : (
+                    <Select
+                      className="max-w-md"
+                      placeholder="Select module..."
+                      options={availableModulesForArrangementAdd.map((moduleName) => ({
+                        value: moduleName,
+                        label: moduleName,
+                      }))}
+                      value={
+                        arrangementModuleName
+                          ? { value: arrangementModuleName, label: arrangementModuleName }
+                          : null
+                      }
+                      onChange={(option) => setArrangementModuleName(option ? option.value : '')}
+                      isClearable
+                    />
+                  )}
+                </div>
+                <div className="mb-4">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div>
+                      <label className="block text-sm font-medium">Selected Order</label>
+                      <p className="text-xs text-gray-500 mt-1">Drag and drop to change order</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={openArrangementModePicker}
+                      disabled={
+                        allPaymentModeLabels.length === 0 || availablePaymentModesForArrangement.length === 0
+                      }
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-[#BF9853] text-lg font-semibold text-[#BF9853] transition-colors hover:bg-[#FFFDF9] disabled:cursor-not-allowed disabled:opacity-40"
+                      title="Add payment mode"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 max-h-72 overflow-y-auto p-2 bg-white">
+                    {arrangementSelectedModeIds.length === 0 ? (
+                      <p className="text-sm text-gray-500 p-2">Click + to add payment modes.</p>
+                    ) : (
+                      arrangementSelectedModeIds.map((modeId, index) => (
+                        <div
+                          key={`${modeId}-${index}`}
+                          draggable
+                          onDragStart={(e) => handleArrangementDragStart(e, index)}
+                          onDragOver={(e) => handleArrangementDragOver(e, index)}
+                          onDrop={(e) => handleArrangementDrop(e, index)}
+                          onDragEnd={handleArrangementDragEnd}
+                          className={`mb-2 flex items-center justify-between rounded-md border bg-white px-2 py-2 cursor-grab active:cursor-grabbing select-none ${arrangementDragIndex === index
+                              ? 'opacity-50 border-[#BF9853]'
+                              : arrangementDragOverIndex === index
+                                ? 'border-[#BF9853] border-2 bg-[#FFFDF9]'
+                                : 'border-[#BF9853] border-opacity-20'
+                            }`}
+                        >
+                          <span className="text-sm font-medium flex items-center gap-2">
+                            <span className="text-gray-400 text-base leading-none" aria-hidden="true">
+                              ⋮⋮
+                            </span>
+                            <span className="text-[#BF9853]">{index + 1}.</span>
+                            {getPaymentModeLabelById(modeId)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeModeFromArrangement(modeId)}
+                            className="px-2 py-1 text-xs border rounded text-red-600 shrink-0"
+                            title="Remove"
+                            onMouseDown={(e) => e.stopPropagation()}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2 mt-6">
+                  <button
+                    type="submit"
+                    className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                  >
+                    {isPaymentModeArrangementEditOpen ? 'Update' : 'Submit'}
+                  </button>
+                  <button
+                    type="button"
+                    className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                    onClick={isPaymentModeArrangementEditOpen ? closePaymentModeArrangementEdit : closePaymentModeArrangement}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
-        )}
+          {isArrangementModePickerOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+              <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
+                <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+                  <h3 className="text-lg font-semibold text-[#BF9853]">Select Payment Modes</h3>
+                  <button
+                    type="button"
+                    className="text-red-500"
+                    onClick={closeArrangementModePicker}
+                  >
+                    <img src={cross} alt="close" className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="p-4 text-left">
+                  <label className="mb-2 block text-sm font-medium">Payment Modes</label>
+                  {allPaymentModeLabels.length === 0 ? (
+                    <p className="text-sm text-gray-500">
+                      No payment modes found. Add them in Rent Management Input Data.
+                    </p>
+                  ) : availablePaymentModesForArrangement.length === 0 ? (
+                    <p className="text-sm text-gray-500">All payment modes are already selected.</p>
+                  ) : (
+                    <Select
+                      isMulti
+                      options={arrangementModePickerOptions}
+                      value={arrangementModesPendingAdd.map((modeId) => {
+                        const numericId = Number(modeId);
+                        const option = arrangementModePickerOptions.find((item) => item.value === numericId);
+                        return option || { value: numericId, label: getPaymentModeLabelById(numericId) };
+                      })}
+                      onChange={(selected) =>
+                        setArrangementModesPendingAdd(
+                          selected ? selected.map((option) => Number(option.value)) : []
+                        )
+                      }
+                      placeholder="Choose payment modes..."
+                      isClearable
+                      closeMenuOnSelect={false}
+                      menuPortalTarget={document.body}
+                      styles={{
+                        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                        control: (base) => ({
+                          ...base,
+                          minHeight: '48px',
+                          borderColor: 'rgba(191, 152, 83, 0.3)',
+                          boxShadow: 'none',
+                          '&:hover': { borderColor: '#BF9853' },
+                        }),
+                        multiValue: (base) => ({
+                          ...base,
+                          backgroundColor: '#FAF6ED',
+                        }),
+                        multiValueLabel: (base) => ({
+                          ...base,
+                          color: '#BF9853',
+                          fontWeight: 500,
+                        }),
+                        option: (base, state) => ({
+                          ...base,
+                          backgroundColor: state.isSelected ? '#BF9853' : state.isFocused ? '#FFFDF9' : 'white',
+                          color: state.isSelected ? 'white' : 'black',
+                        }),
+                      }}
+                    />
+                  )}
+                  <p className="mt-2 text-xs text-gray-500">
+                    Select one or more payment modes, then click Add.
+                  </p>
+                </div>
+                <div className="flex justify-end gap-2 border-t border-gray-100 px-4 py-3">
+                  <button
+                    type="button"
+                    className="rounded-lg border border-[#BF9853] px-6 py-2 text-[#BF9853]"
+                    onClick={closeArrangementModePicker}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-lg bg-[#BF9853] px-6 py-2 font-semibold text-white hover:bg-yellow-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={confirmArrangementModesAdd}
+                    disabled={arrangementModesPendingAdd.length === 0}
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
       {isProjectManagementOpen && (
@@ -7782,7 +7766,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                     </div>
                     <div className="">
                       <label className="block mb-1 text-lg font-medium">Project Type</label>
-                      <select value={detail.projectType} onChange={(e) =>handleNewDetailChange(index, 'projectType', e.target.value)}
+                      <select value={detail.projectType} onChange={(e) => handleNewDetailChange(index, 'projectType', e.target.value)}
                         className="w-40 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                       >
                         <option value="">Select Type</option>
@@ -8325,7 +8309,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                     }
                   }
                   try {
-                    const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/employee_details/edit/${selectedEmployeeDataId}`, {
+                    const response = await fetch(`https://backendaab.in/aabuildersDash/api/employee_details/edit/${selectedEmployeeDataId}`, {
                       method: 'PUT',
                       body: formData,
                     });
@@ -8764,7 +8748,7 @@ const MasterData = ({ username, userRoles = [] }) => {
             <form onSubmit={async (e) => {
               e.preventDefault();
               try {
-                const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/labours-details/edit/${selectedLabourDataId}`, {
+                const response = await fetch(`https://backendaab.in/aabuildersDash/api/labours-details/edit/${selectedLabourDataId}`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -8845,7 +8829,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       upi_qr_image: qrImageBase64
                     };
                     try {
-                      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/account-details/update/${selectedAccountId}`, {
+                      const response = await fetch(`https://backendaab.in/aabuildersDash/api/account-details/update/${selectedAccountId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(updateData),
@@ -9099,9 +9083,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
       {tooltipData && (
         <div
-          className={`fixed z-50 bg-white text-black p-3 rounded shadow-lg text-sm border ${
-            tooltipAlign === 'left' ? 'min-w-[10rem] text-left' : 'max-w-xs'
-          }`}
+          className={`fixed z-50 bg-white text-black p-3 rounded shadow-lg text-sm border ${tooltipAlign === 'left' ? 'min-w-[10rem] text-left' : 'max-w-xs'
+            }`}
           style={{
             left: tooltipAlign === 'left' ? tooltipPosition.x : tooltipPosition.x + 10,
             top: tooltipAlign === 'left' ? tooltipPosition.y : tooltipPosition.y - 10,

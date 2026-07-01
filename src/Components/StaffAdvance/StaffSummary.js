@@ -387,7 +387,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   useEffect(() => {
     const fetchEmpNames = async () => {
       try {
-        const res = await fetch("https://backendaab.in/demoAabuildersDash/api/employee_details/getAll", {
+        const res = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
@@ -410,7 +410,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   }, []);
   const fetchLaboursList = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/labours-details/getAll');
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
       if (response.ok) {
         const data = await response.json();
         const formattedData = data.map(item => ({
@@ -431,7 +431,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   useEffect(() => {
     const fetchPurposeOptions = async () => {
       try {
-        const res = await fetch("https://backendaab.in/demoAabuildersDash/api/purposes/getAll", {
+        const res = await fetch("https://backendaab.in/aabuildersDash/api/purposes/getAll", {
           method: "GET",
           headers: { "Content-Type": "application/json" }
         });
@@ -457,7 +457,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch("https://backendaab.in/demoAabuildersDash/api/staff-advance/all");
+        const res = await fetch("https://backendaab.in/aabuildersDash/api/staff-advance/all");
         if (!res.ok) {
           console.warn('Staff advance API not available, using empty data');
           setStaffData([]);
@@ -1037,7 +1037,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                             sortDirection={sortConfig.direction}
                             onSort={handlePurposeEdbcSort}
                           />
-                          <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Refund Amount" />
+                          <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Refund" />
                           <EdbcColumnHeader
                             columnId={EDBC_IDS.EDBC13}
                             label="Status"
@@ -1185,7 +1185,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                             sortDirection={purposeSortConfig.direction}
                             onSort={handleEmpEdbcSort}
                           />
-                          <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Refund Amount" />
+                          <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Refund" />
                           <EdbcColumnHeader
                             columnId={EDBC_IDS.EDBC13}
                             label="Status"

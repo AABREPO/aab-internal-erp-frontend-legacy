@@ -215,7 +215,7 @@ const Report = () => {
 
   const fetchVendors = async () => {
     try {
-      const res = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll');
+      const res = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
       if (res.ok) {
         const data = await res.json();
         setVendorOptions(data.map((item) => ({ id: item.id, label: item.vendorName })));
@@ -227,7 +227,7 @@ const Report = () => {
 
   const fetchContractors = async () => {
     try {
-      const res = await fetch('https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll');
+      const res = await fetch('https://backendaab.in/aabuilderDash/api/contractor_Names/getAll');
       if (res.ok) {
         const data = await res.json();
         setContractorOptions(data.map((item) => ({ id: item.id, label: item.contractorName })));
@@ -239,7 +239,7 @@ const Report = () => {
 
   const fetchSites = async () => {
     try {
-      const res = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/getAll');
+      const res = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/getAll');
       if (res.ok) {
         const data = await res.json();
         const formatted = data.map((item) => ({
@@ -260,7 +260,7 @@ const Report = () => {
   const loadAdvanceData = useCallback(async () => {
     try {
       // Mobile: avoid fetching the full dataset (can crash the browser on large payloads).
-      const res = await fetch('https://backendaab.in/demoAabuildersDash/api/advance_portal/getLast150');
+      const res = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getLast150');
       if (!res.ok) throw new Error('Failed to fetch advance data');
       const data = await res.json();
       setAdvanceData(Array.isArray(data) ? data : []);

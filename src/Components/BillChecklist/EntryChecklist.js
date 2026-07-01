@@ -116,7 +116,7 @@ const EntryChecklist = () => {
     };
     useEffect(() => {
         axios
-            .get('https://backendaab.in/demoAabuilderDash/expenses_form/get_form')
+            .get('https://backendaab.in/aabuilderDash/expenses_form/get_form')
             .then((response) => {
                 const sortedExpenses = response.data.sort((a, b) => {
                     const enoA = parseInt(a.eno, 10);
@@ -213,7 +213,7 @@ const EntryChecklist = () => {
     };
     const fetchAuditDetails = async (expenseId) => {
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuilderDash/expenses_form/audit/${expenseId}`);
+            const response = await fetch(`https://backendaab.in/aabuilderDash/expenses_form/audit/${expenseId}`);
             const data = await response.json();
             setAudits(data);
             setShowModal(true);

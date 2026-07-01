@@ -128,7 +128,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
     // Fetch bill payments data
     const fetchBillPayments = useCallback(async () => {
         try {
-            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/all", {
+            const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-payment-bills/all", {
                 method: "GET",
                 credentials: "include",
                 headers: {
@@ -149,7 +149,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
     // Fetch vendor options
     const fetchVendorOptions = useCallback(async () => {
         try {
-            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
+            const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
                 method: "GET",
                 credentials: "include",
                 headers: {
@@ -172,7 +172,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
     // Fetch contractor options
     const fetchContractorOptions = useCallback(async () => {
         try {
-            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
+            const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
                 method: "GET",
                 credentials: "include",
                 headers: {
@@ -195,7 +195,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
     // Fetch employee options
     const fetchEmployeeOptions = useCallback(async () => {
         try {
-            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/employee_details/getAll", {
+            const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
                 method: "GET",
                 credentials: "include",
                 headers: {
@@ -218,7 +218,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
     // Fetch project options
     const fetchProjectOptions = useCallback(async () => {
         try {
-            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+            const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
                 method: "GET",
                 credentials: "include",
                 headers: {
@@ -258,7 +258,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
     // Fetch purpose options from API
     const fetchPurposeOptions = useCallback(async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loan-purposes/getAll', {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/loan-purposes/getAll', {
                 method: "GET",
                 credentials: "include",
                 headers: {
@@ -283,7 +283,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
     // Fetch tenant options from tenant link shop API (like Form.js)
     const fetchTenantOptions = useCallback(async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll', {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll', {
                 method: "GET",
                 credentials: "include",
                 headers: {
@@ -319,7 +319,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
             let successMessage = "Bill payment deleted successfully!";
             let errorMessage = "Failed to delete bill payment. Please try again.";
             let allOperationsSuccessful = true;
-            const deleteResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/delete/${item.id}`, {
+            const deleteResponse = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-payment-bills/delete/${item.id}`, {
                 method: "DELETE",
                 credentials: "include",
                 headers: {
@@ -331,7 +331,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
                 errorMessage = "Failed to delete bill payment. Please try again.";
             }
             if (item.advance_portal_id) {
-                const clearResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${item.advance_portal_id}?editedBy=${username}`, {
+                const clearResponse = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${item.advance_portal_id}?editedBy=${username}`, {
                     method: "PUT",
                     credentials: "include",
                     headers: {
@@ -358,7 +358,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
                 }
             }
             else if (item.staff_advance_portal_id) {
-                const clearResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/staff-advance/${item.staff_advance_portal_id}?editedBy=${username}`, {
+                const clearResponse = await fetch(`https://backendaab.in/aabuildersDash/api/staff-advance/${item.staff_advance_portal_id}?editedBy=${username}`, {
                     method: "PUT",
                     credentials: "include",
                     headers: {

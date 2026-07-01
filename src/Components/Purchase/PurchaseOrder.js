@@ -4,8 +4,23 @@ import deleteIcon from '../Images/Delete.svg';
 import Select from 'react-select';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import { fetchUserModulePermissions } from '../../componentsMobile/utils/fetchUserModulePermissions';
+import {
+    areItemsSame,
+    buildPurchaseTablePayload,
+    fetchInchargeLists,
+    fetchNextPoNumberForVendor,
+    fetchPreviousPO,
+    formatDateForPoSave,
+    getNumericEno,
+    mapHistoryItemsToDesktopItems,
+    parsePoDateForInput,
+    resolvePoEnoForVendor,
+    savePurchaseOrder,
+} from './purchaseOrderFormApi';
 const PurchaseOrder = ({ username, userRoles = [] }) => {
     const [siteInchargeOptions, setSiteInchargeOptions] = useState([]);
+    const [employeeList, setEmployeeList] = useState([]);
     const [selectedIncharge, setSelectedIncharge] = useState(null);
     const [poItemName, setPoItemName] = useState([]);
     const [itemNameOptions, setItemNameOptions] = useState([]);
@@ -48,7 +63,26 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     const brandRef = useRef(null);
     const typeRef = useRef(null);
     const quantityRef = useRef(null);
+    const previousVendorIdRef = useRef(null);
+    const isLoadingFromEventRef = useRef(false);
+    const generatePoClickLockRef = useRef(false);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [canCreate, setCanCreate] = useState(true);
+    const [poMeta, setPoMeta] = useState({
+        originalId: null,
+        originalClientId: null,
+        originalSiteInchargeId: null,
+        originalSiteInchargeType: null,
+        originalSiteInchargeMobileNumber: null,
+    });
     useEffect(() => {
+        fetchUserModulePermissions(userRoles, 'Purchase Order')
+            .then((permissions) => setCanCreate(permissions.includes('Create')))
+            .catch(() => setCanCreate(true));
+    }, [userRoles]);
+    useEffect(() => {
+        if (isEditMode) return;
         const savedSelectedVendor = sessionStorage.getItem('selectedVendor');
         const savedSelectedSite = sessionStorage.getItem('selectedSite');
         const savedPoNo = sessionStorage.getItem('poNo');
@@ -95,6 +129,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
         sessionStorage.removeItem('items');
     };
     useEffect(() => {
+        if (isEditMode) return;
         if (selectedCategory) sessionStorage.setItem('selectedCategory', JSON.stringify(selectedCategory));
         if (selectedVendor) sessionStorage.setItem('selectedVendor', JSON.stringify(selectedVendor));
         if (selectedSite) sessionStorage.setItem('selectedSite', JSON.stringify(selectedSite));
@@ -106,13 +141,13 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
         if (selectedIncharge) sessionStorage.setItem('selectedIncharge', JSON.stringify(selectedIncharge));
         if (quantity) sessionStorage.setItem('quantity', JSON.stringify(quantity));
         if (items) sessionStorage.setItem('items', JSON.stringify(items));
-    }, [selectedCategory, selectedVendor, selectedSite, selectedModel, selectedItemName, selectedBrand, selectedType, selectedIncharge, quantity, items, poNo]);
+    }, [selectedCategory, selectedVendor, selectedSite, selectedModel, selectedItemName, selectedBrand, selectedType, selectedIncharge, quantity, items, poNo, isEditMode]);
     useEffect(() => {
         fetchPoModel();
     }, []);
     const fetchPoModel = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_model/getAll');
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setPoModel(data);
@@ -128,7 +163,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     }, []);
     const fetchPoType = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_type/getAll');
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setPoType(data);
@@ -144,7 +179,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     }, []);
     const fetchPoBrand = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_brand/getAll');
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/po_brand/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setPoBrand(data);
@@ -231,7 +266,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     }, []);
     const fetchVendorNames = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll');
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
             if (response.ok) {
                 const data = await response.json();
                 const formattedData = data.map(item => ({
@@ -248,50 +283,10 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             console.error('Error:', error);
         }
     };
-    const getNumericEno = (purchaseOrder = {}) => {
-        const candidateKeys = ['eno', 'poNo', 'po_no', 'po_number', 'purchase_order_number'];
-        for (const key of candidateKeys) {
-            const value = purchaseOrder[key];
-            if (value === undefined || value === null || value === '') continue;
-            const parsed = parseInt(value, 10);
-            if (!Number.isNaN(parsed)) {
-                return parsed;
-            }
-        }
-        return 0;
-    };
-    const fetchNextPoNumberForVendor = async (vendorId) => {
-        if (!vendorId) {
-            return 1;
-        }
-        try {
-            // Backend-supported optimized endpoint:
-            // GET /api/purchase_orders/countByVendor?vendorId=123  -> returns total count (Long)
-            // Next eno should be count + 1.
-            const response = await fetch(
-                `https://backendaab.in/demoAabuildersDash/api/purchase_orders/countByVendor?vendorId=${encodeURIComponent(String(vendorId))}`,
-                {
-                    method: "GET",
-                    credentials: "include",
-                    headers: { "Content-Type": "application/json" },
-                }
-            );
-            if (!response.ok) {
-                throw new Error('Failed to fetch purchase orders');
-            }
-            const raw = await response.text();
-            const count = Number(String(raw || '').trim());
-            if (!Number.isFinite(count) || count < 0) return 1;
-            return count + 1;
-        } catch (error) {
-            console.error('Failed to fetch last PO number:', error);
-            return 1;
-        }
-    };
     useEffect(() => {
         const fetchSites = async () => {
             try {
-                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+                const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -316,32 +311,45 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
         fetchSites();
     }, []);
     useEffect(() => {
-        fetchSiteIncharge();
+        fetchInchargeLists().then(({ employees, options }) => {
+            setEmployeeList(employees);
+            setSiteInchargeOptions(options);
+        });
     }, []);
-    const fetchSiteIncharge = async () => {
-        try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/site_incharge/getAll');
-            if (response.ok) {
-                const data = await response.json();
-                const formatted = data.map((item) => ({
-                    value: item.id,
-                    label: item.siteEngineer,
-                    mobileNumber: item.mobileNumber,
-                    id: item.id,
-                }));
-                setSiteInchargeOptions(formatted);
-            } else {
-                console.log('Error fetching tile area names.');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-        }
-    };
+    useEffect(() => {
+        const normalizedUsername = String(username || '').trim().toLowerCase();
+        if (!normalizedUsername || isEditMode || selectedIncharge) return;
+        if (!Array.isArray(employeeList) || employeeList.length === 0) return;
+        const matchedEmployee = employeeList.find((emp) => {
+            const empUserName = emp.user_name || emp.userName || emp.username || '';
+            return String(empUserName).trim().toLowerCase() === normalizedUsername;
+        });
+        if (!matchedEmployee) return;
+        const matchedOption = siteInchargeOptions.find(
+            (opt) => opt.type === 'employee' && String(opt.id) === String(matchedEmployee.id)
+        );
+        if (matchedOption) setSelectedIncharge(matchedOption);
+    }, [username, employeeList, siteInchargeOptions, isEditMode, selectedIncharge]);
     const handleChange = (selectedOption) => {
         setSelectedIncharge(selectedOption);
     };
+    const resolveInchargeSelectValue = () => {
+        if (!selectedIncharge) return null;
+        return (
+            siteInchargeOptions.find((opt) => {
+                if (selectedIncharge.value != null) return opt.value === selectedIncharge.value;
+                return (
+                    String(opt.id) === String(selectedIncharge.id) &&
+                    (!selectedIncharge.type || opt.type === selectedIncharge.type)
+                );
+            }) || selectedIncharge
+        );
+    };
     const formatDateOnly = (dateString) => {
+        if (!dateString) return '';
+        if (typeof dateString === 'string' && dateString.includes('/')) return dateString;
         const date = new Date(dateString);
+        if (Number.isNaN(date.getTime())) return String(dateString);
         const day = String(date.getDate()).padStart(2, '0');
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const year = date.getFullYear();
@@ -352,7 +360,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     }, []);
     const fetchPoCategory = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll');
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
             if (response.ok) {
                 const data = await response.json();
                 const options = data.map(item => ({
@@ -373,7 +381,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     }, []);
     const fetchMappedPoCategory = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/mapped/category/getAll');
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/mapped/category/getAll');
             if (response.ok) {
                 const data = await response.json();
                 const options = data.map(item => ({
@@ -394,7 +402,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     }, []);
     const fetchPoItemName = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_itemNames/getAll');
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setPoItemName(data);
@@ -406,10 +414,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
         }
     };
     const handleCategoryChange = (selectedOption) => {
-        if (!selectedIncharge) {
-            alert("Please select the Project Incharge first.");
-            return;
-        }
         const categoryValue = selectedOption?.value || '';
         if (selectedCategory?.value !== categoryValue) {
             setSelectedItemName(null);
@@ -752,11 +756,11 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             }
         }),
     };
+    const normalizeItemKey = (value) => (value || '').toString().trim().toLowerCase();
     const handleAddItem = () => {
         if (
             selectedItemName &&
             selectedCategory &&
-            selectedType &&
             quantity
         ) {
             const quantityNumber = Number(quantity);
@@ -768,15 +772,15 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             const modelId = selectedModel?.id ?? null;
             const brandLabel = selectedBrand?.label || '';
             const brandId = selectedBrand?.id ?? null;
-            const typeLabel = selectedType.label;
-            const typeId = selectedType.id ?? null;
+            const typeLabel = selectedType?.label || '';
+            const typeId = selectedType?.id ?? null;
             const existingIndex = items.findIndex(
-                item =>
-                    item.itemName === itemLabel &&
-                    item.category === categoryLabel &&
-                    item.model === modelLabel &&
-                    item.brand === brandLabel &&
-                    item.type === typeLabel
+                (item) =>
+                    normalizeItemKey(item.itemName) === normalizeItemKey(itemLabel) &&
+                    normalizeItemKey(item.category) === normalizeItemKey(categoryLabel) &&
+                    normalizeItemKey(item.model) === normalizeItemKey(modelLabel) &&
+                    normalizeItemKey(item.brand) === normalizeItemKey(brandLabel) &&
+                    normalizeItemKey(item.type) === normalizeItemKey(typeLabel)
             );
             if (existingIndex !== -1) {
                 const updatedItems = [...items];
@@ -833,52 +837,138 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             }
         }
     };
-    const generatePO = async () => {
-        if (!selectedVendor?.id) {
-            alert("Please select a Vendor before generating a PO.");
-            return;
-        }
+    const proceedWithPOGeneration = async () => {
+        setIsGenerating(true);
         try {
-            const currentPoNo = await fetchNextPoNumberForVendor(selectedVendor.id);
+            const isEditingExistingPo = isEditMode && poMeta.originalId;
+            const currentPoNo = await resolvePoEnoForVendor(selectedVendor.id, {
+                isEditing: isEditingExistingPo,
+                displayedPoNumber: poNo,
+            });
             setPoNo(currentPoNo);
+            const clientIdForPayload = selectedSite?.id ?? poMeta.originalClientId ?? null;
+            const siteInchargeIdForPayload = selectedIncharge?.id ?? poMeta.originalSiteInchargeId ?? null;
+            const mobileForPayload =
+                selectedIncharge?.mobileNumber ||
+                poMeta.originalSiteInchargeMobileNumber ||
+                '';
+            const siteInchargeTypeForPayload =
+                selectedIncharge?.type ||
+                poMeta.originalSiteInchargeType ||
+                null;
             const payload = {
-                vendor_id: selectedVendor?.id,
-                client_id: selectedSite?.id,
-                date: date,
-                site_incharge_id: selectedIncharge?.id,
-                site_incharge_mobile_number: selectedIncharge?.mobileNumber || "",
+                vendor_id: selectedVendor.id,
+                client_id: clientIdForPayload,
+                date: formatDateForPoSave(date),
+                site_incharge_id: siteInchargeIdForPayload,
+                site_incharge_mobile_number: mobileForPayload,
+                site_incharge_type: siteInchargeTypeForPayload,
+                rfq_id: null,
                 eno: currentPoNo,
                 created_by: username,
-                purchaseTable: items.map(item => ({
-                    item_id: item.itemId,
-                    category_id: item.categoryId,
-                    model_id: item.modelId,
-                    brand_id: item.brandId,
-                    type_id: item.typeId,
-                    quantity: item.quantity,
-                    amount: item.amount,
-                }))
+                purchaseTable: buildPurchaseTablePayload(items, {
+                    isEditing: isEditingExistingPo,
+                    originalId: poMeta.originalId,
+                    poItemName,
+                    poBrand,
+                    poModel,
+                    poType,
+                    categoryOptions,
+                }),
             };
-            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/purchase_orders/save", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(payload)
+            if (!isEditingExistingPo && !canCreate) {
+                alert("You don't have permission to create a new Purchase Order.");
+                generatePoClickLockRef.current = false;
+                return;
+            }
+            const response = await savePurchaseOrder({
+                payload,
+                isEditing: isEditingExistingPo,
+                originalId: poMeta.originalId,
+                username,
             });
             if (response.ok) {
                 const result = await response.json();
-                generatePDF(payload);
-                window.location.reload();
-                alert("Purchase Order Generated!");
+                const savedEno = result?.eno != null ? getNumericEno({ eno: result.eno }) : currentPoNo;
+                const finalPayload = { ...payload, eno: savedEno || currentPoNo };
+                setPoNo(savedEno || currentPoNo);
+                generatePDF(finalPayload);
+                alert(isEditingExistingPo ? 'Purchase Order Updated!' : 'Purchase Order Generated!');
+                if (isEditingExistingPo) {
+                    setIsEditMode(false);
+                    setPoMeta({
+                        originalId: null,
+                        originalClientId: null,
+                        originalSiteInchargeId: null,
+                        originalSiteInchargeType: null,
+                        originalSiteInchargeMobileNumber: null,
+                    });
+                }
+                window.dispatchEvent(new CustomEvent('poUpdated'));
             } else {
                 const error = await response.text();
-                console.error("Error:", error);
-                alert("Failed to save Purchase Order");
+                console.error('Error:', error);
+                alert(isEditingExistingPo ? 'Failed to update Purchase Order' : 'Failed to save Purchase Order');
             }
         } catch (error) {
-            console.error("Network error:", error);
-            alert("Server not responding");
+            console.error('Network error:', error);
+            alert('Server not responding');
+        } finally {
+            setIsGenerating(false);
+            generatePoClickLockRef.current = false;
+        }
+    };
+    const generatePO = async () => {
+        if (generatePoClickLockRef.current || isGenerating) return;
+        generatePoClickLockRef.current = true;
+        try {
+            if (!selectedVendor?.id) {
+                alert('Please select a Vendor before generating a PO.');
+                generatePoClickLockRef.current = false;
+                return;
+            }
+            const isCreatingNewPo = !isEditMode || !poMeta.originalId;
+            if (isCreatingNewPo) {
+                const correctEno = await resolvePoEnoForVendor(selectedVendor.id, {
+                    isEditing: false,
+                    displayedPoNumber: poNo,
+                });
+                if (correctEno !== poNo) {
+                    setPoNo(correctEno);
+                }
+            }
+            if (isCreatingNewPo) {
+                const clientIdForCheck = selectedSite?.id ?? poMeta.originalClientId ?? null;
+                if (clientIdForCheck && items.length > 0) {
+                    const previousPO = await fetchPreviousPO(selectedVendor.id, clientIdForCheck);
+                    if (previousPO?.purchaseTable?.length) {
+                        const currentItemsForComparison = buildPurchaseTablePayload(items, {
+                            isEditing: false,
+                            originalId: null,
+                            poItemName,
+                            poBrand,
+                            poModel,
+                            poType,
+                            categoryOptions,
+                        });
+                        if (areItemsSame(currentItemsForComparison, previousPO.purchaseTable)) {
+                            const previousPONumber = previousPO.eno || previousPO.poNumber || 'N/A';
+                            const confirmed = window.confirm(
+                                `A previous PO (#${previousPONumber}) has the same items for this vendor and project. Do you still want to create a new PO?`
+                            );
+                            if (!confirmed) {
+                                generatePoClickLockRef.current = false;
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+            await proceedWithPOGeneration();
+        } catch (error) {
+            console.error('Error during PO generation pre-check:', error);
+            alert('Unable to generate PO. Please try again.');
+            generatePoClickLockRef.current = false;
         }
     };
     const totalQuantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
@@ -1039,6 +1129,87 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             handleBrandChange(selectedBrand);
         }
     }, [hasRestoredSession, selectedBrand, brandOptions, selectedModel, selectedItemName, poItemName]);
+    useEffect(() => {
+        const hydrateFromHistoryPo = (po) => {
+            if (!po) return;
+            isLoadingFromEventRef.current = true;
+            setItems([]);
+            setSelectedSite(null);
+            setSelectedIncharge(null);
+            const vendorId = po.vendor_id || po.vendorId || null;
+            if (po.isClone) {
+                previousVendorIdRef.current = null;
+            } else if (vendorId) {
+                previousVendorIdRef.current = vendorId;
+            }
+            if (vendorId) {
+                const vendorOption = vendorNameOptions.find((opt) => String(opt.id) === String(vendorId));
+                setSelectedVendor(vendorOption || { id: vendorId, value: po.vendorName || '', label: po.vendorName || '' });
+            }
+            const clientId = po.client_id || po.clientId || null;
+            if (clientId) {
+                const siteOption = siteOptions.find((opt) => String(opt.id) === String(clientId));
+                setSelectedSite(siteOption || { id: clientId, value: po.projectName || '', label: po.projectName || '' });
+            }
+            const inchargeId = po.site_incharge_id || po.siteInchargeId || null;
+            const inchargeType = po.site_incharge_type || po.siteInchargeType || null;
+            if (inchargeId) {
+                const inchargeOption = siteInchargeOptions.find(
+                    (opt) =>
+                        String(opt.id) === String(inchargeId) &&
+                        (!inchargeType || opt.type === inchargeType)
+                );
+                if (inchargeOption) {
+                    setSelectedIncharge(inchargeOption);
+                } else {
+                    const fallbackType = inchargeType || 'employee';
+                    setSelectedIncharge({
+                        id: inchargeId,
+                        value: `${fallbackType}:${inchargeId}`,
+                        label: po.projectIncharge || '',
+                        mobileNumber: po.site_incharge_mobile_number || po.contact || '',
+                        type: fallbackType,
+                    });
+                }
+            }
+            let displayPoNo = 0;
+            if (!po.isClone) {
+                displayPoNo = getNumericEno({ eno: po.eno, poNumber: po.poNumber });
+            } else if (po.prefetchedPoNumber) {
+                displayPoNo = getNumericEno({ eno: po.prefetchedPoNumber });
+            }
+            setPoNo(displayPoNo);
+            setDate(po.isClone ? new Date().toISOString().split('T')[0] : parsePoDateForInput(po.date));
+            setItems(mapHistoryItemsToDesktopItems(po.items || []));
+            setPoMeta({
+                originalId: po.isClone ? null : po.id,
+                originalClientId: clientId,
+                originalSiteInchargeId: inchargeId,
+                originalSiteInchargeType: inchargeType,
+                originalSiteInchargeMobileNumber: po.site_incharge_mobile_number || po.contact || null,
+            });
+            setIsEditMode(true);
+            setTimeout(() => {
+                isLoadingFromEventRef.current = false;
+                if (po.isClone && vendorId) {
+                    previousVendorIdRef.current = vendorId;
+                }
+            }, 150);
+        };
+        const handleEditPO = (event) => hydrateFromHistoryPo(event.detail);
+        window.addEventListener('editPO', handleEditPO);
+        try {
+            const stored = localStorage.getItem('editingPO');
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                localStorage.removeItem('editingPO');
+                hydrateFromHistoryPo(parsed);
+            }
+        } catch (error) {
+            console.error('Error loading editing PO:', error);
+        }
+        return () => window.removeEventListener('editPO', handleEditPO);
+    }, [vendorNameOptions, siteOptions, siteInchargeOptions]);
     return (
         <div>
             <div className="p-6 border-collapse bg-[#FFFFFF] rounded-md ml-8 mr-8 [@media(min-width:1450)]w-[1900px]">
@@ -1050,11 +1221,19 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                             onChange={async (selectedOption) => {
                                 const value = selectedOption?.id || '';
                                 setSelectedVendor(selectedOption);
-                                if (value) {
-                                    const nextPoNumber = await fetchNextPoNumberForVendor(value);
-                                    setPoNo(nextPoNumber);
-                                } else {
+                                if (isLoadingFromEventRef.current) return;
+                                if (value && previousVendorIdRef.current !== value) {
+                                    if (!isEditMode || !poMeta.originalId) {
+                                        const nextPoNumber = await fetchNextPoNumberForVendor(value);
+                                        setPoNo(nextPoNumber);
+                                    }
+                                    previousVendorIdRef.current = value;
+                                    if (isEditMode && items.length > 0) {
+                                        setItems([]);
+                                    }
+                                } else if (!value) {
                                     setPoNo(0);
+                                    previousVendorIdRef.current = null;
                                 }
                             }}
                             options={vendorNameOptions}
@@ -1113,13 +1292,18 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                         </div>
                         <Select
                             options={siteInchargeOptions}
-                            value={selectedIncharge}
+                            value={resolveInchargeSelectValue()}
                             onChange={handleChange}
                             isSearchable
                             isClearable
                             placeholder="Select Site Incharge"
                             className="[@media(min-width:1500px)]:w-[370px] w-[250px]"
-                            styles={customStyles}
+                            styles={{
+                                ...customStyles,
+                                menuPortal: (provided) => ({ ...provided, zIndex: 9999 }),
+                            }}
+                            menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                            menuPosition="fixed"
                         />
                     </div>
                 </div>
@@ -1843,10 +2027,15 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                     Cancel
                                 </button>
                                 <button
-                                    className="bg-[#BF9853] text-white w-[137px] h-[36px] px-5 rounded"
+                                    className="bg-[#BF9853] text-white w-[137px] h-[36px] px-5 rounded disabled:opacity-60"
                                     onClick={generatePO}
+                                    disabled={isGenerating}
                                 >
-                                    Generate PO
+                                    {isGenerating
+                                        ? 'Saving...'
+                                        : isEditMode && poMeta.originalId
+                                            ? 'Update PO'
+                                            : 'Generate PO'}
                                 </button>
                             </div>
                         </div>

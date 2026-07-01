@@ -21,7 +21,7 @@ const WaterDatabase = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchWaterData = async () => {
             try {
-                const response = await axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/utility/water');
+                const response = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/water');
                 setWaterData(response.data || []);
                 setFilteredData(response.data || []);
             } catch (err) {

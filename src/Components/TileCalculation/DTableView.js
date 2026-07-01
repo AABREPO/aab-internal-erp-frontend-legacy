@@ -166,7 +166,7 @@ const DTableView = () => {
   const handleEditFloorTypeSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/typeFloor/${selectedFloorTypeId}`, {
+      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/typeFloor/${selectedFloorTypeId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -188,7 +188,7 @@ const DTableView = () => {
   };
   const deleteFloorType = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/typeFloor/${id}`, {
+      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/typeFloor/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -220,7 +220,7 @@ const DTableView = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tiles/tileNameBulkUpload", {
+      const response = await fetch("https://backendaab.in/aabuilderDash/api/tiles/tileNameBulkUpload", {
         method: "POST",
         body: formData,
       });
@@ -243,7 +243,7 @@ const DTableView = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/bulkUpload", {
+      const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/bulkUpload", {
         method: "POST",
         body: formData,
       });
@@ -263,7 +263,7 @@ const DTableView = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/vendor/bulkUpload", {
+      const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/vendor/bulkUpload", {
         method: "POST",
         body: formData,
       });
@@ -283,7 +283,7 @@ const DTableView = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/bulk_upload", {
+      const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/bulk_upload", {
         method: "POST",
         body: formData,
       });
@@ -303,7 +303,7 @@ const DTableView = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/bulk_upload", {
+      const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/bulk_upload", {
         method: "POST",
         body: formData,
       });
@@ -323,7 +323,7 @@ const DTableView = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/bulk_upload", {
+      const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/bulk_upload", {
         method: "POST",
         body: formData,
       });
@@ -343,7 +343,7 @@ const DTableView = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/expenses_categories/bulk_upload", {
+      const response = await fetch("https://backendaab.in/aabuilderDash/api/expenses_categories/bulk_upload", {
         method: "POST",
         body: formData,
       });
@@ -363,7 +363,7 @@ const DTableView = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/sizeBulkUpload", {
+      const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/sizeBulkUpload", {
         method: "POST",
         body: formData,
       });
@@ -383,7 +383,7 @@ const DTableView = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/floorNameBulkUpload", {
+      const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/floorNameBulkUpload", {
         method: "POST",
         body: formData,
       });
@@ -403,7 +403,7 @@ const DTableView = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/bulkUploadType", {
+      const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/bulkUploadType", {
         method: "POST",
         body: formData,
       });
@@ -418,7 +418,7 @@ const DTableView = () => {
   const handleEditFloorName = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/nameFloor/${selectedFloorId}`, {
+      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/nameFloor/${selectedFloorId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -437,7 +437,7 @@ const DTableView = () => {
   };
   const deleteFloor = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/nameFloor/${id}`, {
+      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/nameFloor/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -453,7 +453,7 @@ const DTableView = () => {
   };
   const deleteTileSizeAndQuantity = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/size/quantity/${id}`, {
+      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/size/quantity/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -471,7 +471,7 @@ const DTableView = () => {
     const confirmed = window.confirm("Are you sure you want to delete all area names?");
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/size/quantity/all", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/size/quantity/all", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -504,7 +504,7 @@ const DTableView = () => {
   const handleSubmitTileEditSize = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/size/quantity/${currentTileSize.id}`, {
+      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/size/quantity/${currentTileSize.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -531,7 +531,7 @@ const DTableView = () => {
   }
   const handleAreaDelete = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/nameArea/${id}`, {
+      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/nameArea/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -547,7 +547,7 @@ const DTableView = () => {
   };
   const handleTileVendorDelete = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/vendor/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/vendor/delete/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -565,7 +565,7 @@ const DTableView = () => {
     const confirmed = window.confirm("Are you sure you want to delete all area names?");
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/nameArea/all", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/nameArea/all", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -587,7 +587,7 @@ const DTableView = () => {
     const confirmed = window.confirm("Are you sure you want to delete all vendors?");
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/vendor/delete/all", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/vendor/delete/all", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -609,7 +609,7 @@ const DTableView = () => {
     const confirmed = window.confirm("Are you sure you want to delete all Site Names?");
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/deleteAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/deleteAll", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -631,7 +631,7 @@ const DTableView = () => {
     const confirmed = window.confirm("Are you sure you want to delete all area names?");
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/nameFloor/all", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/nameFloor/all", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -653,7 +653,7 @@ const DTableView = () => {
     const confirmed = window.confirm("Are you sure you want to delete all area names?");
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/nameFloorType/all", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/nameFloorType/all", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -675,7 +675,7 @@ const DTableView = () => {
     const confirmed = window.confirm("Are you sure you want to delete all area names?");
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tiles/allTile", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/tiles/allTile", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -696,7 +696,7 @@ const DTableView = () => {
   const handleAreaEditSave = async () => {
     if (!areaEdit) return;
     try {
-      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/nameArea/${areaEdit.id}`, {
+      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/nameArea/${areaEdit.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -717,7 +717,7 @@ const DTableView = () => {
   const handleTileVendorEditSave = async () => {
     if (!tileVendorEdit) return;
     try {
-      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/vendor/${tileVendorEdit.id}`, {
+      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/vendor/${tileVendorEdit.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -761,7 +761,7 @@ const DTableView = () => {
   const deleteTile = (id) => {
     const confirmed = window.confirm("Are you sure you want to delete this tile?");
     if (confirmed) {
-      fetch(`https://backendaab.in/demoAabuilderDash/api/tiles/${id}`, {
+      fetch(`https://backendaab.in/aabuilderDash/api/tiles/${id}`, {
         method: "DELETE",
       })
         .then((response) => {
@@ -804,7 +804,7 @@ const DTableView = () => {
       const fileName = selectedFile ? selectedFile.name : 'default.png';
       formData.append("image", imageBlob, fileName);
     }
-    fetch(`https://backendaab.in/demoAabuilderDash/api/tiles/change/${editTileData.id}`, {
+    fetch(`https://backendaab.in/aabuilderDash/api/tiles/change/${editTileData.id}`, {
       method: "PUT",
       body: formData,
     })
@@ -827,7 +827,7 @@ const DTableView = () => {
   }, []);
   const fetchTileFloorTypes = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/floorType');
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/floorType');
       if (response.ok) {
         const data = await response.json();
         setTileFloorTypes(data);
@@ -843,7 +843,7 @@ const DTableView = () => {
     e.preventDefault();
     const newTileFloorType = { floorType, formula };
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/typeFloor', {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/typeFloor', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -868,7 +868,7 @@ const DTableView = () => {
   }, []);
   const fetchTileAreaNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/areaName');
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/areaName');
       if (response.ok) {
         const data = await response.json();
         setTileAreaNames(data);
@@ -885,7 +885,7 @@ const DTableView = () => {
   }, []);
   const fetchTileVendors = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/vendor/getAll');
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/vendor/getAll');
       if (response.ok) {
         const data = await response.json();
         setTileVendors(data);
@@ -902,7 +902,7 @@ const DTableView = () => {
   }, []);
   const fetchSiteNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/getAll');
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/getAll');
       if (response.ok) {
         const data = await response.json();
         setSiteNames(data);
@@ -919,7 +919,7 @@ const DTableView = () => {
   }, []);
   const fetchVendorNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll');
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
       if (response.ok) {
         const data = await response.json();
         setVendorNames(data);
@@ -936,7 +936,7 @@ const DTableView = () => {
   }, []);
   const fetchContractorNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll');
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/contractor_Names/getAll');
       if (response.ok) {
         const data = await response.json();
         setContractorNames(data);
@@ -953,7 +953,7 @@ const DTableView = () => {
   }, []);
   const fetchCategories = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll');
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/expenses_categories/getAll');
       if (response.ok) {
         const data = await response.json();
         setExpensesCategory(data);
@@ -969,7 +969,7 @@ const DTableView = () => {
     e.preventDefault();
     const newTileArea = { areaName };
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/nameArea', {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/nameArea', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -993,7 +993,7 @@ const DTableView = () => {
     e.preventDefault();
     const newTileVendors = { tileVendor };
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/vendor/save', {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/vendor/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1017,7 +1017,7 @@ const DTableView = () => {
     e.preventDefault();
     const newSiteNames = { siteName, siteNo };
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/save', {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1043,7 +1043,7 @@ const DTableView = () => {
   }, []);
   const fetchTileFloorNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/floorName');
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/floorName');
       if (response.ok) {
         const data = await response.json();
         setTileFloorNames(data);
@@ -1059,7 +1059,7 @@ const DTableView = () => {
     e.preventDefault();
     const newTileFloor = { floorName };
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/nameFloor', {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/nameFloor', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1088,7 +1088,7 @@ const DTableView = () => {
   };
   useEffect(() => {
     const fetchTiles = async () => {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tiles/all/data');
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/tiles/all/data');
       const data = await response.json();
       setTiles(data);
     };
@@ -1121,7 +1121,7 @@ const DTableView = () => {
   };
   const fetchTileData = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/quantity/size');
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/quantity/size');
       const data = await response.json();
       setTileList(data);
       console.log(data);
@@ -1135,7 +1135,7 @@ const DTableView = () => {
   const handleSubmitTileSize = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/size/quantity', {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/size/quantity', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -1158,7 +1158,7 @@ const DTableView = () => {
     formData.append('tileSize', tileSize);
     formData.append('image', selectedFile);
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tiles/upload', {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/tiles/upload', {
         method: 'POST',
         body: formData,
       });

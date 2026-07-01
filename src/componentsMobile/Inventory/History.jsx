@@ -9,8 +9,8 @@ import Close from '../Images/close.png'
 import Search from '../Images/Search.png'
 import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
-const INVENTORY_EDIT_URL = 'https://backendaab.in/demoAabuildersDash/api/inventory/edit_with_history';
-const INVENTORY_GET_ALL_URL = 'https://backendaab.in/demoAabuildersDash/api/inventory/getAll';
+const INVENTORY_EDIT_URL = 'https://backendaab.in/aabuildersDash/api/inventory/edit_with_history';
+const INVENTORY_GET_ALL_URL = 'https://backendaab.in/aabuildersDash/api/inventory/getAll';
 
 /** Load header + line items for a history row (getAll often omits nested items). */
 const fetchInventoryWithItems = async (inventoryData) => {
@@ -149,7 +149,7 @@ const History = ({ onTabChange, user } = {}) => {
   useEffect(() => {
     const fetchClients = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -180,7 +180,7 @@ const History = ({ onTabChange, user } = {}) => {
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll');
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll');
         if (response.ok) {
           const data = await response.json();
           const siteEngineers = data.filter(
@@ -199,7 +199,7 @@ const History = ({ onTabChange, user } = {}) => {
   useEffect(() => {
     const fetchPoCategory = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll');
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
         if (response.ok) {
           const data = await response.json();
           const options = (data || []).map(item => item.category || item.categoryName || item.name || '').filter(Boolean);
@@ -221,7 +221,7 @@ const History = ({ onTabChange, user } = {}) => {
       try {
         setLoading(true);
         // Fetch inventory data from getAll endpoint
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/inventory/getAll', {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll', {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -716,7 +716,7 @@ const History = ({ onTabChange, user } = {}) => {
         if (inventoryData?.id) {
           try {
             // Try to fetch the inventory record with items by ID
-            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/inventory/edit_with_history/${inventoryData.id}`, {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/inventory/edit_with_history/${inventoryData.id}`, {
               method: 'GET',
               credentials: 'include',
               headers: {
@@ -799,7 +799,7 @@ const History = ({ onTabChange, user } = {}) => {
         if (inventoryData?.id) {
           try {
             // Try to fetch the inventory record with items by ID
-            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/inventory/edit_with_history/${inventoryData.id}`, {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/inventory/edit_with_history/${inventoryData.id}`, {
               method: 'GET',
               credentials: 'include',
               headers: {

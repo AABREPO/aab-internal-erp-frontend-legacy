@@ -367,7 +367,7 @@ const History = ({ onPersonClick, user } = {}) => {
         request_approval: false,
         request_completed: false,
       };
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/edit_requests/save', {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/edit_requests/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -437,14 +437,14 @@ const History = ({ onPersonClick, user } = {}) => {
       formData.append('file', file);
       formData.append('file_name', `${timestamp} ${item.personName || 'Staff Advance'}`);
       const uploadRes = await fetch(
-        'https://backendaab.in/demoAabuilderDash/expenses/googleUploader/uploadToGoogleDrive',
+        'https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive',
         { method: 'POST', body: formData }
       );
       if (!uploadRes.ok) throw new Error('Upload failed');
       const uploadResult = await uploadRes.json();
       const payload = { ...item.entry, file_url: uploadResult.url };
       const editRes = await fetch(
-        `https://backendaab.in/demoAabuildersDash/api/staff-advance/${entryId}?editedBy=${encodeURIComponent(username)}`,
+        `https://backendaab.in/aabuildersDash/api/staff-advance/${entryId}?editedBy=${encodeURIComponent(username)}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },

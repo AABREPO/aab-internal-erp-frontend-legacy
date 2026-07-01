@@ -125,7 +125,7 @@ const History = () => {
     };
     useEffect(() => {
         axios
-            .get('https://backendaab.in/demoAabuilderDash/expenses_form/get_form')
+            .get('https://backendaab.in/aabuilderDash/expenses_form/get_form')
             .then((response) => {
                 const sortedExpenses = response.data.sort((a, b) => {
                     const enoA = parseInt(a.eno, 10);
@@ -147,7 +147,7 @@ const History = () => {
     }, []);
     useEffect(() => {
         axios
-            .get('https://backendaab.in/demoAabuilderDash/api/account_type/daily_checklist')
+            .get('https://backendaab.in/aabuilderDash/api/account_type/daily_checklist')
             .then((response) => {
                 const sortedExpenses = response.data.sort((a, b) => new Date(b.date) - new Date(a.date));
                 const uniqueUrls = [
@@ -238,7 +238,7 @@ const History = () => {
     };
     const fetchAuditDetails = async (expenseId) => {
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuilderDash/expenses_form/audit/${expenseId}`);
+            const response = await fetch(`https://backendaab.in/aabuilderDash/expenses_form/audit/${expenseId}`);
             const data = await response.json();
             setAudits(data);
             setShowModal(true);

@@ -14,7 +14,7 @@ export async function fetchUserModulePermissions(userRoles, moduleName) {
 
   if (!roleNames.length) return [];
 
-  const response = await axios.get('https://backendaab.in/demoAabuilderDash/api/user_roles/all');
+  const response = await axios.get('https://backendaab.in/aabuilderDash/api/user_roles/all');
   const allRoles = response.data || [];
 
   // userRoles values are matched against backend `role.userRoles`

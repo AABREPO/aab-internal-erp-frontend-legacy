@@ -130,7 +130,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     }, []);
     const fetchWeeklyType = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_types/getAll');
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/weekly_types/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setWeeklyReceivedTypes(data);
@@ -146,7 +146,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
         const confirmed = window.confirm("Are you sure you want to delete all Machine Tools?");
         if (confirmed) {
             try {
-                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly_types/deleteAll", {
+                const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly_types/deleteAll", {
                     method: "DELETE",
                 });
                 if (response.ok) {
@@ -166,7 +166,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     };
     const handleWeeklyTypeDelete = async (id) => {
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_types/delete/${id}`, {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly_types/delete/${id}`, {
                 method: 'DELETE',
             });
             if (response.ok) {
@@ -185,7 +185,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
         e.preventDefault();
         const newWeeklyType = { type: weeklyReceivedType };
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_types/save', {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/weekly_types/save', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -207,7 +207,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     const handleEditWeeklyTypes = async (e) => {
         e.preventDefault();
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_types/edit/${selectedWeeklyReceivedTypeId}`, {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly_types/edit/${selectedWeeklyReceivedTypeId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -229,7 +229,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     }, []);
     const fetchWeeklyReceivedTypes = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_received_types/getAll');
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/weekly_received_types/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setWeeklyReceivedTypeRows(data);
@@ -245,7 +245,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
         const confirmed = window.confirm("Are you sure you want to delete all Weekly Received Types?");
         if (confirmed) {
             try {
-                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly_received_types/deleteAll", {
+                const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly_received_types/deleteAll", {
                     method: "DELETE",
                 });
                 if (response.ok) {
@@ -263,7 +263,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     };
     const handleWeeklyReceivedTypeDelete = async (id) => {
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_received_types/delete/${id}`, {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly_received_types/delete/${id}`, {
                 method: 'DELETE',
             });
             if (response.ok) {
@@ -282,7 +282,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
         e.preventDefault();
         const payload = { received_type: weeklyReceivedName };
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_received_types/save', {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/weekly_received_types/save', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -304,7 +304,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     const handleEditWeeklyReceivedType = async (e) => {
         e.preventDefault();
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_received_types/edit/${selectedWeeklyReceivedNameId}`, {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly_received_types/edit/${selectedWeeklyReceivedNameId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -327,7 +327,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     }, []);
     const fetchLaboursList = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/labours-details/getAll');
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setLaboursList(data);
@@ -344,7 +344,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     }, []);
     const fetchEmployeeList = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll');
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setEmployeeList(data);
@@ -360,7 +360,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
         const confirmed = window.confirm("Are you sure you want to delete all Labours List?");
         if (confirmed) {
             try {
-                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/labours-details/deleteAll", {
+                const response = await fetch("https://backendaab.in/aabuildersDash/api/labours-details/deleteAll", {
                     method: "DELETE",
                 });
                 if (response.ok) {
@@ -382,7 +382,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
         const confirmed = window.confirm("Are you sure you want to delete all Labours List?");
         if (confirmed) {
             try {
-                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/employee_details/deleteAll", {
+                const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/deleteAll", {
                     method: "DELETE",
                 });
                 if (response.ok) {
@@ -402,7 +402,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     };
     const handleLabourDataDelete = async (id) => {
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/labours-details/delete/${id}`, {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/labours-details/delete/${id}`, {
                 method: 'DELETE',
             });
             if (response.ok) {
@@ -419,7 +419,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     };
     const handleEmployeeDataDelete = async (id) => {
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/employee_details/delete/${id}`, {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/employee_details/delete/${id}`, {
                 method: 'DELETE',
             });
             if (response.ok) {
@@ -438,7 +438,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
         e.preventDefault();
         const newLaboursList = { labour_name: labourName, labour_salary: labourSalary };
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/labours-details/save', {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/save', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -462,7 +462,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
         e.preventDefault();
         const newEmployeeList = { employee_name: employeeName, employee_mobile_number: mobileNumber, role_of_employee: roleOfEmployee };
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/save', {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/save', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -486,7 +486,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     const handleEditLabourData = async (e) => {
         e.preventDefault();
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/labours-details/edit/${selectedLabourDataId}`, {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/labours-details/edit/${selectedLabourDataId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -506,7 +506,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     const handleEditEmployeeData = async (e) => {
         e.preventDefault();
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/employee_details/edit/${selectedEmployeeDataId}`, {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/employee_details/edit/${selectedEmployeeDataId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -531,7 +531,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
         const formData = new FormData();
         formData.append("file", file);
         try {
-            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/labours-details/bulk_upload", {
+            const response = await fetch("https://backendaab.in/aabuildersDash/api/labours-details/bulk_upload", {
                 method: "POST",
                 body: formData,
             });

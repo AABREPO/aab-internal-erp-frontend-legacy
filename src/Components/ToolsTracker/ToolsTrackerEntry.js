@@ -38,7 +38,7 @@ const ToolsTrackerEntry = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -68,7 +68,7 @@ const ToolsTrackerEntry = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchSiteIncharge = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/site_incharge/getAll');
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/site_incharge/getAll');
         if (response.ok) {
           const data = await response.json();
           const formatted = data.map((item) => ({
@@ -92,7 +92,7 @@ const ToolsTrackerEntry = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll');
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
         if (response.ok) {
           const data = await response.json();
           const options = data.map(item => ({
@@ -116,7 +116,7 @@ const ToolsTrackerEntry = ({ username, userRoles = [] }) => {
     if (selectedCategory) {
       const fetchItemNames = async () => {
         try {
-          const response = await fetch('https://backendaab.in/demoAabuilderDash/api/po_itemNames/getAll');
+          const response = await fetch('https://backendaab.in/aabuilderDash/api/po_itemNames/getAll');
           if (response.ok) {
             const data = await response.json();
             const filteredItems = data.filter(
@@ -149,13 +149,13 @@ const ToolsTrackerEntry = ({ username, userRoles = [] }) => {
       const fetchItemDetails = async () => {
         try {
           // This should be replaced with actual tools tracker API
-          // Example: fetch(`https://backendaab.in/demoAabuilderDash/api/tools_tracker/available?itemId=${selectedItemName.id}&fromSiteId=${selectedFrom.id}`)
+          // Example: fetch(`https://backendaab.in/aabuilderDash/api/tools_tracker/available?itemId=${selectedItemName.id}&fromSiteId=${selectedFrom.id}`)
 
           // Simulating available stock for now
           setAvailableStock(0); // Will be updated when API is available
 
           // Fetch brands
-          const brandResponse = await fetch('https://backendaab.in/demoAabuilderDash/api/po_brand/getAll');
+          const brandResponse = await fetch('https://backendaab.in/aabuilderDash/api/po_brand/getAll');
           if (brandResponse.ok) {
             const brandData = await brandResponse.json();
             const filteredBrands = brandData
@@ -190,7 +190,7 @@ const ToolsTrackerEntry = ({ username, userRoles = [] }) => {
       const generateEntryNo = async () => {
         try {
           // TODO: Replace with actual API endpoint
-          // Example: const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tools_tracker/countBySite?siteId=${selectedFrom.id}`);
+          // Example: const response = await fetch(`https://backendaab.in/aabuilderDash/api/tools_tracker/countBySite?siteId=${selectedFrom.id}`);
           // For now, set a placeholder
           setEntryNo(236);
         } catch (error) {
@@ -303,7 +303,7 @@ const ToolsTrackerEntry = ({ username, userRoles = [] }) => {
       };
 
       // Example API call (replace with actual endpoint)
-      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tools_tracker/transfer", {
+      const response = await fetch("https://backendaab.in/aabuilderDash/api/tools_tracker/transfer", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

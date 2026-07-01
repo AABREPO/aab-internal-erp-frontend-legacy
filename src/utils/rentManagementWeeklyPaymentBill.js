@@ -3,7 +3,7 @@ import {
   saveWeeklyPaymentBill,
 } from './advancePortalWeeklyPaymentBill';
 
-const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
+const TOOLS_API_BASE = 'https://backendaab.in/aabuildersDash';
 
 const normalizeWeeklyBillNullableId = (value) => {
   if (value == null || value === '') return null;

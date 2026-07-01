@@ -151,7 +151,7 @@ const Interior = () => {
     }, []);
     const fetchPaintCalculations = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/paint_calculation/all/paints');
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/paint_calculation/all/paints');
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
@@ -197,7 +197,7 @@ const Interior = () => {
     useEffect(() => {
         const fetchSites = async () => {
             try {
-                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+                const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -310,7 +310,7 @@ const Interior = () => {
     });
     const deleteCalculation = async (id) => {
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint_calculation/delete/paints/${id}`, {
+            const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint_calculation/delete/paints/${id}`, {
                 method: 'DELETE',
             });
 
@@ -340,7 +340,7 @@ const Interior = () => {
         console.log('Form Data before Save:', formData);
         const formattedDate = formatDates(formData.date);
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint_calculation/edit/paints/${formData.id}`, {
+            const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint_calculation/edit/paints/${formData.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

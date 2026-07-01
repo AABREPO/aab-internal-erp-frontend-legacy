@@ -4,6 +4,7 @@ import DateRangePickerModal from './DateRangePickerModal';
 import SelectVendorModal from './SelectVendorModal';
 import Edit from '../Images/edit1.png'
 import Delete from '../Images/delete.png'
+import Undo from '../Images/two-arrow.png'
 import Filter from '../Images/Filter.png'
 import Search from '../Images/Search.png'
 import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
@@ -155,7 +156,7 @@ const History = ({ user } = {}) => {
 
   const fetchAllVendors = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll');
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
       if (response.ok) {
         const data = await response.json();
         setAllVendors(data); // Store full objects instead of just names
@@ -167,7 +168,7 @@ const History = ({ user } = {}) => {
 
   const fetchAllProjects = async () => {
     try {
-      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
+      const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
         method: "GET",
         credentials: "include",
         headers: {
@@ -185,7 +186,7 @@ const History = ({ user } = {}) => {
 
   const fetchAllEmployees = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll');
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll');
       if (response.ok) {
         const data = await response.json();
         setAllEmployees(data); // Store full objects instead of just names
@@ -197,7 +198,7 @@ const History = ({ user } = {}) => {
 
   const fetchAllSupportStaff = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/support_staff/getAll');
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/support_staff/getAll');
       if (response.ok) {
         const data = await response.json();
         setAllSupportStaff(data);
@@ -238,8 +239,8 @@ const History = ({ user } = {}) => {
     }
     try {
       const apiUrl = hasActiveFilters
-        ? 'https://backendaab.in/demoAabuildersDash/api/purchase_orders/getAll'
-        : 'https://backendaab.in/demoAabuildersDash/api/purchase_orders/get/latest';
+        ? 'https://backendaab.in/aabuildersDash/api/purchase_orders/getAll'
+        : 'https://backendaab.in/aabuildersDash/api/purchase_orders/get/latest';
 
       // Fetch purchase orders first so list displays immediately (inventory blocks for a long time)
       const response = await fetch(apiUrl);
@@ -285,7 +286,7 @@ const History = ({ user } = {}) => {
       };
 
       // Fetch inventory in background - don't block display (inventory/getAll can be very slow)
-      fetch('https://backendaab.in/demoAabuildersDash/api/inventory/getAll')
+      fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll')
         .then((invRes) => (invRes.ok ? invRes.json() : []))
         .then((inventoryData) => {
           const map = buildIncomingQtyMap(inventoryData);
@@ -326,10 +327,8 @@ const History = ({ user } = {}) => {
         .catch(() => {});
       incomingQtyByPurchaseNo = buildIncomingQtyMap([]);
       const transformedPOs = data
-        .filter((po) => {
-          return !(po.delete_status === true || po.deleteStatus === true);
-        })
         .map((po) => {
+          const isDeleted = po.delete_status === true || po.deleteStatus === true;
           let vendorName = '';
           if (po.vendor_id && allVendors.length > 0) {
             const vendorMatch = allVendors.find(v => v.id === po.vendor_id);
@@ -446,6 +445,7 @@ const History = ({ user } = {}) => {
             paymentStatus: paymentStatus,
             stockStatus: stockStatus,
             stockStatusType: stockStatusType,
+            deleteStatus: isDeleted,
             createdAt: po.createdAt || po.created_at || po.created_date_time || po.date || new Date().toISOString(),
             created_date_time: po.created_date_time || po.createdAt || po.created_at || null,
             // Preserve raw IDs so edit screen can send them back when unchanged
@@ -565,13 +565,13 @@ const History = ({ user } = {}) => {
 
       const [vendorObj, projectObj, inchargeObj] = await Promise.all([
         vendorId
-          ? quickFetchJson(`https://backendaab.in/demoAabuilderDash/api/vendor_Names/get/${vendorId}`)
+          ? quickFetchJson(`https://backendaab.in/aabuilderDash/api/vendor_Names/get/${vendorId}`)
           : Promise.resolve(null),
         clientId
-          ? quickFetchJson(`https://backendaab.in/demoAabuilderDash/api/project_Names/get/${clientId}`)
+          ? quickFetchJson(`https://backendaab.in/aabuilderDash/api/project_Names/get/${clientId}`)
           : Promise.resolve(null),
         inchargeId && (!inchargeType || inchargeType === 'employee')
-          ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/employee_details/get/${inchargeId}`)
+          ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/employee_details/get/${inchargeId}`)
           : Promise.resolve(null),
       ]);
 
@@ -613,19 +613,19 @@ const History = ({ user } = {}) => {
 
             const [itemObj, modelObj, brandObj, typeObj, categoryObj] = await Promise.all([
               itemId
-                ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/po_itemNames/get/${itemId}`)
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_itemNames/get/${itemId}`)
                 : Promise.resolve(null),
               modelId
-                ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/po_model/get/${modelId}`)
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_model/get/${modelId}`)
                 : Promise.resolve(null),
               brandId
-                ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/po_brand/get/${brandId}`)
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_brand/get/${brandId}`)
                 : Promise.resolve(null),
               typeId
-                ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/po_type/get/${typeId}`)
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_type/get/${typeId}`)
                 : Promise.resolve(null),
               categoryId
-                ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/po_category/get/${categoryId}`)
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_category/get/${categoryId}`)
                 : Promise.resolve(null),
             ]);
 
@@ -733,13 +733,13 @@ const History = ({ user } = {}) => {
 
       const [vendorObj, projectObj, inchargeObj] = await Promise.all([
         vendorId
-          ? quickFetchJson(`https://backendaab.in/demoAabuilderDash/api/vendor_Names/get/${vendorId}`)
+          ? quickFetchJson(`https://backendaab.in/aabuilderDash/api/vendor_Names/get/${vendorId}`)
           : Promise.resolve(null),
         clientId
-          ? quickFetchJson(`https://backendaab.in/demoAabuilderDash/api/project_Names/get/${clientId}`)
+          ? quickFetchJson(`https://backendaab.in/aabuilderDash/api/project_Names/get/${clientId}`)
           : Promise.resolve(null),
         inchargeId && (!inchargeType || inchargeType === 'employee')
-          ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/employee_details/get/${inchargeId}`)
+          ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/employee_details/get/${inchargeId}`)
           : Promise.resolve(null),
       ]);
 
@@ -781,19 +781,19 @@ const History = ({ user } = {}) => {
 
             const [itemObj, modelObj, brandObj, typeObj, categoryObj] = await Promise.all([
               itemId
-                ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/po_itemNames/get/${itemId}`)
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_itemNames/get/${itemId}`)
                 : Promise.resolve(null),
               modelId
-                ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/po_model/get/${modelId}`)
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_model/get/${modelId}`)
                 : Promise.resolve(null),
               brandId
-                ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/po_brand/get/${brandId}`)
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_brand/get/${brandId}`)
                 : Promise.resolve(null),
               typeId
-                ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/po_type/get/${typeId}`)
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_type/get/${typeId}`)
                 : Promise.resolve(null),
               categoryId
-                ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/po_category/get/${categoryId}`)
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_category/get/${categoryId}`)
                 : Promise.resolve(null),
             ]);
 
@@ -874,7 +874,7 @@ const History = ({ user } = {}) => {
   const fetchPurchaseOrderById = useCallback(
     async (poId) => {
       if (!poId) return null;
-      return await quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/purchase_orders/get/${poId}`);
+      return await quickFetchJson(`https://backendaab.in/aabuildersDash/api/purchase_orders/get/${poId}`);
     },
     [quickFetchJson]
   );
@@ -938,14 +938,14 @@ const History = ({ user } = {}) => {
 
       const [vendorObj, projectObj, inchargeObj] = await Promise.all([
         vendorId
-          ? quickFetchJson(`https://backendaab.in/demoAabuilderDash/api/vendor_Names/get/${vendorId}`)
+          ? quickFetchJson(`https://backendaab.in/aabuilderDash/api/vendor_Names/get/${vendorId}`)
           : Promise.resolve(null),
         clientId
-          ? quickFetchJson(`https://backendaab.in/demoAabuilderDash/api/project_Names/get/${clientId}`)
+          ? quickFetchJson(`https://backendaab.in/aabuilderDash/api/project_Names/get/${clientId}`)
           : Promise.resolve(null),
         // Fast fetch for employee incharge (if it's an employee); support-staff stays best-effort via existing list
         inchargeId && (!inchargeType || inchargeType === 'employee')
-          ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/employee_details/get/${inchargeId}`)
+          ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/employee_details/get/${inchargeId}`)
           : Promise.resolve(null),
       ]);
 
@@ -957,7 +957,7 @@ const History = ({ user } = {}) => {
 
         // Prefetch next PO number for this vendor in background (non-blocking)
         // Don't await - let it fetch in background while page opens
-        fetch('https://backendaab.in/demoAabuildersDash/api/purchase_orders/getAll')
+        fetch('https://backendaab.in/aabuildersDash/api/purchase_orders/getAll')
           .then(response => {
             if (response.ok) {
               return response.json();
@@ -1034,19 +1034,19 @@ const History = ({ user } = {}) => {
 
             const [itemObj, modelObj, brandObj, typeObj, categoryObj] = await Promise.all([
               itemId
-                ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/po_itemNames/get/${itemId}`)
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_itemNames/get/${itemId}`)
                 : Promise.resolve(null),
               modelId
-                ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/po_model/get/${modelId}`)
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_model/get/${modelId}`)
                 : Promise.resolve(null),
               brandId
-                ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/po_brand/get/${brandId}`)
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_brand/get/${brandId}`)
                 : Promise.resolve(null),
               typeId
-                ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/po_type/get/${typeId}`)
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_type/get/${typeId}`)
                 : Promise.resolve(null),
               categoryId
-                ? quickFetchJson(`https://backendaab.in/demoAabuildersDash/api/po_category/get/${categoryId}`)
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_category/get/${categoryId}`)
                 : Promise.resolve(null),
             ]);
 
@@ -1116,6 +1116,48 @@ const History = ({ user } = {}) => {
     window.dispatchEvent(new CustomEvent('editPO', { detail: clonedPO }));
     setCloneExpandedPoId(null);
   };
+  const handleUndoDelete = async (poId) => {
+    if (!canDelete) {
+      alert("You don't have permission to delete.");
+      return;
+    }
+    const confirmed = window.confirm('Are you sure you want to undo delete for this purchase order?');
+    if (!confirmed) return;
+    try {
+      const order = purchaseOrders.find((po) => po.id === poId);
+      if (!order) {
+        alert('Purchase order not found.');
+        return;
+      }
+      const apiUrl = `https://backendaab.in/aabuildersDash/api/purchase_orders/markDeleted/${order.id}?deleteStatus=false`;
+      const response = await fetch(apiUrl, { method: 'PUT' });
+      if (response.ok) {
+        setPurchaseOrders((prev) =>
+          prev.map((po) => (po.id === poId ? { ...po, deleteStatus: false } : po))
+        );
+        try {
+          const cachedData = localStorage.getItem('purchaseOrdersHistoryCache');
+          if (cachedData) {
+            const parsed = JSON.parse(cachedData);
+            const updated = parsed.map((po) =>
+              po.id === poId ? { ...po, deleteStatus: false } : po
+            );
+            localStorage.setItem('purchaseOrdersHistoryCache', JSON.stringify(updated));
+          }
+        } catch (error) {
+          console.error('Error updating purchase orders cache:', error);
+        }
+        loadPurchaseOrders();
+      } else {
+        alert(`Failed to restore purchase order. Status: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Error restoring purchase order:', error);
+      alert('An error occurred while restoring the purchase order. Please try again.');
+    } finally {
+      setExpandedPoId(null);
+    }
+  };
   const handleDelete = (poId) => {
     if (!canDelete) {
       alert("You don't have permission to delete.");
@@ -1136,7 +1178,7 @@ const History = ({ user } = {}) => {
         const order = purchaseOrders.find(po => po.id === poToDelete);
         if (order) {
           // Call API to mark PO as deleted - matching working example format
-          const apiUrl = `https://backendaab.in/demoAabuildersDash/api/purchase_orders/markDeleted/${order.id}?deleteStatus=true`;
+          const apiUrl = `https://backendaab.in/aabuildersDash/api/purchase_orders/markDeleted/${order.id}?deleteStatus=true`;
           const response = await fetch(apiUrl, {
             method: 'PUT',
           });
@@ -1968,6 +2010,7 @@ const History = ({ user } = {}) => {
         ) : (
           <div className="mt-[6px]">
             {filteredPOs.map((po, index) => {
+              const isDeleted = po.deleteStatus === true || po.delete_status === true;
               const isFirstCard = index === 0;
               // First card starts expanded, but can be closed by swiping right
               const isExpanded = isFirstCard
@@ -2009,7 +2052,7 @@ const History = ({ user } = {}) => {
               return (
                 <div
                   key={po.id}
-                  className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] min-w-[330px]"
+                  className={`relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] min-w-[330px] group ${isDeleted ? 'opacity-90' : ''}`}
                   style={{
                     userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
                     WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
@@ -2017,6 +2060,7 @@ const History = ({ user } = {}) => {
                     msUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
                     height: '95px'
                   }}
+                  title={isDeleted ? 'Deleted' : undefined}
                 >
                   {/* Clone Button - Behind the card on the left, revealed on right swipe */}
                   <div
@@ -2046,7 +2090,7 @@ const History = ({ user } = {}) => {
                         delete cardRefs.current[po.id];
                       }
                     }}
-                    className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[12px] transition-all duration-300 ease-out flex flex-col"
+                    className={`flex-1 bg-white rounded-[8px] h-full px-[12px] py-[12px] transition-all duration-300 ease-out flex flex-col ${isDeleted ? 'line-through decoration-[#9E9E9E]' : ''}`}
                     style={{
                       transform: `translateX(${swipeOffset}px)`,
                       touchAction: 'pan-y',
@@ -2064,7 +2108,7 @@ const History = ({ user } = {}) => {
                       }
                     }}
                   >
-                    <div className="flex items-start justify-between gap-[8px] mb-[2px]">
+                    <div className={`flex items-start justify-between gap-[8px] mb-[2px] ${isDeleted ? 'text-gray-500' : ''}`}>
                       {/* Left: PO Details */}
                       <div className=" min-w-0">
                         <div className="flex items-center gap-[8px] mb-[2px]">
@@ -2076,12 +2120,12 @@ const History = ({ user } = {}) => {
                               setExpandedPoId(null);
                               setCloneExpandedPoId(null);
                             }}
-                            className="text-[12px] font-semibold text-black leading-snug cursor-pointer hover:text-blue-600 hover:underline text-left"
+                            className={`text-[12px] font-semibold leading-snug cursor-pointer hover:text-blue-600 hover:underline text-left ${isDeleted ? 'text-gray-500' : 'text-black'}`}
                           >
                             {po.poNumber || 'N/A'}
                           </button>
                         </div>
-                        <p className="text-[12px] font-semibold text-black leading-snug break-words mb-0.5" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+                        <p className={`text-[12px] font-semibold leading-snug break-words mb-0.5 ${isDeleted ? 'text-gray-500' : 'text-black'}`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                           {po.vendorName || 'N/A'}
                         </p>
                         <p className="text-[11px] font-medium text-[#777777] leading-snug break-words" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
@@ -2117,10 +2161,10 @@ const History = ({ user } = {}) => {
                       </div>
                     </div>
                     {/* Bottom row: Date/Time on the left, Amount on the right - similar to ToolsTracker layout */}
-                    <div className="flex items-center justify-between ">
+                    <div className={`flex items-center justify-between ${isDeleted ? 'text-gray-500' : ''}`}>
                       {!isExpanded && (
                         <span className="text-[11px] leading-normal min-w-0 flex-1 flex items-center flex-wrap gap-x-[4px]">
-                          <span className="font-bold text-black">
+                          <span className={`font-bold ${isDeleted ? 'text-gray-500' : 'text-black'}`}>
                             {formatRelativeDateLabel(po.created_date_time || po.createdAt)}
                           </span>
                           {(() => {
@@ -2145,7 +2189,7 @@ const History = ({ user } = {}) => {
                         )}
                         {totalAmount > 0 && (
                           <div className="flex flex-col items-end">
-                          <p className="text-[12px] font-semibold text-black leading-snug">
+                          <p className={`text-[12px] font-semibold leading-snug ${isDeleted ? 'text-gray-500' : 'text-black'}`}>
                             ₹{totalAmount.toLocaleString('en-IN')}
                           </p>
                           </div>
@@ -2153,6 +2197,13 @@ const History = ({ user } = {}) => {
                       </div>
                     </div>
                   </div>
+                  {isDeleted && (
+                    <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center rounded-[8px] bg-white/0 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-hover:bg-white/40">
+                      <span className="rounded-[6px] bg-[#424242] px-[10px] py-[4px] text-[11px] font-semibold text-white shadow-sm">
+                        Deleted
+                      </span>
+                    </div>
+                  )}
                   {/* Action Buttons - Behind the card on the right, revealed on swipe */}
                   <div
                     className="absolute right-0 top-[0px] flex gap-[8px] flex-shrink-0 z-0"
@@ -2180,20 +2231,36 @@ const History = ({ user } = {}) => {
                     >
                       <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(po.id);
-                        setExpandedPoId(null); // Close after delete
-                      }}
-                      disabled={!canDelete}
-                      className={`action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-[6px] hover:bg-[#cc4d26] transition-colors shadow-sm ${
-                        !canDelete ? 'opacity-50 cursor-not-allowed hover:bg-[#E4572E]' : ''
-                      }`}
-                      title="Delete"
-                    >
-                      <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />
-                    </button>
+                    {isDeleted ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUndoDelete(po.id);
+                        }}
+                        disabled={!canDelete}
+                        className={`action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-[6px] hover:bg-[#cc4d26] transition-colors shadow-sm ${
+                          !canDelete ? 'opacity-50 cursor-not-allowed hover:bg-[#E4572E]' : ''
+                        }`}
+                        title="Undo"
+                      >
+                        <img src={Undo} alt="Undo" className="w-[18px] h-[18px]" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(po.id);
+                          setExpandedPoId(null); // Close after delete
+                        }}
+                        disabled={!canDelete}
+                        className={`action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-[6px] hover:bg-[#cc4d26] transition-colors shadow-sm ${
+                          !canDelete ? 'opacity-50 cursor-not-allowed hover:bg-[#E4572E]' : ''
+                        }`}
+                        title="Delete"
+                      >
+                        <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />
+                      </button>
+                    )}
                   </div>
                 </div>
               );

@@ -895,6 +895,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
 
     const handleOpenExpenseEntryPopup = ({ ebNo, project, property }) => {
         const prefillData = {
+            source: 'Utility Hub',
             utilityType: 'Electricity',
             siteName: project?.projectName || project?.siteName || '',
             projectId: project?.id || project?.projectId || null,

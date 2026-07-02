@@ -30,6 +30,8 @@ import { Table, TableProvider, buildTableViewExpenseTableContext, BLANK_VALUE, b
 import {
     DATABASE_TABLE_FILTER_SELECT_STYLES,
     isAdvancePortalSourceExpense,
+    isUtilityBillsFromUtilityHub,
+    isWeeklyExpensesLinkedExpense,
     EdbcPaymentModeFilterChip,
     buildEdbcSelectFilterOptions,
     hasEdbcPaymentModeFilter,
@@ -1950,6 +1952,12 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     };
     const handleEditClick = (expense) => {
         if (isAdvancePortalSourceExpense(expense)) {
+            return;
+        }
+        if (isUtilityBillsFromUtilityHub(expense)) {
+            return;
+        }
+        if (isWeeklyExpensesLinkedExpense(expense)) {
             return;
         }
         setEditId(expense.id);

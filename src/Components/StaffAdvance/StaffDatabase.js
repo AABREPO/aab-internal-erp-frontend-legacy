@@ -11,8 +11,9 @@ import {
   getStaffAdvanceDisplayAmount,
   isStaffAdvanceChequePaymentMode,
 } from '../../utils/staffAdvanceWeeklyPaymentBill';
-import { formatWeeklyBillDeleteMessage } from '../../utils/advancePortalWeeklyPaymentBill';
+import { formatWeeklyBillDeleteMessage, resolveFilesUploadResponseUrl } from '../../utils/advancePortalWeeklyPaymentBill';
 import AdvancePortalEditPaymentModal from '../Advance Portal/AdvancePortalEditPaymentModal';
+import UploadFile from '../Images/Upload file.svg';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
@@ -49,6 +50,158 @@ import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
 
+const ADVANCE_PORTAL_SELECT_CLASS =
+  'custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const ADVANCE_PORTAL_INPUT_CLASS =
+  'border-2 border-[#BF9853] rounded-lg px-[8px] w-[300px] h-[40px] focus:outline-none border-opacity-[0.20] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const ADVANCE_PORTAL_READONLY_INPUT_CLASS =
+  'border-2 border-[#BF9853] rounded-lg px-[8px] w-[300px] h-[40px] focus:outline-none border-opacity-[0.20] bg-[#ededed] text-[14px] font-semibold';
+const ADVANCE_PORTAL_LABEL_CLASS = 'text-md font-semibold mb-[8px] block';
+const ADVANCE_PORTAL_TEXTAREA_CLASS =
+  'border-2 border-[#BF9853] rounded-md px-[8px] w-[616px] h-[60px] focus:outline-none border-opacity-[0.20] resize-none text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const STAFF_EDIT_SELECT_TYPE_OPTIONS = [
+  { value: 'Advance', label: 'Advance' },
+  { value: 'Refund', label: 'Refund' },
+  { value: 'Transfer', label: 'Transfer' },
+];
+const STAFF_EDIT_MODAL_SELECT_STYLES = {
+  control: (provided, state) => ({
+    ...provided,
+    fontFamily: 'Manrope',
+    borderWidth: '2px',
+    borderRadius: '8px',
+    minHeight: '40px',
+    height: '40px',
+    flexWrap: 'nowrap',
+    borderColor: state.isFocused ? 'rgba(191, 152, 83, 1)' : 'rgba(191, 152, 83, 0.2)',
+    boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.2)' : 'none',
+    '&:hover': { borderColor: 'rgba(191, 152, 83, 0.2)' },
+  }),
+  valueContainer: (provided, state) => ({
+    ...provided,
+    flex: '1 1 0%',
+    minWidth: 0,
+    flexWrap: 'nowrap',
+    overflow: 'hidden',
+    paddingLeft: '12px',
+    paddingRight: state.hasValue ? '2px' : provided.paddingRight,
+    paddingTop: 0,
+    paddingBottom: 0,
+    height: '36px',
+    alignItems: 'center',
+  }),
+  singleValue: (provided) => ({
+    ...provided,
+    maxWidth: '100%',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    margin: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    color: 'black',
+  }),
+  input: (provided) => ({ ...provided, margin: 0, padding: 0 }),
+  menu: (provided) => ({ ...provided, zIndex: 9999, maxHeight: '300px' }),
+  menuPortal: (provided) => ({ ...provided, zIndex: 9999 }),
+  menuList: (provided) => ({
+    ...provided,
+    paddingTop: 0,
+    paddingBottom: 0,
+    maxHeight: '250px',
+    overflowY: 'auto',
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
+    '&::-webkit-scrollbar': { display: 'none' },
+  }),
+  indicatorSeparator: () => ({ display: 'none' }),
+  indicatorsContainer: (provided) => ({ ...provided, flex: '0 0 auto', paddingLeft: '0' }),
+  dropdownIndicator: (provided, state) => ({
+    ...provided,
+    display: state.hasValue ? 'none' : 'flex',
+    color: '#000000',
+    flexShrink: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+  }),
+  clearIndicator: (provided) => ({
+    ...provided,
+    cursor: 'pointer',
+    color: '#000000',
+    flexShrink: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    paddingLeft: '4px',
+    paddingRight: '4px',
+  }),
+  placeholder: (provided) => ({
+    ...provided,
+    fontWeight: 'normal',
+    fontSize: '14px',
+    color: '#6b7280',
+    margin: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    textAlign: 'left',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: '100%',
+    position: 'absolute',
+  }),
+  option: (provided, state) => ({
+    ...provided,
+    minHeight: 36,
+    height: 'auto',
+    paddingTop: 6,
+    paddingBottom: 6,
+    whiteSpace: 'normal',
+    display: 'flex',
+    alignItems: 'center',
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
+    WebkitTapHighlightColor: '#FAF6ED',
+    backgroundColor: state.isSelected ? '#BF9853' : state.isFocused ? '#FAF6ED' : provided.backgroundColor,
+    color: state.isSelected ? '#FFFFFF' : provided.color,
+    ':active': { backgroundColor: state.isSelected ? '#BF9853' : '#FAF6ED' },
+  }),
+};
+
+const calculateStaffEditOverallAdvance = (records, empSelection) => {
+  if (!empSelection || !records?.length) return '';
+  const employeeRecords = records.filter((record) => {
+    if (empSelection.type === 'Employee') return record.employee_id === empSelection.id;
+    if (empSelection.type === 'Labour') return record.labour_id === empSelection.id;
+    return false;
+  });
+  const totalAdvance = employeeRecords.reduce((total, record) => {
+    if (record.type === 'Advance') return total + (parseFloat(record.amount) || 0);
+    if (record.type === 'Refund') return total - (parseFloat(record.staff_refund_amount) || 0);
+    return total;
+  }, 0);
+  return totalAdvance.toFixed(2);
+};
+
+const calculateStaffEditAdvanceAmount = (records, empSelection, fromPurposeId) => {
+  if (!empSelection || !fromPurposeId || !records?.length) return '';
+  const purposeRecords = records.filter((record) => {
+    let employeeMatch = false;
+    if (empSelection.type === 'Employee') employeeMatch = record.employee_id === empSelection.id;
+    else if (empSelection.type === 'Labour') employeeMatch = record.labour_id === empSelection.id;
+    if (!employeeMatch) return false;
+    return record.from_purpose_id === fromPurposeId;
+  });
+  const totalAmount = purposeRecords.reduce((total, record) => {
+    const amount = parseFloat(record.amount) || 0;
+    const refund = parseFloat(record.staff_refund_amount) || 0;
+    if (record.type === 'Advance') return total + amount;
+    if (record.type === 'Refund') return total - refund;
+    if (record.type === 'Transfer') return total + amount;
+    return total;
+  }, 0);
+  return totalAmount.toFixed(2);
+};
+
 const formatAmountDisplay = (value) => {
   if (value === '' || value === null || value === undefined) return '';
   const normalized = String(value).replace(/,/g, '');
@@ -76,7 +229,7 @@ const AdvancePortalAmountOutput = ({ value, className = '' }) => {
 
 const formatStaffDatabaseAmount = (value) =>
   value != null && value !== ''
-    ? Number(value).toLocaleString('en-IN', { maximumFractionDigits: 0 })
+    ? `₹${Number(value).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
     : '';
 
 const STAFF_TABLEVIEW_BLANK_VALUE = 'BLANK';
@@ -128,6 +281,8 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
   });
   const [accountDetails, setAccountDetails] = useState([]);
   const pendingStaffUpdateRef = useRef(null);
+  const editFileInputRef = useRef(null);
+  const [editSelectedFile, setEditSelectedFile] = useState(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [staffAdvanceAudits, setStaffAdvanceAudits] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
@@ -975,6 +1130,10 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
 
   const handleEditClick = (entry) => {
     setEditingId(entry.staffAdvancePortalId || entry.id);
+    setEditSelectedFile(null);
+    if (editFileInputRef.current) {
+      editFileInputRef.current.value = '';
+    }
     setEditFormData({
       date: entry.date?.split('T')[0] || '',
       amount: entry.amount || '',
@@ -984,6 +1143,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
       to_purpose_id: entry.to_purpose_id || '',
       entryNo: entry.entry_no || '',
       description: entry.description || '',
+      file_url: entry.file_url || '',
       type: entry.type || '',
       staff_payment_mode: entry.staff_payment_mode || '',
       staff_refund_amount: entry.staff_refund_amount || ''
@@ -1039,9 +1199,69 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
     [editingId, records, refreshStaffRecords, username]
   );
 
+  const handleEditFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setEditSelectedFile(file);
+    }
+    e.target.value = '';
+  };
+
   const handleUpdate = useCallback(async () => {
     try {
-      const payload = buildStaffEditPayloadFromForm({ editFormData });
+      let formDataForPayload = { ...editFormData };
+      if (editSelectedFile) {
+        try {
+          const uploadFormData = new FormData();
+          const now = new Date();
+          const timestamp = now
+            .toLocaleString('en-GB', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: true,
+            })
+            .replace(',', '')
+            .replace(/\s/g, '-');
+          const empSelection =
+            staffAdvanceCombinedOptions.find(
+              (opt) =>
+                (opt.type === 'Employee' && opt.id === editFormData.employee_id) ||
+                (opt.type === 'Labour' && opt.id === editFormData.labour_id)
+            ) || null;
+          const employeeName = empSelection?.label || '';
+          const finalName = `${timestamp} ${employeeName}`;
+          uploadFormData.append('files', editSelectedFile);
+          uploadFormData.append('folder', 'FileUpload / Staff_Advances');
+          uploadFormData.append('fileName', finalName);
+          const uploadResponse = await fetch('https://backendaab.in/aabuildersDash/api/files/upload', {
+            method: 'POST',
+            body: uploadFormData,
+          });
+          if (!uploadResponse.ok) {
+            throw new Error('Upload failed');
+          }
+          const uploadResult = await uploadResponse.json();
+          const fileUrl = resolveFilesUploadResponseUrl(uploadResult);
+          if (!fileUrl) {
+            throw new Error('Upload succeeded but no file URL was returned');
+          }
+          formDataForPayload = { ...formDataForPayload, file_url: fileUrl };
+          setEditFormData(formDataForPayload);
+          setEditSelectedFile(null);
+          if (editFileInputRef.current) {
+            editFileInputRef.current.value = '';
+          }
+        } catch (error) {
+          console.error('Error during file upload:', error);
+          alert('Error during file upload. Please try again.');
+          return;
+        }
+      }
+      const payload = buildStaffEditPayloadFromForm({ editFormData: formDataForPayload });
       if (shouldPromptStaffEditPaymentModal(payload)) {
         pendingStaffUpdateRef.current = { payload };
         const modalData = await fetchStaffEditPaymentModalData(editingId, accountDetails);
@@ -1054,7 +1274,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
       console.error('Update error:', error);
       alert(error.message || 'Failed to update record. Please try again.');
     }
-  }, [accountDetails, editFormData, editingId, performStaffAdvanceUpdate]);
+  }, [accountDetails, editFormData, editSelectedFile, editingId, performStaffAdvanceUpdate, staffAdvanceCombinedOptions]);
 
   const handleEditPaymentModalSubmit = async () => {
     if (!editPaymentModalData.accountNumber) {
@@ -1116,31 +1336,30 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
     }
   };
 
-  const fieldConfig = useMemo(() => {
-    switch (editFormData.type) {
-      case 'Refund':
-        return {
-          purposeLabel: 'Purpose',
-          amountGivenLabel: 'Refund Amount',
-          paymentModeLabel: 'Payment Mode',
-          showTransferAmount: false
-        };
-      case 'Transfer':
-        return {
-          purposeLabel: 'Purpose From',
-          amountGivenLabel: 'Purpose To',
-          paymentModeLabel: 'Transfer Amount',
-          showTransferAmount: true
-        };
-      default:
-        return {
-          purposeLabel: 'Purpose',
-          amountGivenLabel: 'Amount Given',
-          paymentModeLabel: 'Payment Mode',
-          showTransferAmount: false
-        };
-    }
-  }, [editFormData.type]);
+  const editEmpSelection = useMemo(
+    () =>
+      staffAdvanceCombinedOptions.find(
+        (opt) =>
+          (opt.type === 'Employee' && opt.id === editFormData.employee_id) ||
+          (opt.type === 'Labour' && opt.id === editFormData.labour_id)
+      ) || null,
+    [staffAdvanceCombinedOptions, editFormData.employee_id, editFormData.labour_id]
+  );
+
+  const editOverallAdvance = useMemo(
+    () => calculateStaffEditOverallAdvance(records, editEmpSelection),
+    [records, editEmpSelection]
+  );
+
+  const editAdvanceAmount = useMemo(
+    () => calculateStaffEditAdvanceAmount(records, editEmpSelection, editFormData.from_purpose_id),
+    [records, editEmpSelection, editFormData.from_purpose_id]
+  );
+
+  const editAmountGivenValue =
+    editFormData.type === 'Refund'
+      ? (editFormData.staff_refund_amount ?? '')
+      : (editFormData.amount ?? '');
 
   useEffect(() => {
     return () => cancelMomentum();
@@ -1755,249 +1974,254 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
           </div>
         )}
         {isEditModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-            <div className="bg-white p-4 sm:p-6 rounded-lg w-full max-w-[700px] max-h-[90vh] overflow-y-auto">
-              <h2 className="text-lg font-bold mb-4">Edit Entry</h2>
-              <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-left ml-0 sm:ml-5'>
-                {/* Select Type */}
-                <div className='flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3'>
-                  <label className='font-semibold text-[#E4572E] text-sm sm:text-base'>Select Type</label>
-                  <select
-                    value={editFormData.type}
-                    onChange={(e) => setEditFormData({ ...editFormData, type: e.target.value })}
-                    className='w-full sm:w-[163px] h-[40px] sm:h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                  >
-                    <option value=''>Select Type...</option>
-                    <option value='Advance'>Advance</option>
-                    <option value='Transfer'>Transfer</option>
-                    <option value='Refund'>Refund</option>
-                  </select>
-                </div>
-                {/* Date */}
-                <div className='flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3'>
-                  <label className='font-semibold text-[#E4572E] text-sm sm:text-base'>Date</label>
-                  <input
-                    type='date'
-                    placeholder='dd-mm-yyyy'
-                    value={editFormData.date}
-                    onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
-                    className='w-full sm:w-[144px] h-[40px] sm:h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                  />
-                </div>
-                {/* Employee */}
-                <div className='sm:col-span-1'>
-                  <div className='flex'>
-                    <label className='font-semibold block text-sm sm:text-base'>Employee</label>
-                  </div>
-                  <Select
-                    options={staffAdvanceCombinedOptions}
-                    value={
-                      staffAdvanceCombinedOptions.find(
-                        opt =>
-                          (opt.type === "Employee" && opt.id === editFormData.employee_id) ||
-                          (opt.type === "Labour" && opt.id === editFormData.labour_id)
-                      ) || null
-                    }
-                    onChange={(selected) => {
-                      if (!selected) {
-                        setEditFormData({ ...editFormData, employee_id: '', labour_id: '' });
-                        return;
-                      }
-
-                      if (selected.type === "Employee") {
-                        setEditFormData({ ...editFormData, employee_id: selected.id, labour_id: null });
-                      } else {
-                        setEditFormData({ ...editFormData, labour_id: selected.id, employee_id: null });
-                      }
-                    }}
-                    className='w-full sm:w-[263px] h-[40px] sm:h-[45px] rounded-lg focus:outline-none'
-                    isClearable
-                    styles={{
-                      control: (provided, state) => ({
-                        ...provided,
-                        borderWidth: '2px',
-                        borderRadius: '8px',
-                        borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
-                        boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
-                        '&:hover': {
-                          borderColor: 'rgba(191, 152, 83, 0.2)',
-                        },
-                        minHeight: '40px',
-                        fontSize: '14px',
-                      }),
-                      placeholder: (provided) => ({
-                        ...provided,
-                        fontSize: '14px',
-                      }),
-                      singleValue: (provided) => ({
-                        ...provided,
-                        fontSize: '14px',
-                      }),
-                      option: (provided, state) => ({
-                        ...provided,
-                        backgroundColor: state.isSelected ? 'transparent' : state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'transparent',
-                        color: 'black',
-                        '&:hover': {
-                          backgroundColor: 'rgba(191, 152, 83, 0.1)',
-                        },
-                      }),
-                    }}
-                  />
-                </div>
-                {/* Purpose */}
-                <div className='sm:col-span-1'>
-                  <label className='font-semibold block text-sm sm:text-base'>{fieldConfig.purposeLabel}</label>
-                  <Select
-                    options={purposes}
-                    value={purposes.find(purp => purp.id === editFormData.from_purpose_id) || null}
-                    onChange={(selected) => setEditFormData({ ...editFormData, from_purpose_id: selected?.id || '' })}
-                    styles={{
-                      control: (provided, state) => ({
-                        ...provided,
-                        borderWidth: '2px',
-                        borderRadius: '8px',
-                        borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
-                        boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
-                        '&:hover': {
-                          borderColor: 'rgba(191, 152, 83, 0.2)',
-                        },
-                        minHeight: '40px',
-                        fontSize: '14px',
-                      }),
-                      placeholder: (provided) => ({
-                        ...provided,
-                        fontSize: '14px',
-                      }),
-                      singleValue: (provided) => ({
-                        ...provided,
-                        fontSize: '14px',
-                      }),
-                      option: (provided, state) => ({
-                        ...provided,
-                        backgroundColor: state.isSelected ? 'transparent' : state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'transparent',
-                        color: 'black',
-                        '&:hover': {
-                          backgroundColor: 'rgba(191, 152, 83, 0.1)',
-                        },
-                      }),
-                    }}
-                    isClearable
-                    className='w-full sm:w-[263px] h-[40px] sm:h-[45px] focus:outline-none' />
-                </div>
-                {/* Amount */}
-                <div className='sm:col-span-1'>
-                  <label className='font-semibold block text-sm sm:text-base'>{fieldConfig.amountGivenLabel}</label>
-                  {editFormData.type === 'Transfer' ? (
+          <div className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]">
+            <div className="bg-white text-left p-6 rounded-lg shadow-lg w-full max-w-2xl">
+              <div className="flex justify-between items-center mb-[14px]">
+                <h2 className="text-[18px] font-semibold text-black">Edit Staff Advance Entry</h2>
+                <span className="text-[16px] font-semibold text-[#E4572E]">{editFormData.entryNo}</span>
+              </div>
+              <div className="max-h-[75vh] overflow-y-auto">
+                <div className="grid grid-cols-2 gap-3 text-left">
+                  <div className="text-left max-w-[300px]">
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Select Type</label>
                     <Select
-                      options={purposes}
-                      value={purposes.find(purp => purp.id === editFormData.to_purpose_id) || null}
-                      onChange={(selected) => setEditFormData({ ...editFormData, to_purpose_id: selected?.id || '' })}
-                      styles={{
-                        control: (provided, state) => ({
-                          ...provided,
-                          borderWidth: '2px',
-                          borderRadius: '8px',
-                          borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
-                          boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
-                          '&:hover': {
-                            borderColor: 'rgba(191, 152, 83, 0.2)',
-                          },
-                          minHeight: '40px',
-                          fontSize: '14px',
-                        }),
-                        placeholder: (provided) => ({
-                          ...provided,
-                          fontSize: '14px',
-                        }),
-                        singleValue: (provided) => ({
-                          ...provided,
-                          fontSize: '14px',
-                        }),
-                        option: (provided, state) => ({
-                          ...provided,
-                          backgroundColor: state.isSelected ? 'transparent' : state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'transparent',
-                          color: 'black',
-                          '&:hover': {
-                            backgroundColor: 'rgba(191, 152, 83, 0.1)',
-                          },
-                        }),
-                      }}
+                      value={STAFF_EDIT_SELECT_TYPE_OPTIONS.find((option) => option.value === editFormData.type) || null}
+                      onChange={(selected) =>
+                        setEditFormData((prev) => ({ ...prev, type: selected ? selected.value : '' }))
+                      }
+                      options={STAFF_EDIT_SELECT_TYPE_OPTIONS}
+                      placeholder="Select Type..."
                       isClearable
-                      className='w-full sm:w-[263px] h-[40px] sm:h-[45px] focus:outline-none'
-                      placeholder="Select purpose to..."
+                      isSearchable
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
+                      styles={STAFF_EDIT_MODAL_SELECT_STYLES}
+                      className={ADVANCE_PORTAL_SELECT_CLASS}
                     />
-                  ) : (
+                  </div>
+                  <div className="text-left">
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Date</label>
                     <input
-                      value={editFormData.type === 'Refund' ? formatWithCommas(editFormData.staff_refund_amount) : formatWithCommas(editFormData.amount)}
-                      onChange={(e) => {
-                        const rawValue = e.target.value.replace(/,/g, "");
-                        if (!isNaN(rawValue)) {
-                          if (editFormData.type === "Refund") {
-                            setEditFormData({ ...editFormData, staff_refund_amount: rawValue, amount: '' });
+                      type="date"
+                      value={editFormData.date}
+                      onChange={(e) => setEditFormData((prev) => ({ ...prev, date: e.target.value }))}
+                      className={`${ADVANCE_PORTAL_INPUT_CLASS} hover:!border-[rgba(191,152,83,0.2)] focus:!border-[rgba(191,152,83,1)]`}
+                    />
+                  </div>
+                  <div className="text-left">
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>EMP Name</label>
+                    <Select
+                      value={editEmpSelection}
+                      onChange={(selected) => {
+                        if (!selected) {
+                          setEditFormData((prev) => ({ ...prev, employee_id: '', labour_id: '' }));
+                          return;
+                        }
+                        if (selected.type === 'Employee') {
+                          setEditFormData((prev) => ({ ...prev, employee_id: selected.id, labour_id: null }));
+                        } else {
+                          setEditFormData((prev) => ({ ...prev, labour_id: selected.id, employee_id: null }));
+                        }
+                      }}
+                      options={staffAdvanceCombinedOptions}
+                      placeholder="Select employee..."
+                      isClearable
+                      isSearchable
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
+                      styles={STAFF_EDIT_MODAL_SELECT_STYLES}
+                      className={ADVANCE_PORTAL_SELECT_CLASS}
+                    />
+                  </div>
+                  <div className="text-left">
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Overall Advance</label>
+                    <input
+                      value={
+                        editOverallAdvance
+                          ? Number(editOverallAdvance).toLocaleString('en-IN', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })
+                          : ''
+                      }
+                      readOnly
+                      className={ADVANCE_PORTAL_READONLY_INPUT_CLASS}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="text-left">
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Purpose</label>
+                    <Select
+                      value={purposes.find((purp) => purp.id === editFormData.from_purpose_id) || null}
+                      onChange={(selected) =>
+                        setEditFormData((prev) => ({ ...prev, from_purpose_id: selected?.id || '' }))
+                      }
+                      options={purposes}
+                      placeholder="Select a purpose..."
+                      isSearchable
+                      isClearable
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
+                      styles={STAFF_EDIT_MODAL_SELECT_STYLES}
+                      className={ADVANCE_PORTAL_SELECT_CLASS}
+                    />
+                  </div>
+                  <div className="text-left">
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Advance Amount</label>
+                    <input
+                      value={
+                        editAdvanceAmount
+                          ? Number(editAdvanceAmount).toLocaleString('en-IN', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })
+                          : ''
+                      }
+                      readOnly
+                      className={ADVANCE_PORTAL_READONLY_INPUT_CLASS}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="text-left">
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>
+                      {editFormData.type === 'Transfer' ? 'Purpose To' : 'Amount Given'}
+                    </label>
+                    {editFormData.type === 'Transfer' ? (
+                      <Select
+                        value={purposes.find((purp) => purp.id === editFormData.to_purpose_id) || null}
+                        onChange={(selected) =>
+                          setEditFormData((prev) => ({ ...prev, to_purpose_id: selected?.id || '' }))
+                        }
+                        options={purposes}
+                        placeholder="Select purpose to..."
+                        isClearable
+                        isSearchable
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
+                        styles={STAFF_EDIT_MODAL_SELECT_STYLES}
+                        className={ADVANCE_PORTAL_SELECT_CLASS}
+                      />
+                    ) : (
+                      <input
+                        value={editAmountGivenValue}
+                        onChange={(e) => {
+                          const rawValue = e.target.value;
+                          if (editFormData.type === 'Refund') {
+                            setEditFormData((prev) => ({ ...prev, staff_refund_amount: rawValue, amount: '' }));
                           } else {
-                            setEditFormData({ ...editFormData, amount: rawValue, staff_refund_amount: '' });
+                            setEditFormData((prev) => ({ ...prev, amount: rawValue, staff_refund_amount: '' }));
                           }
+                        }}
+                        className={`${ADVANCE_PORTAL_INPUT_CLASS} no-spinner hover:!border-[rgba(191,152,83,0.2)] focus:!border-[rgba(191,152,83,1)]`}
+                        placeholder="Enter amount given"
+                      />
+                    )}
+                  </div>
+                  <div className="text-left">
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>
+                      {editFormData.type === 'Transfer' ? 'Transfer Amount' : 'Payment Mode'}
+                    </label>
+                    {editFormData.type === 'Transfer' ? (
+                      <input
+                        value={editFormData.amount ?? ''}
+                        onChange={(e) =>
+                          setEditFormData((prev) => ({ ...prev, amount: e.target.value }))
                         }
-                      }}
-                      className='w-full sm:w-[263px] h-[40px] sm:h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                    />
-                  )}
+                        className={`${ADVANCE_PORTAL_INPUT_CLASS} no-spinner hover:!border-[rgba(191,152,83,0.2)] focus:!border-[rgba(191,152,83,1)]`}
+                        placeholder="Enter transfer amount"
+                      />
+                    ) : (
+                      <Select
+                        value={
+                          paymentModeOptions.find((option) => option.value === editFormData.staff_payment_mode) ||
+                          null
+                        }
+                        onChange={(selected) =>
+                          setEditFormData((prev) => ({
+                            ...prev,
+                            staff_payment_mode: selected ? selected.value : '',
+                          }))
+                        }
+                        options={paymentModeOptions}
+                        placeholder="Select"
+                        isClearable
+                        isSearchable
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
+                        styles={STAFF_EDIT_MODAL_SELECT_STYLES}
+                        className={ADVANCE_PORTAL_SELECT_CLASS}
+                      />
+                    )}
+                  </div>
                 </div>
-                {/* Payment Mode */}
-                <div className='sm:col-span-1'>
-                  <label className='font-semibold block text-sm sm:text-base'>{fieldConfig.paymentModeLabel}</label>
-                  {editFormData.type === 'Transfer' ? (
+                <div className="text-left mt-[8px]">
+                  <div className="flex justify-between w-[616px]">
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>File URL</label>
+                    {editSelectedFile && (
+                      <span className="text-[14px] text-[#E4572E] font-semibold">{editSelectedFile.name}</span>
+                    )}
+                  </div>
+                  <div className="flex w-[616px] items-center gap-[8px]">
                     <input
-                      value={formatWithCommas(editFormData.amount)}
-                      onChange={(e) => {
-                        const rawValue = e.target.value.replace(/,/g, "");
-                        if (!isNaN(rawValue)) {
-                          setEditFormData({ ...editFormData, amount: rawValue });
-                        }
-                      }}
-                      className='w-full sm:w-[263px] h-[40px] sm:h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                      placeholder="Enter transfer amount"
+                      type="text"
+                      name="file_url"
+                      value={editFormData.file_url || ''}
+                      onChange={(e) =>
+                        setEditFormData((prev) => ({ ...prev, file_url: e.target.value }))
+                      }
+                      placeholder="File URL"
+                      className="min-w-0 flex-1 h-[40px] text-[14px] py-0 px-2 box-border border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-semibold placeholder:font-normal"
                     />
-                  ) : (
-                    <select
-                      value={editFormData.staff_payment_mode}
-                      onChange={(e) => setEditFormData({ ...editFormData, staff_payment_mode: e.target.value })}
-                      className='w-full sm:w-[263px] h-[40px] sm:h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'>
-                      <option value=''>Select</option>
-                      {paymentModeOptions && paymentModeOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  )}
+                    <input
+                      ref={editFileInputRef}
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,image/*,application/pdf"
+                      onChange={handleEditFileChange}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => editFileInputRef.current?.click()}
+                      className="shrink-0 h-[40px] text-[#BF9853]"
+                    >
+                      <img src={UploadFile} alt="Upload" className="w-[40px] h-[40px]" />
+                    </button>
+                  </div>
                 </div>
-                {/* Description */}
-                <div className='col-span-1 sm:col-span-2'>
-                  <label className='font-semibold block text-sm sm:text-base'>Description</label>
+                <div className="text-left mt-[8px]">
+                  <label className={ADVANCE_PORTAL_LABEL_CLASS}>Description</label>
                   <textarea
                     rows={2}
-                    value={editFormData.description}
-                    onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                    className='w-full sm:w-[590px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'>
-                  </textarea>
+                    value={editFormData.description || ''}
+                    onChange={(e) =>
+                      setEditFormData((prev) => ({ ...prev, description: e.target.value }))
+                    }
+                    placeholder="Description"
+                    className={`${ADVANCE_PORTAL_TEXTAREA_CLASS} hover:!border-[rgba(191,152,83,0.2)] focus:!border-[rgba(191,152,83,1)]`}
+                  />
                 </div>
-              </div>
-              <div className="flex flex-col sm:flex-row justify-end gap-3 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 border border-[#BF9853] w-full sm:w-[100px] h-[40px] sm:h-[45px] rounded text-sm sm:text-base"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleUpdate}
-                  className="px-4 py-2 bg-[#BF9853] w-full sm:w-[100px] h-[40px] sm:h-[45px] text-white rounded text-sm sm:text-base"
-                >
-                  Save
-                </button>
+                <div className="flex justify-end space-x-4 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditModalOpen(false);
+                      setEditSelectedFile(null);
+                      if (editFileInputRef.current) {
+                        editFileInputRef.current.value = '';
+                      }
+                    }}
+                    className="px-4 py-2 border-2 border-opacity-[] border-[#BF9853] text-[#BF9853] rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUpdate}
+                    className="px-4 py-2 bg-[#BF9853] text-white rounded transition duration-200"
+                  >
+                    Save
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -2057,6 +2281,44 @@ const formatDate = (dateString) => {
 };
 
 const StaffAdvanceAuditModal = ({ show, onClose, audits, employees, laboursList, purposes }) => {
+  const auditScrollRef = useRef(null);
+  const auditIsDragging = useRef(false);
+  const [auditDragCursor, setAuditDragCursor] = useState(false);
+  const auditStart = useRef({ x: 0, y: 0 });
+  const auditScrollPos = useRef({ left: 0, top: 0 });
+  const handleAuditMouseDown = (e) => {
+    if (e.target.closest('a, button, input, textarea, select')) return;
+    if (!auditScrollRef.current) return;
+    auditIsDragging.current = true;
+    auditStart.current = { x: e.clientX, y: e.clientY };
+    auditScrollPos.current = {
+      left: auditScrollRef.current.scrollLeft,
+      top: auditScrollRef.current.scrollTop,
+    };
+    auditScrollRef.current.style.userSelect = 'none';
+  };
+  const handleAuditMouseMove = (e) => {
+    if (!auditIsDragging.current || !auditScrollRef.current) return;
+    setAuditDragCursor(true);
+    const dx = e.clientX - auditStart.current.x;
+    const dy = e.clientY - auditStart.current.y;
+    auditScrollRef.current.scrollLeft = auditScrollPos.current.left - dx;
+    auditScrollRef.current.scrollTop = auditScrollPos.current.top - dy;
+  };
+  const handleAuditMouseUp = () => {
+    auditIsDragging.current = false;
+    setAuditDragCursor(false);
+    if (auditScrollRef.current) {
+      auditScrollRef.current.style.userSelect = '';
+    }
+  };
+  useEffect(() => {
+    if (!auditDragCursor) return undefined;
+    const handleWindowMouseUp = () => handleAuditMouseUp();
+    window.addEventListener('mouseup', handleWindowMouseUp);
+    return () => window.removeEventListener('mouseup', handleWindowMouseUp);
+  }, [auditDragCursor]);
+
   if (!show) return null;
   
   const getNameById = (id, options) => {
@@ -2069,18 +2331,41 @@ const StaffAdvanceAuditModal = ({ show, onClose, audits, employees, laboursList,
   const getLabourName = (id) => laboursList.find(l => l.id === id)?.label || id;
   const getPurposeName = (id) => purposes.find(p => p.id === id)?.label || id;
 
+  const edbc1Config = getEdbcColumnConfig(EDBC_IDS.EDBC1);
+  const edbc2Config = getEdbcColumnConfig(EDBC_IDS.EDBC2);
+  const edbc3Config = getEdbcColumnConfig(EDBC_IDS.EDBC3);
+  const edbc4Config = getEdbcColumnConfig(EDBC_IDS.EDBC4);
+  const edbc8Config = getEdbcColumnConfig(EDBC_IDS.EDBC8);
+  const edbc9Config = getEdbcColumnConfig(EDBC_IDS.EDBC9);
+  const edbc12Config = getEdbcColumnConfig(EDBC_IDS.EDBC12);
+  const edbc13Config = getEdbcColumnConfig(EDBC_IDS.EDBC13);
+  const edbc14Config = getEdbcColumnConfig(EDBC_IDS.EDBC14);
+
   const fields = [
-    { oldKey: "old_date", newKey: "new_date", label: "Date", width: "120px" },
-    { oldKey: "old_type", newKey: "new_type", label: "Type", width: "100px" },
-    { oldKey: "old_employee_id", newKey: "new_employee_id", label: "Employee", width: "150px" },
-    { oldKey: "old_labour_id", newKey: "new_labour_id", label: "Labour", width: "150px" },
-    { oldKey: "old_from_purpose_id", newKey: "new_from_purpose_id", label: "Purpose", width: "150px" },
-    { oldKey: "old_to_purpose_id", newKey: "new_to_purpose_id", label: "Transfer To", width: "150px" },
-    { oldKey: "old_staff_payment_mode", newKey: "new_staff_payment_mode", label: "Mode", width: "100px" },
-    { oldKey: "old_description", newKey: "new_description", label: "Description", width: "200px" },
-    { oldKey: "old_amount", newKey: "new_amount", label: "Amount", width: "100px" },
-    { oldKey: "old_staff_refund_amount", newKey: "new_staff_refund_amount", label: "Refund", width: "100px" },
+    { columnId: EDBC_IDS.EDBC14, oldKey: "old_from_purpose_id", newKey: "new_from_purpose_id", label: "Purpose" },
+    { columnId: EDBC_IDS.EDBC3, oldKey: "old_to_purpose_id", newKey: "new_to_purpose_id", label: "Transfer To" },
+    { columnId: EDBC_IDS.EDBC8, oldKey: "old_amount", newKey: "new_amount", label: "Advance" },
+    { columnId: EDBC_IDS.EDBC8, oldKey: "old_staff_refund_amount", newKey: "new_staff_refund_amount", label: "Refund" },
+    { columnId: EDBC_IDS.EDBC9, oldKey: "old_description", newKey: "new_description", label: "Description" },
+    { columnId: EDBC_IDS.EDBC12, oldKey: "old_type", newKey: "new_type", label: "Type" },
+    { columnId: EDBC_IDS.EDBC13, oldKey: "old_staff_payment_mode", newKey: "new_staff_payment_mode", label: "Mode" },
   ];
+
+  const getEmployeeOrLabourName = (audit, useOld = true) => {
+    const empId = useOld ? audit.old_employee_id : audit.new_employee_id;
+    const labId = useOld ? audit.old_labour_id : audit.new_labour_id;
+    if (empId) return getEmployeeName(empId);
+    if (labId) return getLabourName(labId);
+    return '-';
+  };
+
+  const getEmployeeTypeLabel = (audit, useOld = true) => {
+    const empId = useOld ? audit.old_employee_id : audit.new_employee_id;
+    const labId = useOld ? audit.old_labour_id : audit.new_labour_id;
+    if (empId) return 'Employee';
+    if (labId) return 'Labour';
+    return '-';
+  };
 
   const formatDateTime = (dateString) => {
     if (!dateString) return "-";
@@ -2106,7 +2391,7 @@ const StaffAdvanceAuditModal = ({ show, onClose, audits, employees, laboursList,
     if (field.oldKey?.includes("purpose_id") || field.newKey?.includes("purpose_id")) {
       return value ? getPurposeName(value) : "-";
     }
-    if (field.label.includes("Amount") || field.label.includes("Refund")) {
+    if (field.label.includes("Advance") || field.label.includes("Refund")) {
       return value ? Number(value).toLocaleString("en-IN") : "-";
     }
     if (field.label === "Date") {
@@ -2116,8 +2401,8 @@ const StaffAdvanceAuditModal = ({ show, onClose, audits, employees, laboursList,
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[9999]">
+      <div className="bg-white rounded-md shadow-lg max-w-[1800px] overflow-x-auto no-scrollbar scrollbar-none p-[16px]">
         <div className="flex justify-between items-center mt-4 ml-7 mr-7">
           <h2 className="text-xl font-bold">History</h2>
           <button onClick={onClose}>
@@ -2125,59 +2410,106 @@ const StaffAdvanceAuditModal = ({ show, onClose, audits, employees, laboursList,
           </button>
         </div>
         {/* Scroll container for both vertical and horizontal overflow */}
-        <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
-          <table className="table-fixed min-w-full bg-white">
+        <div
+          ref={auditScrollRef}
+          className={`overflow-x-auto overflow-y-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7 no-scrollbar scrollbar-none select-none${auditDragCursor ? ' cursor-grabbing' : ''}`}
+          onMouseDown={handleAuditMouseDown}
+          onMouseMove={handleAuditMouseMove}
+          onMouseUp={handleAuditMouseUp}
+          onMouseLeave={handleAuditMouseUp}
+        >
+          <table className="table-fixed w-max bg-white border-collapse">
             <thead className="bg-[#FAF6ED]">
-              <tr>
-                <th style={{ width: "130px" }}>Time Stamp</th>
-                <th style={{ width: "120px" }}>Edited By</th>
-                {fields.map((f) => (
-                  <th
-                    key={f.label}
-                    style={{ width: f.width }}
-                    className="border-b py-2 px-2 text-center font-bold whitespace-nowrap overflow-hidden text-ellipsis"
-                  >
-                    {f.label}
-                  </th>
-                ))}
-              </tr>
+              <EdbcTableHeaderRow>
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC1} label="Time Stamp" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label="Employee Name" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC14} label="Employee Type" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC14} label="Purpose" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label="Transfer To" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Advance" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Refund" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC9} label="Description" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Type" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC13} label="Mode" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC14} label="Edited By" />
+              </EdbcTableHeaderRow>
             </thead>
             <tbody>
-              {audits.map((audit, index) => (
-                <tr
-                  key={index}
-                  className="odd:bg-white even:bg-[#FAF6ED]"
-                >
+              {audits.map((audit, index) => {
+                const employeeNameOld = getEmployeeOrLabourName(audit, true);
+                const employeeNameNew = getEmployeeOrLabourName(audit, false);
+                const employeeNameChanged = employeeNameOld !== employeeNameNew;
+                const employeeTypeOld = getEmployeeTypeLabel(audit, true);
+                const employeeTypeNew = getEmployeeTypeLabel(audit, false);
+                const employeeTypeChanged = employeeTypeOld !== employeeTypeNew;
+                const dateOldDisplay = audit.old_date
+                  ? new Date(audit.old_date).toLocaleDateString("en-GB")
+                  : "-";
+                const dateNewDisplay = audit.new_date
+                  ? new Date(audit.new_date).toLocaleDateString("en-GB")
+                  : "-";
+                const dateChanged = dateOldDisplay !== dateNewDisplay;
+                return (
+                <EdbcTableBodyRow key={index}>
                   <td
-                    className="whitespace-nowrap overflow-hidden text-ellipsis"
-                    style={{ width: "130px" }}
+                    id={EDBC_IDS.EDBC1}
+                    className={`${edbc1Config?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis`}
                   >
                     {formatDateTime(audit.edited_date)}
                   </td>
                   <td
-                    className="whitespace-nowrap overflow-hidden text-ellipsis"
-                    style={{ width: "120px" }}
+                    id={EDBC_IDS.EDBC2}
+                    title={dateChanged ? `Previous: ${dateOldDisplay} → Current: ${dateNewDisplay}` : ""}
+                    className={`${edbc2Config?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${dateChanged ? "bg-[#BF9853] font-bold" : ""}`}
                   >
-                    {audit.edited_by}
+                    {dateOldDisplay}
+                  </td>
+                  <td
+                    id={EDBC_IDS.EDBC4}
+                    title={employeeNameChanged ? `Previous: ${employeeNameOld} → Current: ${employeeNameNew}` : ""}
+                    className={`${edbc4Config?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${employeeNameChanged ? "bg-[#BF9853] font-bold" : ""}`}
+                  >
+                    {employeeNameOld}
+                  </td>
+                  <td
+                    id={EDBC_IDS.EDBC14}
+                    title={employeeTypeChanged ? `Previous: ${employeeTypeOld} → Current: ${employeeTypeNew}` : ""}
+                    className={`${edbc14Config?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${employeeTypeChanged ? "bg-[#BF9853] font-bold" : ""}`}
+                  >
+                    {employeeTypeOld}
                   </td>
                   {fields.map((f) => {
                     const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
                     const newDisplay = formatDisplayValue(audit[f.newKey], f);
                     const changed = oldDisplay !== newDisplay;
+                    const tdClass =
+                      f.columnId === EDBC_IDS.EDBC3 ? edbc3Config?.tdClass
+                        : f.columnId === EDBC_IDS.EDBC8 ? edbc8Config?.tdClass
+                          : f.columnId === EDBC_IDS.EDBC9 ? edbc9Config?.tdClass
+                            : f.columnId === EDBC_IDS.EDBC12 ? edbc12Config?.tdClass
+                              : f.columnId === EDBC_IDS.EDBC13 ? edbc13Config?.tdClass
+                                : edbc14Config?.tdClass;
                     return (
                       <td
                         key={f.label}
-                        style={{ width: f.width }}
+                        id={f.columnId}
                         title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
-                        className={`whitespace-nowrap overflow-hidden text-ellipsis px-2 ${changed ? "bg-[#BF9853] font-bold" : ""
-                          }`}
+                        className={`${tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${changed ? "bg-[#BF9853] font-bold" : ""}`}
                       >
                         {oldDisplay}
                       </td>
                     );
                   })}
-                </tr>
-              ))}
+                  <td
+                    id={EDBC_IDS.EDBC14}
+                    className={`${edbc14Config?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis`}
+                  >
+                    {audit.edited_by}
+                  </td>
+                </EdbcTableBodyRow>
+              );
+              })}
             </tbody>
           </table>
         </div>

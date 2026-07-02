@@ -960,6 +960,7 @@ const PropertyTab = ({ username, userRoles = [] }) => {
     };
     const handleOpenExpenseEntryPopup = ({ propertyTaxNo, project, property }) => {
         const prefillData = {
+            source: 'Utility Hub',
             utilityType: 'Property',
             siteName: project?.projectName || project?.siteName || '',
             projectId: project?.id ?? project?.projectId ?? null,

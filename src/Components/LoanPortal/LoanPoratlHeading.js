@@ -126,7 +126,7 @@ const LoanPoratlHeading = ({ username, userRoles = [] }) => {
                     active={activeTab === 'loanaddinput'}
                     onClick={() => handleTabChange('loanaddinput')}
                 >
-                    Add Input
+                    Input Data
                 </ModuleHeadingTab>
                 <ModuleHeadingTab
                     active={activeTab === 'loanreport'}
@@ -164,7 +164,7 @@ const LoanPoratlHeading = ({ username, userRoles = [] }) => {
                 )}
                 {visitedTabs.has('loanreport') && (
                     <div className={activeTab === 'loanreport' ? '' : 'hidden'}>
-                        <LoanReport username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} />
+                        <LoanReport username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} isActive={activeTab === 'loanreport'} />
                     </div>
                 )}
                 {visitedTabs.has('loansummary') && (

@@ -6526,11 +6526,13 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
     const getAssociateFromAudit = (audit, keyPrefix) => {
         const vendorId = normalizeAuditId(audit[`${keyPrefix}_vendor_id`]);
         const contractorId = normalizeAuditId(audit[`${keyPrefix}_contractor_id`]);
-        const projectId = normalizeAuditId(audit[`${keyPrefix}_project_id`]);
         if (vendorId) return { name: getNameById(vendorId, vendorOptions), type: "Vendor" };
         if (contractorId) return { name: getNameById(contractorId, contractorOptions), type: "Contractor" };
-        if (projectId) return { name: getNameById(projectId, siteOptions), type: "Project" };
         return { name: "-", type: "-" };
+    };
+    const getProjectNameFromAudit = (audit, keyPrefix) => {
+        const projectId = normalizeAuditId(audit[`${keyPrefix}_project_id`]);
+        return projectId ? getNameById(projectId, siteOptions) : "-";
     };
     const formatDateTime = (dateString) => {
         if (!dateString) return "-";
@@ -6547,8 +6549,8 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
     };
     const formatDisplayValue = (value, field) => {
         if (
-            (field.oldKey?.includes("vendor_id") || field.oldKey?.includes("transfer_site_id") ||
-                field.newKey?.includes("vendor_id") || field.newKey?.includes("transfer_site_id")) &&
+            (field.oldKey?.includes("vendor_id") || field.oldKey?.includes("project_id") || field.oldKey?.includes("transfer_site_id") ||
+                field.newKey?.includes("vendor_id") || field.newKey?.includes("project_id") || field.newKey?.includes("transfer_site_id")) &&
             String(value) === "0"
         ) { return "-"; }
         if (field.lookup) { return getNameById(value, field.lookup); }
@@ -6573,6 +6575,7 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
                                 <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" />
                                 <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label="Associate" />
                                 <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Associate Type" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label="Project Name" />
                                 <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Type" />
                                 <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Amount" />
                                 <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Edited By" />
@@ -6613,6 +6616,18 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
                                                 >
                                                     {oldAssociate.type}
                                                 </td>
+                                                {(() => {
+                                                    const oldProjectName = getProjectNameFromAudit(audit, "old");
+                                                    const newProjectName = getProjectNameFromAudit(audit, "new");
+                                                    const projectChanged = oldProjectName !== newProjectName;
+                                                    return (
+                                                        <td id={EDBC_IDS.EDBC3} title={projectChanged ? `Previous: ${oldProjectName} → Current: ${newProjectName}` : ""}
+                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC3)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${projectChanged ? "bg-[#BF9853] font-bold" : ""}`}
+                                                        >
+                                                            {oldProjectName}
+                                                        </td>
+                                                    );
+                                                })()}
                                             </>
                                         );
                                     })()}
@@ -6679,8 +6694,8 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits }) => {
     };
     const formatDisplayValue = (value, field) => {
         if (
-            (field.oldKey?.includes("vendor_id") || field.oldKey?.includes("transfer_site_id") ||
-                field.newKey?.includes("vendor_id") || field.newKey?.includes("transfer_site_id")) &&
+            (field.oldKey?.includes("vendor_id") || field.oldKey?.includes("project_id") || field.oldKey?.includes("transfer_site_id") ||
+                field.newKey?.includes("vendor_id") || field.newKey?.includes("project_id") || field.newKey?.includes("transfer_site_id")) &&
             String(value) === "0"
         ) { return "-"; }
         if (field.lookup) { return getNameById(value, field.lookup); }

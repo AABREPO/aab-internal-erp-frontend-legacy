@@ -11,10 +11,87 @@ import ReloadIcon from '../Images/Clear.svg';
 import SearchIcon from '../Images/Searchnew.svg';
 import PdfIcon from '../Images/pdf.png';
 import XlIcon from '../Images/sheets.png';
+import { getWeeklyExpensesIdFromExpense } from '../../utils/summaryBillWeeklyExpenses';
 
 /** Expenses created from Advance Portal Bill Settlement — edit in Advance Portal only. */
 export const isAdvancePortalSourceExpense = (expense) =>
     String(expense?.source ?? '').trim().toLowerCase() === 'advance portal';
+
+/** Utility bill entries are managed from Utility Hub database pages only. */
+export const isUtilityBillsExpense = (expense) =>
+    String(expense?.accountType ?? expense?.account_type ?? '').trim() === 'Utility Bills';
+
+const normalizeExpenseSource = (expense) =>
+    String(expense?.source ?? '').trim().toLowerCase();
+
+export const isUtilityHubSourceExpense = (expense) =>
+    normalizeExpenseSource(expense) === 'utility hub';
+
+export const isExpensesEntrySourceExpense = (expense) =>
+    normalizeExpenseSource(expense) === 'expenses entry';
+
+/** Utility Bills created from Utility Hub — edit/delete only in respective Utility Hub database. */
+export const isUtilityBillsFromUtilityHub = (expense) =>
+    isUtilityBillsExpense(expense) && isUtilityHubSourceExpense(expense);
+
+/** Expenses linked to a weekly payment row — edit/delete in Weekly Payment only. */
+export const isWeeklyExpensesLinkedExpense = (expense) => {
+    const weeklyExpensesId = getWeeklyExpensesIdFromExpense(expense);
+    return weeklyExpensesId != null && String(weeklyExpensesId).trim() !== '';
+};
+
+export const getExpenseActivityRestrictions = (expense, { utilityHubDatabaseMode = false } = {}) => {
+    if (isAdvancePortalSourceExpense(expense)) {
+        return {
+            editDisabled: true,
+            deleteDisabled: true,
+            editTitle: 'Edit in Advance Portal',
+            deleteTitle: 'Delete in Advance Portal',
+        };
+    }
+    if (utilityHubDatabaseMode) {
+        if (!isUtilityBillsFromUtilityHub(expense)) {
+            return {
+                editDisabled: true,
+                deleteDisabled: true,
+                editTitle: isExpensesEntrySourceExpense(expense) && isUtilityBillsExpense(expense)
+                    ? 'Edit in Expenses Entry'
+                    : 'Only Utility Hub utility bills can be edited here',
+                deleteTitle: isExpensesEntrySourceExpense(expense) && isUtilityBillsExpense(expense)
+                    ? 'Delete in Expenses Entry'
+                    : 'Only Utility Hub utility bills can be deleted here',
+            };
+        }
+        return {
+            editDisabled: false,
+            deleteDisabled: false,
+            editTitle: 'Edit',
+            deleteTitle: 'Delete',
+        };
+    }
+    if (isUtilityBillsFromUtilityHub(expense)) {
+        return {
+            editDisabled: true,
+            deleteDisabled: true,
+            editTitle: 'Edit in Utility Hub database',
+            deleteTitle: 'Delete in Utility Hub database',
+        };
+    }
+    if (!utilityHubDatabaseMode && isWeeklyExpensesLinkedExpense(expense)) {
+        return {
+            editDisabled: true,
+            deleteDisabled: true,
+            editTitle: 'Edit in Weekly Payment',
+            deleteTitle: 'Delete in Weekly Payment',
+        };
+    }
+    return {
+        editDisabled: false,
+        deleteDisabled: false,
+        editTitle: 'Edit',
+        deleteTitle: 'Delete',
+    };
+};
 
 /** Shared column IDs — layout/styles live here; heading text is set per page via `label` on DstColumnHeader. */
 export const EDBC_IDS = {
@@ -1443,17 +1520,20 @@ export const EdbcActivityBodyCell = ({
     onDelete,
     onHistory,
     username,
+    utilityHubDatabaseMode = false,
 }) => {
     const config = EDBC_CONFIG[columnId];
     if (!config) return null;
-    const editDisabled = isAdvancePortalSourceExpense(expense);
+    const { editDisabled, deleteDisabled, editTitle, deleteTitle } = getExpenseActivityRestrictions(expense, {
+        utilityHubDatabaseMode,
+    });
     return (
         <td id={columnId} className={config.tdClass}>
             <button
                 type="button"
                 onClick={editDisabled ? undefined : () => onEdit(expense)}
                 disabled={editDisabled}
-                title={editDisabled ? 'Edit in Advance Portal' : 'Edit'}
+                title={editTitle}
                 className={`rounded-full transition duration-200 ${editDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
                 <img
@@ -1462,12 +1542,17 @@ export const EdbcActivityBodyCell = ({
                     className={`w-4 h-6 transition duration-200 ${editDisabled ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
                 />
             </button>
-            <button className="">
+            <button
+                type="button"
+                onClick={deleteDisabled ? undefined : () => onDelete(expense.id, username)}
+                disabled={deleteDisabled}
+                title={deleteTitle}
+                className={deleteDisabled ? 'opacity-50 cursor-not-allowed' : ''}
+            >
                 <img
                     src={remove}
                     alt="delete"
-                    onClick={() => onDelete(expense.id, username)}
-                    className=" w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200 "
+                    className={`w-4 h-4 transition duration-200 ${deleteDisabled ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
                 />
             </button>
             <button onClick={() => onHistory(expense.id)} className="rounded-full transition duration-200">

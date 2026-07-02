@@ -20,7 +20,7 @@ import {
     EdbcBillArrivalFilter,
     EdbcExpandableBodyCell,
     EdbcActivityBodyCell,
-    isAdvancePortalSourceExpense,
+    getExpenseActivityRestrictions,
     EdbcFileBodyCell,
     EdbcTableHeaderRow,
     EdbcTableFilterRow,
@@ -425,6 +425,7 @@ export function Table({
     tableClassName = '',
     activityColumnLabel,
     editOnlyActivityColumn = false,
+    utilityHubDatabaseMode = false,
 }) {
     const { expandedCells, toggleExpandedCell } = useEdbcExpandedCells();
 
@@ -1053,13 +1054,15 @@ export function Table({
                             editOnlyActivityColumn ? (
                                 <td id={EDBC_IDS.EDBC19} className={activityTdClass}>
                                     {(() => {
-                                        const editDisabled = isAdvancePortalSourceExpense(expense);
+                                        const { editDisabled, editTitle } = getExpenseActivityRestrictions(expense, {
+                                            utilityHubDatabaseMode,
+                                        });
                                         return (
                                             <button
                                                 type="button"
                                                 onClick={editDisabled ? undefined : () => handleEditClick(expense)}
                                                 disabled={editDisabled}
-                                                title={editDisabled ? 'Edit in Advance Portal' : 'Edit'}
+                                                title={editTitle}
                                                 className={`rounded-full transition duration-200 ${editDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                             >
                                                 <img
@@ -1079,6 +1082,7 @@ export function Table({
                                     onDelete={handleDelete}
                                     onHistory={fetchAuditDetails}
                                     username={username}
+                                    utilityHubDatabaseMode={utilityHubDatabaseMode}
                                 />
                             )
                         )}

@@ -1,5 +1,88 @@
 /** Shared filter helpers for Utility Hub property-style tabs (Electricity, Property, Water, etc.) */
 
+const getUtilityRecordSortTime = (item) => {
+    const timestamp =
+        item?.timestamp ??
+        item?.createdAt ??
+        item?.created_at ??
+        item?.createdDateTime ??
+        item?.created_date_time;
+    if (timestamp) {
+        const parsed = new Date(timestamp).getTime();
+        if (!Number.isNaN(parsed)) return parsed;
+    }
+    if (item?.date) {
+        const parsed = new Date(item.date).getTime();
+        if (!Number.isNaN(parsed)) return parsed;
+    }
+    return null;
+};
+
+/** Default database table order: newest entries first. */
+export const sortUtilityDatabaseRecordsNewestFirst = (records = []) => {
+    if (!Array.isArray(records) || records.length <= 1) {
+        return Array.isArray(records) ? [...records] : [];
+    }
+    return [...records].sort((a, b) => {
+        const timeA = getUtilityRecordSortTime(a);
+        const timeB = getUtilityRecordSortTime(b);
+        if (timeA != null && timeB != null && timeA !== timeB) return timeB - timeA;
+        if (timeA != null && timeB == null) return -1;
+        if (timeA == null && timeB != null) return 1;
+
+        const idA = Number(a?.id);
+        const idB = Number(b?.id);
+        if (Number.isFinite(idA) && Number.isFinite(idB) && idA !== idB) return idB - idA;
+
+        const enoA = Number(a?.eno);
+        const enoB = Number(b?.eno);
+        if (Number.isFinite(enoA) && Number.isFinite(enoB) && enoA !== enoB) return enoB - enoA;
+
+        return 0;
+    });
+};
+
+/** Map utility-hub API rows to expenses-entry field names used by DatabaseExpenses / Table. */
+export const normalizeUtilityExpenseRow = (row = {}, utilityType = '') => ({
+    ...row,
+    siteName: row.siteName ?? row.site_name ?? '',
+    vendor: row.vendor ?? row.vendorName ?? row.vendor_name ?? '',
+    contractor: row.contractor ?? '',
+    comments: row.comments ?? row.description ?? '',
+    quantity: row.quantity ?? '',
+    amount: row.amount ?? 0,
+    category: row.category ?? '',
+    accountType: row.accountType ?? row.account_type ?? 'Utility Bills',
+    utilityType: row.utilityType ?? row.utility_type ?? utilityType ?? '',
+    utilityTypeNumber: row.utilityTypeNumber ?? row.utility_type_number ?? '',
+    utilityForTheMonth: row.utilityForTheMonth ?? row.utility_for_the_month ?? '',
+    utilityValidityDays: row.utilityValidityDays ?? row.utility_validity_days ?? '',
+    utilityValidityType: row.utilityValidityType ?? row.utility_validity_type ?? '',
+    serviceStartingDate: row.serviceStartingDate ?? row.service_starting_date ?? '',
+    paymentMode: row.paymentMode ?? row.payment_mode ?? '',
+    source: row.source ?? '',
+    branch_id: row.branch_id ?? row.branchId ?? '',
+    branchId: row.branchId ?? row.branch_id ?? '',
+    enteredBy: row.enteredBy ?? row.entered_by ?? '',
+    eno: row.eno ?? '',
+    timestamp: row.timestamp ?? row.createdAt ?? row.created_at ?? '',
+    date: row.date ?? '',
+    billCopy: row.billCopy ?? row.bill_copy ?? row.billCopyUrl ?? '',
+    billCopyUrl: row.billCopyUrl ?? row.billCopy ?? row.bill_copy ?? '',
+    billArrivalDate: row.billArrivalDate ?? row.bill_arrival_date ?? '',
+    machineTools: row.machineTools ?? row.machine_tools ?? '',
+    labourId: row.labourId ?? row.labour_id ?? '',
+    labour_id: row.labour_id ?? row.labourId ?? '',
+    employeeId: row.employeeId ?? row.employee_id ?? '',
+    employee_id: row.employee_id ?? row.employeeId ?? '',
+    projectId: row.projectId ?? row.project_id ?? '',
+    project_id: row.project_id ?? row.projectId ?? '',
+    vendorId: row.vendorId ?? row.vendor_id ?? '',
+    vendor_id: row.vendor_id ?? row.vendorId ?? '',
+    contractorId: row.contractorId ?? row.contractor_id ?? '',
+    contractor_id: row.contractor_id ?? row.contractorId ?? '',
+});
+
 export const UTILITY_MONTH_NUMBER_MAP = {
     Jan: '01', Feb: '02', Mar: '03', Apr: '04',
     May: '05', June: '06', July: '07', Aug: '08',

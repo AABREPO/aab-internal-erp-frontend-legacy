@@ -39,6 +39,8 @@ import { Table, TableProvider } from './Table';
 import {
     DATABASE_TABLE_FILTER_SELECT_STYLES,
     isAdvancePortalSourceExpense,
+    isUtilityBillsFromUtilityHub,
+    isWeeklyExpensesLinkedExpense,
     EdbcPaymentModeFilterChip,
     buildEdbcSelectFilterOptions,
     hasEdbcPaymentModeFilter,
@@ -57,6 +59,10 @@ import {
 } from './databaseExpensesSharedColumns';
 import { useExpensesListLoader } from './expensesListStore';
 import { uploadExpensesEntryBillCopy } from './expensesBillCopyUpload';
+import {
+    sortUtilityDatabaseRecordsNewestFirst,
+    normalizeUtilityExpenseRow,
+} from '../UtilityHub/utilityHubTabFilters';
 import {
     EXPENSE_ENTRY_MODULE_NAME,
     sortEdbcFilterOptionsByArrangement,
@@ -140,6 +146,7 @@ const EDIT_POPUP_UTILITY_TYPE_OPTIONS = [
     { value: 'Profession', label: 'Profession' },
     { value: 'Telecom', label: 'Telecom' },
     { value: 'Subscription', label: 'Subscription' },
+    { value: 'AMC', label: 'AMC' },
 ];
 const getEditPopupHeading = (source, defaultTitle) => {
     const s = String(source ?? '').trim();
@@ -317,7 +324,9 @@ const updateWeeklyPaymentBillById = async (billId, payload) => {
     return response.json();
 };
 
-const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
+const DatabaseExpenses = ({ username, userRoles = [], isActive = true, utilityEndpoint = null, utilityType = '' }) => {
+    const isUtilityHubMode = Boolean(utilityEndpoint);
+    const readExpenseFilter = (key) => (isUtilityHubMode ? '' : (localStorage.getItem(key) || ''));
     const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/aabuildersDash/api/utility-telecom/getAll';
     const resolveActiveBranchId = useCallback(() => {
         try {
@@ -332,12 +341,39 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     }, []);
     const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
     const {
-        expenses,
-        expensesLoading,
-        expensesLoadingMore,
-        expensesTotalCount,
-        refetchExpenses,
+        expenses: loaderExpenses,
+        expensesLoading: loaderExpensesLoading,
+        expensesLoadingMore: loaderExpensesLoadingMore,
+        expensesTotalCount: loaderExpensesTotalCount,
+        refetchExpenses: refetchLoaderExpenses,
     } = useExpensesListLoader(null);
+    const [utilityExpenses, setUtilityExpenses] = useState([]);
+    const [utilityExpensesLoading, setUtilityExpensesLoading] = useState(isUtilityHubMode);
+    const fetchUtilityExpenses = useCallback(async () => {
+        if (!utilityEndpoint) return;
+        setUtilityExpensesLoading(true);
+        try {
+            const response = await axios.get(utilityEndpoint);
+            const normalized = (Array.isArray(response.data) ? response.data : []).map((row) =>
+                normalizeUtilityExpenseRow(row, utilityType)
+            );
+            setUtilityExpenses(sortUtilityDatabaseRecordsNewestFirst(normalized));
+        } catch (error) {
+            console.error('Error fetching utility hub expenses:', error);
+            setUtilityExpenses([]);
+        } finally {
+            setUtilityExpensesLoading(false);
+        }
+    }, [utilityEndpoint, utilityType]);
+    useEffect(() => {
+        if (!isUtilityHubMode) return;
+        fetchUtilityExpenses();
+    }, [isUtilityHubMode, fetchUtilityExpenses]);
+    const expenses = isUtilityHubMode ? utilityExpenses : loaderExpenses;
+    const expensesLoading = isUtilityHubMode ? utilityExpensesLoading : loaderExpensesLoading;
+    const expensesLoadingMore = isUtilityHubMode ? false : loaderExpensesLoadingMore;
+    const expensesTotalCount = isUtilityHubMode ? utilityExpenses.length : loaderExpensesTotalCount;
+    const refetchExpenses = isUtilityHubMode ? fetchUtilityExpenses : refetchLoaderExpenses;
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [filteredExpenses, setFilteredExpenses] = useState([]);
     const [editId, setEditId] = useState(null);
@@ -367,54 +403,28 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const [branchFilterOptions, setBranchFilterOptions] = useState([]);
     const [enteredByOptions, setEnteredByOptions] = useState([]);
     // Initialize filter states from localStorage or defaults
-    const [selectedSiteName, setSelectedSiteName] = useState(() => {
-        return localStorage.getItem('expenseFilter_siteName') || '';
-    });
-    const [selectedVendor, setSelectedVendor] = useState(() => {
-        return localStorage.getItem('expenseFilter_vendor') || '';
-    });
+    const [selectedSiteName, setSelectedSiteName] = useState(() => readExpenseFilter('expenseFilter_siteName'));
+    const [selectedVendor, setSelectedVendor] = useState(() => readExpenseFilter('expenseFilter_vendor'));
     const [enoOptions, setEnoOptions] = useState([]);
-    const [selectedContractor, setSelectedContractor] = useState(() => {
-        return localStorage.getItem('expenseFilter_contractor') || '';
-    });
-    const [selectedCategory, setSelectedCategory] = useState(() => {
-        return localStorage.getItem('expenseFilter_category') || '';
-    });
+    const [selectedContractor, setSelectedContractor] = useState(() => readExpenseFilter('expenseFilter_contractor'));
+    const [selectedCategory, setSelectedCategory] = useState(() => readExpenseFilter('expenseFilter_category'));
     const [pendingBillCopyFile, setPendingBillCopyFile] = useState(null);
     const billCopyFileInputRef = useRef(null);
-    const [selectedEno, setSelectedEno] = useState(() => {
-        return localStorage.getItem('expenseFilter_eno') || '';
-    });
+    const [selectedEno, setSelectedEno] = useState(() => readExpenseFilter('expenseFilter_eno'));
     const [overallSearch, setOverallSearch] = useState('');
     const [accountTypeOptions, setAccountTypeOptions] = useState([]);
-    const [selectedMachineTools, setSelectedMachineTools] = useState(() => {
-        return localStorage.getItem('expenseFilter_machineTools') || '';
-    });
-    const [startDate, setStartDate] = useState(() => {
-        return localStorage.getItem('expenseFilter_startDate') || '';
-    });
-    const [endDate, setEndDate] = useState(() => {
-        return localStorage.getItem('expenseFilter_endDate') || '';
-    });
-    const [timestampStartDate, setTimestampStartDate] = useState(() => {
-        return localStorage.getItem('expenseFilter_timestampStartDate') || '';
-    });
-    const [timestampEndDate, setTimestampEndDate] = useState(() => {
-        return localStorage.getItem('expenseFilter_timestampEndDate') || '';
-    });
-    const [selectedAccountType, setSelectedAccountType] = useState(() => {
-        return localStorage.getItem('expenseFilter_accountType') || '';
-    });
-    const [selectedSource, setSelectedSource] = useState(() => {
-        return localStorage.getItem('expenseFilter_source') || '';
-    });
-    const [selectedPaymentModes, setSelectedPaymentModes] = useState(() => loadEdbcPaymentModeFilterFromStorage());
-    const [selectedBranch, setSelectedBranch] = useState(() => {
-        return localStorage.getItem('expenseFilter_branch') || '';
-    });
-    const [selectedEnteredBy, setSelectedEnteredBy] = useState(() => {
-        return localStorage.getItem('expenseFilter_enteredBy') || '';
-    });
+    const [selectedMachineTools, setSelectedMachineTools] = useState(() => readExpenseFilter('expenseFilter_machineTools'));
+    const [startDate, setStartDate] = useState(() => readExpenseFilter('expenseFilter_startDate'));
+    const [endDate, setEndDate] = useState(() => readExpenseFilter('expenseFilter_endDate'));
+    const [timestampStartDate, setTimestampStartDate] = useState(() => readExpenseFilter('expenseFilter_timestampStartDate'));
+    const [timestampEndDate, setTimestampEndDate] = useState(() => readExpenseFilter('expenseFilter_timestampEndDate'));
+    const [selectedAccountType, setSelectedAccountType] = useState(() => readExpenseFilter('expenseFilter_accountType'));
+    const [selectedSource, setSelectedSource] = useState(() => readExpenseFilter('expenseFilter_source'));
+    const [selectedPaymentModes, setSelectedPaymentModes] = useState(() =>
+        isUtilityHubMode ? [] : loadEdbcPaymentModeFilterFromStorage()
+    );
+    const [selectedBranch, setSelectedBranch] = useState(() => readExpenseFilter('expenseFilter_branch'));
+    const [selectedEnteredBy, setSelectedEnteredBy] = useState(() => readExpenseFilter('expenseFilter_enteredBy'));
     const [staffOptions, setStaffOptions] = useState([]);
     const [selectedStaff, setSelectedStaff] = useState('');
     const [selectedQuantity, setSelectedQuantity] = useState('');
@@ -555,57 +565,72 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         return () => window.removeEventListener('scroll', closeCalendar, true);
     }, [showBillArrivalCalendar]);
     useEffect(() => {
+        if (isUtilityHubMode) return;
         localStorage.setItem('expenseFilter_siteName', selectedSiteName);
-    }, [selectedSiteName]);
+    }, [selectedSiteName, isUtilityHubMode]);
 
     useEffect(() => {
+        if (isUtilityHubMode) return;
         localStorage.setItem('expenseFilter_vendor', selectedVendor);
-    }, [selectedVendor]);
+    }, [selectedVendor, isUtilityHubMode]);
 
     useEffect(() => {
+        if (isUtilityHubMode) return;
         localStorage.setItem('expenseFilter_contractor', selectedContractor);
-    }, [selectedContractor]);
+    }, [selectedContractor, isUtilityHubMode]);
 
     useEffect(() => {
+        if (isUtilityHubMode) return;
         localStorage.setItem('expenseFilter_category', selectedCategory);
-    }, [selectedCategory]);
+    }, [selectedCategory, isUtilityHubMode]);
 
     useEffect(() => {
+        if (isUtilityHubMode) return;
         localStorage.setItem('expenseFilter_machineTools', selectedMachineTools);
-    }, [selectedMachineTools]);
+    }, [selectedMachineTools, isUtilityHubMode]);
 
     useEffect(() => {
+        if (isUtilityHubMode) return;
         localStorage.setItem('expenseFilter_accountType', selectedAccountType);
-    }, [selectedAccountType]);
+    }, [selectedAccountType, isUtilityHubMode]);
 
     useEffect(() => {
+        if (isUtilityHubMode) return;
         localStorage.setItem('expenseFilter_startDate', startDate);
-    }, [startDate]);
+    }, [startDate, isUtilityHubMode]);
     useEffect(() => {
+        if (isUtilityHubMode) return;
         localStorage.setItem('expenseFilter_endDate', endDate);
-    }, [endDate]);
+    }, [endDate, isUtilityHubMode]);
     useEffect(() => {
+        if (isUtilityHubMode) return;
         localStorage.setItem('expenseFilter_timestampStartDate', timestampStartDate);
-    }, [timestampStartDate]);
+    }, [timestampStartDate, isUtilityHubMode]);
     useEffect(() => {
+        if (isUtilityHubMode) return;
         localStorage.setItem('expenseFilter_timestampEndDate', timestampEndDate);
-    }, [timestampEndDate]);
+    }, [timestampEndDate, isUtilityHubMode]);
 
     useEffect(() => {
+        if (isUtilityHubMode) return;
         localStorage.setItem('expenseFilter_eno', selectedEno);
-    }, [selectedEno]);
+    }, [selectedEno, isUtilityHubMode]);
     useEffect(() => {
+        if (isUtilityHubMode) return;
         localStorage.setItem('expenseFilter_source', selectedSource);
-    }, [selectedSource]);
+    }, [selectedSource, isUtilityHubMode]);
     useEffect(() => {
+        if (isUtilityHubMode) return;
         saveEdbcPaymentModeFilterToStorage(selectedPaymentModes);
-    }, [selectedPaymentModes]);
+    }, [selectedPaymentModes, isUtilityHubMode]);
     useEffect(() => {
+        if (isUtilityHubMode) return;
         localStorage.setItem('expenseFilter_branch', selectedBranch);
-    }, [selectedBranch]);
+    }, [selectedBranch, isUtilityHubMode]);
     useEffect(() => {
+        if (isUtilityHubMode) return;
         localStorage.setItem('expenseFilter_enteredBy', selectedEnteredBy);
-    }, [selectedEnteredBy]);
+    }, [selectedEnteredBy, isUtilityHubMode]);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [paymentModalData, setPaymentModalData] = useState({
         chequeNo: '',
@@ -2056,11 +2081,21 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         if (isAdvancePortalSourceExpense(expense)) {
             return;
         }
+        if (isUtilityHubMode) {
+            if (!isUtilityBillsFromUtilityHub(expense)) {
+                return;
+            }
+        } else if (isUtilityBillsFromUtilityHub(expense)) {
+            return;
+        }
+        if (!isUtilityHubMode && isWeeklyExpensesLinkedExpense(expense)) {
+            return;
+        }
         setEditId(expense.id);
         setFormData({
             ...expense,
             paymentMode: expense.paymentMode || '',
-            utilityType: expense.utilityType || '',
+            utilityType: expense.utilityType || utilityType || '',
             utilityTypeNumber: expense.utilityTypeNumber || '',
             utilityForTheMonth: expense.utilityForTheMonth || '',
             utilityValidityDays: expense.utilityValidityDays || '',
@@ -2102,6 +2137,17 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         return { deletedCount, failedCount: deleteResults.length - deletedCount };
     };
     const handleDelete = async (id, username) => {
+        const expense = expenses.find((item) => String(item.id) === String(id));
+        if (isUtilityHubMode) {
+            if (!expense || !isUtilityBillsFromUtilityHub(expense)) {
+                return;
+            }
+        } else if (expense && isUtilityBillsFromUtilityHub(expense)) {
+            return;
+        }
+        if (!isUtilityHubMode && expense && isWeeklyExpensesLinkedExpense(expense)) {
+            return;
+        }
         if (window.confirm('Are you sure you want to delete this expense?')) {
             try {
                 let advanceClearMessage = '';
@@ -2194,22 +2240,24 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         setCurrentPage(1);
         setSortField('');
         setSortDirection('asc');
-        // Clear localStorage as well
-        localStorage.removeItem('expenseFilter_siteName');
-        localStorage.removeItem('expenseFilter_vendor');
-        localStorage.removeItem('expenseFilter_contractor');
-        localStorage.removeItem('expenseFilter_category');
-        localStorage.removeItem('expenseFilter_machineTools');
-        localStorage.removeItem('expenseFilter_accountType');
-        localStorage.removeItem('expenseFilter_source');
-        localStorage.removeItem('expenseFilter_paymentMode');
-        localStorage.removeItem('expenseFilter_branch');
-        localStorage.removeItem('expenseFilter_enteredBy');
-        localStorage.removeItem('expenseFilter_startDate');
-        localStorage.removeItem('expenseFilter_endDate');
-        localStorage.removeItem('expenseFilter_timestampStartDate');
-        localStorage.removeItem('expenseFilter_timestampEndDate');
-        localStorage.removeItem('expenseFilter_eno');
+        if (!isUtilityHubMode) {
+            // Clear localStorage as well
+            localStorage.removeItem('expenseFilter_siteName');
+            localStorage.removeItem('expenseFilter_vendor');
+            localStorage.removeItem('expenseFilter_contractor');
+            localStorage.removeItem('expenseFilter_category');
+            localStorage.removeItem('expenseFilter_machineTools');
+            localStorage.removeItem('expenseFilter_accountType');
+            localStorage.removeItem('expenseFilter_source');
+            localStorage.removeItem('expenseFilter_paymentMode');
+            localStorage.removeItem('expenseFilter_branch');
+            localStorage.removeItem('expenseFilter_enteredBy');
+            localStorage.removeItem('expenseFilter_startDate');
+            localStorage.removeItem('expenseFilter_endDate');
+            localStorage.removeItem('expenseFilter_timestampStartDate');
+            localStorage.removeItem('expenseFilter_timestampEndDate');
+            localStorage.removeItem('expenseFilter_eno');
+        }
     };
     const exportToCSV = () => {
         const headers = [
@@ -2575,7 +2623,11 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                     formatDate, formatDateOnly, getDisplaySiteName, getDisplayVendorName, getDisplayContractorName, getDisplayStaffName,
                                     getMachineToolsItemIdDisplay, getBranchName, formatBillArrivalDisplay, handleEditClick, handleDelete, fetchAuditDetails, username,
                                 }}>
-                                    <Table showActivityColumn showServiceNumberColumn />
+                                    <Table
+                                        showActivityColumn
+                                        showServiceNumberColumn
+                                        utilityHubDatabaseMode={isUtilityHubMode}
+                                    />
                                 </TableProvider>
                             </div>
                             <div className="flex shrink-0 items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">

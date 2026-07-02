@@ -1,27 +1,47 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Select from 'react-select';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import PdfIcon from '../Images/pdf.png';
 import XlIcon from '../Images/sheets.png';
+import SearchIcon from '../Images/Searchnew.svg';
+import FileRemover from '../Images/FileRemover.svg';
 import {
   EDBC_IDS,
   getEdbcColumnConfig,
   EdbcTableHeaderRow,
+  EdbcTableFilterRow,
   EdbcTableBodyRow,
   EdbcColumnHeader,
+  EdbcTotalAmountFilter,
+  matchesEdbcAmountFilter,
+  DATABASE_TABLE_FILTER_SELECT_STYLES,
   EDBC_TABLE_EDGE_TABLE_CLASS,
   EDBC8_COLUMN_LOCK_TABLE_CLASS,
+  EDBC2_FIRST_COLUMN_WIDTH_CLASS,
   useEdbcExpandedCells,
   EdbcExpandableBodyCell,
   EdbcFilterToggleButton,
+  EdbcTableToolbarRightActions,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
+
+const SUMMARY_FIRST_COLUMN_FILTER_SELECT_STYLES = {
+  ...DATABASE_TABLE_FILTER_SELECT_STYLES,
+  dropdownIndicator: (provided, state) => ({
+    ...DATABASE_TABLE_FILTER_SELECT_STYLES.dropdownIndicator(provided, state),
+    display: state.hasValue ? 'none' : 'flex',
+  }),
+};
 
 const SUMMARY_EDBC13_COLUMN_LOCK =
   '[&_th#EDBC-13]:!w-[130px] [&_td#EDBC-13]:!w-[130px] [&_th#EDBC-13]:!min-w-[130px] [&_td#EDBC-13]:!min-w-[130px] [&_th#EDBC-13]:!max-w-[130px] [&_td#EDBC-13]:!max-w-[130px] [&_th#EDBC-13]:!overflow-hidden [&_td#EDBC-13]:!overflow-hidden';
 const SUMMARY_TABLE_CLASS = `table-fixed border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS} ${EDBC8_COLUMN_LOCK_TABLE_CLASS} ${SUMMARY_EDBC13_COLUMN_LOCK} [&_#EDBC-12]:!pl-0 [&_th#EDBC-13]:!pr-0 [&_td#EDBC-13]:!pr-0`;
-const SUMMARY_PURPOSE_TABLE_CLASS = `${SUMMARY_TABLE_CLASS} w-[668px] max-w-full [&_th#EDBC-3]:!w-[298px] [&_td#EDBC-3]:!w-[298px] [&_th#EDBC-3]:!min-w-[298px] [&_td#EDBC-3]:!min-w-[298px] [&_th#EDBC-3]:!max-w-[298px] [&_td#EDBC-3]:!max-w-[298px] [&_th#EDBC-3]:!overflow-hidden [&_td#EDBC-3]:!overflow-hidden [&_thead_tr:nth-child(2)>th:first-child>div]:!w-[286px] [&_thead_tr:nth-child(2)>th:first-child>div]:!min-w-[286px] [&_thead_tr:nth-child(2)>th:first-child>div]:!max-w-[286px]`;
-const SUMMARY_EMPLOYEE_TABLE_CLASS = `${SUMMARY_TABLE_CLASS} w-[600px] max-w-full [&_th#EDBC-4]:!w-[230px] [&_td#EDBC-4]:!w-[230px] [&_th#EDBC-4]:!min-w-[230px] [&_td#EDBC-4]:!min-w-[230px] [&_th#EDBC-4]:!max-w-[230px] [&_td#EDBC-4]:!max-w-[230px] [&_td#EDBC-4]:!overflow-hidden`;
+const SUMMARY_PURPOSE_TABLE_CLASS = `${SUMMARY_TABLE_CLASS} max-w-full [&_th#EDBC-4]:!w-[230px] [&_td#EDBC-4]:!w-[230px] [&_th#EDBC-4]:!min-w-[230px] [&_td#EDBC-4]:!min-w-[230px] [&_th#EDBC-4]:!max-w-[230px] [&_td#EDBC-4]:!max-w-[230px] [&_td#EDBC-4]:!overflow-hidden`;
+const SUMMARY_EMPLOYEE_TABLE_CLASS = `${SUMMARY_TABLE_CLASS} max-w-full [&_th#EDBC-4]:!w-[230px] [&_td#EDBC-4]:!w-[230px] [&_th#EDBC-4]:!min-w-[230px] [&_td#EDBC-4]:!min-w-[230px] [&_th#EDBC-4]:!max-w-[230px] [&_td#EDBC-4]:!max-w-[230px] [&_td#EDBC-4]:!overflow-hidden`;
+const SUMMARY_POPUP_TABLE_CLASS = `table-fixed w-[468px] max-w-full border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS} ${EDBC8_COLUMN_LOCK_TABLE_CLASS} [&_th#EDBC-2]:!w-[130px] [&_td#EDBC-2]:!w-[130px] [&_th#EDBC-2]:!min-w-[130px] [&_td#EDBC-2]:!min-w-[130px] [&_th#EDBC-2]:!max-w-[130px] [&_td#EDBC-2]:!max-w-[130px]`;
+const SUMMARY_STATUS_POPUP_TABLE_BASE = `table-fixed border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS} ${EDBC8_COLUMN_LOCK_TABLE_CLASS} [&_th#EDBC-2]:!w-[130px] [&_td#EDBC-2]:!w-[130px] [&_th#EDBC-2]:!min-w-[130px] [&_td#EDBC-2]:!min-w-[130px] [&_th#EDBC-2]:!max-w-[130px] [&_td#EDBC-2]:!max-w-[130px]`;
+const SUMMARY_STATUS_LEFT_POPUP_TABLE_CLASS = `${SUMMARY_STATUS_POPUP_TABLE_BASE} w-[588px] max-w-full [&_th#EDBC-4]:!w-[218px] [&_td#EDBC-4]:!w-[218px] [&_th#EDBC-4]:!min-w-[218px] [&_td#EDBC-4]:!min-w-[218px] [&_th#EDBC-4]:!max-w-[218px] [&_td#EDBC-4]:!max-w-[218px]`;
+const SUMMARY_STATUS_RIGHT_POPUP_TABLE_CLASS = `${SUMMARY_STATUS_POPUP_TABLE_BASE} w-[668px] max-w-full [&_th#EDBC-4]:!w-[298px] [&_td#EDBC-4]:!w-[298px] [&_th#EDBC-4]:!min-w-[298px] [&_td#EDBC-4]:!min-w-[298px] [&_th#EDBC-4]:!max-w-[298px] [&_td#EDBC-4]:!max-w-[298px]`;
 const SUMMARY_OUTSIDE_SELECT_CLASS = 'custom-select w-[300px] h-[40px] rounded-lg focus:outline-none';
 const SUMMARY_PANEL_SHADOW =
   'shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1),0_-8px_15px_-3px_rgba(0,0,0,0.1)]';
@@ -49,12 +69,29 @@ const edbc13Config = getEdbcColumnConfig(EDBC_IDS.EDBC13);
 const getStaffStatusColor = (pendingAdvance) =>
   pendingAdvance > 0 ? BILL_STATUS_PENDING_COLOR : BILL_STATUS_SETTLED_COLOR;
 
+const EMPTY_SUMMARY_POPUP_CONTEXT = { line1: '', line2: '' };
+
+const formatSummaryPopupContextText = ({ line1, line2 }) => {
+  if (!line1 && !line2) return '';
+  if (!line1) return line2;
+  if (!line2) return line1;
+  return `${line1} - ${line2}`;
+};
+
+const SummaryPopupContextHeader = ({ context }) => (
+  <h3 className="text-[18px] font-semibold text-[#000000]">
+    {context.line1 && <span className="block">{context.line1}</span>}
+    {context.line2 && <span className="block">{context.line2}</span>}
+  </h3>
+);
+
 const renderStaffStatusBodyCell = ({
   pendingAdvance,
   rowId,
   rowIndex,
   expandedCells,
   onToggleExpanded,
+  onClick,
 }) => {
   const label = getStaffStatusLabel(pendingAdvance);
   const cellKey = `${rowId ?? rowIndex}-paymentMode`;
@@ -63,11 +100,12 @@ const renderStaffStatusBodyCell = ({
   return (
     <td id={EDBC_IDS.EDBC13} className={`${tdClass} !pr-0`}>
       <span
+        onClick={onClick}
         onDoubleClick={(e) => {
           e.stopPropagation();
           onToggleExpanded(cellKey);
         }}
-        className={`block w-full font-semibold ${expanded ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+        className={`block w-full cursor-pointer font-semibold ${expanded ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
         style={{ color: getStaffStatusColor(pendingAdvance) }}
         title={label}
       >
@@ -78,7 +116,7 @@ const renderStaffStatusBodyCell = ({
 };
 
 const SummaryTableExportActions = ({ onExportPdf, onExportCsv }) => (
-  <div className="flex shrink-0 items-end gap-2">
+  <div className="flex shrink-0 justify-end items-center gap-2">
     <span
       className="text-[#E4572E] flex items-center gap-1 font-semibold hover:underline cursor-pointer"
       onClick={onExportPdf}
@@ -95,6 +133,107 @@ const SummaryTableExportActions = ({ onExportPdf, onExportCsv }) => (
     </span>
   </div>
 );
+
+const SummaryTableSearchInput = ({ value, onChange }) => (
+  <div className="h-[34px] min-w-0 flex-1 max-w-[286px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1 sm:w-[286px] sm:min-w-[286px] sm:flex-none sm:shrink-0">
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder="Search Transactions..."
+      className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
+    />
+    <img src={SearchIcon} alt="Search" className="w-[16px] h-[16px] pointer-events-none shrink-0" />
+  </div>
+);
+
+const SummaryFilterChip = ({ label, value, onClear }) => (
+  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium">
+    <span className="font-medium text-[#BF9853] whitespace-nowrap">{label}:</span>
+    <span className="font-semibold text-[14px] whitespace-nowrap">{value}</span>
+    <button type="button" onClick={onClear} className="text-[#E4572E] ml-1 text-2xl leading-none shrink-0">×</button>
+  </span>
+);
+
+const getEmployeeOptionValue = (option) => `${option.type}-${option.id}`;
+
+const SummaryPurposeNameFilter = ({ placeholder, options, value, onChange }) => {
+  const config = getEdbcColumnConfig(EDBC_IDS.EDBC4);
+  if (!config) return null;
+  const resolvedValue = value ? { value, label: value } : null;
+  return (
+    <th id={EDBC_IDS.EDBC4} className={config.filterThClass}>
+      <Select
+        className={config.filterWidthClass}
+        options={options}
+        value={resolvedValue}
+        onChange={(selectedOption) => onChange(selectedOption ? selectedOption.value : '')}
+        placeholder={placeholder}
+        menuPlacement="bottom"
+        menuPortalTarget={document.body}
+        isSearchable
+        noOptionsMessage={() => 'No options'}
+        styles={SUMMARY_FIRST_COLUMN_FILTER_SELECT_STYLES}
+      />
+    </th>
+  );
+};
+
+const SummaryEmployeeNameFilter = ({ value, onChange, options }) => {
+  const config = getEdbcColumnConfig(EDBC_IDS.EDBC4);
+  if (!config) return null;
+  return (
+    <th id={EDBC_IDS.EDBC4} className={config.filterThClass}>
+      <Select
+        className={config.filterWidthClass}
+        options={options}
+        value={value}
+        onChange={onChange}
+        getOptionValue={getEmployeeOptionValue}
+        getOptionLabel={(option) => option.label}
+        placeholder="Employee Name"
+        menuPlacement="bottom"
+        menuPortalTarget={document.body}
+        isSearchable
+        noOptionsMessage={() => 'No options'}
+        filterOption={(option, input) => {
+          const q = input.trim().toLowerCase();
+          if (!q) return true;
+          return option.label.toLowerCase().includes(q);
+        }}
+        styles={SUMMARY_FIRST_COLUMN_FILTER_SELECT_STYLES}
+      />
+    </th>
+  );
+};
+
+const SummaryEdbcSelectFilter = ({
+  columnId,
+  placeholder,
+  options,
+  value,
+  onChange,
+}) => {
+  const config = getEdbcColumnConfig(columnId);
+  if (!config) return null;
+  const resolvedValue = value ? { value, label: value } : null;
+  return (
+    <th id={columnId} className={config.filterThClass}>
+      <Select
+        className={config.filterWidthClass}
+        options={options}
+        value={resolvedValue}
+        onChange={(selectedOption) => onChange(selectedOption ? selectedOption.value : '')}
+        placeholder={placeholder}
+        menuPlacement="bottom"
+        menuPortalTarget={document.body}
+        isSearchable
+        noOptionsMessage={() => 'No options'}
+        styles={SUMMARY_FIRST_COLUMN_FILTER_SELECT_STYLES}
+      />
+    </th>
+  );
+};
 
 const useTableDragScroll = () => {
   const scrollRef = useRef(null);
@@ -353,6 +492,22 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   const [tooltipData, setTooltipData] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [tooltipTitle, setTooltipTitle] = useState("");
+  const [tooltipTable, setTooltipTable] = useState('purpose');
+  const [showPurposePopup, setShowPurposePopup] = useState(false);
+  const [purposePopupData, setPurposePopupData] = useState(null);
+  const [purposePopupTitle, setPurposePopupTitle] = useState("");
+  const [purposePopupContext, setPurposePopupContext] = useState(EMPTY_SUMMARY_POPUP_CONTEXT);
+  const [purposePopupSortConfig, setPurposePopupSortConfig] = useState({ key: null, direction: 'asc' });
+  const [showEmpPopup, setShowEmpPopup] = useState(false);
+  const [empPopupData, setEmpPopupData] = useState(null);
+  const [empPopupTitle, setEmpPopupTitle] = useState("");
+  const [empPopupContext, setEmpPopupContext] = useState(EMPTY_SUMMARY_POPUP_CONTEXT);
+  const [empPopupSortConfig, setEmpPopupSortConfig] = useState({ key: null, direction: 'asc' });
+  const [showStatusPopup, setShowStatusPopup] = useState(false);
+  const [statusPopupData, setStatusPopupData] = useState({ advances: [], refunds: [] });
+  const [statusPopupContext, setStatusPopupContext] = useState(EMPTY_SUMMARY_POPUP_CONTEXT);
+  const [statusPopupSortConfig, setStatusPopupSortConfig] = useState({ key: null, direction: 'asc' });
+  const [isStatusFromPurposeTable, setIsStatusFromPurposeTable] = useState(true);
   useEffect(() => {
     const savedEmp = sessionStorage.getItem('selectedEmpOption');
     try {
@@ -474,13 +629,37 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   }, []);
   const purposeTableScroll = useTableDragScroll();
   const empTableScroll = useTableDragScroll();
+  const purposeScrollRef = purposeTableScroll.scrollRef;
+  const empScrollRef = empTableScroll.scrollRef;
   const { expandedCells: purposeExpandedCells, toggleExpandedCell: togglePurposeExpandedCell } = useEdbcExpandedCells();
   const { expandedCells: empExpandedCells, toggleExpandedCell: toggleEmpExpandedCell } = useEdbcExpandedCells();
   const [showPurposeFilters, setShowPurposeFilters] = useState(false);
   const [showEmpFilters, setShowEmpFilters] = useState(false);
+  const [selectPurposeNameFilter, setSelectPurposeNameFilter] = useState('');
+  const [selectPurposeAdvanceFilter, setSelectPurposeAdvanceFilter] = useState('');
+  const [selectPurposeRefundFilter, setSelectPurposeRefundFilter] = useState('');
+  const [selectPurposeStatusFilter, setSelectPurposeStatusFilter] = useState('');
+  const [selectEmpNameFilter, setSelectEmpNameFilter] = useState(null);
+  const [selectEmpAdvanceFilter, setSelectEmpAdvanceFilter] = useState('');
+  const [selectEmpRefundFilter, setSelectEmpRefundFilter] = useState('');
+  const [selectEmpStatusFilter, setSelectEmpStatusFilter] = useState('');
+  const purposeFilterRowRef = useRef(null);
+  const empFilterRowRef = useRef(null);
+  const purposeFilterNudgeUsedRef = useRef(false);
+  const empFilterNudgeUsedRef = useRef(false);
+  const purposeFilterChipsScrollRef = useRef(null);
+  const purposeIsFilterChipsDragging = useRef(false);
+  const purposeFilterChipsDragStart = useRef({ x: 0, scrollLeft: 0 });
+  const empFilterChipsScrollRef = useRef(null);
+  const empIsFilterChipsDragging = useRef(false);
+  const empFilterChipsDragStart = useRef({ x: 0, scrollLeft: 0 });
+  const [purposeTableSearch, setPurposeTableSearch] = useState('');
+  const [empTableSearch, setEmpTableSearch] = useState('');
   const edbc8Config = getEdbcColumnConfig(EDBC_IDS.EDBC8);
+  const edbc2Config = getEdbcColumnConfig(EDBC_IDS.EDBC2);
+  const edbc4Config = getEdbcColumnConfig(EDBC_IDS.EDBC4);
   const handlePurposeEdbcSort = (field) => {
-    if (field === 'siteName') handleSort('purposeName');
+    if (field === 'vendor') handleSort('purposeName');
     else if (field === 'amount') handleSort('pendingAdvance');
     else if (field === 'paymentMode') handleSort('billStatus');
   };
@@ -490,7 +669,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     else if (field === 'paymentMode') handlePurposeSort('billStatus');
   };
   const purposeHeaderSortField = sortConfig.key === 'purposeName'
-    ? 'siteName'
+    ? 'vendor'
     : sortConfig.key === 'pendingAdvance'
       ? 'amount'
       : sortConfig.key === 'billAmount'
@@ -510,8 +689,8 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   // State for filtered purpose data
   const [purposeData, setPurposeData] = useState([]);
   useEffect(() => {
-    if (selectedEmpOption) {
-      const filtered = staffData.filter(item => {
+    const filtered = selectedEmpOption
+      ? staffData.filter(item => {
         // Check based on the type of selected option (Employee or Labour)
         if (selectedEmpOption.type === "Employee") {
           // Only check employee-related fields when an employee is selected
@@ -530,11 +709,12 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
             item.labour_name === selectedEmpOption.value ||
             item.labour_id === selectedEmpOption.id;
         }
-      });
-      const grouped = {};
-      let totalPendingAll = 0;
-      let totalRefundAll = 0;
-      filtered.forEach(curr => {
+      })
+      : staffData;
+    const grouped = {};
+    let totalPendingAll = 0;
+    let totalRefundAll = 0;
+    filtered.forEach(curr => {
         const {
           from_purpose_id,
           to_purpose_id,
@@ -577,7 +757,9 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
           }
         }
       });
-      const purposeArray = Object.values(grouped).map(p => {
+      const purposeArray = Object.values(grouped)
+        .filter(p => p.totalAdvance !== 0 || p.totalRefund !== 0)
+        .map(p => {
         const pending = p.totalAdvance - p.totalRefund;
         totalPendingAll += pending;
         totalRefundAll += p.totalRefund;
@@ -591,11 +773,6 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       setPurposeData(purposeArray);
       setTotalPendingAdvance(totalPendingAll);
       setTotalBillAmount(totalRefundAll); // Show total refund amount
-    } else {
-      setPurposeData([]);
-      setTotalPendingAdvance(0);
-      setTotalBillAmount(0);
-    }
   }, [selectedEmpOption, staffData, purposeOptions]);
   const sortedPurposeOptions = purposeOptions.sort((a, b) =>
     a.label.localeCompare(b.label)
@@ -655,98 +832,892 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       return 0;
     });
   };
+  const filteredPurposeData = useMemo(() => {
+    return purposeData.filter((purpose) => {
+      if (selectPurposeNameFilter && purpose.purposeName !== selectPurposeNameFilter) return false;
+      if (!matchesEdbcAmountFilter(purpose.pendingAdvance, selectPurposeAdvanceFilter)) return false;
+      if (!matchesEdbcAmountFilter(purpose.billAmount, selectPurposeRefundFilter)) return false;
+      const status = getStaffStatusLabel(purpose.pendingAdvance);
+      if (selectPurposeStatusFilter && status !== selectPurposeStatusFilter) return false;
+      if (!purposeTableSearch.trim()) return true;
+      const q = purposeTableSearch.toLowerCase().trim();
+      return [purpose.purposeName, purpose.pendingAdvance, purpose.billAmount, status].some((val) =>
+        String(val ?? '').toLowerCase().includes(q)
+      );
+    });
+  }, [
+    purposeData,
+    purposeTableSearch,
+    selectPurposeNameFilter,
+    selectPurposeAdvanceFilter,
+    selectPurposeRefundFilter,
+    selectPurposeStatusFilter,
+  ]);
+  const filteredPurposeDetails = useMemo(() => {
+    return purposeDetails.filter((detail) => {
+      if (selectEmpNameFilter) {
+        if (detail.empId !== selectEmpNameFilter.id || detail.empType !== selectEmpNameFilter.type) {
+          return false;
+        }
+      }
+      if (!matchesEdbcAmountFilter(detail.pendingAdvance, selectEmpAdvanceFilter)) return false;
+      if (!matchesEdbcAmountFilter(detail.billAmount, selectEmpRefundFilter)) return false;
+      const status = getStaffStatusLabel(detail.pendingAdvance);
+      if (selectEmpStatusFilter && status !== selectEmpStatusFilter) return false;
+      if (!empTableSearch.trim()) return true;
+      const q = empTableSearch.toLowerCase().trim();
+      return [detail.name, detail.pendingAdvance, detail.billAmount, status].some((val) =>
+        String(val ?? '').toLowerCase().includes(q)
+      );
+    });
+  }, [
+    purposeDetails,
+    empTableSearch,
+    selectEmpNameFilter,
+    selectEmpAdvanceFilter,
+    selectEmpRefundFilter,
+    selectEmpStatusFilter,
+  ]);
+  const purposeNameFilterOptions = useMemo(
+    () => [...new Set(purposeData.map((p) => p.purposeName))].sort().map((name) => ({ value: name, label: name })),
+    [purposeData],
+  );
+  const empNameFilterOptions = useMemo(
+    () => purposeDetails.map((d) => ({
+      id: d.empId,
+      label: d.name,
+      type: d.empType,
+    })),
+    [purposeDetails],
+  );
+  const statusFilterOptions = useMemo(
+    () => [{ value: 'Pending', label: 'Pending' }, { value: 'Settled', label: 'Settled' }],
+    [],
+  );
+  const purposeTableTotals = useMemo(() => ({
+    advance: purposeData.reduce((sum, row) => sum + (parseFloat(row.pendingAdvance) || 0), 0),
+    refund: purposeData.reduce((sum, row) => sum + (parseFloat(row.billAmount) || 0), 0),
+  }), [purposeData]);
+  const empTableTotals = useMemo(() => ({
+    advance: purposeDetails.reduce((sum, row) => sum + (parseFloat(row.pendingAdvance) || 0), 0),
+    refund: purposeDetails.reduce((sum, row) => sum + (parseFloat(row.billAmount) || 0), 0),
+  }), [purposeDetails]);
+  const hasPurposeColumnFilters = Boolean(
+    selectPurposeNameFilter ||
+    selectPurposeAdvanceFilter.trim() ||
+    selectPurposeRefundFilter.trim() ||
+    selectPurposeStatusFilter
+  );
+  const hasEmpColumnFilters = Boolean(
+    selectEmpNameFilter ||
+    selectEmpAdvanceFilter.trim() ||
+    selectEmpRefundFilter.trim() ||
+    selectEmpStatusFilter
+  );
+  const clearPurposeTableFilters = useCallback(() => {
+    setSelectedEmpOption('');
+    sessionStorage.removeItem('selectedEmpOption');
+    setPurposeTableSearch('');
+    setSelectPurposeNameFilter('');
+    setSelectPurposeAdvanceFilter('');
+    setSelectPurposeRefundFilter('');
+    setSelectPurposeStatusFilter('');
+    setSortConfig({ key: null, direction: 'asc' });
+  }, []);
+  const clearEmpTableFilters = useCallback(() => {
+    setSelectedPurposeOption('');
+    localStorage.removeItem('staffPurpose');
+    setEmpTableSearch('');
+    setSelectEmpNameFilter(null);
+    setSelectEmpAdvanceFilter('');
+    setSelectEmpRefundFilter('');
+    setSelectEmpStatusFilter('');
+    setPurposeSortConfig({ key: null, direction: 'asc' });
+  }, []);
+  const handlePurposeFilterChipsMouseDown = (e) => {
+    if (!purposeFilterChipsScrollRef.current || e.target.closest('button')) return;
+    purposeIsFilterChipsDragging.current = true;
+    purposeFilterChipsDragStart.current = {
+      x: e.clientX,
+      scrollLeft: purposeFilterChipsScrollRef.current.scrollLeft,
+    };
+    purposeFilterChipsScrollRef.current.style.cursor = 'grabbing';
+    purposeFilterChipsScrollRef.current.style.userSelect = 'none';
+  };
+  const handlePurposeFilterChipsMouseMove = (e) => {
+    if (!purposeIsFilterChipsDragging.current || !purposeFilterChipsScrollRef.current) return;
+    e.preventDefault();
+    const dx = e.clientX - purposeFilterChipsDragStart.current.x;
+    purposeFilterChipsScrollRef.current.scrollLeft =
+      purposeFilterChipsDragStart.current.scrollLeft - dx;
+  };
+  const handlePurposeFilterChipsMouseUp = () => {
+    if (!purposeFilterChipsScrollRef.current) return;
+    purposeIsFilterChipsDragging.current = false;
+    purposeFilterChipsScrollRef.current.style.cursor = 'grab';
+    purposeFilterChipsScrollRef.current.style.userSelect = '';
+  };
+  const handleEmpFilterChipsMouseDown = (e) => {
+    if (!empFilterChipsScrollRef.current || e.target.closest('button')) return;
+    empIsFilterChipsDragging.current = true;
+    empFilterChipsDragStart.current = {
+      x: e.clientX,
+      scrollLeft: empFilterChipsScrollRef.current.scrollLeft,
+    };
+    empFilterChipsScrollRef.current.style.cursor = 'grabbing';
+    empFilterChipsScrollRef.current.style.userSelect = 'none';
+  };
+  const handleEmpFilterChipsMouseMove = (e) => {
+    if (!empIsFilterChipsDragging.current || !empFilterChipsScrollRef.current) return;
+    e.preventDefault();
+    const dx = e.clientX - empFilterChipsDragStart.current.x;
+    empFilterChipsScrollRef.current.scrollLeft =
+      empFilterChipsDragStart.current.scrollLeft - dx;
+  };
+  const handleEmpFilterChipsMouseUp = () => {
+    if (!empFilterChipsScrollRef.current) return;
+    empIsFilterChipsDragging.current = false;
+    empFilterChipsScrollRef.current.style.cursor = 'grab';
+    empFilterChipsScrollRef.current.style.userSelect = '';
+  };
+  const togglePurposeFilters = useCallback(() => {
+    const willOpen = !showPurposeFilters;
+    const scroller = purposeScrollRef.current;
+    if (willOpen) {
+      setShowPurposeFilters(true);
+      if (!scroller) return;
+      if (scroller.scrollTop <= 0) return;
+      if (purposeFilterNudgeUsedRef.current) return;
+      purposeFilterNudgeUsedRef.current = true;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const h = purposeFilterRowRef.current?.offsetHeight || 0;
+          if (h > 0) {
+            scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+          }
+        });
+      });
+      return;
+    }
+    const h = purposeFilterRowRef.current?.offsetHeight || 0;
+    setShowPurposeFilters(false);
+    if (!scroller || h <= 0 || !purposeFilterNudgeUsedRef.current) return;
+    purposeFilterNudgeUsedRef.current = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scroller.scrollTop = scroller.scrollTop + h;
+      });
+    });
+  }, [showPurposeFilters, purposeScrollRef]);
+  const toggleEmpFilters = useCallback(() => {
+    const willOpen = !showEmpFilters;
+    const scroller = empScrollRef.current;
+    if (willOpen) {
+      setShowEmpFilters(true);
+      if (!scroller) return;
+      if (scroller.scrollTop <= 0) return;
+      if (empFilterNudgeUsedRef.current) return;
+      empFilterNudgeUsedRef.current = true;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const h = empFilterRowRef.current?.offsetHeight || 0;
+          if (h > 0) {
+            scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+          }
+        });
+      });
+      return;
+    }
+    const h = empFilterRowRef.current?.offsetHeight || 0;
+    setShowEmpFilters(false);
+    if (!scroller || h <= 0 || !empFilterNudgeUsedRef.current) return;
+    empFilterNudgeUsedRef.current = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scroller.scrollTop = scroller.scrollTop + h;
+      });
+    });
+  }, [showEmpFilters, empScrollRef]);
   // Get refund details for tooltip
   const getRefundDetails = (purposeId, empId, empType) => {
     if (!staffData.length) return [];
-    return staffData.filter(item => {
-      let matchesEmp = false;
-      if (empType === "Employee") {
-        matchesEmp = item.employee_id === empId;
-      } else if (empType === "Labour") {
-        matchesEmp = item.labour_id === empId;
-      } else {
-        // Fallback to original logic
-        matchesEmp = item.employee_id === empId || item.labour_id === empId;
+    const resolvePersonName = (item) => {
+      if (item.employee_id) {
+        return empOptions.find((e) => e.id === item.employee_id)?.label || item.employee_name || item.emp_name || '-';
       }
-      if (!matchesEmp) return false;
-      // Handle regular refunds
-      if (item.type === 'Refund' && item.from_purpose_id === purposeId && item.staff_refund_amount > 0) {
+      if (item.labour_id) {
+        return laboursList.find((l) => l.id === item.labour_id)?.label || item.labour_name || '-';
+      }
+      return '-';
+    };
+    const resolvePurposeName = (pid) =>
+      purposeOptions.find((p) => String(p.id) === String(pid))?.label || '-';
+
+    return staffData.filter(item => {
+      const fromPurposeId = item.from_purpose_id || item.purpose_id;
+      const matchesPurpose = purposeId ? fromPurposeId === purposeId : true;
+      const matchesEmp = empId
+        ? empType === 'Employee'
+          ? item.employee_id === empId
+          : empType === 'Labour'
+            ? item.labour_id === empId
+            : item.employee_id === empId || item.labour_id === empId
+        : true;
+      if (!matchesPurpose || !matchesEmp) return false;
+      const refundAmt = parseFloat(item.staff_refund_amount) || 0;
+      const amount = parseFloat(item.amount) || 0;
+      if (item.type === 'Refund' && refundAmt > 0) {
         return true;
       }
-      // Handle transfers where this purpose is the source (negative amount)
-      if (item.type === 'Transfer' && item.from_purpose_id === purposeId && item.amount < 0) {
+      if (item.type === 'Transfer' && amount < 0) {
         return true;
       }
       return false;
     }).map(item => ({
       date: new Date(item.date).toLocaleDateString('en-GB'),
       amount: item.type === 'Transfer' ? parseFloat(item.amount) || 0 : parseFloat(item.staff_refund_amount) || 0,
-      type: item.type === 'Transfer' ? 'Transfer Out' : 'Refund'
+      type: item.type === 'Transfer' ? 'Transfer' : 'Refund',
+      personName: resolvePersonName(item),
+      purposeName: resolvePurposeName(item.from_purpose_id || item.purpose_id),
+      transferPurposeName: item.to_purpose_id ? resolvePurposeName(item.to_purpose_id) : null,
+      isRefund: true,
+      staffAdvancePortalId: item.staffAdvancePortalId || item.id || 0,
     }));
   };
   // Get advance details for tooltip
   const getAdvanceDetails = (purposeId, empId, empType) => {
     if (!staffData.length) return [];
-    return staffData.filter(item => {
-      let matchesEmp = false;
-      if (empType === "Employee") {
-        matchesEmp = item.employee_id === empId;
-      } else if (empType === "Labour") {
-        matchesEmp = item.labour_id === empId;
-      } else {
-        // Fallback to original logic
-        matchesEmp = item.employee_id === empId || item.labour_id === empId;
+    const resolvePersonName = (item) => {
+      if (item.employee_id) {
+        return empOptions.find((e) => e.id === item.employee_id)?.label || item.employee_name || item.emp_name || '-';
       }
-      if (!matchesEmp) return false;
-      // Handle regular advances
-      if (item.type === 'Advance' && item.from_purpose_id === purposeId && item.amount > 0) {
+      if (item.labour_id) {
+        return laboursList.find((l) => l.id === item.labour_id)?.label || item.labour_name || '-';
+      }
+      return '-';
+    };
+    const resolvePurposeName = (pid) =>
+      purposeOptions.find((p) => String(p.id) === String(pid))?.label || '-';
+
+    return staffData.filter(item => {
+      const fromPurposeId = item.from_purpose_id || item.purpose_id;
+      const matchesPurpose = purposeId ? fromPurposeId === purposeId : true;
+      const matchesEmp = empId
+        ? empType === 'Employee'
+          ? item.employee_id === empId
+          : empType === 'Labour'
+            ? item.labour_id === empId
+            : item.employee_id === empId || item.labour_id === empId
+        : true;
+      if (!matchesPurpose || !matchesEmp) return false;
+      const amount = parseFloat(item.amount) || 0;
+      if (item.type === 'Advance' && amount > 0) {
         return true;
       }
-      // Handle transfers where this purpose is the destination (positive amount)
-      if (item.type === 'Transfer' && item.from_purpose_id === purposeId && item.amount > 0) {
+      if (item.type === 'Transfer' && amount > 0) {
         return true;
       }
       return false;
     }).map(item => ({
       date: new Date(item.date).toLocaleDateString('en-GB'),
       amount: parseFloat(item.amount) || 0,
-      type: item.type === 'Transfer' ? 'Transfer In' : 'Advance'
+      type: item.type === 'Transfer' ? 'Transfer' : 'Advance',
+      personName: resolvePersonName(item),
+      purposeName: resolvePurposeName(item.from_purpose_id || item.purpose_id),
+      transferPurposeName: item.to_purpose_id ? resolvePurposeName(item.to_purpose_id) : null,
+      isRefund: false,
+      staffAdvancePortalId: item.staffAdvancePortalId || item.id || 0,
     }));
   };
   // Tooltip handlers
-  const handleMouseEnter = (event, purposeId, empId, empType) => {
+  const handleMouseEnter = (event, purposeId, empId, empType, table = 'purpose') => {
     const refundDetails = getRefundDetails(purposeId, empId, empType);
     if (refundDetails.length > 0) {
       setTooltipTitle('Refund Details');
       setTooltipData(refundDetails);
       setTooltipPosition({ x: event.clientX, y: event.clientY });
+      setTooltipTable(table);
     }
   };
   const handleMouseLeave = () => {
     setTooltipData(null);
     setTooltipTitle("");
   };
-  const handleMouseEnterAdvance = (event, purposeId, empId, empType) => {
+  const handleMouseEnterAdvance = (event, purposeId, empId, empType, table = 'purpose') => {
     const advanceDetails = getAdvanceDetails(purposeId, empId, empType);
     if (advanceDetails.length > 0) {
       setTooltipTitle('Advance Details');
       setTooltipData(advanceDetails);
       setTooltipPosition({ x: event.clientX, y: event.clientY });
+      setTooltipTable(table);
     }
   };
+  const resolveSummaryEmployeeLabel = ({ empId, empType, selectedEmp }) => {
+    if (selectedEmp?.label) return selectedEmp.label;
+    if (empId) {
+      if (empType === 'Labour') {
+        return laboursList.find((l) => l.id === empId)?.label || '-';
+      }
+      return empOptions.find((e) => e.id === empId)?.label || '-';
+    }
+    return 'All Employees';
+  };
+  const resolveSummaryPurposeLabel = ({ purposeId, selectedPurpose, purposeName }) => {
+    if (purposeName) return purposeName;
+    if (selectedPurpose?.label) return selectedPurpose.label;
+    if (purposeId) {
+      return purposeOptions.find((p) => String(p.id) === String(purposeId))?.label || '-';
+    }
+    return 'All Purposes';
+  };
+  const buildPurposeTablePopupContext = ({
+    empId,
+    empType,
+    purposeId,
+    purposeName,
+  }) => ({
+    line1: resolveSummaryEmployeeLabel({
+      empId,
+      empType,
+      selectedEmp: selectedEmpOption,
+    }),
+    line2: resolveSummaryPurposeLabel({
+      purposeId,
+      selectedPurpose: null,
+      purposeName,
+    }),
+  });
+  const buildEmployeeTablePopupContext = ({
+    purposeId,
+    empName,
+  }) => ({
+    line1: resolveSummaryPurposeLabel({
+      purposeId,
+      selectedPurpose: selectedPurposeOption,
+      purposeName: null,
+    }),
+    line2: empName || '-',
+  });
+  const handlePurposeAdvanceClick = (purposeId, empId, empType, purposeName) => {
+    const advanceDetails = getAdvanceDetails(purposeId, empId, empType);
+    if (advanceDetails.length > 0) {
+      setPurposePopupTitle('Advance Details');
+      setPurposePopupData(advanceDetails);
+      setPurposePopupContext(buildPurposeTablePopupContext({
+        empId,
+        empType,
+        purposeId,
+        purposeName,
+      }));
+      setShowPurposePopup(true);
+    }
+  };
+  const handlePurposeRefundClick = (purposeId, empId, empType, purposeName) => {
+    const refundDetails = getRefundDetails(purposeId, empId, empType);
+    if (refundDetails.length > 0) {
+      setPurposePopupTitle('Refund Details');
+      setPurposePopupData(refundDetails);
+      setPurposePopupContext(buildPurposeTablePopupContext({
+        empId,
+        empType,
+        purposeId,
+        purposeName,
+      }));
+      setShowPurposePopup(true);
+    }
+  };
+  const handleEmpAdvanceClick = (purposeId, empId, empType, empName) => {
+    const advanceDetails = getAdvanceDetails(purposeId, empId, empType);
+    if (advanceDetails.length > 0) {
+      setEmpPopupTitle('Advance Details');
+      setEmpPopupData(advanceDetails);
+      setEmpPopupContext(buildEmployeeTablePopupContext({
+        purposeId,
+        empName,
+      }));
+      setShowEmpPopup(true);
+    }
+  };
+  const handleEmpRefundClick = (purposeId, empId, empType, empName) => {
+    const refundDetails = getRefundDetails(purposeId, empId, empType);
+    if (refundDetails.length > 0) {
+      setEmpPopupTitle('Refund Details');
+      setEmpPopupData(refundDetails);
+      setEmpPopupContext(buildEmployeeTablePopupContext({
+        purposeId,
+        empName,
+      }));
+      setShowEmpPopup(true);
+    }
+  };
+  const handlePurposeStatusClick = (purposeId, empId, empType, purposeName) => {
+    const advanceDetails = getAdvanceDetails(purposeId, empId, empType);
+    const refundDetails = getRefundDetails(purposeId, empId, empType);
+    setStatusPopupData({ advances: advanceDetails, refunds: refundDetails });
+    setStatusPopupContext(buildPurposeTablePopupContext({
+      empId,
+      empType,
+      purposeId,
+      purposeName,
+    }));
+    setIsStatusFromPurposeTable(true);
+    setShowStatusPopup(true);
+  };
+  const handleEmpStatusClick = (purposeId, empId, empType, empName) => {
+    const advanceDetails = getAdvanceDetails(purposeId, empId, empType);
+    const refundDetails = getRefundDetails(purposeId, empId, empType);
+    setStatusPopupData({ advances: advanceDetails, refunds: refundDetails });
+    setStatusPopupContext(buildEmployeeTablePopupContext({
+      purposeId,
+      empName,
+    }));
+    setIsStatusFromPurposeTable(false);
+    setShowStatusPopup(true);
+  };
+  const handlePurposePopupSort = (key) => {
+    const resolvedKey = key === 'vendor'
+      ? (selectedEmpOption ? 'transferPurposeName' : 'personName')
+      : key;
+    let direction = 'asc';
+    if (purposePopupSortConfig.key === resolvedKey && purposePopupSortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setPurposePopupSortConfig({ key: resolvedKey, direction });
+  };
+  const handleEmpPopupSort = (key) => {
+    const resolvedKey = key === 'vendor'
+      ? (selectedPurposeOption ? 'transferPurposeName' : 'purposeName')
+      : key;
+    let direction = 'asc';
+    if (empPopupSortConfig.key === resolvedKey && empPopupSortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setEmpPopupSortConfig({ key: resolvedKey, direction });
+  };
+  const handleStatusPopupSort = (key) => {
+    const resolvedKey = key === 'vendor'
+      ? (isStatusFromPurposeTable
+        ? (selectedEmpOption ? 'transferPurposeName' : 'personName')
+        : (selectedPurposeOption ? 'transferPurposeName' : 'purposeName'))
+      : key;
+    let direction = 'asc';
+    if (statusPopupSortConfig.key === resolvedKey && statusPopupSortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setStatusPopupSortConfig({ key: resolvedKey, direction });
+  };
+  const sortPopupData = (data, config) => {
+    if (!data || data.length === 0) return [];
+    const parseDate = (dateStr) => {
+      const [day, month, year] = dateStr.split('/');
+      return new Date(`${year}-${month}-${day}`);
+    };
+    if (!config.key) {
+      return [...data].sort((a, b) => parseDate(b.date) - parseDate(a.date));
+    }
+    return [...data].sort((a, b) => {
+      let aValue = a[config.key];
+      let bValue = b[config.key];
+      if (config.key === 'date') {
+        aValue = parseDate(aValue);
+        bValue = parseDate(bValue);
+        return config.direction === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return config.direction === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+      aValue = String(aValue || '').toLowerCase();
+      bValue = String(bValue || '').toLowerCase();
+      if (aValue < bValue) return config.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return config.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+  const buildStatusCombinedData = (advances, refunds, sortConfig) => {
+    const combinedData = [];
+    const dateMap = new Map();
+    advances.forEach((adv) => {
+      const key = `${adv.date}-${adv.staffAdvancePortalId}-advance`;
+      dateMap.set(key, {
+        date: adv.date,
+        staffAdvancePortalId: adv.staffAdvancePortalId,
+        advanceAmount: adv.amount,
+        refundAmount: 0,
+        personName: adv.personName,
+        purposeName: adv.purposeName,
+        transferPurposeName: adv.transferPurposeName,
+        type: adv.type,
+        isRefund: adv.isRefund,
+      });
+    });
+    refunds.forEach((ref) => {
+      const key = `${ref.date}-${ref.staffAdvancePortalId}-refund`;
+      dateMap.set(key, {
+        date: ref.date,
+        staffAdvancePortalId: ref.staffAdvancePortalId,
+        advanceAmount: 0,
+        refundAmount: ref.amount,
+        personName: ref.personName,
+        purposeName: ref.purposeName,
+        transferPurposeName: ref.transferPurposeName,
+        type: ref.type,
+        isRefund: ref.isRefund,
+      });
+    });
+    combinedData.push(...Array.from(dateMap.values()));
+    const parseDate = (dateStr) => {
+      const [day, month, year] = dateStr.split('/');
+      return new Date(`${year}-${month}-${day}`);
+    };
+    if (!sortConfig.key) {
+      combinedData.sort((a, b) => {
+        const dateDiff = parseDate(b.date) - parseDate(a.date);
+        if (dateDiff !== 0) return dateDiff;
+        return b.staffAdvancePortalId - a.staffAdvancePortalId;
+      });
+    } else {
+      combinedData.sort((a, b) => {
+        let aValue = a[sortConfig.key];
+        let bValue = b[sortConfig.key];
+        if (sortConfig.key === 'date') {
+          aValue = parseDate(aValue);
+          bValue = parseDate(bValue);
+          const primarySort = sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
+          if (primarySort !== 0) return primarySort;
+          return sortConfig.direction === 'asc' ? a.staffAdvancePortalId - b.staffAdvancePortalId : b.staffAdvancePortalId - a.staffAdvancePortalId;
+        }
+        if (typeof aValue === 'number' && typeof bValue === 'number') {
+          const primarySort = sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
+          if (primarySort !== 0) return primarySort;
+          return a.staffAdvancePortalId - b.staffAdvancePortalId;
+        }
+        aValue = String(aValue || '').toLowerCase();
+        bValue = String(bValue || '').toLowerCase();
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return a.staffAdvancePortalId - b.staffAdvancePortalId;
+      });
+    }
+    return combinedData;
+  };
+  const writeSummaryPopupContextToPdf = (doc, context, subtitle, subtitleY = 29, tableStartY = 35) => {
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(context.line1 || '', 14, 15);
+    doc.text(context.line2 || '', 14, 22);
+    doc.setFontSize(10);
+    doc.text(subtitle, 14, subtitleY);
+    return tableStartY;
+  };
+  const exportPopupPDF = (data, title, context, isPurposePopup) => {
+    const doc = new jsPDF();
+    const contextText = formatSummaryPopupContextText(context);
+    const tableStartY = writeSummaryPopupContextToPdf(doc, context, title);
+    const tableColumn = isPurposePopup && selectedEmpOption
+      ? ['Date', 'Transfer', 'Amount']
+      : isPurposePopup
+        ? ['Date', 'Employee', 'Amount']
+        : selectedPurposeOption
+          ? ['Date', 'Transfer', 'Amount']
+          : ['Date', 'Purpose', 'Amount'];
+    const tableRows = [];
+    data.forEach((entry) => {
+      const row = [entry.date];
+      if (isPurposePopup && selectedEmpOption) {
+        let transferInfo = '';
+        if (entry.isRefund) {
+          transferInfo = 'Refund';
+        } else if (entry.type === 'Transfer' && entry.transferPurposeName) {
+          transferInfo = `${entry.amount < 0 ? 'To: ' : 'From: '}${entry.transferPurposeName}`;
+        }
+        row.push(transferInfo);
+      } else if (isPurposePopup) {
+        row.push(entry.personName || '');
+      } else if (selectedPurposeOption) {
+        let transferInfo = '';
+        if (entry.isRefund) {
+          transferInfo = 'Refund';
+        } else if (entry.type === 'Transfer' && entry.transferPurposeName) {
+          transferInfo = `${entry.amount < 0 ? 'To: ' : 'From: '}${entry.transferPurposeName}`;
+        }
+        row.push(transferInfo);
+      } else {
+        row.push(entry.purposeName || '');
+      }
+      row.push(entry.amount.toLocaleString('en-IN'));
+      tableRows.push(row);
+    });
+    const total = data.reduce((sum, item) => sum + item.amount, 0);
+    tableRows.push(['Total', '', total.toLocaleString('en-IN')]);
+    doc.autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      theme: 'grid',
+      startY: tableStartY,
+      headStyles: {
+        fillColor: [255, 255, 255],
+        lineWidth: 0.2,
+        lineColor: [100, 100, 100],
+        fontStyle: 'bold',
+      },
+      styles: {
+        textColor: 0,
+        lineWidth: 0.2,
+        lineColor: [100, 100, 100],
+      },
+      columnStyles: {
+        2: { halign: 'right' },
+      },
+      didParseCell(data) {
+        if (data.row.index === tableRows.length - 1) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fillColor = [255, 255, 255];
+        }
+      },
+    });
+    doc.save(`${contextText.replace(/[^a-z0-9]/gi, '_')}_${title.replace(/[^a-z0-9]/gi, '_')}.pdf`);
+  };
+  const exportPopupCSV = (data, title, context, isPurposePopup) => {
+    const contextText = formatSummaryPopupContextText(context);
+    const extraRow = [[contextText], [title], []];
+    const headers = isPurposePopup && selectedEmpOption
+      ? ['Date', 'Transfer', 'Amount']
+      : isPurposePopup
+        ? ['Date', 'Employee', 'Amount']
+        : selectedPurposeOption
+          ? ['Date', 'Transfer', 'Amount']
+          : ['Date', 'Purpose', 'Amount'];
+    const rows = data.map((entry) => {
+      const row = [entry.date];
+      if (isPurposePopup && selectedEmpOption) {
+        let transferInfo = '';
+        if (entry.isRefund) transferInfo = 'Refund';
+        else if (entry.type === 'Transfer' && entry.transferPurposeName) {
+          transferInfo = `${entry.amount < 0 ? 'To: ' : 'From: '}${entry.transferPurposeName}`;
+        }
+        row.push(transferInfo);
+      } else if (isPurposePopup) {
+        row.push(entry.personName || '');
+      } else if (selectedPurposeOption) {
+        let transferInfo = '';
+        if (entry.isRefund) transferInfo = 'Refund';
+        else if (entry.type === 'Transfer' && entry.transferPurposeName) {
+          transferInfo = `${entry.amount < 0 ? 'To: ' : 'From: '}${entry.transferPurposeName}`;
+        }
+        row.push(transferInfo);
+      } else {
+        row.push(entry.purposeName || '');
+      }
+      row.push(entry.amount.toLocaleString('en-IN'));
+      return row;
+    });
+    const total = data.reduce((sum, item) => sum + item.amount, 0);
+    rows.push(['Total', '', total.toLocaleString('en-IN')]);
+    const csvContent = [...extraRow, headers, ...rows]
+      .map((row) => row.map((cell) => `"${cell}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', `${contextText.replace(/[^a-z0-9]/gi, '_')}_${title.replace(/[^a-z0-9]/gi, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  const exportStatusPDF = () => {
+    const doc = new jsPDF();
+    const contextText = formatSummaryPopupContextText(statusPopupContext);
+    const tableStartY = writeSummaryPopupContextToPdf(doc, statusPopupContext, 'Status Details');
+    const tableColumn = ['Date'];
+    if (isStatusFromPurposeTable && !selectedEmpOption) {
+      tableColumn.push('Employee');
+    } else if (!isStatusFromPurposeTable && !selectedPurposeOption) {
+      tableColumn.push('Purpose');
+    } else {
+      tableColumn.push('Transfer');
+    }
+    tableColumn.push('Advance', 'Refund');
+    const combinedData = buildStatusCombinedData(
+      statusPopupData.advances,
+      statusPopupData.refunds,
+      statusPopupSortConfig
+    );
+    const tableRows = combinedData.map((entry) => {
+      const row = [entry.date];
+      if (isStatusFromPurposeTable && !selectedEmpOption) {
+        row.push(entry.personName || '-');
+      } else if (!isStatusFromPurposeTable && !selectedPurposeOption) {
+        row.push(entry.purposeName || '-');
+      } else {
+        let transferInfo = '-';
+        if (entry.isRefund) transferInfo = 'Refund';
+        else if (entry.type === 'Transfer' && entry.transferPurposeName) {
+          transferInfo = `${entry.advanceAmount < 0 ? 'To: ' : 'From: '}${entry.transferPurposeName}`;
+        }
+        row.push(transferInfo);
+      }
+      row.push(
+        entry.advanceAmount !== 0 ? entry.advanceAmount.toLocaleString('en-IN') : '-',
+        entry.refundAmount !== 0 ? entry.refundAmount.toLocaleString('en-IN') : '-'
+      );
+      return row;
+    });
+    const totalAdvance = statusPopupData.advances.reduce((sum, item) => sum + item.amount, 0);
+    const totalRefund = statusPopupData.refunds.reduce((sum, item) => sum + item.amount, 0);
+    tableRows.push(['Total', '', totalAdvance.toLocaleString('en-IN'), totalRefund.toLocaleString('en-IN')]);
+    tableRows.push(['Balance Advance', '', '', (totalAdvance - totalRefund).toLocaleString('en-IN')]);
+    doc.autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      theme: 'grid',
+      startY: tableStartY,
+      headStyles: {
+        fillColor: [255, 255, 255],
+        lineWidth: 0.2,
+        lineColor: [100, 100, 100],
+        fontStyle: 'bold',
+      },
+      styles: {
+        textColor: 0,
+        lineWidth: 0.2,
+        lineColor: [100, 100, 100],
+      },
+      columnStyles: {
+        2: { halign: 'right' },
+        3: { halign: 'right' },
+      },
+    });
+    doc.save(`${contextText.replace(/[^a-z0-9]/gi, '_')}_Status_Details.pdf`);
+  };
+  const exportStatusCSV = () => {
+    const contextText = formatSummaryPopupContextText(statusPopupContext);
+    const extraRow = [[contextText], ['Status Details'], []];
+    const headers = ['Date'];
+    if (isStatusFromPurposeTable && !selectedEmpOption) headers.push('Employee');
+    else if (!isStatusFromPurposeTable && !selectedPurposeOption) headers.push('Purpose');
+    else headers.push('Transfer');
+    headers.push('Advance', 'Refund');
+    const combinedData = buildStatusCombinedData(
+      statusPopupData.advances,
+      statusPopupData.refunds,
+      statusPopupSortConfig
+    );
+    const rows = combinedData.map((entry) => {
+      const row = [entry.date];
+      if (isStatusFromPurposeTable && !selectedEmpOption) {
+        row.push(entry.personName || '-');
+      } else if (!isStatusFromPurposeTable && !selectedPurposeOption) {
+        row.push(entry.purposeName || '-');
+      } else {
+        let transferInfo = '-';
+        if (entry.isRefund) transferInfo = 'Refund';
+        else if (entry.type === 'Transfer' && entry.transferPurposeName) {
+          transferInfo = `${entry.advanceAmount < 0 ? 'To: ' : 'From: '}${entry.transferPurposeName}`;
+        }
+        row.push(transferInfo);
+      }
+      row.push(
+        entry.advanceAmount !== 0 ? entry.advanceAmount.toLocaleString('en-IN') : '-',
+        entry.refundAmount !== 0 ? entry.refundAmount.toLocaleString('en-IN') : '-'
+      );
+      return row;
+    });
+    const totalAdvance = statusPopupData.advances.reduce((sum, item) => sum + item.amount, 0);
+    const totalRefund = statusPopupData.refunds.reduce((sum, item) => sum + item.amount, 0);
+    rows.push(['Total', '', totalAdvance.toLocaleString('en-IN'), totalRefund.toLocaleString('en-IN')]);
+    rows.push(['Balance Advance', '', '', (totalAdvance - totalRefund).toLocaleString('en-IN')]);
+    const csvContent = [...extraRow, headers, ...rows]
+      .map((row) => row.map((cell) => `"${cell}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', `${contextText.replace(/[^a-z0-9]/gi, '_')}_Status_Details.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  const purposePopupEdbcSortField =
+    purposePopupSortConfig.key === 'personName' || purposePopupSortConfig.key === 'transferPurposeName'
+      ? 'vendor'
+      : purposePopupSortConfig.key;
+  const empPopupEdbcSortField =
+    empPopupSortConfig.key === 'purposeName' || empPopupSortConfig.key === 'transferPurposeName'
+      ? 'vendor'
+      : empPopupSortConfig.key;
+  const statusPopupEdbcSortField =
+    statusPopupSortConfig.key === 'personName' || statusPopupSortConfig.key === 'transferPurposeName' || statusPopupSortConfig.key === 'purposeName'
+      ? 'vendor'
+      : statusPopupSortConfig.key;
+  const statusPopupTableClass = isStatusFromPurposeTable
+    ? SUMMARY_STATUS_LEFT_POPUP_TABLE_CLASS
+    : SUMMARY_STATUS_RIGHT_POPUP_TABLE_CLASS;
+  const renderPopupSecondColumn = (entry, isPurposePopup) => {
+    if (isPurposePopup) {
+      if (!selectedEmpOption) return entry.personName || '-';
+      if (entry.isRefund) return <div className="text-xs text-gray-500">Refund</div>;
+      if (entry.type === 'Transfer' && selectedEmpOption) {
+        return (
+          <div className="text-xs text-gray-500">
+            {entry.amount < 0 ? 'Transfer To: ' : 'Transfer From: '}
+            {entry.transferPurposeName || '-'}
+          </div>
+        );
+      }
+      return null;
+    }
+    if (!selectedPurposeOption) return entry.purposeName || '-';
+    if (entry.isRefund) return <div className="text-xs text-gray-500">Refund</div>;
+    if (entry.type === 'Transfer' && selectedPurposeOption) {
+      return (
+        <div className="text-xs text-gray-500">
+          {entry.amount < 0 ? 'Transfer To: ' : 'Transfer From: '}
+          {entry.transferPurposeName || '-'}
+        </div>
+      );
+    }
+    return null;
+  };
+  const renderStatusSecondColumn = (entry) => {
+    if (isStatusFromPurposeTable) {
+      if (!selectedEmpOption) return entry.personName || '-';
+      if (entry.isRefund) return <div className="text-xs text-gray-500">Refund</div>;
+      if (entry.type === 'Transfer' && entry.transferPurposeName) {
+        return (
+          <div className="text-xs text-gray-500">
+            {entry.advanceAmount < 0 ? 'To: ' : 'From: '}
+            {entry.transferPurposeName}
+          </div>
+        );
+      }
+      return '-';
+    }
+    if (!selectedPurposeOption) return entry.purposeName || '-';
+    if (entry.isRefund) return <div className="text-xs text-gray-500">Refund</div>;
+    if (entry.type === 'Transfer' && entry.transferPurposeName) {
+      return (
+        <div className="text-xs text-gray-500">
+          {entry.advanceAmount < 0 ? 'To: ' : 'From: '}
+          {entry.transferPurposeName}
+        </div>
+      );
+    }
+    return '-';
+  };
   useEffect(() => {
-    if (selectedPurposeOption) {
-      const purposeId = selectedPurposeOption.id;
-      const filtered = staffData.filter(item => {
+    const purposeId = selectedPurposeOption?.id;
+    const filtered = selectedPurposeOption
+      ? staffData.filter(item => {
         // Check for purpose match - try different possible field names
         return item.from_purpose_id === purposeId ||
           item.purpose_id === purposeId ||
           item.purpose === selectedPurposeOption.value;
-      });
-      const grouped = {};
-      let totalPending = 0;
-      let totalRefund = 0;
-      filtered.forEach(curr => {
+      })
+      : staffData;
+    const grouped = {};
+    let totalPending = 0;
+    let totalRefund = 0;
+    filtered.forEach(curr => {
         const {
           employee_id,
           labour_id,
@@ -781,7 +1752,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         if (curr.type === 'Transfer') {
           // For transfer records, check if this purpose is the from_purpose_id
           // The amount field already contains the correct sign
-          if (from_purpose_id === purposeId) {
+          if (!selectedPurposeOption || from_purpose_id === purposeId) {
             grouped[personId].totalAdvance += parseFloat(amount) || 0; // Amount already has correct sign
           }
         } else {
@@ -796,7 +1767,9 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
           }
         }
       });
-      const detailsArray = Object.values(grouped).map(d => {
+      const detailsArray = Object.values(grouped)
+        .filter(d => d.totalAdvance !== 0 || d.totalRefund !== 0)
+        .map(d => {
         const pending = d.totalAdvance - d.totalRefund;
         totalPending += pending;
         totalRefund += d.totalRefund;
@@ -811,12 +1784,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       setPurposeDetails(detailsArray);
       setPurposePendingAdvance(totalPending);
       setPurposeBillAmount(totalRefund); // Show total refund amount
-    } else {
-      setPurposeDetails([]);
-      setPurposePendingAdvance(0);
-      setPurposeBillAmount(0);
-    }
-  }, [selectedPurposeOption, staffData, empOptions]);
+  }, [selectedPurposeOption, staffData, empOptions, laboursList]);
   const exportPDF = () => {
     const doc = new jsPDF();
     if (selectedEmpOption) {
@@ -966,7 +1934,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       <div className="p-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
         <div className="flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 max-h-full overflow-visible px-[24px] py-[24px] items-stretch bg-white">
           {/* Employee Section */}
-          <div className={`flex flex-col flex-1 min-w-0 min-h-0 max-h-full overflow-hidden bg-white rounded-[6px] max-w-[770px] ${SUMMARY_PANEL_SHADOW} px-[24px] py-[24px]`}>
+          <div className={`flex flex-col flex-1 min-w-0 min-h-0 max-h-full overflow-hidden bg-white rounded-[6px] max-w-[696px] ${SUMMARY_PANEL_SHADOW} px-[24px] py-[24px]`}>
             <div className="w-full min-w-0 flex flex-col flex-1 min-h-0 max-h-full">
               <div className="flex flex-wrap justify-between items-start gap-[12px] mb-[18px] shrink-0 w-full">
                 <div className="text-left max-w-[220px]">
@@ -1006,11 +1974,59 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                 </div>
               </div>
               <div className="border border-gray-200 px-[18px] pt-[18px] flex flex-col flex-1 min-h-0 overflow-hidden">
-                <div className="flex min-w-0 w-[676px] max-w-full flex-nowrap items-end justify-between gap-[6px] mb-[9px] shrink-0 overflow-hidden">
-                  <div className="flex min-w-0 items-center overflow-hidden gap-[6px] shrink-0">
-                    <EdbcFilterToggleButton onClick={() => setShowPurposeFilters((v) => !v)} />
+                <div className="flex min-w-0 w-[600px] max-w-full flex-nowrap items-end gap-[6px] mb-[9px] shrink-0">
+                  <div className={`flex min-w-0 items-center overflow-hidden gap-[6px]${hasPurposeColumnFilters ? ' flex-1 min-w-0' : ' shrink-0'}`}>
+                    <EdbcFilterToggleButton onClick={togglePurposeFilters} />
+                    {hasPurposeColumnFilters && (
+                      <div
+                        ref={purposeFilterChipsScrollRef}
+                        onMouseDown={handlePurposeFilterChipsMouseDown}
+                        onMouseMove={handlePurposeFilterChipsMouseMove}
+                        onMouseUp={handlePurposeFilterChipsMouseUp}
+                        onMouseLeave={handlePurposeFilterChipsMouseUp}
+                        className="flex min-w-0 flex-1 overflow-x-auto flex-nowrap gap-2 no-scrollbar scrollbar-none cursor-grab select-none"
+                      >
+                        {selectPurposeNameFilter && (
+                          <SummaryFilterChip
+                            label="Purpose"
+                            value={selectPurposeNameFilter}
+                            onClear={() => setSelectPurposeNameFilter('')}
+                          />
+                        )}
+                        {selectPurposeAdvanceFilter.trim() && (
+                          <SummaryFilterChip
+                            label="Advance"
+                            value={selectPurposeAdvanceFilter}
+                            onClear={() => setSelectPurposeAdvanceFilter('')}
+                          />
+                        )}
+                        {selectPurposeRefundFilter.trim() && (
+                          <SummaryFilterChip
+                            label="Refund"
+                            value={selectPurposeRefundFilter}
+                            onClear={() => setSelectPurposeRefundFilter('')}
+                          />
+                        )}
+                        {selectPurposeStatusFilter && (
+                          <SummaryFilterChip
+                            label="Status"
+                            value={selectPurposeStatusFilter}
+                            onClear={() => setSelectPurposeStatusFilter('')}
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex flex-nowrap shrink-0 items-end justify-end gap-[6px]">
+                  <div className="ml-auto flex items-end gap-[6px] shrink-0">
+                    <EdbcTableToolbarRightActions
+                      onClearFilters={clearPurposeTableFilters}
+                      overallSearch={purposeTableSearch}
+                      onOverallSearchChange={setPurposeTableSearch}
+                      showExportIcons={false}
+                      clearButtonType="button"
+                      wrapperClassName={null}
+                      searchWrapperClassName="h-[34px] min-w-0 flex-1 max-w-[286px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 sm:w-[286px] sm:min-w-[286px] sm:flex-none sm:shrink-0"
+                    />
                     <SummaryTableExportActions onExportPdf={exportPDF} onExportCsv={exportCSV} />
                   </div>
                 </div>
@@ -1024,7 +2040,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                       <thead className="sticky top-0 z-20 bg-white">
                         <EdbcTableHeaderRow>
                           <EdbcColumnHeader
-                            columnId={EDBC_IDS.EDBC3}
+                            columnId={EDBC_IDS.EDBC4}
                             label="Purpose"
                             sortField={purposeHeaderSortField}
                             sortDirection={sortConfig.direction}
@@ -1046,13 +2062,42 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                             onSort={handlePurposeEdbcSort}
                           />
                         </EdbcTableHeaderRow>
+                        {showPurposeFilters && (
+                          <EdbcTableFilterRow ref={purposeFilterRowRef}>
+                            <SummaryPurposeNameFilter
+                              placeholder="Purpose"
+                              options={purposeNameFilterOptions}
+                              value={selectPurposeNameFilter}
+                              onChange={setSelectPurposeNameFilter}
+                            />
+                            <EdbcTotalAmountFilter
+                              columnId={EDBC_IDS.EDBC8}
+                              totalAmount={purposeTableTotals.advance}
+                              value={selectPurposeAdvanceFilter}
+                              onChange={(e) => setSelectPurposeAdvanceFilter(e.target.value)}
+                            />
+                            <EdbcTotalAmountFilter
+                              columnId={EDBC_IDS.EDBC8}
+                              totalAmount={purposeTableTotals.refund}
+                              value={selectPurposeRefundFilter}
+                              onChange={(e) => setSelectPurposeRefundFilter(e.target.value)}
+                            />
+                            <SummaryEdbcSelectFilter
+                              columnId={EDBC_IDS.EDBC13}
+                              placeholder="Status"
+                              options={statusFilterOptions}
+                              value={selectPurposeStatusFilter}
+                              onChange={setSelectPurposeStatusFilter}
+                            />
+                          </EdbcTableFilterRow>
+                        )}
                       </thead>
                       <tbody>
-                        {sortData(purposeData, sortConfig, 'pendingAdvance', 'purposeName').length > 0 ? (
-                          sortData(purposeData, sortConfig, 'pendingAdvance', 'purposeName').map((purpose, idx) => (
+                        {sortData(filteredPurposeData, sortConfig, 'pendingAdvance', 'purposeName').length > 0 ? (
+                          sortData(filteredPurposeData, sortConfig, 'pendingAdvance', 'purposeName').map((purpose, idx) => (
                             <EdbcTableBodyRow key={purpose.purposeId ?? idx}>
                               <EdbcExpandableBodyCell
-                                columnId={EDBC_IDS.EDBC3}
+                                columnId={EDBC_IDS.EDBC4}
                                 expense={{ id: purpose.purposeId, ...purpose }}
                                 rowIndex={idx}
                                 expandedCells={purposeExpandedCells}
@@ -1066,11 +2111,12 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                                 onMouseLeave={handleMouseLeave}
                               >
                                 <span
+                                  onClick={() => handlePurposeAdvanceClick(purpose.purposeId, selectedEmpOption?.id, selectedEmpOption?.type, purpose.purposeName)}
                                   onDoubleClick={(e) => {
                                     e.stopPropagation();
                                     togglePurposeExpandedCell(`${purpose.purposeId ?? idx}-amount`);
                                   }}
-                                  className={`block w-full cursor-help ${purposeExpandedCells[`${purpose.purposeId ?? idx}-amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                  className={`block w-full cursor-pointer ${purposeExpandedCells[`${purpose.purposeId ?? idx}-amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
                                   title={formatSummaryAmount(purpose.pendingAdvance)}
                                 >
                                   {formatSummaryAmount(purpose.pendingAdvance)}
@@ -1082,11 +2128,12 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                                 onMouseLeave={handleMouseLeave}
                               >
                                 <span
+                                  onClick={() => handlePurposeRefundClick(purpose.purposeId, selectedEmpOption?.id, selectedEmpOption?.type, purpose.purposeName)}
                                   onDoubleClick={(e) => {
                                     e.stopPropagation();
                                     togglePurposeExpandedCell(`${purpose.purposeId ?? idx}-bill_amount`);
                                   }}
-                                  className={`block w-full cursor-help ${purposeExpandedCells[`${purpose.purposeId ?? idx}-bill_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                  className={`block w-full cursor-pointer ${purposeExpandedCells[`${purpose.purposeId ?? idx}-bill_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
                                   title={formatSummaryAmount(purpose.billAmount)}
                                 >
                                   {formatSummaryAmount(purpose.billAmount)}
@@ -1098,6 +2145,12 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                                 rowIndex: idx,
                                 expandedCells: purposeExpandedCells,
                                 onToggleExpanded: togglePurposeExpandedCell,
+                                onClick: () => handlePurposeStatusClick(
+                                  purpose.purposeId,
+                                  selectedEmpOption?.id,
+                                  selectedEmpOption?.type,
+                                  purpose.purposeName
+                                ),
                               })}
                             </EdbcTableBodyRow>
                           ))
@@ -1154,11 +2207,59 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                 </div>
               </div>
               <div className="border border-gray-200 px-[18px] pt-[18px] flex flex-col flex-1 min-h-0 overflow-hidden">
-                <div className="flex min-w-0 w-full flex-nowrap items-end justify-between gap-[6px] mb-[9px] shrink-0 overflow-hidden">
-                  <div className="flex min-w-0 items-center overflow-hidden gap-[6px] shrink-0">
-                    <EdbcFilterToggleButton onClick={() => setShowEmpFilters((v) => !v)} />
+                <div className="flex min-w-0 w-[600px] max-w-full flex-nowrap items-end justify-between gap-[6px] mb-[9px] shrink-0">
+                  <div className={`flex min-w-0 items-center overflow-hidden gap-[6px]${hasEmpColumnFilters ? ' flex-1 min-w-0' : ' shrink-0'}`}>
+                    <EdbcFilterToggleButton onClick={toggleEmpFilters} />
+                    {hasEmpColumnFilters && (
+                      <div
+                        ref={empFilterChipsScrollRef}
+                        onMouseDown={handleEmpFilterChipsMouseDown}
+                        onMouseMove={handleEmpFilterChipsMouseMove}
+                        onMouseUp={handleEmpFilterChipsMouseUp}
+                        onMouseLeave={handleEmpFilterChipsMouseUp}
+                        className="flex min-w-0 flex-1 overflow-x-auto flex-nowrap gap-2 no-scrollbar scrollbar-none cursor-grab select-none"
+                      >
+                        {selectEmpNameFilter && (
+                          <SummaryFilterChip
+                            label="Employee Name"
+                            value={selectEmpNameFilter.label}
+                            onClear={() => setSelectEmpNameFilter(null)}
+                          />
+                        )}
+                        {selectEmpAdvanceFilter.trim() && (
+                          <SummaryFilterChip
+                            label="Advance"
+                            value={selectEmpAdvanceFilter}
+                            onClear={() => setSelectEmpAdvanceFilter('')}
+                          />
+                        )}
+                        {selectEmpRefundFilter.trim() && (
+                          <SummaryFilterChip
+                            label="Refund"
+                            value={selectEmpRefundFilter}
+                            onClear={() => setSelectEmpRefundFilter('')}
+                          />
+                        )}
+                        {selectEmpStatusFilter && (
+                          <SummaryFilterChip
+                            label="Status"
+                            value={selectEmpStatusFilter}
+                            onClear={() => setSelectEmpStatusFilter('')}
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex flex-nowrap shrink-0 items-end justify-end gap-[6px]">
+                  <div className="flex items-end gap-[6px] shrink-0">
+                    <EdbcTableToolbarRightActions
+                      onClearFilters={clearEmpTableFilters}
+                      overallSearch={empTableSearch}
+                      onOverallSearchChange={setEmpTableSearch}
+                      showExportIcons={false}
+                      clearButtonType="button"
+                      wrapperClassName={null}
+                      searchWrapperClassName="h-[34px] min-w-0 flex-1 max-w-[286px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 sm:w-[286px] sm:min-w-[286px] sm:flex-none sm:shrink-0"
+                    />
                     <SummaryTableExportActions onExportPdf={exportPurposePDF} onExportCsv={exportPurposeCSV} />
                   </div>
                 </div>
@@ -1194,10 +2295,38 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                             onSort={handleEmpEdbcSort}
                           />
                         </EdbcTableHeaderRow>
+                        {showEmpFilters && (
+                          <EdbcTableFilterRow ref={empFilterRowRef}>
+                            <SummaryEmployeeNameFilter
+                              value={selectEmpNameFilter}
+                              onChange={setSelectEmpNameFilter}
+                              options={empNameFilterOptions}
+                            />
+                            <EdbcTotalAmountFilter
+                              columnId={EDBC_IDS.EDBC8}
+                              totalAmount={empTableTotals.advance}
+                              value={selectEmpAdvanceFilter}
+                              onChange={(e) => setSelectEmpAdvanceFilter(e.target.value)}
+                            />
+                            <EdbcTotalAmountFilter
+                              columnId={EDBC_IDS.EDBC8}
+                              totalAmount={empTableTotals.refund}
+                              value={selectEmpRefundFilter}
+                              onChange={(e) => setSelectEmpRefundFilter(e.target.value)}
+                            />
+                            <SummaryEdbcSelectFilter
+                              columnId={EDBC_IDS.EDBC13}
+                              placeholder="Status"
+                              options={statusFilterOptions}
+                              value={selectEmpStatusFilter}
+                              onChange={setSelectEmpStatusFilter}
+                            />
+                          </EdbcTableFilterRow>
+                        )}
                       </thead>
                       <tbody>
-                        {sortData(purposeDetails, purposeSortConfig).length > 0 ? (
-                          sortData(purposeDetails, purposeSortConfig).map((d, idx) => (
+                        {sortData(filteredPurposeDetails, purposeSortConfig).length > 0 ? (
+                          sortData(filteredPurposeDetails, purposeSortConfig).map((d, idx) => (
                             <EdbcTableBodyRow key={d.empId ?? idx}>
                               <EdbcExpandableBodyCell
                                 columnId={EDBC_IDS.EDBC4}
@@ -1210,15 +2339,16 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                               <td
                                 id={EDBC_IDS.EDBC8}
                                 className={edbc8Config?.tdClass}
-                                onMouseEnter={(e) => handleMouseEnterAdvance(e, selectedPurposeOption?.id, d.empId, d.empType)}
+                                onMouseEnter={(e) => handleMouseEnterAdvance(e, selectedPurposeOption?.id, d.empId, d.empType, 'employee')}
                                 onMouseLeave={handleMouseLeave}
                               >
                                 <span
+                                  onClick={() => handleEmpAdvanceClick(selectedPurposeOption?.id, d.empId, d.empType, d.name)}
                                   onDoubleClick={(e) => {
                                     e.stopPropagation();
                                     toggleEmpExpandedCell(`${d.empId ?? idx}-amount`);
                                   }}
-                                  className={`block w-full cursor-help ${empExpandedCells[`${d.empId ?? idx}-amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                  className={`block w-full cursor-pointer ${empExpandedCells[`${d.empId ?? idx}-amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
                                   title={formatSummaryAmount(d.pendingAdvance)}
                                 >
                                   {formatSummaryAmount(d.pendingAdvance)}
@@ -1226,15 +2356,16 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                               </td>
                               <td
                                 className={edbc8Config?.tdClass}
-                                onMouseEnter={(e) => handleMouseEnter(e, selectedPurposeOption?.id, d.empId, d.empType)}
+                                onMouseEnter={(e) => handleMouseEnter(e, selectedPurposeOption?.id, d.empId, d.empType, 'employee')}
                                 onMouseLeave={handleMouseLeave}
                               >
                                 <span
+                                  onClick={() => handleEmpRefundClick(selectedPurposeOption?.id, d.empId, d.empType, d.name)}
                                   onDoubleClick={(e) => {
                                     e.stopPropagation();
                                     toggleEmpExpandedCell(`${d.empId ?? idx}-bill_amount`);
                                   }}
-                                  className={`block w-full cursor-help ${empExpandedCells[`${d.empId ?? idx}-bill_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                  className={`block w-full cursor-pointer ${empExpandedCells[`${d.empId ?? idx}-bill_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
                                   title={formatSummaryAmount(d.billAmount)}
                                 >
                                   {formatSummaryAmount(d.billAmount)}
@@ -1246,6 +2377,12 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                                 rowIndex: idx,
                                 expandedCells: empExpandedCells,
                                 onToggleExpanded: toggleEmpExpandedCell,
+                                onClick: () => handleEmpStatusClick(
+                                  selectedPurposeOption?.id,
+                                  d.empId,
+                                  d.empType,
+                                  d.name
+                                ),
                               })}
                             </EdbcTableBodyRow>
                           ))
@@ -1266,34 +2403,336 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         </div>
       </div>
 
-      {/* Enhanced Tooltip Component */}
+      {showPurposePopup && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
+          onClick={() => setShowPurposePopup(false)}
+        >
+          <div
+            className="relative bg-white rounded-lg shadow-xl p-[18px] w-fit text-left max-h-[80vh] overflow-hidden no-scrollbar scrollbar-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setShowPurposePopup(false)}
+              className="absolute top-[18px] right-[18px] z-10 flex h-[20px] w-[20px] items-center justify-center"
+            >
+              <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
+            </button>
+            <div className="mb-2 pr-6">
+              <SummaryPopupContextHeader context={purposePopupContext} />
+              <p className="text-sm text-gray-600 mt-1">{purposePopupTitle}</p>
+            </div>
+            <div className="flex w-[468px] max-w-full justify-end mb-3">
+              <SummaryTableExportActions
+                onExportPdf={() => exportPopupPDF(sortPopupData(purposePopupData, purposePopupSortConfig), purposePopupTitle, purposePopupContext, true)}
+                onExportCsv={() => exportPopupCSV(sortPopupData(purposePopupData, purposePopupSortConfig), purposePopupTitle, purposePopupContext, true)}
+              />
+            </div>
+            <div className="mt-4 border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
+              <table className={` ${SUMMARY_POPUP_TABLE_CLASS}`}>
+                <thead className="sticky top-0 z-20 bg-[#FAF6ED]">
+                  <EdbcTableHeaderRow>
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC2}
+                      label="Date"
+                      columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS}
+                      sortField={purposePopupEdbcSortField}
+                      sortDirection={purposePopupSortConfig.direction}
+                      onSort={handlePurposePopupSort}
+                    />
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC4}
+                      label={!selectedEmpOption ? 'Employee' : 'Transfer'}
+                      sortField={purposePopupEdbcSortField}
+                      sortDirection={purposePopupSortConfig.direction}
+                      onSort={handlePurposePopupSort}
+                    />
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC8}
+                      label="Amount"
+                      sortField={purposePopupEdbcSortField}
+                      sortDirection={purposePopupSortConfig.direction}
+                      onSort={handlePurposePopupSort}
+                    />
+                  </EdbcTableHeaderRow>
+                </thead>
+                <tbody>
+                  {purposePopupData &&
+                    sortPopupData(purposePopupData, purposePopupSortConfig).map((entry, index) => (
+                      <EdbcTableBodyRow key={index}>
+                        <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass}>{entry.date}</td>
+                        <td id={EDBC_IDS.EDBC4} className={edbc4Config?.tdClass}>
+                          {renderPopupSecondColumn(entry, true)}
+                        </td>
+                        <td id={EDBC_IDS.EDBC8} className={`${edbc8Config?.tdClass} font-semibold ${entry.amount < 0 ? 'text-red-600' : ''}`.trim()}>
+                          ₹{entry.amount.toLocaleString('en-IN')}
+                        </td>
+                      </EdbcTableBodyRow>
+                    ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-[#BF9853] text-white h-[40px] font-bold">
+                    <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass}>Total</td>
+                    <td id={EDBC_IDS.EDBC4} className={edbc4Config?.tdClass}></td>
+                    <td id={EDBC_IDS.EDBC8} className={`${edbc8Config?.tdClass} text-white`}>
+                      ₹{purposePopupData &&
+                        purposePopupData.reduce((sum, item) => sum + item.amount, 0).toLocaleString('en-IN')}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+      {showEmpPopup && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
+          onClick={() => setShowEmpPopup(false)}
+        >
+          <div
+            className="relative bg-white rounded-lg shadow-xl p-[18px] w-fit text-left max-h-[80vh] overflow-hidden no-scrollbar scrollbar-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setShowEmpPopup(false)}
+              className="absolute top-[18px] right-[18px] z-10 flex h-[20px] w-[20px] items-center justify-center"
+            >
+              <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
+            </button>
+            <div className="mb-2 pr-6">
+              <SummaryPopupContextHeader context={empPopupContext} />
+              <p className="text-sm text-gray-600 mt-1">{empPopupTitle}</p>
+            </div>
+            <div className="flex w-[468px] max-w-full justify-end mb-3">
+              <SummaryTableExportActions
+                onExportPdf={() => exportPopupPDF(sortPopupData(empPopupData, empPopupSortConfig), empPopupTitle, empPopupContext, false)}
+                onExportCsv={() => exportPopupCSV(sortPopupData(empPopupData, empPopupSortConfig), empPopupTitle, empPopupContext, false)}
+              />
+            </div>
+            <div className="mt-4 border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
+              <table className={` ${SUMMARY_POPUP_TABLE_CLASS}`}>
+                <thead className="sticky top-0 z-20 bg-[#FAF6ED]">
+                  <EdbcTableHeaderRow>
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC2}
+                      label="Date"
+                      columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS}
+                      sortField={empPopupEdbcSortField}
+                      sortDirection={empPopupSortConfig.direction}
+                      onSort={handleEmpPopupSort}
+                    />
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC4}
+                      label={!selectedPurposeOption ? 'Purpose' : 'Transfer'}
+                      sortField={empPopupEdbcSortField}
+                      sortDirection={empPopupSortConfig.direction}
+                      onSort={handleEmpPopupSort}
+                    />
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC8}
+                      label="Amount"
+                      sortField={empPopupEdbcSortField}
+                      sortDirection={empPopupSortConfig.direction}
+                      onSort={handleEmpPopupSort}
+                    />
+                  </EdbcTableHeaderRow>
+                </thead>
+                <tbody>
+                  {empPopupData &&
+                    sortPopupData(empPopupData, empPopupSortConfig).map((entry, index) => (
+                      <EdbcTableBodyRow key={index}>
+                        <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass}>{entry.date}</td>
+                        <td id={EDBC_IDS.EDBC4} className={edbc4Config?.tdClass}>
+                          {renderPopupSecondColumn(entry, false)}
+                        </td>
+                        <td id={EDBC_IDS.EDBC8} className={`${edbc8Config?.tdClass} font-semibold ${entry.amount < 0 ? 'text-red-600' : ''}`.trim()}>
+                          ₹{entry.amount.toLocaleString('en-IN')}
+                        </td>
+                      </EdbcTableBodyRow>
+                    ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-[#BF9853] text-white h-[40px] font-bold">
+                    <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass}>Total</td>
+                    <td id={EDBC_IDS.EDBC4} className={edbc4Config?.tdClass}></td>
+                    <td id={EDBC_IDS.EDBC8} className={`${edbc8Config?.tdClass} text-white`}>
+                      ₹{empPopupData &&
+                        empPopupData.reduce((sum, item) => sum + item.amount, 0).toLocaleString('en-IN')}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+      {showStatusPopup && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
+          onClick={() => setShowStatusPopup(false)}
+        >
+          <div
+            className="relative bg-white rounded-lg shadow-xl p-[18px] w-fit text-left max-h-[80vh] overflow-hidden no-scrollbar scrollbar-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setShowStatusPopup(false)}
+              className="absolute top-[18px] right-[18px] z-10 flex h-[20px] w-[20px] items-center justify-center"
+            >
+              <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
+            </button>
+            <div className="mb-2 pr-6">
+              <SummaryPopupContextHeader context={statusPopupContext} />
+              <p className="text-sm text-gray-600 mt-1">Status Details</p>
+            </div>
+            <div className={`flex max-w-full justify-end mb-3 ${isStatusFromPurposeTable ? 'w-[588px]' : 'w-[668px]'}`}>
+              <SummaryTableExportActions
+                onExportPdf={exportStatusPDF}
+                onExportCsv={exportStatusCSV}
+              />
+            </div>
+            <div className="mt-4 border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
+              <table className={statusPopupTableClass}>
+                <thead className="sticky top-0 z-20 bg-[#FAF6ED]">
+                  <EdbcTableHeaderRow>
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC2}
+                      label="Date"
+                      columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS}
+                      sortField={statusPopupEdbcSortField}
+                      sortDirection={statusPopupSortConfig.direction}
+                      onSort={handleStatusPopupSort}
+                    />
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC4}
+                      label={
+                        isStatusFromPurposeTable
+                          ? (selectedEmpOption ? 'Transfer' : 'Employee')
+                          : (selectedPurposeOption ? 'Transfer' : 'Purpose')
+                      }
+                      sortField={statusPopupEdbcSortField}
+                      sortDirection={statusPopupSortConfig.direction}
+                      onSort={handleStatusPopupSort}
+                    />
+                    <th
+                      id={EDBC_IDS.EDBC8}
+                      className={edbc8Config?.headerClass}
+                      onClick={() => handleStatusPopupSort('advanceAmount')}
+                    >
+                      Advance
+                      {statusPopupSortConfig.key === 'advanceAmount' && (
+                        <span className="ml-1">{statusPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </th>
+                    <th
+                      id={EDBC_IDS.EDBC8}
+                      className={edbc8Config?.headerClass}
+                      onClick={() => handleStatusPopupSort('refundAmount')}
+                    >
+                      Refund
+                      {statusPopupSortConfig.key === 'refundAmount' && (
+                        <span className="ml-1">{statusPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </th>
+                  </EdbcTableHeaderRow>
+                </thead>
+                <tbody>
+                  {buildStatusCombinedData(
+                    statusPopupData.advances,
+                    statusPopupData.refunds,
+                    statusPopupSortConfig
+                  ).map((entry, index) => (
+                    <EdbcTableBodyRow key={index}>
+                      <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass}>{entry.date}</td>
+                      <td id={EDBC_IDS.EDBC4} className={edbc4Config?.tdClass}>
+                        {renderStatusSecondColumn(entry)}
+                      </td>
+                      <td id={EDBC_IDS.EDBC8} className={`${edbc8Config?.tdClass} font-semibold ${entry.advanceAmount < 0 ? 'text-red-600' : ''}`.trim()}>
+                        {entry.advanceAmount !== 0 ? `₹${entry.advanceAmount.toLocaleString('en-IN')}` : '-'}
+                      </td>
+                      <td id={EDBC_IDS.EDBC8} className={`${edbc8Config?.tdClass} font-semibold ${entry.refundAmount < 0 ? 'text-red-600' : ''}`.trim()}>
+                        {entry.refundAmount !== 0 ? `₹${entry.refundAmount.toLocaleString('en-IN')}` : '-'}
+                      </td>
+                    </EdbcTableBodyRow>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-[#f8f1e5] font-bold h-[40px]">
+                    <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass}>Total</td>
+                    <td id={EDBC_IDS.EDBC4} className={edbc4Config?.tdClass}></td>
+                    <td id={EDBC_IDS.EDBC8} className={edbc8Config?.tdClass}>
+                      ₹{statusPopupData.advances.reduce((sum, item) => sum + item.amount, 0).toLocaleString('en-IN')}
+                    </td>
+                    <td id={EDBC_IDS.EDBC8} className={edbc8Config?.tdClass}>
+                      ₹{statusPopupData.refunds.reduce((sum, item) => sum + item.amount, 0).toLocaleString('en-IN')}
+                    </td>
+                  </tr>
+                  <tr className="bg-[#BF9853] text-white font-bold h-[40px]">
+                    <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass} colSpan={2}>Balance Advance</td>
+                    <td id={EDBC_IDS.EDBC8} className={`${edbc8Config?.tdClass} text-white`} colSpan={2}>
+                      ₹{(
+                        statusPopupData.advances.reduce((sum, item) => sum + item.amount, 0) -
+                        statusPopupData.refunds.reduce((sum, item) => sum + item.amount, 0)
+                      ).toLocaleString('en-IN')}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {tooltipData && (
         <div
-          className="fixed z-50 bg-white text-black p-4 rounded-lg shadow-xl border border-gray-200 text-sm max-w-sm"
-          style={{
-            left: Math.min(tooltipPosition.x + 10, window.innerWidth - 320),
-            top: Math.max(tooltipPosition.y - 10, 10),
-            pointerEvents: 'none',
-            transform: tooltipPosition.x > window.innerWidth - 320 ? 'translateX(-100%)' : 'none'
-          }}
+          className="fixed z-50 bg-white text-black p-3 rounded shadow-lg text-sm max-w-xs"
+          style={{ left: tooltipPosition.x + 10, top: tooltipPosition.y - 10, pointerEvents: 'none' }}
         >
-          <div className="font-semibold mb-3 text-gray-800 border-b border-gray-200 pb-2">
-            {tooltipTitle || 'Details'}
-          </div>
-          <div className="max-h-48 overflow-y-auto">
-            {tooltipData.map((entry, index) => (
-              <div key={index} className="mb-2 flex justify-between items-center">
-                <div className="flex flex-col">
-                  <span className="text-gray-600 text-xs">{entry.date}</span>
-                  {entry.type && <span className="text-xs text-blue-600 font-medium">{entry.type}</span>}
-                </div>
-                <span className="font-mono font-semibold">₹{entry.amount.toLocaleString('en-IN')}</span>
+          <div className="font-semibold mb-2">{tooltipTitle || 'Details'}:</div>
+          {tooltipData
+            .slice()
+            .reverse()
+            .map((entry, index) => (
+              <div key={index} className="mb-1">
+                <span className="text-gray-600">{entry.date}:</span>
+                <span className={`ml-2 ${entry.amount < 0 ? 'text-red-600' : ''}`}>
+                  ₹{entry.amount.toLocaleString('en-IN')}
+                </span>
+                {entry.personName && tooltipTable === 'purpose' && !selectedEmpOption && (
+                  <div className="text-xs text-gray-500 ml-2">({entry.personName})</div>
+                )}
+                {entry.purposeName && tooltipTable === 'employee' && !selectedPurposeOption && (
+                  <div className="text-xs text-gray-500 ml-2">({entry.purposeName})</div>
+                )}
+                {entry.isRefund && tooltipTable === 'purpose' && selectedEmpOption && (
+                  <div className="text-xs text-gray-500 ml-2">(Refund)</div>
+                )}
+                {entry.isRefund && tooltipTable === 'employee' && selectedPurposeOption && (
+                  <div className="text-xs text-gray-500 ml-2">(Refund)</div>
+                )}
+                {entry.type === 'Transfer' && tooltipTable === 'purpose' && selectedEmpOption && entry.transferPurposeName && !entry.isRefund && (
+                  <div className="text-xs text-gray-500 ml-2">
+                    ({entry.amount < 0 ? 'Transfer To: ' : 'Transfer From: '}{entry.transferPurposeName})
+                  </div>
+                )}
+                {entry.type === 'Transfer' && tooltipTable === 'employee' && selectedPurposeOption && entry.transferPurposeName && !entry.isRefund && (
+                  <div className="text-xs text-gray-500 ml-2">
+                    ({entry.amount < 0 ? 'Transfer To: ' : 'Transfer From: '}{entry.transferPurposeName})
+                  </div>
+                )}
               </div>
             ))}
-          </div>
-          <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between items-center">
-            <span className="font-semibold text-gray-800">Total:</span>
-            <span className="font-mono font-bold text-lg">₹{tooltipData.reduce((sum, item) => sum + item.amount, 0).toLocaleString('en-IN')}</span>
+          <div className="mt-2 pt-2 border-t border-gray-600">
+            <span className="font-semibold">
+              Total: ₹
+              {tooltipData
+                .reduce((sum, item) => sum + item.amount, 0)
+                .toLocaleString('en-IN')}
+            </span>
           </div>
         </div>
       )}

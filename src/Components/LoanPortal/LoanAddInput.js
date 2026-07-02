@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
 import search from '../Images/search.png';
 import imports from '../Images/Import.svg';
-import cross from '../Images/cross.png';
+import FileRemover from '../Images/FileRemover.svg';
 import edit from '../Images/Edit.svg';
+import Add from '../Images/+Add.svg';
 import deleteIcon from '../Images/Delete.svg';
 
 const LoanAddInput = ({ username, userRoles = [] }) => {
@@ -142,90 +143,179 @@ const LoanAddInput = ({ username, userRoles = [] }) => {
         item.purpose.toLowerCase().includes(loanTypeSearch.toLowerCase())
     );
 
+    const [isDragging, setIsDragging] = useState(false);
+    const [startX, setStartX] = useState(0);
+    const [scrollLeft, setScrollLeft] = useState(0);
+    const [expandedCells, setExpandedCells] = useState({});
+
+    const toggleExpandedCell = (cellKey) => {
+        setExpandedCells((prev) => ({
+            ...prev,
+            [cellKey]: !prev[cellKey],
+        }));
+    };
+
+    const interactiveDragSelectors =
+        'input, textarea, button, select, a, label, [role="button"], [contenteditable="true"], .prevent-drag-scroll';
+
+    const shouldSkipDragScroll = (target) => {
+        if (!target || typeof target.closest !== 'function') return false;
+        return Boolean(target.closest(interactiveDragSelectors));
+    };
+
+    const handleMouseDown = (e) => {
+        if (shouldSkipDragScroll(e.target)) {
+            setIsDragging(false);
+            return;
+        }
+        setIsDragging(true);
+        setStartX(e.pageX - e.currentTarget.offsetLeft);
+        setScrollLeft(e.currentTarget.scrollLeft);
+    };
+
+    const handleMouseLeave = () => {
+        setIsDragging(false);
+    };
+
+    const handleMouseUp = () => {
+        setIsDragging(false);
+    };
+
+    const handleMouseMove = (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        const x = e.pageX - e.currentTarget.offsetLeft;
+        const walk = (x - startX) * 2;
+        e.currentTarget.scrollLeft = scrollLeft - walk;
+    };
+
+    const handleTouchStart = (e) => {
+        if (shouldSkipDragScroll(e.target)) {
+            setIsDragging(false);
+            return;
+        }
+        setIsDragging(true);
+        setStartX(e.touches[0].pageX - e.currentTarget.offsetLeft);
+        setScrollLeft(e.currentTarget.scrollLeft);
+    };
+
+    const handleTouchMove = (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        const x = e.touches[0].pageX - e.currentTarget.offsetLeft;
+        const walk = (x - startX) * 2;
+        e.currentTarget.scrollLeft = scrollLeft - walk;
+    };
+
+    const handleTouchEnd = () => {
+        setIsDragging(false);
+    };
+
     return (
-        <div className="p-4 bg-white ml-10 mr-10 max-w-[95vw] h-[780px]">
-            <div className="lg:flex space-x-[2%] lg:w-full md:w-[32rem] w-[17rem] overflow-x-auto px-1">
-                <div>
-                    <div className="flex items-center mb-2 lg:mt-0 mt-3 ">
-                        <input
-                            type="text"
-                            className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
-                            placeholder="Search Purpose.."
-                            value={loanTypeSearch}
-                            onChange={(e) => setLoanTypeSearch(e.target.value)}
-                        />
-                        <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
-                            <img src={search} alt='search' className=' w-5 h-5' />
-                        </button>
-                        <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-                            onClick={openLoanTypes}>
-                            + Add
-                        </button>
-                    </div>
-                    <button className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
-                    <button onClick={handleDeleteAllLoanTypes}>
-                        <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[15rem]' />
-                    </button>
-                    <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
-                        <div className="bg-[#FAF6ED]">
-                            <table className="table-auto lg:w-72 ">
-                                <thead className='bg-[#FAF6ED]'>
-                                    <tr className="border-b">
-                                        <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
-                                        <th className="p-2 text-left lg:w-72 text-xl font-bold">Purpose</th>
-                                    </tr>
-                                </thead>
-                            </table>
+        <div className='flex flex-col h-[calc(100vh-104px)] px-[18px] pt-[18px] pb-[18px] overflow-hidden bg-[#FAF6ED]'>
+            <div className=" flex flex-col flex-1 min-h-0 px-[18px] pt-[18px] pb-[18px] overflow-hidden bg-white">
+                <div
+                    className="flex-1 min-h-0 lg:flex space-x-[18px] lg:w-full md:w-[32rem] w-[20rem] overflow-x-auto overflow-y-hidden no-scrollbar scrollbar-none select-none"
+                    style={{ cursor: isDragging ? 'grabbing' : 'default' }}
+                    onMouseDown={handleMouseDown}
+                    onMouseLeave={handleMouseLeave}
+                    onMouseUp={handleMouseUp}
+                    onMouseMove={handleMouseMove}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                >
+                    <div>
+                        <div className="flex items-center mb-[6px] lg:mt-0 mt-3">
+                            <input
+                                type="text"
+                                className=" border-[#BF9853] border-2 border-opacity-25 rounded-full text-[14px] pl-[16px] flex-1 w-44 h-[40px] focus:outline-none"
+                                placeholder="Purpose"
+                                value={loanTypeSearch}
+                                onChange={(e) => setLoanTypeSearch(e.target.value)}
+                            />
+                            <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
+                                <img src={search} alt='search' className=' w-5 h-5' />
+                            </button>
+                            <button className="text-black font-bold px-1 ml-4"
+                                onClick={openLoanTypes}>
+                                <img src={Add} alt='add' className='w-[30px] h-[30px]' />
+                            </button>
                         </div>
-                        <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                            <table className="table-auto lg:w-72 w-full">
-                                <tbody>
-                                    {filteredLoanTypes.map((item, index) => (
-                                        <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                                            <td className="p-2 text-left font-semibold">{(loanTypes.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
-                                            <td className="p-2 text-left group flex font-semibold">
-                                                <div className="flex flex-grow">
-                                                    {item.purpose}
-                                                </div>
-                                                <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                                                    <button type="button" >
-                                                        <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditLoanTypePopup(item)} />
-                                                    </button>
-                                                    <button >
-                                                        <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleLoanTypeDelete(item.id)} />
+                        <button className="text-[#E4572E] flex mb-[8px]"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' /><h1 className='mt-1.5 text-[14px] font-semibold'>Import file</h1></button>
+                        <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
+                            <div className="bg-[#FAF6ED]">
+                                <table className="table-auto lg:w-[320px] ">
+                                    <thead className='bg-[#FAF6ED]'>
+                                        <tr className="border-b h-[40px]">
+                                            <th className="pl-[12px] pr-[12px] text-left lg:w-16 text-[16px] font-bold">S.No</th>
+                                            <th className="pl-0 pr-[8px] text-left lg:w-72 text-[16px] font-bold">
+                                                <div className="flex items-center justify-between gap-[12px]">
+                                                    <span>Purpose</span>
+                                                    <button type="button" onClick={handleDeleteAllLoanTypes} className="inline-flex shrink-0 items-center justify-center">
+                                                        <img src={deleteIcon} alt='del' className='w-4 h-4' />
                                                     </button>
                                                 </div>
-                                            </td>
+                                            </th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                </table>
+                            </div>
+                            <div className="overflow-y-auto max-h-[calc(100vh-300px)] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                                <table className="table-fixed lg:w-[320px] w-full">
+                                    <tbody>
+                                        {filteredLoanTypes.map((item) => (
+                                            <tr key={item.id} className="border-b odd:bg-white text-[14px] even:bg-[#FAF6ED] h-[40px]">
+                                                <td className="pl-[12px] pr-[12px] text-left font-semibold w-[64px]">{(loanTypes.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                                                <td className="pl-0 pr-[8px] text-left group font-semibold max-w-0">
+                                                    <div className="flex items-center min-w-0">
+                                                        <span
+                                                            onClick={() => toggleExpandedCell(`${item.id}-purpose`)}
+                                                            className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-purpose`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                            title={item.purpose}
+                                                        >
+                                                            {item.purpose}
+                                                        </span>
+                                                        <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
+                                                            <button type="button" >
+                                                                <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditLoanTypePopup(item)} />
+                                                            </button>
+                                                            <button >
+                                                                <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleLoanTypeDelete(item.id)} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Add Staff Type Modal */}
             {isLoanTypeOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-                    <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
-                        <div>
-                            <button className="text-red-500 ml-[95%]" onClick={closeLoanTypes}>
-                                <img src={cross} alt='cross' className='w-5 h-5' />
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999] ">
+                    <div className="bg-white rounded-md p-[16px]">
+                        <div className="flex justify-end">
+                            <button className="" onClick={closeLoanTypes}>
+                                <img src={FileRemover} alt='close' className='w-3 h-3' />
                             </button>
                         </div>
                         <form onSubmit={handleSubmitLoanTypes}>
-                            <div className="mb-4">
-                                <label className="block text-lg font-medium mb-2 -ml-60">Purpose</label>
+                            <div className="mb-[8px] text-left">
+                                <label className="block text-lg font-medium mb-[8px]">Purpose</label>
                                 <input
                                     type="text"
-                                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                                    className="w-[300px] border-2 border-[#BF9853] border-opacity-35 rounded pl-[8px] h-[40px] focus:outline-none"
                                     placeholder="Enter Purpose"
                                     onChange={(e) => setLoanType(e.target.value)}
                                     required
                                 />
                             </div>
-                            <div className="flex space-x-2 mt-4 ml-12">
+                            <div className="flex space-x-2 mt-[16px] justify-end">
                                 <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
                                     Submit
                                 </button>
@@ -237,28 +327,27 @@ const LoanAddInput = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )}
-            {/* Edit Staff Type Modal */}
             {isEditLoanTypeOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
-                    <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
-                        <div>
-                            <button className="text-red-500 ml-[95%]" onClick={closeEditLoanTypePopup}>
-                                <img src={cross} alt='close' className='w-5 h-5' />
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999]" >
+                    <div className="bg-white rounded-md p-[16px]">
+                        <div className="flex justify-end">
+                            <button className="" onClick={closeEditLoanTypePopup}>
+                                <img src={FileRemover} alt='close' className='w-3 h-3' />
                             </button>
                         </div>
                         <form onSubmit={handleEditLoanTypes}>
-                            <div className="mb-4">
-                                <label className="block text-lg font-medium mb-2 -ml-[15rem]">Purpose</label>
+                            <div className="mb-[8px] text-left">
+                                <label className="block text-lg font-medium mb-[8px]">Purpose</label>
                                 <input
                                     type="text"
                                     value={editLoanType}
-                                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                                    className="w-[300px] border-2 border-[#BF9853] border-opacity-35 rounded pl-[8px] h-[40px] focus:outline-none"
                                     placeholder="Enter Purpose"
                                     onChange={(e) => setEditLoanType(e.target.value)}
                                     required
                                 />
                             </div>
-                            <div className="flex space-x-2 mt-8 ml-12">
+                            <div className="flex space-x-2 mt-[16px] justify-end">
                                 <button
                                     type="submit"
                                     className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"

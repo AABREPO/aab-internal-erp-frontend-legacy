@@ -935,6 +935,7 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
 
     const handleOpenExpenseEntryPopup = ({ professionServiceNo, project, property }) => {
         const prefillData = {
+            source: 'Utility Hub',
             utilityType: 'Profession',
             siteName: project?.projectName || project?.siteName || '',
             projectId: project?.id ?? project?.projectId ?? null,

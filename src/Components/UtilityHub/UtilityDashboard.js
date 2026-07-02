@@ -1126,6 +1126,7 @@ const UtilityDashboard = () => {
 
   const handleNavigateToExpense = ({ utilityType, identifierKey, identifierValue, projectId, propertyId, siteName }) => {
     const prefillData = {
+      source: 'Utility Hub',
       utilityType,
       siteName,
       projectId,

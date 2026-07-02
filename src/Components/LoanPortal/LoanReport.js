@@ -1,9 +1,39 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Select from 'react-select';
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import Filter from '../Images/TableFilter.svg';
+import Search from '../Images/Searchnew.svg';
+import Reload from '../Images/Clear.svg';
+import Pdf from '../Images/pdf.png';
+import XL from '../Images/sheets.png';
+import {
+  EDBC_IDS,
+  DATABASE_TABLE_FILTER_SELECT_STYLES,
+  getEdbcColumnConfig,
+  useEdbcExpandedCells,
+  formatExpenseDateOnly,
+  EdbcTableHeaderRow,
+  EdbcTableFilterRow,
+  EdbcTableBodyRow,
+  EdbcColumnHeader,
+  EdbcDateFilter,
+  EdbcProjectNameFilter,
+  EdbcSelectFilter,
+  EdbcPaymentModeFilter,
+  EdbcPaymentModeFilterChip,
+  hasEdbcPaymentModeFilter,
+  matchesEdbcPaymentModeFilter,
+  EdbcTextInputFilter,
+  EdbcTotalAmountFilter,
+  matchesEdbcAmountFilter,
+  EdbcEmptyFilterCell,
+  EdbcDateBodyCell,
+  EdbcExpandableBodyCell,
+  EDBC_TABLE_EDGE_TABLE_CLASS,
+} from '../ExpensesEntry/databaseExpensesSharedColumns';
 
 Date.prototype.getWeekNumber = function () {
   const firstDay = new Date(this.getFullYear(), 0, 1);
@@ -12,6 +42,16 @@ Date.prototype.getWeekNumber = function () {
 };
 
 const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
+  const BLANK_VALUE = 'BLANK';
+  const BLANK_LABEL = '(Blank)';
+  const blankOption = { value: BLANK_VALUE, label: BLANK_LABEL };
+  const isReportBlankish = (value) =>
+    value === null ||
+    value === undefined ||
+    (typeof value === 'string' && value.trim() === '') ||
+    value === 0 ||
+    value === '0';
+
   const [week, setWeek] = useState("");
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [vendorOptions, setVendorOptions] = useState([]);
@@ -26,6 +66,17 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const [endDate, setEndDate] = useState("");
   const [paymentModeFilter, setPaymentModeFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [overallSearch, setOverallSearch] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectReportDate, setSelectReportDate] = useState("");
+  const [selectReportAssociateName, setSelectReportAssociateName] = useState("");
+  const [selectReportPurpose, setSelectReportPurpose] = useState("");
+  const [selectReportTransfer, setSelectReportTransfer] = useState("");
+  const [selectReportType, setSelectReportType] = useState("");
+  const [selectedPaymentModes, setSelectedPaymentModes] = useState([]);
+  const [selectReportDescription, setSelectReportDescription] = useState("");
+  const [selectReportAmount, setSelectReportAmount] = useState("");
+  const [selectReportRefundAmount, setSelectReportRefundAmount] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -167,6 +218,15 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       ...provided,
       maxHeight: '250px',
       overflowY: 'auto',
+    }),
+    indicatorSeparator: () => ({ display: 'none' }),
+    dropdownIndicator: (provided, state) => ({
+      ...provided,
+      display: state.hasValue ? 'none' : 'flex',
+      color: '#000000',
+      flexShrink: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
     }),
     singleValue: (provided) => ({
       ...provided,
@@ -423,6 +483,25 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     return "";
   };
 
+  const getLabelById = (options, id) => options.find((o) => String(o.id) === String(id))?.label || "";
+  const getAssociateName = (entry) => {
+    if (entry.vendor_id) return getLabelById(vendorOptions, entry.vendor_id);
+    if (entry.contractor_id) return getLabelById(contractorOptions, entry.contractor_id);
+    if (entry.employee_id) return getLabelById(employeeOptions, entry.employee_id);
+    if (entry.labour_id) return getLabelById(labourOptions, entry.labour_id);
+    return "";
+  };
+  const getTransferDestination = (entry) => {
+    if (entry.type === "Transfer") {
+      if (entry.to_purpose_id) {
+        return purposeOptions.find((p) => String(p.id) === String(entry.to_purpose_id))?.value || "";
+      } else if (entry.transfer_Project_id) {
+        return getLabelById(siteOptions, entry.transfer_Project_id);
+      }
+    }
+    return "";
+  };
+
   // Helper — Week number calculation for Monday-Sunday weeks
   const getWeekNumberFromDate = (date) => {
     const d = new Date(date);
@@ -493,8 +572,89 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       filtered = filtered.filter((item) => (item.type || "").toString().toLowerCase() === typeFilter.toLowerCase());
     }
 
+    if (selectReportDate) {
+      const [reportYear, reportMonth, reportDay] = selectReportDate.split("-");
+      const formattedSelectDate = `${parseInt(reportDay, 10)}-${parseInt(reportMonth, 10)}-${reportYear}`;
+      filtered = filtered.filter((item) => {
+        const entryDateObj = new Date(item.date);
+        const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
+        return formattedEntryDate === formattedSelectDate;
+      });
+    }
+    if (selectReportAssociateName) {
+      filtered = filtered.filter((item) => {
+        const name = getAssociateName(item);
+        if (selectReportAssociateName === BLANK_VALUE) {
+          return !name || !String(name).trim();
+        }
+        return name.toLowerCase() === selectReportAssociateName.toLowerCase();
+      });
+    }
+    if (selectReportPurpose) {
+      filtered = filtered.filter((item) => {
+        const purposeName = getPurposeOrSiteName(item);
+        if (selectReportPurpose === BLANK_VALUE) {
+          return !purposeName || !String(purposeName).trim();
+        }
+        return purposeName.toLowerCase() === selectReportPurpose.toLowerCase();
+      });
+    }
+    if (selectReportTransfer) {
+      filtered = filtered.filter((item) => {
+        const transferName = getTransferDestination(item);
+        if (selectReportTransfer === BLANK_VALUE) {
+          return !transferName || !String(transferName).trim();
+        }
+        return transferName.toLowerCase() === selectReportTransfer.toLowerCase();
+      });
+    }
+    if (selectReportType) {
+      filtered = filtered.filter((item) => {
+        if (selectReportType === BLANK_VALUE) {
+          return !item.type || !String(item.type).trim();
+        }
+        return (item.type || "").toString().toLowerCase() === selectReportType.toLowerCase();
+      });
+    }
+    filtered = filtered.filter((item) =>
+      matchesEdbcPaymentModeFilter(item.loan_payment_mode, selectedPaymentModes, {
+        blankValue: BLANK_VALUE,
+        isBlankish: isReportBlankish,
+      })
+    );
+    if (selectReportDescription.trim()) {
+      filtered = filtered.filter((item) =>
+        String(item.description ?? "").toLowerCase().includes(selectReportDescription.toLowerCase().trim())
+      );
+    }
+    if (selectReportAmount.trim()) {
+      filtered = filtered.filter((item) => matchesEdbcAmountFilter(item.amount, selectReportAmount));
+    }
+    if (selectReportRefundAmount.trim()) {
+      filtered = filtered.filter((item) => matchesEdbcAmountFilter(item.loan_refund_amount, selectReportRefundAmount));
+    }
+    if (overallSearch.trim()) {
+      const q = overallSearch.toLowerCase().trim();
+      filtered = filtered.filter((item) => {
+        const searchable = [
+          new Date(item.date).toLocaleDateString("en-GB"),
+          getAssociateName(item),
+          getPurposeOrSiteName(item),
+          getTransferDestination(item),
+          item.amount,
+          item.loan_refund_amount,
+          item.type,
+          finalPaymentModeOptions.find((opt) => opt.value === item.loan_payment_mode)?.label || item.loan_payment_mode,
+          item.description,
+        ]
+          .map((v) => String(v ?? "").toLowerCase())
+          .join(" ");
+        return searchable.includes(q);
+      });
+    }
+
     setFilteredData(filtered);
-  }, [loanData, startDate, endDate, week, year, paymentModeFilter, typeFilter]);
+  }, [loanData, startDate, endDate, week, year, paymentModeFilter, typeFilter, selectReportDate, selectReportAssociateName, selectReportPurpose, selectReportTransfer, selectReportType, selectedPaymentModes, selectReportDescription, selectReportAmount, selectReportRefundAmount, overallSearch, vendorOptions, contractorOptions, employeeOptions, labourOptions, purposeOptions, siteOptions, paymentModeOptions]);
 
   // fromDate/toDate/totalLoan computations
   const fromDate = filteredData.length
@@ -521,24 +681,6 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     }
     const t = Date.parse(s);
     return isNaN(t) ? -Infinity : new Date(new Date(t).toDateString()).getTime();
-  };
-  const getLabelById = (options, id) => options.find((o) => String(o.id) === String(id))?.label || "";
-  const getAssociateName = (entry) => {
-    if (entry.vendor_id) return getLabelById(vendorOptions, entry.vendor_id);
-    if (entry.contractor_id) return getLabelById(contractorOptions, entry.contractor_id);
-    if (entry.employee_id) return getLabelById(employeeOptions, entry.employee_id);
-    if (entry.labour_id) return getLabelById(labourOptions, entry.labour_id);
-    return "";
-  };
-  const getTransferDestination = (entry) => {
-    if (entry.type === "Transfer") {
-      if (entry.to_purpose_id) {
-        return purposeOptions.find((p) => String(p.id) === String(entry.to_purpose_id))?.value || "";
-      } else if (entry.transfer_Project_id) {
-        return getLabelById(siteOptions, entry.transfer_Project_id);
-      }
-    }
-    return "";
   };
   const requestSort = (key) => {
     setSortConfig((prev) => {
@@ -604,9 +746,163 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentData = sortedData.slice(startIndex, endIndex);
+  const { expandedCells, toggleExpandedCell } = useEdbcExpandedCells();
+  const edbc8Config = getEdbcColumnConfig(EDBC_IDS.EDBC8);
+  const edbc21Config = getEdbcColumnConfig(EDBC_IDS.EDBC21);
+
+  const formatReportAmount = (value) => {
+    if (value == null || value === "" || value === "-") return "";
+    const num = Number(value);
+    return Number.isFinite(num) ? `₹${num.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "";
+  };
+
+  const reportFilterOptions = useMemo(() => {
+    let tableData = loanData;
+    if (startDate && endDate) {
+      const s = new Date(startDate);
+      const e = new Date(endDate);
+      e.setHours(23, 59, 59, 999);
+      tableData = loanData.filter((item) => {
+        const d = new Date(item.date);
+        return d >= s && d <= e;
+      });
+    } else if (week) {
+      const selectedWeekNum = parseInt(week.replace("Week ", ""), 10);
+      tableData = loanData.filter((item) => {
+        const d = new Date(item.date);
+        return d.getFullYear() === parseInt(year, 10) && getWeekNumberFromDate(item.date) === selectedWeekNum;
+      });
+    } else {
+      tableData = [];
+    }
+    if (paymentModeFilter) {
+      tableData = tableData.filter((item) => (item.loan_payment_mode || "").toString().toLowerCase() === paymentModeFilter.toLowerCase());
+    }
+    if (typeFilter) {
+      tableData = tableData.filter((item) =>
+        (item.type || "").toString().toLowerCase() === typeFilter.toLowerCase()
+      );
+    }
+
+    const uniqueAssociates = new Set();
+    const uniquePurposes = new Set();
+    const uniqueTransfers = new Set();
+    const uniqueTypes = new Set();
+    const uniqueModes = new Set();
+    let hasBlankAssociate = false;
+    let hasBlankPurpose = false;
+    let hasBlankTransfer = false;
+    let hasBlankType = false;
+    let hasBlankMode = false;
+
+    tableData.forEach((entry) => {
+      const assocName = getAssociateName(entry);
+      if (assocName) uniqueAssociates.add(assocName);
+      else hasBlankAssociate = true;
+
+      const purposeName = getPurposeOrSiteName(entry);
+      if (purposeName) uniquePurposes.add(purposeName);
+      else hasBlankPurpose = true;
+
+      const transferName = getTransferDestination(entry);
+      if (transferName) uniqueTransfers.add(transferName);
+      else hasBlankTransfer = true;
+
+      if (entry.type) uniqueTypes.add(entry.type);
+      else hasBlankType = true;
+
+      const modeLabel = finalPaymentModeOptions.find((opt) => opt.value === entry.loan_payment_mode)?.label || entry.loan_payment_mode;
+      if (modeLabel) uniqueModes.add(modeLabel);
+      else hasBlankMode = true;
+    });
+
+    const associateOptions = Array.from(uniqueAssociates)
+      .map((name) => ({ value: name, label: name }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    if (hasBlankAssociate) associateOptions.unshift(blankOption);
+
+    const purposeFilterOptions = Array.from(uniquePurposes)
+      .map((name) => ({ value: name, label: name }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    if (hasBlankPurpose) purposeFilterOptions.unshift(blankOption);
+
+    const transferOptions = Array.from(uniqueTransfers)
+      .map((name) => ({ value: name, label: name }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    if (hasBlankTransfer) transferOptions.unshift({ value: BLANK_VALUE, label: 'Blank' });
+
+    const typeOptions = (hasBlankType ? [BLANK_VALUE] : []).concat(Array.from(uniqueTypes).sort());
+    const modeOptions = Array.from(uniqueModes)
+      .sort()
+      .map((mode) => ({ value: mode, label: mode }));
+    if (hasBlankMode) modeOptions.unshift(blankOption);
+
+    return {
+      associateOptions,
+      purposeOptions: purposeFilterOptions,
+      transferOptions,
+      typeOptions,
+      modeOptions,
+    };
+  }, [loanData, startDate, endDate, week, year, paymentModeFilter, typeFilter, vendorOptions, contractorOptions, employeeOptions, labourOptions, purposeOptions, siteOptions, paymentModeOptions]);
+
+  const reportTotals = useMemo(() => ({
+    amount: filteredData.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0),
+    refund_amount: filteredData.reduce((sum, row) => sum + (parseFloat(row.loan_refund_amount) || 0), 0),
+  }), [filteredData]);
+
+  const clearFilters = useCallback(() => {
+    const currentWeek = getCurrentWeekNumber();
+    setWeek(`Week ${String(currentWeek).padStart(2, "0")}`);
+    setYear(new Date().getFullYear().toString());
+    setStartDate("");
+    setEndDate("");
+    setPaymentModeFilter("");
+    setTypeFilter("");
+    setOverallSearch("");
+    setSelectReportDate("");
+    setSelectReportAssociateName("");
+    setSelectReportPurpose("");
+    setSelectReportTransfer("");
+    setSelectReportType("");
+    setSelectedPaymentModes([]);
+    setSelectReportDescription("");
+    setSelectReportAmount("");
+    setSelectReportRefundAmount("");
+    setSortConfig({ key: null, direction: "asc" });
+  }, []);
+
+  const mapReportSortKeyToEdbc = (key) => {
+    if (key === "associate") return "vendor";
+    if (key === "purpose") return "project";
+    if (key === "transfer") return "transfer";
+    if (key === "payment_mode") return "paymentMode";
+    if (key === "type") return "accountType";
+    if (key === "description") return "comments";
+    if (key === "amount" || key === "refund") return "amount";
+    return key;
+  };
+  const handleEdbcSort = (edbcField) => {
+    const fieldToKey = {
+      vendor: "associate",
+      project: "purpose",
+      transfer: "transfer",
+      amount: "amount",
+      paymentMode: "payment_mode",
+      accountType: "type",
+      comments: "description",
+      date: "date",
+    };
+    requestSort(fieldToKey[edbcField] || edbcField);
+  };
+  const resolveEdbcSortField = (reportSortKey) =>
+    sortConfig.key === reportSortKey ? mapReportSortKeyToEdbc(reportSortKey) : "";
+
+  const hasActiveColumnFilters = selectReportDate || selectReportAssociateName || selectReportPurpose || selectReportTransfer || selectReportAmount.trim() || selectReportRefundAmount.trim() || selectReportType || hasEdbcPaymentModeFilter(selectedPaymentModes) || selectReportDescription.trim();
+
   useEffect(() => {
     setCurrentPage(1);
-  }, [startDate, endDate, week, year, paymentModeFilter, typeFilter]);
+  }, [startDate, endDate, week, year, paymentModeFilter, typeFilter, selectReportDate, selectReportAssociateName, selectReportPurpose, selectReportTransfer, selectReportType, selectedPaymentModes, selectReportDescription, selectReportAmount, selectReportRefundAmount, overallSearch]);
   const SortIcon = ({ columnKey }) => {
     if (sortConfig.key !== columnKey) return null;
     return <span className="ml-1">{sortConfig.direction === "asc" ? "↑" : "↓"}</span>;
@@ -1037,340 +1333,353 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   };
 
   return (
-    <div className='bg-[#FAF6ED]'>
-      <div className="xl:flex items-start justify-between bg-white p-4 ml-4 sm:ml-6 lg:ml-10 px-5 xl:h-[128px] rounded-md shadow-sm max-w-[95vw] w-full mb-4">
-        <div className="block md:flex md:flex-wrap gap-4 text-left w-full">
-          <div className="xl:px-0">
-            <label className="block font-semibold mb-1">Week No</label>
-            <Select
-              options={Array.from({ length: getCurrentWeekNumber() }, (_, i) => ({
-                value: `Week ${String(i + 1).padStart(2, "0")}`,
-                label: `Week ${String(i + 1).padStart(2, "0")}`
-              }))}
-              value={week ? { value: week, label: week } : null}
-              onChange={(selected) => {
-                setWeek(selected ? selected.value : '');
-                setStartDate("");
-                setEndDate("");
-              }}
-              placeholder="Select"
-              isSearchable
-              isClearable
-              menuPortalTarget={document.body}
-              styles={customStyles}
-              className=' w-fullrounded-lg focus:outline-none'
-            />
-          </div>
-          <div className="">
-            <label className="block font-semibold mb-1">Year</label>
-            <Select
-              options={years.map((y) => ({
-                value: y.toString(),
-                label: y.toString()
-              }))}
-              value={year ? { value: year, label: year } : null}
-              onChange={(selected) => setYear(selected ? selected.value : '')}
-              placeholder="Select Year"
-              isSearchable
-              isClearable
-              menuPortalTarget={document.body}
-              styles={customStyles}
-              className=' w-full rounded-lg focus:outline-none'
-            />
-          </div>
-          <div className="">
-            <label className="block font-semibold mb-1">Start Date</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                setWeek("");
-              }}
-              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-full h-[45px] focus:outline-none"
-            />
-          </div>
-          <div className="">
-            <label className="block font-semibold mb-1">End Date</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                setWeek("");
-              }}
-              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-full h-[45px] focus:outline-none"
-            />
-          </div>
-          <div className="">
-            <label className="block font-semibold mb-1">Payment Mode</label>
-            <Select
-              options={[
-                ...finalPaymentModeOptions.map((opt) => ({
-                  value: opt.value,
-                  label: opt.label
-                }))
-              ]}
-              value={paymentModeFilter ? { value: paymentModeFilter, label: finalPaymentModeOptions.find(opt => opt.value === paymentModeFilter)?.label || paymentModeFilter } : null}
-              onChange={(selected) => setPaymentModeFilter(selected ? selected.value : '')}
-              placeholder="Select Modes"
-              isSearchable
-              isClearable
-              menuPortalTarget={document.body}
-              styles={customStyles}
-              className=' w-full rounded-lg focus:outline-none'
-            />
-          </div>
-          <div className="">
-            <label className="block font-semibold mb-1">Type</label>
-            <Select
-              options={[
-                { value: 'Loan', label: 'Loan' },
-                { value: 'Refund', label: 'Refund' },
-                { value: 'Transfer', label: 'Transfer' }
-              ]}
-              value={typeFilter ? { value: typeFilter, label: typeFilter } : null}
-              onChange={(selected) => setTypeFilter(selected ? selected.value : '')}
-              placeholder="Select Types"
-              isSearchable
-              isClearable
-              menuPortalTarget={document.body}
-              styles={customStyles}
-              className=' w-full rounded-lg focus:outline-none'
-            />
+    <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]">
+      <div className="px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
+        <div className="w-full rounded-[6px] bg-white mb-[18px] shrink-0">
+          <div className="flex flex-wrap items-center justify-between text-left max-md:flex-col max-md:items-stretch">
+            <div className="flex flex-wrap items-center space-x-3 text-left p-[18px]">
+              <div>
+                <label className="block font-semibold mb-[8px]">Week No</label>
+                <Select
+                  value={week ? { value: week, label: week } : null}
+                  onChange={(selectedOption) => {
+                    const value = selectedOption ? selectedOption.value : "";
+                    setWeek(value);
+                    setStartDate("");
+                    setEndDate("");
+                  }}
+                  options={Array.from({ length: getCurrentWeekNumber() }, (_, i) => {
+                    const w = getCurrentWeekNumber() - i;
+                    const label = `Week ${String(w).padStart(2, "0")}`;
+                    return { label, value: label };
+                  })}
+                  placeholder="Week No"
+                  isSearchable
+                  isClearable
+                  styles={customStyles}
+                  className="w-[150px] h-[40px]"
+                  classNamePrefix="select"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-[8px]">Year</label>
+                <Select
+                  value={year ? { value: year, label: year } : null}
+                  onChange={(selectedOption) => setYear(selectedOption ? selectedOption.value : "")}
+                  options={[...years].reverse().map((y) => ({
+                    value: y.toString(),
+                    label: y.toString(),
+                  }))}
+                  placeholder="Year"
+                  isSearchable
+                  isClearable
+                  styles={customStyles}
+                  className="w-[150px] h-[40px]"
+                  classNamePrefix="select"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-[8px]">Payment Mode</label>
+                <Select
+                  value={paymentModeFilter ? { value: paymentModeFilter, label: paymentModeFilter } : null}
+                  onChange={(selectedOption) => setPaymentModeFilter(selectedOption ? selectedOption.value : "")}
+                  options={finalPaymentModeOptions}
+                  placeholder="Payment Mode"
+                  isSearchable
+                  isClearable
+                  styles={{
+                    ...customStyles,
+                    placeholder: (provided) => ({
+                      ...customStyles.placeholder(provided),
+                      color: '#A6A5A6',
+                    }),
+                    dropdownIndicator: (provided, state) => ({
+                      ...customStyles.dropdownIndicator(provided, state),
+                      paddingLeft: 0,
+                      paddingRight: 4,
+                    }),
+                  }}
+                  className="w-[150px] h-[40px]"
+                  classNamePrefix="select"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-[8px]">Type</label>
+                <Select
+                  value={typeFilter ? { value: typeFilter, label: typeFilter } : null}
+                  onChange={(selectedOption) => setTypeFilter(selectedOption ? selectedOption.value : "")}
+                  options={[
+                    { value: "Loan", label: "Loan" },
+                    { value: "Refund", label: "Refund" },
+                    { value: "Transfer", label: "Transfer" },
+                  ]}
+                  placeholder="Type"
+                  isSearchable
+                  isClearable
+                  styles={{
+                    ...customStyles,
+                    placeholder: (provided) => ({
+                      ...customStyles.placeholder(provided),
+                      color: '#A6A5A6',
+                    }),
+                    dropdownIndicator: (provided, state) => ({
+                      ...customStyles.dropdownIndicator(provided, state),
+                      paddingLeft: 0,
+                      paddingRight: 4,
+                    }),
+                  }}
+                  className="w-[150px] h-[40px]"
+                  classNamePrefix="select"
+                />
+              </div>
+            </div>
+            <div className="flex items-center flex-wrap justify-end pr-[18px] max-xl:basis-full max-xl:pl-[18px] max-xl:justify-start max-xl:pb-[18px] max-md:justify-start max-md:px-[18px] max-md:pb-[18px] max-md:w-full">
+              <div
+                className="rounded-md px-4 py-[8px] text-sm shrink-0"
+                style={{
+                  backgroundColor: '#FFFDF9',
+                  backgroundImage: [
+                    'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                    'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                    'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+                    'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+                  ].join(', '),
+                  backgroundSize: '100% 1px, 100% 1px, 1px 100%, 1px 100%',
+                  backgroundPosition: '0 0, 0 100%, 0 0, 100% 0',
+                  backgroundRepeat: 'repeat-x, repeat-x, repeat-y, repeat-y',
+                }}
+              >
+                <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                  <span className="flex shrink-0 w-[110px] text-black font-semibold">
+                    <span className="whitespace-nowrap">From Date</span>
+                    <span className="ml-auto">:</span>
+                  </span>
+                  <span className="font-semibold" style={{ color: '#E4572E' }}>
+                    {startDate
+                      ? new Date(startDate).toLocaleDateString("en-GB")
+                      : fromDate || "-"}
+                  </span>
+                </div>
+                <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                  <span className="flex shrink-0 w-[110px] text-black font-semibold">
+                    <span className="whitespace-nowrap">To Date</span>
+                    <span className="ml-auto">:</span>
+                  </span>
+                  <span className="font-semibold" style={{ color: '#E4572E' }}>
+                    {endDate
+                      ? new Date(endDate).toLocaleDateString("en-GB")
+                      : toDate || "-"}
+                  </span>
+                </div>
+                <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                  <span className="flex shrink-0 w-[110px] text-black font-semibold">
+                    <span className="whitespace-nowrap">Total Loan</span>
+                    <span className="ml-auto">:</span>
+                  </span>
+                  <span className="font-semibold" style={{ color: '#E4572E' }}>
+                    {totalLoan}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="xl:ml-0 max-w-[200px] w-full">
-          <div className="text-sm text-right space-y-1 border-2 border-[#E4572E] border-opacity-15 p-1 xl:mt-0 mt-2">
-            <div>
-              <span className="font-semibold">From Date</span> :{" "}
-              <span className="text-red-500">
-                {startDate
-                  ? new Date(startDate).toLocaleDateString("en-GB")
-                  : fromDate || "-"}
-              </span>
+
+        <div className="w-full max-w-[1850px] mx-auto pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="w-fit max-w-full flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div
+              className={`text-left flex ${hasActiveColumnFilters
+                ? 'flex-col sm:flex-row sm:justify-between'
+                : 'flex-row justify-between items-center'
+                } mb-[12px] gap-[6px] shrink-0 w-full`}
+            >
+              <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
+                <button className="" type="button" onClick={() => setShowFilters((prev) => !prev)}>
+                  <img src={Filter} alt="Toggle Filter" className="border rounded-md h-[34px]" />
+                </button>
+                {hasActiveColumnFilters && (
+                  <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
+                    {selectReportDate && (
+                      <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                        <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
+                        <span className="font-semibold text-[14px] truncate min-w-0">{selectReportDate}</span>
+                        <button type="button" onClick={() => setSelectReportDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                      </span>
+                    )}
+                    {selectReportAssociateName && (
+                      <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                        <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Associate: </span>
+                        <span className="font-semibold text-[14px] truncate min-w-0">{selectReportAssociateName === BLANK_VALUE ? BLANK_LABEL : selectReportAssociateName}</span>
+                        <button type="button" onClick={() => setSelectReportAssociateName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                      </span>
+                    )}
+                    {selectReportPurpose && (
+                      <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                        <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Purpose: </span>
+                        <span className="font-semibold text-[14px] truncate min-w-0">{selectReportPurpose === BLANK_VALUE ? BLANK_LABEL : selectReportPurpose}</span>
+                        <button type="button" onClick={() => setSelectReportPurpose('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                      </span>
+                    )}
+                    {selectReportTransfer && (
+                      <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                        <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Transfer: </span>
+                        <span className="font-semibold text-[14px] truncate min-w-0">{selectReportTransfer === BLANK_VALUE ? 'Blank' : selectReportTransfer}</span>
+                        <button type="button" onClick={() => setSelectReportTransfer('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                      </span>
+                    )}
+                    {selectReportAmount.trim() && (
+                      <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                        <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Loan: </span>
+                        <span className="font-semibold text-[14px] truncate min-w-0">{selectReportAmount}</span>
+                        <button type="button" onClick={() => setSelectReportAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                      </span>
+                    )}
+                    {selectReportRefundAmount.trim() && (
+                      <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                        <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Refund Amount: </span>
+                        <span className="font-semibold text-[14px] truncate min-w-0">{selectReportRefundAmount}</span>
+                        <button type="button" onClick={() => setSelectReportRefundAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                      </span>
+                    )}
+                    {selectReportType && (
+                      <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                        <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Type: </span>
+                        <span className="font-semibold text-[14px] truncate min-w-0">{selectReportType === BLANK_VALUE ? BLANK_LABEL : selectReportType}</span>
+                        <button type="button" onClick={() => setSelectReportType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                      </span>
+                    )}
+                    <EdbcPaymentModeFilterChip
+                      fieldLabel="Mode"
+                      selectedModes={selectedPaymentModes}
+                      blankValue={BLANK_VALUE}
+                      blankLabel={BLANK_LABEL}
+                      onClear={() => setSelectedPaymentModes([])}
+                    />
+                    {selectReportDescription.trim() && (
+                      <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                        <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Description: </span>
+                        <span className="font-semibold text-[14px] truncate min-w-0">{selectReportDescription}</span>
+                        <button type="button" onClick={() => setSelectReportDescription('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-end gap-[6px] shrink-0">
+                <button type="button" onClick={clearFilters} className="flex h-[34px] w-[32px] shrink-0 items-center justify-center">
+                  <img className="w-full h-full" src={Reload} alt="Reload" />
+                </button>
+                <div className="w-[286px] min-w-[286px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
+                  <input
+                    type="text"
+                    value={overallSearch}
+                    onChange={(e) => setOverallSearch(e.target.value)}
+                    placeholder="Search Transactions..."
+                    className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
+                  />
+                  <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
+                </div>
+                <div className="text-left md:text-right md:items-end items-end cursor-default flex justify-end">
+                  <div className="flex items-end text-center">
+                    <span className="text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer" onClick={handleExportPDF}>PDF<img src={Pdf} alt="Pdf" className="w-4 h-4" /></span>
+                    <span className="text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer" onClick={handleExportExcel}>XL<img src={XL} alt="XL" className="w-4 h-4" /></span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div>
-              <span className="font-semibold">To Date</span> :{" "}
-              <span className="text-red-500">
-                {endDate
-                  ? new Date(endDate).toLocaleDateString("en-GB")
-                  : toDate || "-"}
-              </span>
-            </div>
-          </div>
-          <div className="text-sm text-right space-y-1 border-2 border-[#E4572E] border-opacity-15 p-1 mt-2">
-            <div>
-              <span className="font-semibold">Total Loan</span> : <span className="text-red-500 font-semibold">{totalLoan}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className='max-w-[95vw] w-full rounded-md ml-4 xl:h-[630px] h-auto sm:ml-6 lg:ml-10 px-5 bg-white p-4'>
-        <div className='space-x-6 flex justify-end'>
-          <button onClick={handleExportPDF} className='text-sm text-[#E4572E] hover:underline font-bold'>Export PDF</button>
-          <button onClick={handleExportExcel} className='text-sm text-[#007233] hover:underline font-bold'>Export XL</button>
-          <button className='text-sm text-[#BF9853] hover:underline font-bold'>Print</button>
-        </div>
-        <div
-          ref={scrollRef}
-          className=" rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] max-h-[500px] overflow-auto select-none "
+            <div
+              ref={scrollRef}
+              className="w-full rounded-lg border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none scrollbar-none no-scrollbar"
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
         >
-          <table ref={tableRef} className="table-fixed min-w-[1400px] w-full border-collapse">
-            <thead className='bg-[#FAF6ED]'>
-              <tr>
-                <th
-                  className="pt-2 pl-3 w-20 font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
-                  onClick={() => requestSort("sno")}
-                >
-                  S.No <SortIcon columnKey="sno" />
-                </th>
-                <th
-                  className="pt-2 pl-3 w-32 font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
-                  onClick={() => requestSort("date")}
-                >
-                  Date <SortIcon columnKey="date" />
-                </th>
-                <th
-                  className="px-2 w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
-                  onClick={() => requestSort("associate")}
-                >
-                  Associate <SortIcon columnKey="associate" />
-                </th>
-                <th
-                  className="px-2 w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
-                  onClick={() => requestSort("purpose")}
-                >
-                  Purpose <SortIcon columnKey="purpose" />
-                </th>
-                <th
-                  className="px-2 w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
-                  onClick={() => requestSort("transfer")}
-                >
-                  Transfer To <SortIcon columnKey="transfer" />
-                </th>
-                <th className="px-2 w-[100px] font-bold text-right">Loan/Transfer</th>
-                <th className="px-2 w-[100px] font-bold text-right">Refund</th>
-                <th
-                  className="px-2 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
-                  onClick={() => requestSort("type")}
-                >
-                  Type <SortIcon columnKey="type" />
-                </th>
-                <th
-                  className="px-2 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
-                  onClick={() => requestSort("payment_mode")}
-                >
-                  Mode <SortIcon columnKey="payment_mode" />
-                </th>
-                <th
-                  className="px-2 w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
-                  onClick={() => requestSort("description")}
-                >
-                  Description <SortIcon columnKey="description" />
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentData.length === 0 ? (
-                <tr>
-                  <td colSpan="10" className="text-center py-4 text-gray-500 font-semibold">No Entry is available</td>
-                </tr>
-              ) : (
-                currentData.map((row, index) => (
-                  <tr key={row.id || index} className="odd:bg-white even:bg-[#FAF6ED]">
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{startIndex + index + 1}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{new Date(row.date).toLocaleDateString("en-GB")}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{getAssociateName(row)}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{getPurposeOrSiteName(row)}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{getTransferDestination(row)}</td>
-                    <td
-                      className={`text-sm text-right p-3 w-32 font-semibold ${(row.type === "Loan" || row.type === "Transfer") ? "cursor-pointer hover:bg-gray-200" : ""}`}
-                      onClick={() => {
-                        if (row.type === "Loan" || row.type === "Transfer") {
-                          handleLoanClick(row);
-                        }
-                      }}
-                    >
-                      {(row.type === "Loan" || row.type === "Transfer") ? (row.amount?.toLocaleString("en-IN") || "0") : "-"}
-                    </td>
-                    <td
-                      className={`text-sm text-right p-3 w-32 font-semibold ${row.type === "Refund" ? "cursor-pointer hover:bg-gray-200" : ""}`}
-                      onClick={() => {
-                        if (row.type === "Refund") {
-                          handleRefundClick(row);
-                        }
-                      }}
-                    >
-                      {row.type === "Refund" ? (row.loan_refund_amount?.toLocaleString("en-IN") || "0") : "-"}
-                    </td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{row.type || "-"}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{row.type === 'Transfer' ? '' : (finalPaymentModeOptions.find(opt => opt.value === row.loan_payment_mode)?.label || row.loan_payment_mode || "-")}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{row.description || "-"}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        {sortedData.length > 0 && (
-          <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200">
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium text-gray-700">Show:</label>
-              <Select
-                options={[
-                  { value: 50, label: '50' },
-                  { value: 100, label: '100' },
-                  { value: 200, label: '200' },
-                  { value: 300, label: '300' },
-                  { value: 400, label: '400' },
-                  { value: 500, label: '500' },
-                  { value: 600, label: '600' },
-                  { value: 700, label: '700' },
-                  { value: 800, label: '800' },
-                  { value: 900, label: '900' },
-                  { value: 1000, label: '1000' }
-                ]}
-                value={{ value: itemsPerPage, label: itemsPerPage.toString() }}
-                onChange={(selected) => {
-                  const newItemsPerPage = selected ? selected.value : 50;
-                  setItemsPerPage(newItemsPerPage);
-                  setCurrentPage(1);
-                }}
-                isSearchable
-                styles={{
-                  ...customStyles,
-                  control: (provided) => ({
-                    ...provided,
-                    minWidth: '100px',
-                    height: '38px',
-                    borderWidth: '1px',
-                    borderColor: '#d1d5db',
-                    borderRadius: '6px',
-                  }),
-                }}
-                className="text-sm"
-              />
-              <span className="text-sm text-gray-700">entries</span>
-            </div>
-            <div className="text-sm text-gray-700">
-              Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={goToPreviousPage}
-                disabled={currentPage === 1}
-                className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === 1
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
-                  }`}
-              >
-                Previous
-              </button>
-              <div className="flex items-center space-x-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => goToPage(pageNum)}
-                      className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === pageNum
-                        ? 'bg-[#BF9853] text-white'
-                        : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
-                        }`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
-              </div>
-              <button
-                onClick={goToNextPage}
-                disabled={currentPage === totalPages}
-                className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === totalPages
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
-                  }`}
-              >
-                Next
-              </button>
+              <table ref={tableRef} className={`table-fixed w-px shrink-0 border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS}`}>
+                <thead className="sticky top-0 z-20 bg-[#FAF6ED]">
+                  <EdbcTableHeaderRow>
+                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC21} label="S.No" />
+                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" sortField={resolveEdbcSortField("date")} sortDirection={sortConfig.direction} onSort={handleEdbcSort} />
+                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label="Associate" sortField={resolveEdbcSortField("associate")} sortDirection={sortConfig.direction} onSort={handleEdbcSort} />
+                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC14} label="Purpose" sortField={resolveEdbcSortField("purpose")} sortDirection={sortConfig.direction} onSort={handleEdbcSort} />
+                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label="Transfer To" sortField={resolveEdbcSortField("transfer")} sortDirection={sortConfig.direction} onSort={handleEdbcSort} />
+                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Loan" sortField={resolveEdbcSortField("amount")} sortDirection={sortConfig.direction} onSort={handleEdbcSort} />
+                    <th id={EDBC_IDS.EDBC8} className={edbc8Config?.headerClass} onClick={() => requestSort("refund")}>
+                      Refund{sortConfig.key === "refund" ? (sortConfig.direction === "asc" ? " ↑" : " ↓") : ""}
+                    </th>
+                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC9} label="Description" sortField={resolveEdbcSortField("description")} sortDirection={sortConfig.direction} onSort={handleEdbcSort} />
+                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Type" sortField={resolveEdbcSortField("type")} sortDirection={sortConfig.direction} onSort={handleEdbcSort} />
+                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC13} label="Mode" sortField={resolveEdbcSortField("payment_mode")} sortDirection={sortConfig.direction} onSort={handleEdbcSort} />
+                  </EdbcTableHeaderRow>
+                  {showFilters && (
+                    <EdbcTableFilterRow>
+                      <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC21} />
+                      <EdbcDateFilter placeholder="Date" value={selectReportDate} onChange={setSelectReportDate} />
+                      <EdbcSelectFilter columnId={EDBC_IDS.EDBC4} placeholder="Associate" options={reportFilterOptions.associateOptions} value={selectReportAssociateName} onChange={setSelectReportAssociateName} blankOption={blankOption} blankValue={BLANK_VALUE} selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES} />
+                      <EdbcSelectFilter columnId={EDBC_IDS.EDBC14} placeholder="Purpose" options={reportFilterOptions.purposeOptions} value={selectReportPurpose} onChange={setSelectReportPurpose} blankOption={blankOption} blankValue={BLANK_VALUE} selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES} />
+                      <EdbcProjectNameFilter placeholder="Transfer To" options={reportFilterOptions.transferOptions} value={selectReportTransfer} onChange={setSelectReportTransfer} blankOption={blankOption} blankValue={BLANK_VALUE} selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES} />
+                      <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={reportTotals.amount} value={selectReportAmount} onChange={(e) => setSelectReportAmount(e.target.value)} />
+                      <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={reportTotals.refund_amount} value={selectReportRefundAmount} onChange={(e) => setSelectReportRefundAmount(e.target.value)} />
+                      <EdbcTextInputFilter columnId={EDBC_IDS.EDBC9} placeholder="Description" value={selectReportDescription} onChange={(e) => setSelectReportDescription(e.target.value)} />
+                      <EdbcSelectFilter columnId={EDBC_IDS.EDBC12} placeholder="Type" options={reportFilterOptions.typeOptions.map((t) => t === BLANK_VALUE ? blankOption : { value: t, label: t })} value={selectReportType} onChange={setSelectReportType} blankOption={blankOption} blankValue={BLANK_VALUE} selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES} />
+                      <EdbcPaymentModeFilter columnId={EDBC_IDS.EDBC13} placeholder="Mode" options={reportFilterOptions.modeOptions} value={selectedPaymentModes} onChange={setSelectedPaymentModes} selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES} />
+                    </EdbcTableFilterRow>
+                  )}
+                </thead>
+                <tbody>
+                  {currentData.length === 0 ? (
+                    <tr><td colSpan="10" className="text-center py-4 text-gray-500 font-semibold">No Entry is available</td></tr>
+                  ) : (
+                    currentData.map((row, index) => (
+                      <EdbcTableBodyRow key={row.id || index}>
+                        <td id={EDBC_IDS.EDBC21} className={edbc21Config?.tdClass}>{startIndex + index + 1}</td>
+                        <EdbcDateBodyCell expense={row} rowIndex={index} expandedCells={expandedCells} onToggleExpanded={toggleExpandedCell} formatValue={formatExpenseDateOnly} />
+                        <EdbcExpandableBodyCell columnId={EDBC_IDS.EDBC4} expense={row} rowIndex={index} expandedCells={expandedCells} onToggleExpanded={toggleExpandedCell} getDisplayValue={getAssociateName} />
+                        <EdbcExpandableBodyCell columnId={EDBC_IDS.EDBC14} expense={row} rowIndex={index} expandedCells={expandedCells} onToggleExpanded={toggleExpandedCell} getDisplayValue={getPurposeOrSiteName} />
+                        <EdbcExpandableBodyCell columnId={EDBC_IDS.EDBC3} expense={row} rowIndex={index} expandedCells={expandedCells} onToggleExpanded={toggleExpandedCell} getDisplayValue={getTransferDestination} />
+                        <td className={`${edbc8Config?.tdClass} text-right ${(row.type === "Loan" || row.type === "Transfer") ? "cursor-pointer hover:bg-gray-100" : ""}`} onClick={() => { if (row.type === "Loan" || row.type === "Transfer") handleLoanClick(row); }}>
+                          <span className="block w-full text-right" title={(row.type === "Loan" || row.type === "Transfer") ? formatReportAmount(row.amount) : ""}>{(row.type === "Loan" || row.type === "Transfer") ? formatReportAmount(row.amount) : "-"}</span>
+                        </td>
+                        <td className={`${edbc8Config?.tdClass} text-right ${row.type === "Refund" ? "cursor-pointer hover:bg-gray-100" : ""}`} onClick={() => { if (row.type === "Refund") handleRefundClick(row); }}>
+                          <span className="block w-full text-right" title={row.type === "Refund" ? formatReportAmount(row.loan_refund_amount) : ""}>{row.type === "Refund" ? formatReportAmount(row.loan_refund_amount) : "-"}</span>
+                        </td>
+                        <EdbcExpandableBodyCell columnId={EDBC_IDS.EDBC9} expense={row} rowIndex={index} expandedCells={expandedCells} onToggleExpanded={toggleExpandedCell} getDisplayValue={(entry) => (entry.description && entry.description !== "-") ? entry.description : ""} />
+                        <EdbcExpandableBodyCell columnId={EDBC_IDS.EDBC12} expense={row} rowIndex={index} expandedCells={expandedCells} onToggleExpanded={toggleExpandedCell} getDisplayValue={(entry) => (entry.type && entry.type !== "-") ? entry.type : ""} />
+                        <EdbcExpandableBodyCell columnId={EDBC_IDS.EDBC13} expense={row} rowIndex={index} expandedCells={expandedCells} onToggleExpanded={toggleExpandedCell} getDisplayValue={(entry) => { if (entry.type === 'Transfer') return ''; const label = finalPaymentModeOptions.find((opt) => opt.value === entry.loan_payment_mode)?.label || entry.loan_payment_mode; return (label && label !== "-") ? label : ""; }} />
+                      </EdbcTableBodyRow>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
-        )}
-      </div>
+
+          <div className="flex shrink-0 items-center justify-between mt-4 px-4 py-3 border-t border-gray-200">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-700">Items per page:</span>
+              <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(parseInt(e.target.value, 10)); setCurrentPage(1); }} className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853]">
+                <option value={50}>50</option><option value={100}>100</option><option value={200}>200</option><option value={300}>300</option><option value={400}>400</option><option value={500}>500</option><option value={600}>600</option><option value={700}>700</option><option value={800}>800</option><option value={900}>900</option><option value={1000}>1000</option>
+              </select>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-700">Showing {sortedData.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <button type="button" onClick={goToPreviousPage} disabled={currentPage === 1} className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]">Previous</button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) pageNum = i + 1;
+                else if (currentPage <= 3) pageNum = i + 1;
+                else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                else pageNum = currentPage - 2 + i;
+                return (
+                  <button type="button" key={pageNum} onClick={() => goToPage(pageNum)} className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${currentPage === pageNum ? 'bg-[#BF9853] text-white border-[#BF9853]' : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'}`}>{pageNum}</button>
+                );
+              })}
+              <button type="button" onClick={goToNextPage} disabled={currentPage === totalPages} className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]">Next</button>
+            </div>
+          </div>
+        </div>
       {showPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
           onClick={() => setShowPopup(false)}
@@ -1471,6 +1780,7 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

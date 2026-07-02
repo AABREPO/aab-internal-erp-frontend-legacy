@@ -1505,7 +1505,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
     // Add print logic
   }, []);
 
-  const { sortField: sideTableSortField, sortDirection: sideTableSortDirection, handleSort: handleSideTableSort, clearSort: clearSideTableSort } = useEdbcTableSort();
+  const { sortField: sideTableSortField, sortDirection: sideTableSortDirection, handleSort: handleSideTableSort, setSortField: setSideTableSortField, setSortDirection: setSideTableSortDirection } = useEdbcTableSort();
   const { expandedCells: sideTableExpandedCells, toggleExpandedCell: toggleSideTableExpandedCell } = useEdbcExpandedCells();
   const edbc8Config = getEdbcColumnConfig(EDBC_IDS.EDBC8);
   const edbc3Config = getEdbcColumnConfig(EDBC_IDS.EDBC3);
@@ -1664,8 +1664,9 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
     setSideTableFilterMode('');
     setSideTableFilterAdvanceAmount('');
     setSideTableOverallSearch('');
-    clearSideTableSort();
-  }, [clearSideTableSort]);
+    setSideTableSortField('');
+    setSideTableSortDirection('asc');
+  }, [setSideTableSortField, setSideTableSortDirection]);
 
   const handleSideTableFilterChipsMouseDown = (e) => {
     if (!sideTableFilterChipsScrollRef.current || e.target.closest('button')) return;
@@ -2042,7 +2043,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                     value={selectTypeOptions.find(option => option.value === formData.selectedType) || null}
                     onChange={(selected) => handleInputChange('selectedType', selected ? selected.value : '')}
                     options={selectTypeOptions}
-                    placeholder="Select Type..."
+                    placeholder="Select Type"
                     isClearable
                     isSearchable
                     menuPortalTarget={document.body}
@@ -2088,7 +2089,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                     className={ADVANCE_PORTAL_SELECT_CLASS}
                     isClearable
                     styles={customStyles}
-                    placeholder="Select employee..."
+                    placeholder="EMP Name"
                     isSearchable={true}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -2108,7 +2109,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                     value={formData.purpose}
                     onChange={(value) => handleInputChange('purpose', value)}
                     options={purposeOptions}
-                    placeholder="Select a purpose..."
+                    placeholder={fieldConfig.purposeLabel}
                     isSearchable={true}
                     styles={customStyles}
                     isClearable
@@ -2136,7 +2137,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                           value={formData.transferPurpose}
                           onChange={(value) => handleInputChange('transferPurpose', value)}
                           options={purposeOptions}
-                          placeholder="Select purpose to..."
+                          placeholder={fieldConfig.amountGivenLabel}
                           styles={customStyles}
                           className={ADVANCE_PORTAL_SELECT_CLASS}
                           isClearable
@@ -2173,7 +2174,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                           value={paymentModeOptions.find(option => option.value === formData.paymentMode) || null}
                           onChange={(selected) => handleInputChange('paymentMode', selected ? selected.value : '')}
                           options={paymentModeOptions}
-                          placeholder="Payment Mode"
+                          placeholder={fieldConfig.paymentModeLabel}
                           isClearable
                           isSearchable
                           menuPortalTarget={document.body}
@@ -2224,7 +2225,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                     disabled={isSubmitting}
                     className={`bg-[#c7934c] text-white w-full sm:w-[120px] h-[33px] rounded flex items-center justify-center text-sm xl:mb-0 mb-2 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
                   >
-                    {isSubmitting ? 'Processing...' : 'Pay Advance'}
+                    {isSubmitting ? 'Processing...' : formData.selectedType === 'Refund' ? 'Pay Refund' : formData.selectedType === 'Transfer' ? 'Pay Transfer' : 'Pay Advance'}
                   </button>
                 </div>
               </div>
@@ -2539,7 +2540,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                       value={selectTypeOptions.find(option => option.value === editFormData.selectedType) || null}
                       onChange={(selected) => setEditFormData({ ...editFormData, selectedType: selected ? selected.value : '' })}
                       options={selectTypeOptions}
-                      placeholder="Select Type..."
+                      placeholder="Select Type"
                       isClearable
                       isSearchable
                       menuPortalTarget={document.body}
@@ -2573,7 +2574,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                       className='w-full h-[45px] rounded-lg focus:outline-none'
                       isClearable
                       styles={customStyles}
-                      placeholder="Select employee..."
+                      placeholder="EMP Name"
                       isSearchable={true}
                     />
                   </div>
@@ -2596,7 +2597,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                       value={editFormData.purpose}
                       onChange={(value) => setEditFormData({ ...editFormData, purpose: value })}
                       options={purposeOptions}
-                      placeholder="Select a purpose..."
+                      placeholder="Purpose"
                       isSearchable={true}
                       styles={customStyles}
                       isClearable
@@ -2625,7 +2626,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                         value={editFormData.transferPurpose}
                         onChange={(value) => setEditFormData({ ...editFormData, transferPurpose: value })}
                         options={purposeOptions}
-                        placeholder="Select purpose to..."
+                        placeholder="Purpose To"
                         styles={customStyles}
                         className='w-full h-[45px] rounded-lg focus:outline-none'
                         isClearable
@@ -2657,7 +2658,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                         value={paymentModeOptions.find(option => option.value === editFormData.paymentMode) || null}
                         onChange={(selected) => setEditFormData({ ...editFormData, paymentMode: selected ? selected.value : '' })}
                         options={paymentModeOptions}
-                        placeholder="Select"
+                        placeholder="Payment Mode"
                         isClearable
                         isSearchable
                         menuPortalTarget={document.body}
@@ -2725,7 +2726,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                             }))
                           }
                           options={paymentModeOptions || []}
-                          placeholder="---Select---"
+                          placeholder="Payment Mode"
                           isClearable
                           isSearchable
                           menuPortalTarget={document.body}
@@ -2794,7 +2795,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                                   }))
                                 }
                                 options={accountNumberOptions}
-                                placeholder="Select Account"
+                                placeholder="Account Number"
                                 isClearable
                                 isSearchable
                                 menuPortalTarget={document.body}
@@ -2888,7 +2889,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                             value={selectTypeOptions.find(option => option.value === formData.selectedType) || null}
                             onChange={(selected) => handleInputChange('selectedType', selected ? selected.value : '')}
                             options={selectTypeOptions}
-                            placeholder="Select Type..."
+                            placeholder="Type"
                             isClearable
                             isSearchable
                             menuPortalTarget={document.body}
@@ -2915,6 +2916,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                             isClearable
                             className="custom-select rounded-lg"
                             isSearchable={true}
+                            placeholder="Employee/Labour Name"
                           />
                         </div>
                         <div>
@@ -2927,6 +2929,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                             isClearable
                             className="custom-select rounded-lg"
                             isSearchable={true}
+                            placeholder="Purpose"
                           />
                         </div>
                         {formData.selectedType === 'Transfer' && (
@@ -2941,6 +2944,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                                 isClearable
                                 className="custom-select rounded-lg"
                                 isSearchable={true}
+                                placeholder="Transfer To Purpose"
                               />
                             </div>
                             <div>
@@ -2972,7 +2976,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                                   value={paymentModeOptions.find(option => option.value === formData.paymentMode) || null}
                                   onChange={(selected) => handleInputChange('paymentMode', selected ? selected.value : '')}
                                   options={paymentModeOptions}
-                                  placeholder="Select"
+                                  placeholder="Payment Mode"
                                   isClearable
                                   isSearchable
                                   menuPortalTarget={document.body}

@@ -6,11 +6,6 @@ import "jspdf-autotable";
 import Select from 'react-select';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import Filter from '../Images/TableFilter.svg'
-import Search from '../Images/Searchnew.svg'
-import Reload from '../Images/Clear.svg'
-import Pdf from '../Images/pdf.png'
-import XL from '../Images/sheets.png'
 import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
@@ -33,6 +28,9 @@ import {
   EdbcDateBodyCell,
   EdbcExpandableBodyCell,
   EDBC_TABLE_EDGE_TABLE_CLASS,
+  EdbcFilterToggleButton,
+  EdbcTableToolbarRightActions,
+  formatEdbcFilterDateDMY,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
 import {
   clearLinkedAdvancePortalForLoanDelete,
@@ -56,6 +54,31 @@ import {
 } from '../../utils/paymentModeArrangement';
 
 const LOAN_FILTER_OPTION_MIN_HEIGHT_PX = 36;
+const ADVANCE_PORTAL_FILTER_AMOUNT_INPUT_CLASS =
+  'pl-[12px] pr-2 border border-[#00000029] rounded-lg w-full h-full focus:outline-none bg-[#ededed] text-[14px] font-medium cursor-default';
+const formatAmountDisplay = (value) => {
+  if (value === '' || value === null || value === undefined) return '';
+  const normalized = String(value).replace(/,/g, '');
+  const num = Number(normalized);
+  if (Number.isNaN(num)) return String(value);
+  return num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+const AdvancePortalAmountOutput = ({ value, className = '' }) => {
+  const formattedValue = formatAmountDisplay(value);
+  const displayValue = formattedValue ? `₹${formattedValue}` : '';
+  return (
+    <div className={`relative lg:w-[150px] w-full h-[40px] ${className}`.trim()}>
+      <input
+        type="text"
+        readOnly
+        tabIndex={-1}
+        value={displayValue}
+        className={ADVANCE_PORTAL_FILTER_AMOUNT_INPUT_CLASS}
+      />
+    </div>
+  );
+};
+
 const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
@@ -116,6 +139,11 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
   const velocity = useRef({ x: 0, y: 0 });
   const animationFrame = useRef(null);
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
+  const filterRowRef = useRef(null);
+  const filterNudgeUsedRef = useRef(false);
+  const filterChipsScrollRef = useRef(null);
+  const isFilterChipsDragging = useRef(false);
+  const filterChipsDragStart = useRef({ x: 0, scrollLeft: 0 });
   const handleMouseDown = (e) => {
     if (!scrollRef.current) return;
     isDragging.current = true;
@@ -957,6 +985,41 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
     setCurrentPage(1);
   }, [selectTimeStampDate, selectDate, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectMode, selectDescription, selectSourceFrom, selectBranch, selectEntryNo, overallSearch]);
 
+  const handleFilterChipsMouseDown = (e) => {
+    if (!filterChipsScrollRef.current || e.target.closest('button')) return;
+    isFilterChipsDragging.current = true;
+    filterChipsDragStart.current = {
+      x: e.clientX,
+      scrollLeft: filterChipsScrollRef.current.scrollLeft,
+    };
+    filterChipsScrollRef.current.style.cursor = 'grabbing';
+    filterChipsScrollRef.current.style.userSelect = 'none';
+  };
+  const handleFilterChipsMouseMove = (e) => {
+    if (!isFilterChipsDragging.current || !filterChipsScrollRef.current) return;
+    e.preventDefault();
+    const dx = e.clientX - filterChipsDragStart.current.x;
+    filterChipsScrollRef.current.scrollLeft =
+      filterChipsDragStart.current.scrollLeft - dx;
+  };
+  const handleFilterChipsMouseUp = () => {
+    if (!filterChipsScrollRef.current) return;
+    isFilterChipsDragging.current = false;
+    filterChipsScrollRef.current.style.cursor = 'grab';
+    filterChipsScrollRef.current.style.userSelect = '';
+  };
+  const hasActiveColumnFilters =
+    selectTimeStampDate ||
+    selectDate ||
+    selectContractororVendorName ||
+    selectProjectName ||
+    selectTransfer ||
+    selectType ||
+    selectMode ||
+    selectDescription.trim() ||
+    selectSourceFrom ||
+    selectBranch ||
+    selectEntryNo;
   const clearFilters = () => {
     setSelectTimeStampDate('');
     setSelectDate('');
@@ -970,6 +1033,7 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
     setSelectBranch('');
     setSelectEntryNo('');
     setOverallSearch('');
+    setShowFilters(false);
   };
   const goToPage = (page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
@@ -1347,163 +1411,171 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
     }
   };
   return (
-    <body>
-      <div className='bg-[#FAF6ED]'>
-        <div className='max-w-[1850px] bg-white rounded-md ml-10 h-auto mr-10 px-4 text-left flex items-center gap-6'>
-          <div className='w-full xl:w-auto xl:justify-between'>
-            <div className='flex flex-wrap gap-[12px] p-[18px]'>
-              <div className=''>
-                <label className='block mb-[8px] font-semibold'>Loan Amount</label>
-                <input
-                  className='w-full h-[40px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
-                  value={`₹${totalLoanAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
-                  readOnly
-                />
-              </div>
-              <div className=''>
-                <label className='block mb-[8px] font-semibold'>Transfer Amount</label>
-                <input
-                  className='w-full h-[40px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
-                  value={`₹${totalTransferAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
-                  readOnly
-                />
-              </div>
-              <div className=''>
-                <label className='block mb-[8px] font-semibold'>Refund Amount</label>
-                <input
-                  className='w-full h-[40px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
-                  value={`₹${totalRefundAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
-                  readOnly
-                />
-              </div>
+    <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]">
+      <div className="px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
+      <div className='w-full pt-[18px] px-[18px] pb-[18px] rounded-[6px] bg-white mb-[18px] text-left flex items-center gap-6'>
+        <div className='w-full xl:w-auto xl:justify-between'>
+          <div className='flex flex-wrap gap-[12px]'>
+            <div>
+              <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Loan Amount</label>
+              <AdvancePortalAmountOutput value={totalLoanAmount} />
+            </div>
+            <div>
+              <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Transfer Amount</label>
+              <AdvancePortalAmountOutput value={totalTransferAmount} />
+            </div>
+            <div>
+              <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Refund Amount</label>
+              <AdvancePortalAmountOutput value={totalRefundAmount} />
             </div>
           </div>
         </div>
       </div>
-      <div className=" bg-white shadow-lg overflow-x-auto mt-4 ml-10 mr-10 p-4">
+      <div className="w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
         <div
-          className={`text-left flex mx-5 ${selectTimeStampDate || selectDate || selectContractororVendorName || selectProjectName || selectTransfer || selectType || selectMode || selectDescription.trim() || selectSourceFrom || selectBranch || selectEntryNo
-            ? 'flex-col sm:flex-row sm:justify-between'
-            : 'flex-row justify-between items-center'
-            } mb-[12px] gap-[6px]`}>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
-            <button className='' onClick={() => setShowFilters(!showFilters)}>
-              <img src={Filter} alt="Toggle Filter" className="border rounded-md" />
-            </button>
-            {(selectTimeStampDate || selectDate || selectContractororVendorName || selectProjectName || selectTransfer || selectType || selectMode || selectDescription.trim() || selectSourceFrom || selectBranch || selectEntryNo) && (
-              <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
+          className={`text-left flex ${hasActiveColumnFilters ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'} mb-[12px] gap-[6px]`}>
+          <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
+            <EdbcFilterToggleButton
+              onClick={() => {
+                const willOpen = !showFilters;
+                const scroller = scrollRef.current;
+                if (willOpen) {
+                  setShowFilters(true);
+                  if (!scroller) return;
+                  if (scroller.scrollTop <= 0) return;
+                  if (filterNudgeUsedRef.current) return;
+                  filterNudgeUsedRef.current = true;
+                  requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                      const h = filterRowRef.current?.offsetHeight || 0;
+                      if (h > 0) {
+                        scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+                      }
+                    });
+                  });
+                  return;
+                }
+                const h = filterRowRef.current?.offsetHeight || 0;
+                setShowFilters(false);
+                if (!scroller || h <= 0 || !filterNudgeUsedRef.current) return;
+                filterNudgeUsedRef.current = false;
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(() => {
+                    scroller.scrollTop = scroller.scrollTop + h;
+                  });
+                });
+              }}
+            />
+            {hasActiveColumnFilters && (
+              <div
+                ref={filterChipsScrollRef}
+                onMouseDown={handleFilterChipsMouseDown}
+                onMouseMove={handleFilterChipsMouseMove}
+                onMouseUp={handleFilterChipsMouseUp}
+                onMouseLeave={handleFilterChipsMouseUp}
+                className="flex min-w-0 flex-1 overflow-x-auto flex-nowrap items-center gap-2 no-scrollbar scrollbar-none cursor-grab select-none"
+              >
                 {selectTimeStampDate && (
-                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
-                    <span className="font-normal">Timestamp: </span>
-                    <span className="font-bold">{selectTimeStampDate}</span>
-                    <button onClick={() => setSelectTimeStampDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Timestamp: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{formatEdbcFilterDateDMY(selectTimeStampDate)}</span>
+                    <button type="button" onClick={() => setSelectTimeStampDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                   </span>
                 )}
                 {selectDate && (
-                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
-                    <span className="font-normal">Date: </span>
-                    <span className="font-bold">{selectDate}</span>
-                    <button onClick={() => setSelectDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Date: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{formatEdbcFilterDateDMY(selectDate)}</span>
+                    <button type="button" onClick={() => setSelectDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                   </span>
                 )}
                 {selectContractororVendorName && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Client Name: </span>
-                    <span className="font-bold">{selectContractororVendorName}</span>
-                    <button onClick={() => setSelectContractororVendorName('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Associate: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectContractororVendorName}</span>
+                    <button type="button" onClick={() => setSelectContractororVendorName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectProjectName && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Project Name:</span>
-                    <span className="font-bold">{selectProjectName}</span>
-                    <button onClick={() => setSelectProjectName('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Purpose:</span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectProjectName}</span>
+                    <button type="button" onClick={() => setSelectProjectName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectTransfer && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Transfer To: </span>
-                    <span className="font-bold">{selectTransfer}</span>
-                    <button onClick={() => setSelectTransfer('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Transfer To: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectTransfer}</span>
+                    <button type="button" onClick={() => setSelectTransfer('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectType && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Type: </span>
-                    <span className="font-bold">{selectType}</span>
-                    <button onClick={() => setSelectType('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Type: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectType}</span>
+                    <button type="button" onClick={() => setSelectType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectMode && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Mode: </span>
-                    <span className="font-bold">{selectMode}</span>
-                    <button onClick={() => setSelectMode('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Mode: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectMode}</span>
+                    <button type="button" onClick={() => setSelectMode('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectDescription.trim() && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Description: </span>
-                    <span className="font-bold">{selectDescription}</span>
-                    <button onClick={() => setSelectDescription('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Description: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectDescription}</span>
+                    <button type="button" onClick={() => setSelectDescription('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectSourceFrom && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Source From: </span>
-                    <span className="font-bold">{selectSourceFrom}</span>
-                    <button onClick={() => setSelectSourceFrom('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Source From: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectSourceFrom}</span>
+                    <button type="button" onClick={() => setSelectSourceFrom('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectBranch && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Branch: </span>
-                    <span className="font-bold">{getBranchName(selectBranch) || selectBranch}</span>
-                    <button onClick={() => setSelectBranch('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Branch: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{getBranchName(selectBranch) || selectBranch}</span>
+                    <button type="button" onClick={() => setSelectBranch('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectEntryNo && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Entry No: </span>
-                    <span className="font-bold">{selectEntryNo}</span>
-                    <button onClick={() => setSelectEntryNo('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Entry No: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectEntryNo}</span>
+                    <button type="button" onClick={() => setSelectEntryNo('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
               </div>
             )}
           </div>
-          <div className='flex items-end gap-[6px]'>
-            <button onClick={clearFilters} className='flex h-[30px] w-[30px] shrink-0 items-center justify-center'>
-              <img className='w-full h-full' src={Reload} alt="Reload" />
-            </button>
-            <div className="w-[286px] min-w-[286px] translate-y-[2px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
-              <input
-                type="text"
-                value={overallSearch}
-                onChange={(e) => setOverallSearch(e.target.value)}
-                placeholder="Search Transactions..."
-                className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
-              />
-              <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
-            </div>
-            <div className='text-left md:text-right md:items-end items-end cursor-default flex justify-end max-w-screen-2xl table-auto overflow-auto w-full scrollbar-none no-scrollbar'>
-              <div className='flex items-end text-center'>
-                <span className='text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportPDF}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
-                <span className='text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportCSV}>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
-              </div>
-            </div>
-          </div>
+          <EdbcTableToolbarRightActions
+            onClearFilters={clearFilters}
+            overallSearch={overallSearch}
+            onOverallSearchChange={setOverallSearch}
+            searchPlaceholder="Search Transactions..."
+            showExportIcons
+            onExportPdf={exportPDF}
+            onExportCsv={exportCSV}
+          />
         </div>
-        <div className='border-l-8 border-l-[#BF9853] rounded-lg mx-5'>
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <div
             ref={scrollRef}
-            className='overflow-auto max-h-[500px] no-scrollbar scrollbar-none'
+            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none no-scrollbar scrollbar-none"
+            onWheel={() => { filterNudgeUsedRef.current = false; }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
           >
-            <table className={`table-fixed min-w-[1500px] w-screen border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS}`}>
+            <table className={`table-fixed min-w-[1500px] w-full border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS}`}>
               <thead className="sticky top-0 z-10 bg-white">
                 <EdbcTableHeaderRow>
                   <EdbcColumnHeader
@@ -1587,7 +1659,7 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                   <EdbcColumnHeader columnId={EDBC_IDS.EDBC19} label="Activity" />
                 </EdbcTableHeaderRow>
                 {showFilters && (
-                  <EdbcTableFilterRow>
+                  <EdbcTableFilterRow ref={filterRowRef}>
                     <EdbcTimestampFilter
                       placeholder="Timestamp"
                       timestampStartDate={selectTimeStampDate}
@@ -2131,7 +2203,8 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
         selectStyles={customStyles}
       />
       <ToastContainer position="top-center" autoClose={3000} theme="colored" />
-    </body>
+      </div>
+    </div>
   )
 }
 export default LoanDatabase

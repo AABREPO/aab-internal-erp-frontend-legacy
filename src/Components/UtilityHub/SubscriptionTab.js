@@ -917,6 +917,7 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
 
   const handleOpenExpenseEntryPopup = (serviceNumber, project) => {
     const prefillData = {
+      source: 'Utility Hub',
       utilityType: 'Subscription',
       siteName: project?.projectName || '-',
       projectId: project?.id ?? null,

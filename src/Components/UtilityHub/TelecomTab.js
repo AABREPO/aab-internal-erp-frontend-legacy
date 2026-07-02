@@ -129,6 +129,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
 
     const openTelecomExpenseEntry = (serviceNumber, project) => {
         const prefillData = {
+            source: 'Utility Hub',
             utilityType: 'Telecom',
             siteName: project?.projectName || '-',
             projectId: project?.id ?? null,

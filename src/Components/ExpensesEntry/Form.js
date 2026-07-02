@@ -782,6 +782,10 @@ const Form = ({
 
     useEffect(() => {
         if (!lockUtilityPrefillFields) return;
+        setExpenseEntrySource('Utility Hub');
+    }, [lockUtilityPrefillFields]);
+    useEffect(() => {
+        if (!lockUtilityPrefillFields) return;
         if (selectedAccountType !== 'Utility Bills') {
             setSelectedAccountType('Utility Bills');
         }
@@ -1104,6 +1108,8 @@ const Form = ({
                 const prefillUtilityType = normalizePrefillUtilityType(prefillData);
                 if (prefillUtilityType) {
                     setUtilityType(prefillUtilityType);
+                    const prefillSource = String(prefillData.source ?? 'Utility Hub').trim();
+                    setExpenseEntrySource(prefillSource || 'Utility Hub');
                 }
 
                 const siteOption = siteOptions.find(opt => opt.label === prefillData.siteName);

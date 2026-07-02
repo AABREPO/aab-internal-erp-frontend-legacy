@@ -4,6 +4,37 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import PdfIcon from '../Images/pdf.png';
+import XlIcon from '../Images/sheets.png';
+
+const SUMMARY_OUTSIDE_SELECT_CLASS = 'custom-select w-[300px] h-[40px] rounded-lg focus:outline-none';
+const SUMMARY_PANEL_SHADOW =
+  'shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1),0_-8px_15px_-3px_rgba(0,0,0,0.1)]';
+const SUMMARY_BOX_STYLE = {
+  backgroundColor: '#FFFDF9',
+  backgroundImage: [
+    'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+    'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+    'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+    'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+  ].join(', '),
+  backgroundSize: '100% 1px, 100% 1px, 1px 100%, 1px 100%',
+  backgroundPosition: '0 0, 0 100%, 0 0, 100% 0',
+  backgroundRepeat: 'repeat-x, repeat-x, repeat-y, repeat-y',
+};
+const formatSummaryAmount = (value) =>
+  `₹${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const SummaryTableExportActions = ({ onExportPdf, onExportCsv }) => (
+  <div className="flex shrink-0 items-end gap-2">
+    <span className="text-[#E4572E] flex items-center gap-1 font-semibold hover:underline cursor-pointer" onClick={onExportPdf}>
+      PDF<img src={PdfIcon} alt="Pdf" className="w-4 h-4" />
+    </span>
+    <span className="text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer" onClick={onExportCsv}>
+      XL<img src={XlIcon} alt="XL" className="w-4 h-4" />
+    </span>
+  </div>
+);
 
 const LoanSummary = () => {
   const [vendorOptions, setVendorOptions] = useState([]);
@@ -1150,57 +1181,54 @@ const LoanSummary = () => {
 
   
 
-  return (
-    <div className='bg-[#FAF6ED]'>
-      <div className="bg-white rounded-lg xl:w-full xl:max-w-[95vw] xl:h-[780px] p-3 ml-10 mr-10">
-        <div className="xl:flex gap-8">
-        {/* Left Panel: Contractor/Vendor Summary */}
-        <div className="flex-1 text-left bg-white p-4 sm:p-6 mb-6 xl:mb-0">
-          <div className="mb-4">
-            <label className="block font-semibold mb-2">
-              Contractor/Vendor/Employee/Labour
-            </label>
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-              <Select
-                options={combinedOptions}
-                value={selectedAssociate}
-                onChange={setSelectedAssociate}
-                placeholder="Select..."
-                className="w-full sm:w-[275px]"
-                isClearable
-                menuPortalTarget={document.body}
-                styles={customStyles}
-              />
+  const summaryOutsideSelectStyles = {
+    ...customStyles,
+    control: (provided, state) => ({
+      ...customStyles.control(provided, state),
+      minHeight: '40px',
+      height: '40px',
+    }),
+  };
 
-              {/* Pending Advance badge */}
-              <div className="border-2 h-[37px] border-[#E4572E] border-opacity-35 p-2 px-2 rounded text-sm font-medium whitespace-nowrap">
-                Pending Advance: ₹{pendingAdvanceAssociate.toLocaleString("en-IN")}
+  return (
+    <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]">
+      <div className="p-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
+        <div className="flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 max-h-full overflow-visible px-[24px] py-[24px] items-stretch bg-white">
+        {/* Left Panel: Associate Summary */}
+        <div className={`flex flex-col flex-1 min-w-0 min-h-0 max-h-full overflow-hidden bg-white rounded-[6px] max-w-[770px] ${SUMMARY_PANEL_SHADOW} px-[24px] py-[24px]`}>
+          <div className="w-full min-w-0 flex flex-col flex-1 min-h-0 max-h-full">
+            <div className="flex flex-wrap justify-between items-start gap-[12px] mb-[18px] shrink-0 w-full">
+              <div className="text-left max-w-[320px]">
+                <label className="block font-semibold mb-[8px]">Contractor/Vendor/Employee/Labour</label>
+                <Select
+                  options={combinedOptions}
+                  value={selectedAssociate}
+                  onChange={setSelectedAssociate}
+                  placeholder="Associate Name"
+                  className={SUMMARY_OUTSIDE_SELECT_CLASS}
+                  isClearable
+                  menuPortalTarget={document.body}
+                  styles={summaryOutsideSelectStyles}
+                />
+              </div>
+              <div className="rounded-md px-4 py-[8px] mt-[8px] text-sm shrink-0" style={SUMMARY_BOX_STYLE}>
+                <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                  <span className="flex shrink-0 w-[130px] text-black font-semibold">
+                    <span className="whitespace-nowrap">Pending Loan</span>
+                    <span className="ml-auto">:</span>
+                  </span>
+                  <span className="font-semibold" style={{ color: '#E4572E' }}>
+                    {formatSummaryAmount(pendingAdvanceAssociate)}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex flex-wrap items-center justify-end gap-4 mb-4">
-            <button
-              onClick={exportAssociatePDF}
-              className="flex items-center gap-1 text-sm text-[#E4572E] hover:text-[#E4572E] font-semibold transition-colors"
-            >
-              Export PDF
-            </button>
-            <button
-              onClick={exportAssociateCSV}
-              className="flex items-center gap-1 text-sm text-[#007233] hover:text-[#007233] font-semibold transition-colors"
-            >
-              Export XL
-            </button>
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-1 text-sm  text-[#Bf9853] hover:text-[#Bf9853] font-semibold transition-colors"
-            >
-              Print
-            </button>
-          </div>
-          <div className="rounded-lg border-l-8 border-l-[#BF9853] overflow-x-auto">
+            <div className="border border-gray-200 px-[18px] pt-[18px] flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="flex min-w-0 w-full flex-nowrap items-end justify-end gap-[6px] mb-[9px] shrink-0">
+                <SummaryTableExportActions onExportPdf={exportAssociatePDF} onExportCsv={exportAssociateCSV} />
+              </div>
+              <div className="flex-1 min-h-0 overflow-hidden pb-[18px] flex flex-col">
+                <div className="rounded-lg border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none w-full">
             <table className="w-full min-w-[600px] border-collapse">
               <thead className="bg-[#FAF6ED] sticky top-0 z-10">
                 <tr>
@@ -1268,56 +1296,47 @@ const LoanSummary = () => {
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
-
-        {/* Right Panel: To Summary */}
-        <div className="flex-1 text-left p-4 sm:p-6">
-          <div className="mb-4">
-            <label className="block font-semibold mb-2">
-              Purpose
-            </label>
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-              <Select
-                options={purposeOptions}
-                value={selectedPurpose}
-                onChange={setSelectedPurpose}
-                placeholder="Select Purpose..."
-                className="w-full sm:w-[275px]"
-                isClearable
-                menuPortalTarget={document.body}
-                styles={customStyles}
-              />
-
-              {/* Pending Advance badge */}
-              <div className="h-[37px] border-2 border-[#E4572E] border-opacity-35 p-2 rounded text-sm font-medium whitespace-nowrap">
-                Pending Advance: ₹{pendingAdvancePurpose.toLocaleString("en-IN")}
+                </div>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Action buttons */}
-          <div className="flex flex-wrap items-center justify-end gap-4 mb-4">
-            <button
-              onClick={exportPurposePDF}
-              className="flex items-center gap-1 text-sm text-[#E4572E] hover:text-[#E4572E] font-semibold"
-            >
-              Export PDF
-            </button>
-            <button
-              onClick={exportPurposeCSV}
-              className="flex items-center gap-1 text-sm text-[#007233] hover:text-[#007233] font-semibold"
-            >
-              Export XL
-            </button>
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-1 text-sm text-[#BF9853] hover:text-[#BF9853] font-semibold"
-            >
-              Print
-            </button>
-          </div>
-          <div className="rounded-lg border-l-8 border-l-[#BF9853] overflow-x-auto">
+        {/* Right Panel: Purpose Summary */}
+        <div className={`flex flex-col flex-1 min-w-0 min-h-0 max-h-full overflow-hidden bg-white rounded-[6px] max-w-[770px] ${SUMMARY_PANEL_SHADOW} px-[24px] py-[24px]`}>
+          <div className="w-full min-w-0 flex flex-col flex-1 min-h-0 max-h-full">
+            <div className="flex flex-wrap justify-between items-start gap-[12px] mb-[18px] shrink-0 w-full">
+              <div className="text-left max-w-[220px]">
+                <label className="block font-semibold mb-[8px]">Purpose</label>
+                <Select
+                  options={purposeOptions}
+                  value={selectedPurpose}
+                  onChange={setSelectedPurpose}
+                  placeholder="Purpose"
+                  className={SUMMARY_OUTSIDE_SELECT_CLASS}
+                  isClearable
+                  menuPortalTarget={document.body}
+                  styles={summaryOutsideSelectStyles}
+                />
+              </div>
+              <div className="rounded-md px-4 py-[8px] mt-[8px] text-sm shrink-0" style={SUMMARY_BOX_STYLE}>
+                <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                  <span className="flex shrink-0 w-[130px] text-black font-semibold">
+                    <span className="whitespace-nowrap">Pending Loan</span>
+                    <span className="ml-auto">:</span>
+                  </span>
+                  <span className="font-semibold" style={{ color: '#E4572E' }}>
+                    {formatSummaryAmount(pendingAdvancePurpose)}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="border border-gray-200 px-[18px] pt-[18px] flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="flex min-w-0 w-full flex-nowrap items-end justify-end gap-[6px] mb-[9px] shrink-0">
+                <SummaryTableExportActions onExportPdf={exportPurposePDF} onExportCsv={exportPurposeCSV} />
+              </div>
+              <div className="flex-1 min-h-0 overflow-hidden pb-[18px] flex flex-col">
+                <div className="rounded-lg border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none w-full">
             <table className="w-full min-w-[600px] border-collapse">
               <thead className="bg-[#FAF6ED] sticky top-0 z-10">
                 <tr>
@@ -1385,10 +1404,12 @@ const LoanSummary = () => {
                 ))}
               </tbody>
             </table>
-          </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+        </div>
 
       {/* Tooltip */}
       {tooltipVisible && (
@@ -1762,6 +1783,7 @@ const LoanSummary = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

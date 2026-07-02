@@ -958,6 +958,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
     const handleOpenExpenseEntryPopup = ({ project, property }) => {
         const serviceNo = getWaterServiceNo(property);
         const prefillData = {
+            source: 'Utility Hub',
             utilityType: 'Water',
             siteName: project?.projectName || project?.siteName || '',
             projectId: project?.id ?? project?.projectId ?? null,

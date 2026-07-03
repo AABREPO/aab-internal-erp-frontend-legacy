@@ -35,7 +35,10 @@ import {
 import {
   clearLinkedAdvancePortalForLoanDelete,
   formatWeeklyBillDeleteMessage,
+  resolveFilesUploadResponseUrl,
 } from '../../utils/advancePortalWeeklyPaymentBill';
+import CustomDateField from '../ExpensesEntry/CustomDateField';
+import UploadFile from '../Images/Upload file.svg';
 import {
   buildLoanEditPayloadFromForm,
   clearLoanPortalRecordsOnDelete,
@@ -78,6 +81,142 @@ const AdvancePortalAmountOutput = ({ value, className = '' }) => {
     </div>
   );
 };
+const ADVANCE_PORTAL_SELECT_CLASS =
+  'custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const ADVANCE_PORTAL_READONLY_AMOUNT_INPUT_CLASS =
+  'pl-[12px] pr-4 border-2 border-[#BF9853] rounded-lg w-full h-[40px] focus:outline-none border-opacity-[0.20] bg-[#ededed] text-[14px] font-medium cursor-default';
+const ADVANCE_PORTAL_TEXTAREA_CLASS =
+  'border-2 border-[#BF9853] rounded-md px-[8px] w-full h-[60px] focus:outline-none border-opacity-[0.20] resize-none text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const ADVANCE_PORTAL_LABEL_CLASS = 'text-md font-semibold mb-[8px] block';
+const LOAN_EDIT_MODAL_SELECT_STYLES = {
+  control: (provided, state) => ({
+    ...provided,
+    fontFamily: 'Manrope',
+    borderWidth: '2px',
+    borderRadius: '8px',
+    minHeight: '40px',
+    height: '40px',
+    flexWrap: 'nowrap',
+    borderColor: state.isFocused ? 'rgba(191, 152, 83, 1)' : 'rgba(191, 152, 83, 0.2)',
+    boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.2)' : 'none',
+    '&:hover': { borderColor: 'rgba(191, 152, 83, 0.2)' },
+  }),
+  valueContainer: (provided, state) => ({
+    ...provided,
+    flex: '1 1 0%',
+    minWidth: 0,
+    flexWrap: 'nowrap',
+    overflow: 'hidden',
+    paddingLeft: '12px',
+    paddingRight: state.hasValue ? '2px' : provided.paddingRight,
+    paddingTop: 0,
+    paddingBottom: 0,
+    height: '36px',
+    alignItems: 'center',
+  }),
+  singleValue: (provided) => ({
+    ...provided,
+    maxWidth: '100%',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    margin: 0,
+    color: 'black',
+  }),
+  input: (provided) => ({ ...provided, margin: 0, padding: 0 }),
+  menu: (provided) => ({ ...provided, zIndex: 9999, maxHeight: '300px' }),
+  menuPortal: (provided) => ({ ...provided, zIndex: 9999 }),
+  menuList: (provided) => ({
+    ...provided,
+    paddingTop: 0,
+    paddingBottom: 0,
+    maxHeight: '250px',
+    overflowY: 'auto',
+  }),
+  indicatorSeparator: () => ({ display: 'none' }),
+  indicatorsContainer: (provided) => ({ ...provided, flex: '0 0 auto', paddingLeft: '0' }),
+  dropdownIndicator: (provided, state) => ({
+    ...provided,
+    display: state.hasValue ? 'none' : 'flex',
+    color: '#000000',
+    flexShrink: 0,
+  }),
+  clearIndicator: (provided) => ({ ...provided, cursor: 'pointer', color: '#000000', flexShrink: 0 }),
+  placeholder: (provided) => ({
+    ...provided,
+    fontWeight: 'normal',
+    fontSize: '14px',
+    color: '#A6A5A6',
+  }),
+};
+const LoanEditAmountOutput = ({ value }) => {
+  const formattedValue = formatAmountDisplay(value);
+  const displayValue = formattedValue ? `₹${formattedValue}` : '';
+  return (
+    <div className="relative w-[300px] h-[40px]">
+      <input type="text" readOnly tabIndex={-1} value={displayValue} className={ADVANCE_PORTAL_READONLY_AMOUNT_INPUT_CLASS} />
+    </div>
+  );
+};
+const LoanEditAmountInput = ({ value, onChange, placeholder = '' }) => (
+  <div className="relative w-full h-[40px]">
+    <span className="absolute top-1/2 left-[8px] transform -translate-y-1/2 text-gray-600 text-lg">₹</span>
+    <input
+      type="text"
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      onWheel={(e) => e.target.blur()}
+      className="pl-[20px] pr-4 border-2 border-[#BF9853] rounded-lg w-full h-full focus:outline-none border-opacity-[0.20] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+    />
+  </div>
+);
+const formatLoanEditNumber = (num) => {
+  if (!num) return '';
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+};
+const calculateLoanEditOverallTotal = (data, option) => {
+  if (!option) return '';
+  return data
+    .filter((item) => {
+      if (option.type === 'Vendor') return item.vendor_id === option.id;
+      if (option.type === 'Contractor') return item.contractor_id === option.id;
+      if (option.type === 'Employee') return item.employee_id === option.id;
+      if (option.type === 'Labour') return item.labour_id === option.id;
+      return false;
+    })
+    .reduce((sum, curr) => {
+      if (curr.type === 'Loan') return sum + (parseFloat(curr.amount) || 0);
+      if (curr.type === 'Refund') return sum - (parseFloat(curr.loan_refund_amount) || 0);
+      if (curr.type === 'Transfer') {
+        if (curr.transfer_Project_id) return sum + (parseFloat(curr.amount) || 0);
+        return sum;
+      }
+      return sum;
+    }, 0);
+};
+const calculateLoanEditPurposeTotal = (data, option, purposeId) => {
+  if (!option || !purposeId) return '';
+  const parsedPurposeId = parseInt(purposeId, 10);
+  return data
+    .filter((entry) => {
+      let matchesAssociate = false;
+      if (option.type === 'Vendor') matchesAssociate = entry.vendor_id === option.id;
+      else if (option.type === 'Contractor') matchesAssociate = entry.contractor_id === option.id;
+      else if (option.type === 'Employee') matchesAssociate = entry.employee_id === option.id;
+      else if (option.type === 'Labour') matchesAssociate = entry.labour_id === option.id;
+      return matchesAssociate && entry.from_purpose_id === parsedPurposeId;
+    })
+    .reduce((sum, curr) => {
+      if (curr.type === 'Loan') return sum + (parseFloat(curr.amount) || 0);
+      if (curr.type === 'Refund') return sum - (parseFloat(curr.loan_refund_amount) || 0);
+      if (curr.type === 'Transfer') {
+        if (curr.transfer_Project_id) return sum + (parseFloat(curr.amount) || 0);
+        return sum;
+      }
+      return sum;
+    }, 0);
+};
 
 const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const [vendorOptions, setVendorOptions] = useState([]);
@@ -114,6 +253,9 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
   const [editTransferAmount, setEditTransferAmount] = useState('');
   const [editPaymentMode, setEditPaymentMode] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
+  const fileInputRef = useRef(null);
   const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
   const [isEditPaymentSubmitting, setIsEditPaymentSubmitting] = useState(false);
   const [editPaymentModalData, setEditPaymentModalData] = useState({
@@ -221,6 +363,23 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
       setEditTransferAmount(rawValue);
     }
   };
+  const handleEditFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) setSelectedFile(file);
+  };
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+  const editOverallLoan = useMemo(
+    () => calculateLoanEditOverallTotal(loanData, editSelectedOption),
+    [loanData, editSelectedOption]
+  );
+  const editLoanAmount = useMemo(
+    () => calculateLoanEditPurposeTotal(loanData, editSelectedOption, editPurpose),
+    [loanData, editSelectedOption, editPurpose]
+  );
   const formatDateOnly = (dateString) => {
     const date = new Date(dateString);
     const day = String(date.getDate()).padStart(2, '0');
@@ -1340,7 +1499,7 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
     notifyOrbitModuleDataChanged('portal');
     setShowEditPaymentModal(false);
     pendingLoanUpdateRef.current = null;
-    setIsEditModalOpen(false);
+    closeEditModal();
     toast.success('Entry updated successfully!', {
       position: 'top-center',
       autoClose: 3000,
@@ -1349,6 +1508,8 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
   };
 
   const handleUpdate = async () => {
+    if (isEditSubmitting) return;
+    setIsEditSubmitting(true);
     try {
       const currentEntry = loanData.find(
         (entry) => String(entry.loanPortalId || entry.id) === String(editingId)
@@ -1358,7 +1519,40 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
         return;
       }
 
-      const payload = buildLoanEditPayload(currentEntry);
+      let fileUrl = editFormData.file_url || '';
+      if (selectedFile) {
+        const formData = new FormData();
+        const now = new Date();
+        const timestamp = now.toLocaleString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true,
+        }).replace(',', '').replace(/\s/g, '-');
+        const associateName = editSelectedOption?.label || '';
+        formData.append('files', selectedFile);
+        formData.append('folder', 'FileUpload / Loan_Portal');
+        formData.append('fileName', `${timestamp} ${associateName}`);
+        const uploadResponse = await fetch('https://backendaab.in/aabuildersDash/api/files/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        if (!uploadResponse.ok) throw new Error('Upload failed');
+        const uploadResult = await uploadResponse.json();
+        fileUrl = resolveFilesUploadResponseUrl(uploadResult);
+        if (!fileUrl) throw new Error('Upload succeeded but no file URL was returned');
+        setEditFormData((prev) => ({ ...prev, file_url: fileUrl }));
+        setSelectedFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+
+      const payload = {
+        ...buildLoanEditPayload(currentEntry),
+        file_url: fileUrl,
+      };
 
       if (shouldPromptLoanEditPaymentModal(payload)) {
         pendingLoanUpdateRef.current = { payload };
@@ -1376,6 +1570,8 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
         autoClose: 3000,
         theme: 'colored',
       });
+    } finally {
+      setIsEditSubmitting(false);
     }
   };
 
@@ -1599,13 +1795,17 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                     sortDirection={sortConfig.direction}
                     onSort={handleEdbcSort}
                   />
-                  <th
-                    className={edbc4Config?.headerClass}
-                    onClick={() => handleSort('project')}
-                  >
-                    Purpose {sortConfig.key === 'project' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
-                  </th>
-                  <th className={edbc4Config?.headerClass}>Transfer To</th>
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC4}
+                    label="Purpose"
+                    sortField={resolveEdbcSortField('project')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC3}
+                    label="Transfer To"
+                  />
                   <EdbcColumnHeader
                     columnId={EDBC_IDS.EDBC8}
                     label="Loan"
@@ -1613,7 +1813,14 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                     sortDirection={sortConfig.direction}
                     onSort={handleEdbcSort}
                   />
-                  <th className={edbc8Config?.headerClass}>Refund</th>
+                  <th id={EDBC_IDS.EDBC8} className={edbc8Config?.headerClass}>Refund</th>
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC9}
+                    label="Description"
+                    sortField={resolveEdbcSortField('description')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
                   <EdbcColumnHeader
                     columnId={EDBC_IDS.EDBC12}
                     label="Type"
@@ -1622,9 +1829,9 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                     onSort={handleEdbcSort}
                   />
                   <EdbcColumnHeader
-                    columnId={EDBC_IDS.EDBC9}
-                    label="Description"
-                    sortField={resolveEdbcSortField('description')}
+                    columnId={EDBC_IDS.EDBC13}
+                    label="Mode"
+                    sortField={resolveEdbcSortField('mode')}
                     sortDirection={sortConfig.direction}
                     onSort={handleEdbcSort}
                   />
@@ -1643,13 +1850,6 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                     onSort={handleEdbcSort}
                   />
                   <EdbcColumnHeader
-                    columnId={EDBC_IDS.EDBC13}
-                    label="Mode"
-                    sortField={resolveEdbcSortField('mode')}
-                    sortDirection={sortConfig.direction}
-                    onSort={handleEdbcSort}
-                  />
-                  <EdbcColumnHeader
                     columnId={EDBC_IDS.EDBC17}
                     label="Entry No"
                     sortField={resolveEdbcSortField('entryNo')}
@@ -1657,10 +1857,12 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                     onSort={handleEdbcSort}
                   />
                   <EdbcColumnHeader columnId={EDBC_IDS.EDBC19} label="Activity" />
+                  <th className="w-[6px] min-w-[6px] max-w-[6px] p-0" />
                 </EdbcTableHeaderRow>
                 {showFilters && (
                   <EdbcTableFilterRow ref={filterRowRef}>
                     <EdbcTimestampFilter
+                      columnId={EDBC_IDS.EDBC1}
                       placeholder="Timestamp"
                       timestampStartDate={selectTimeStampDate}
                       timestampEndDate={selectTimeStampDate}
@@ -1694,7 +1896,7 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                       selectStyles={purposeTransferFilterSelectStyles}
                     />
                     <EdbcSelectFilter
-                      columnId={EDBC_IDS.EDBC4}
+                      columnId={EDBC_IDS.EDBC3}
                       placeholder="Transfer To"
                       options={uniqueTransferToOptions}
                       value={selectTransfer}
@@ -1703,6 +1905,12 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                     />
                     <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.loan} />
                     <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.refund} />
+                    <EdbcTextInputFilter
+                      columnId={EDBC_IDS.EDBC9}
+                      placeholder="Description"
+                      value={selectDescription}
+                      onChange={(e) => setSelectDescription(e.target.value)}
+                    />
                     <EdbcSelectFilter
                       columnId={EDBC_IDS.EDBC12}
                       placeholder="Type"
@@ -1711,11 +1919,13 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                       onChange={setSelectType}
                       selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                     />
-                    <EdbcTextInputFilter
-                      columnId={EDBC_IDS.EDBC9}
-                      placeholder="Description"
-                      value={selectDescription}
-                      onChange={(e) => setSelectDescription(e.target.value)}
+                    <EdbcSelectFilter
+                      columnId={EDBC_IDS.EDBC13}
+                      placeholder="Mode"
+                      options={uniquePaymentModes.map((m) => ({ value: m, label: m }))}
+                      value={selectMode}
+                      onChange={setSelectMode}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                     />
                     <EdbcSelectFilter
                       columnId={EDBC_IDS.EDBC14}
@@ -1734,14 +1944,6 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                       selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                     />
                     <EdbcSelectFilter
-                      columnId={EDBC_IDS.EDBC13}
-                      placeholder="Mode"
-                      options={uniquePaymentModes.map((m) => ({ value: m, label: m }))}
-                      value={selectMode}
-                      onChange={setSelectMode}
-                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                    />
-                    <EdbcSelectFilter
                       columnId={EDBC_IDS.EDBC17}
                       placeholder="Entry No"
                       options={uniqueEntryNoOptions}
@@ -1751,6 +1953,7 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                       textAlign="right"
                     />
                     <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC19} />
+                    <th className="w-[6px] min-w-[6px] max-w-[6px] p-0" />
                   </EdbcTableFilterRow>
                 )}
               </thead>
@@ -1780,24 +1983,22 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                         onToggleExpanded={toggleExpandedCell}
                         getDisplayValue={getAssociateName}
                       />
-                      <td className={edbc4Config?.tdClass}>
-                        <span
-                          onClick={() => toggleExpandedCell(`${(entry.loanPortalId || entry.id || index)}-purpose`)}
-                          className={`block w-full cursor-pointer ${expandedCells[`${(entry.loanPortalId || entry.id || index)}-purpose`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                          title={resolveLoanPurposeName(entry)}
-                        >
-                          {resolveLoanPurposeName(entry)}
-                        </span>
-                      </td>
-                      <td className={edbc4Config?.tdClass}>
-                        <span
-                          onClick={() => toggleExpandedCell(`${(entry.loanPortalId || entry.id || index)}-transfer`)}
-                          className={`block w-full cursor-pointer ${expandedCells[`${(entry.loanPortalId || entry.id || index)}-transfer`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                          title={resolveLoanTransferToName(entry)}
-                        >
-                          {resolveLoanTransferToName(entry)}
-                        </span>
-                      </td>
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC4}
+                        expense={{ ...entry, id: entry.loanPortalId || entry.id }}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={resolveLoanPurposeName}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC3}
+                        expense={{ ...entry, id: entry.loanPortalId || entry.id }}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={resolveLoanTransferToName}
+                      />
                       <EdbcExpandableBodyCell
                         columnId={EDBC_IDS.EDBC8}
                         expense={{ ...entry, id: entry.loanPortalId || entry.id }}
@@ -1829,6 +2030,14 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                         </span>
                       </td>
                       <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC9}
+                        expense={{ ...entry, id: entry.loanPortalId || entry.id }}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => row.description || ''}
+                      />
+                      <EdbcExpandableBodyCell
                         columnId={EDBC_IDS.EDBC12}
                         expense={{ ...entry, id: entry.loanPortalId || entry.id }}
                         rowIndex={index}
@@ -1837,12 +2046,16 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                         getDisplayValue={(row) => row.type || ''}
                       />
                       <EdbcExpandableBodyCell
-                        columnId={EDBC_IDS.EDBC9}
+                        columnId={EDBC_IDS.EDBC13}
                         expense={{ ...entry, id: entry.loanPortalId || entry.id }}
                         rowIndex={index}
                         expandedCells={expandedCells}
                         onToggleExpanded={toggleExpandedCell}
-                        getDisplayValue={(row) => row.description || ''}
+                        getDisplayValue={(row) =>
+                          finalPaymentModeOptions.find((opt) => opt.value === row.loan_payment_mode)?.label ||
+                          row.loan_payment_mode ||
+                          ''
+                        }
                       />
                       <EdbcExpandableBodyCell
                         columnId={EDBC_IDS.EDBC14}
@@ -1859,18 +2072,6 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                         expandedCells={expandedCells}
                         onToggleExpanded={toggleExpandedCell}
                         getDisplayValue={(row) => getBranchName(row.branch_id ?? row.branchId ?? '') || ''}
-                      />
-                      <EdbcExpandableBodyCell
-                        columnId={EDBC_IDS.EDBC13}
-                        expense={{ ...entry, id: entry.loanPortalId || entry.id }}
-                        rowIndex={index}
-                        expandedCells={expandedCells}
-                        onToggleExpanded={toggleExpandedCell}
-                        getDisplayValue={(row) =>
-                          finalPaymentModeOptions.find((opt) => opt.value === row.loan_payment_mode)?.label ||
-                          row.loan_payment_mode ||
-                          ''
-                        }
                       />
                       <EdbcExpandableBodyCell
                         columnId={EDBC_IDS.EDBC17}
@@ -1896,7 +2097,8 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                               entry_no: entry.entry_no || '',
                               description: entry.description || '',
                               loan_type: entry.loan_type || '',
-                              payment_mode: entry.loan_payment_mode || ''
+                              payment_mode: entry.loan_payment_mode || '',
+                              file_url: entry.file_url || entry.fileUrl || '',
                             });
                             setEditSelectedType(entry.type || 'Loan');
                             setEditSelectedOption(
@@ -1921,15 +2123,15 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                             setEditDescription(entry.description || '');
                             setIsEditModalOpen(true);
                           }}
-                          className="rounded-full transition duration-200"
+                          className=""
                         >
                           <img
                             src={edit}
                             alt="Edit"
-                            className="w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                            className="w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200"
                           />
                         </button>
-                        <button className="rounded-full transition duration-200">
+                        <button className="">
                           <img
                             src={remove}
                             alt="delete"
@@ -1939,20 +2141,21 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
                         </button>
                         <button
                           onClick={() => fetchAuditDetails(entry.loanPortalId || entry.id)}
-                          className="rounded-full transition duration-200"
+                          className=""
                         >
                           <img
                             src={history}
                             alt="history"
-                            className="w-4 h-5 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                            className="w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200"
                           />
                         </button>
                       </td>
+                      <td className="w-[6px] min-w-[6px] max-w-[6px] p-0" />
                     </EdbcTableBodyRow>
                   ))
                 ) : (
                   <tr>
-                    <td className="p-4 text-center text-sm text-gray-400" colSpan={14}>
+                    <td className="p-4 text-center text-sm text-gray-400" colSpan={15}>
                       No data available
                     </td>
                   </tr>
@@ -2030,139 +2233,217 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refre
           </div>
         )}
         {isEditModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-            <div className="bg-white p-4 sm:p-6 rounded-lg w-full max-w-[800px] max-h-[90vh] overflow-y-auto">
-              <h2 className="text-lg font-bold mb-4">Edit Loan Entry</h2>
-              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 text-left'>
-                <div className='space-y-2'>
-                  <label className='font-semibold text-[#E4572E] text-sm sm:text-base'>Select Type</label>
-                  <select value={editSelectedType} onChange={(e) => setEditSelectedType(e.target.value)}
-                    className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                  >
-                    <option value='Loan'>Loan</option>
-                    <option value='Refund'>Refund</option>
-                    <option value='Transfer'>Transfer</option>
-                  </select>
-                </div>
-                <div className='space-y-2'>
-                  <label className='font-semibold text-[#E4572E] text-sm sm:text-base'>Date</label>
-                  <input
-                    type='date'
-                    value={editFormData.date}
-                    onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
-                    className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                  />
-                </div>
-                <div className='space-y-2'>
-                  <label className='font-semibold block text-sm sm:text-base'>Associate</label>
-                  <Select
-                    options={combinedOptions}
-                    value={editSelectedOption}
-                    onChange={setEditSelectedOption}
-                    className='w-full rounded-lg focus:outline-none'
-                    isClearable
-                    styles={customStyles}
-                  />
-                </div>
-                <div className='space-y-2'>
-                  <label className='font-semibold block text-sm sm:text-base'>Purpose</label>
-                  <select
-                    value={editPurpose}
-                    onChange={(e) => setEditPurpose(e.target.value)}
-                    className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                  >
-                    <option value=''>Select Purpose</option>
-                    {purposeOptions.map(option => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className='space-y-2'>
-                  <label className='font-semibold block text-sm sm:text-base'>
-                    {editSelectedType === 'Transfer' ? 'Transfer To' :
-                      editSelectedType === 'Refund' ? 'Amount' : 'Amount Given'}
-                  </label>
-                  {editSelectedType === 'Transfer' ? (
-                    <Select
-                      options={combinedSitePurposeOptions}
-                      value={editTransferSelection}
-                      onChange={(selected) => setEditTransferSelection(selected || null)}
-                      className='w-full rounded-lg focus:outline-none'
-                      isClearable
-                      styles={customStyles}
-                      placeholder="Select Transfer To"
-                    />
-                  ) : editSelectedType === 'Refund' ? (
-                    <input
-                      value={formatWithCommas(editFormData.loan_refund_amount || '')}
-                      onChange={(e) => {
-                        const rawValue = e.target.value.replace(/,/g, '');
-                        if (!isNaN(rawValue)) {
-                          setEditFormData(prev => ({ ...prev, loan_refund_amount: rawValue }));
-                        }
-                      }}
-                      placeholder="Enter Refund Amount"
-                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                    />
-                  ) : (
-                    <input
-                      value={formatWithCommas(editFormData.loan_amount || '')}
-                      onChange={(e) => {
-                        const rawValue = e.target.value.replace(/,/g, '');
-                        if (!isNaN(rawValue)) {
-                          setEditFormData(prev => ({ ...prev, loan_amount: rawValue }));
-                        }
-                      }}
-                      placeholder="Enter Amount"
-                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                    />
-                  )}
-                </div>
-                <div className='space-y-2'>
-                  <label className='font-semibold block text-sm sm:text-base'>
-                    {editSelectedType === 'Transfer' ? 'Transfer Amount' : 'Payment Mode'}
-                  </label>
-                  {editSelectedType === 'Transfer' ? (
-                    <input
-                      value={formatWithCommas(editTransferAmount)}
-                      onChange={handleEditTransferAmountChange}
-                      placeholder="Enter Amount"
-                      className='w-full h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                    />
-                  ) : (
-                    <select
-                      value={editPaymentMode}
-                      onChange={(e) => setEditPaymentMode(e.target.value)}
-                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                    >
-                      <option value=''>Select</option>
-                      {finalPaymentModeOptions.map(option => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-                <div className='col-span-1 sm:col-span-2 space-y-2'>
-                  <label className='font-semibold block text-sm sm:text-base'>Description</label>
-                  <textarea
-                    rows={2}
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
-                    placeholder="Type your text here..."
-                    className='w-full border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                  />
-                </div>
+          <div className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]">
+            <div className="bg-white text-left p-6 rounded-lg shadow-lg w-full max-w-2xl">
+              <div className="flex justify-between items-center mb-[14px]">
+                <h2 className="text-[18px] font-semibold text-black">Edit Loan Entry</h2>
+                <span className="text-[16px] font-semibold text-[#E4572E]">{editFormData.entry_no}</span>
               </div>
-              <div className="flex justify-center sm:justify-end gap-3 mt-4">
-                <button onClick={() => setIsEditModalOpen(false)} className="w-[100px] h-[45px] border border-[#BF9853] rounded text-sm">
-                  Cancel
-                </button>
-                <button onClick={handleUpdate} className="w-[100px] h-[45px] bg-[#BF9853] text-white rounded text-sm">
-                  Save
-                </button>
-
+              <div className="max-h-[75vh] overflow-y-auto">
+                <div className="grid grid-cols-2 gap-3 text-left">
+                  <div className="text-left max-w-[300px]">
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Account Type</label>
+                    <Select
+                      options={[
+                        { value: 'Loan', label: 'Loan' },
+                        { value: 'Refund', label: 'Refund' },
+                        { value: 'Transfer', label: 'Transfer' },
+                      ]}
+                      value={editSelectedType ? { value: editSelectedType, label: editSelectedType } : null}
+                      onChange={(selected) => setEditSelectedType(selected ? selected.value : '')}
+                      placeholder="Account Type"
+                      isSearchable
+                      isClearable
+                      styles={LOAN_EDIT_MODAL_SELECT_STYLES}
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
+                      className={ADVANCE_PORTAL_SELECT_CLASS}
+                    />
+                  </div>
+                  <div className="text-left">
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Date</label>
+                    <div className="expense-entry-form-date w-[300px]">
+                      <CustomDateField
+                        value={editFormData.date}
+                        onChange={(value) => setEditFormData({ ...editFormData, date: value })}
+                        placeholder="Date"
+                        className="w-full text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                        controlHeightPx={40}
+                        alwaysOpenBelow
+                        anchor="right"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-left">
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Associate</label>
+                    <Select
+                      options={combinedOptions}
+                      value={editSelectedOption}
+                      onChange={setEditSelectedOption}
+                      placeholder="Associate"
+                      className={ADVANCE_PORTAL_SELECT_CLASS}
+                      isClearable
+                      isSearchable
+                      styles={LOAN_EDIT_MODAL_SELECT_STYLES}
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
+                    />
+                  </div>
+                  <div className="text-left">
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Overall Loan</label>
+                    <LoanEditAmountOutput value={editOverallLoan} />
+                  </div>
+                  <div className="text-left">
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Purpose</label>
+                    <Select
+                      options={purposeOptions}
+                      value={editPurpose ? purposeOptions.find((opt) => opt.id === parseInt(editPurpose, 10)) : null}
+                      onChange={(selected) => setEditPurpose(selected ? selected.id : '')}
+                      placeholder="Purpose"
+                      isSearchable
+                      isClearable
+                      styles={LOAN_EDIT_MODAL_SELECT_STYLES}
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
+                      className={ADVANCE_PORTAL_SELECT_CLASS}
+                    />
+                  </div>
+                  <div className="text-left">
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Loan Amount</label>
+                    <LoanEditAmountOutput value={editLoanAmount} />
+                  </div>
+                  <div className="col-span-2">
+                    <div className="flex flex-row gap-3">
+                      <div className="text-left flex-1">
+                        <label className={ADVANCE_PORTAL_LABEL_CLASS}>
+                          {editSelectedType === 'Transfer' ? 'Transfer To' :
+                            editSelectedType === 'Refund' ? 'Amount' : 'Amount Given'}
+                        </label>
+                        {editSelectedType === 'Transfer' ? (
+                          <Select
+                            options={combinedSitePurposeOptions}
+                            value={editTransferSelection}
+                            onChange={(selected) => setEditTransferSelection(selected || null)}
+                            className={ADVANCE_PORTAL_SELECT_CLASS}
+                            isClearable
+                            isSearchable
+                            styles={LOAN_EDIT_MODAL_SELECT_STYLES}
+                            menuPortalTarget={document.body}
+                            menuPosition="fixed"
+                            placeholder="Transfer To"
+                          />
+                        ) : (
+                          <LoanEditAmountInput
+                            value={formatLoanEditNumber(
+                              editSelectedType === 'Refund'
+                                ? editFormData.loan_refund_amount || ''
+                                : editFormData.loan_amount || ''
+                            )}
+                            onChange={(e) => {
+                              const rawValue = e.target.value.replace(/,/g, '');
+                              if (!isNaN(rawValue)) {
+                                if (editSelectedType === 'Refund') {
+                                  setEditFormData((prev) => ({ ...prev, loan_refund_amount: rawValue }));
+                                } else {
+                                  setEditFormData((prev) => ({
+                                    ...prev,
+                                    loan_amount: rawValue === '' ? '' : Number(rawValue),
+                                  }));
+                                }
+                              }
+                            }}
+                            placeholder={editSelectedType === 'Refund' ? 'Amount' : 'Amount Given'}
+                          />
+                        )}
+                      </div>
+                      <div className="text-left flex-1">
+                        <label className={ADVANCE_PORTAL_LABEL_CLASS}>
+                          {editSelectedType === 'Transfer' ? 'Transfer Amount' : 'Payment Mode'}
+                        </label>
+                        {editSelectedType === 'Transfer' ? (
+                          <LoanEditAmountInput
+                            value={formatLoanEditNumber(editTransferAmount)}
+                            onChange={handleEditTransferAmountChange}
+                            placeholder="Transfer Amount"
+                          />
+                        ) : (
+                          <Select
+                            options={finalPaymentModeOptions}
+                            value={editPaymentMode ? { value: editPaymentMode, label: editPaymentMode } : null}
+                            onChange={(selected) => setEditPaymentMode(selected ? selected.value : '')}
+                            placeholder="Payment Mode"
+                            isSearchable
+                            isClearable
+                            styles={LOAN_EDIT_MODAL_SELECT_STYLES}
+                            menuPortalTarget={document.body}
+                            menuPosition="fixed"
+                            className={ADVANCE_PORTAL_SELECT_CLASS}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-span-2 text-left">
+                    <div className="flex justify-between mb-[8px]">
+                      <label className={ADVANCE_PORTAL_LABEL_CLASS}>File URL</label>
+                      {selectedFile && (
+                        <span className="text-[14px] text-[#E4572E] font-semibold">{selectedFile.name}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-[8px]">
+                      <input
+                        type="text"
+                        name="file_url"
+                        value={editFormData.file_url || ''}
+                        onChange={(e) => setEditFormData((prev) => ({ ...prev, file_url: e.target.value }))}
+                        placeholder="File URL"
+                        className="min-w-0 flex-1 h-[40px] text-[14px] py-0 px-2 box-border border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none font-semibold placeholder:font-normal"
+                      />
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,image/*,application/pdf"
+                        onChange={handleEditFileChange}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isEditSubmitting}
+                        className="shrink-0 h-[40px] text-[#BF9853]"
+                      >
+                        <img src={UploadFile} alt="Upload" className="w-[40px] h-[40px]" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="col-span-2 text-left">
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Description</label>
+                    <textarea
+                      rows={2}
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      placeholder="Description"
+                      className={`${ADVANCE_PORTAL_TEXTAREA_CLASS} hover:!border-[rgba(191,152,83,0.2)] focus:!border-[rgba(191,152,83,1)]`}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-4 mt-6">
+                  <button
+                    type="button"
+                    onClick={closeEditModal}
+                    className="px-4 py-2 border-2 border-[#BF9853] text-[#BF9853] rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUpdate}
+                    disabled={isEditSubmitting}
+                    className={`px-4 py-2 bg-[#BF9853] text-white rounded transition duration-200 ${isEditSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isEditSubmitting ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

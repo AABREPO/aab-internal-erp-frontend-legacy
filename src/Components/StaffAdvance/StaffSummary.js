@@ -1937,7 +1937,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
           <div className={`flex flex-col flex-1 min-w-0 min-h-0 max-h-full overflow-hidden bg-white rounded-[6px] max-w-[696px] ${SUMMARY_PANEL_SHADOW} px-[24px] py-[24px]`}>
             <div className="w-full min-w-0 flex flex-col flex-1 min-h-0 max-h-full">
               <div className="flex flex-wrap justify-between items-start gap-[12px] mb-[18px] shrink-0 w-full">
-                <div className="text-left max-w-[220px]">
+                <div className="text-left">
                   <label className="block font-semibold mb-[8px]">Employee Name</label>
                   <Select
                     options={staffAdvanceCombinedOptions}
@@ -1952,7 +1952,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                     styles={summaryOutsideSelectStyles}
                   />
                 </div>
-                <div className="rounded-md px-4 py-[8px] mt-[8px] text-sm shrink-0" style={SUMMARY_BOX_STYLE}>
+                <div className="rounded-md pl-4 pr-[18px] py-[8px] mt-[8px] text-sm shrink-0" style={SUMMARY_BOX_STYLE}>
                   <div className="flex justify-between text-[14px] gap-6 py-0.5">
                     <span className="flex shrink-0 w-[130px] text-black font-semibold">
                       <span className="whitespace-nowrap">Pending Advance</span>
@@ -1974,7 +1974,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                 </div>
               </div>
               <div className="border border-gray-200 px-[18px] pt-[18px] flex flex-col flex-1 min-h-0 overflow-hidden">
-                <div className="flex min-w-0 w-[600px] max-w-full flex-nowrap items-end gap-[6px] mb-[9px] shrink-0">
+                <div className="flex min-w-0 w-full flex-nowrap items-center justify-between gap-[6px] mb-[9px] shrink-0 overflow-hidden">
                   <div className={`flex min-w-0 items-center overflow-hidden gap-[6px]${hasPurposeColumnFilters ? ' flex-1 min-w-0' : ' shrink-0'}`}>
                     <EdbcFilterToggleButton onClick={togglePurposeFilters} />
                     {hasPurposeColumnFilters && (
@@ -2017,7 +2017,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                       </div>
                     )}
                   </div>
-                  <div className="ml-auto flex items-end gap-[6px] shrink-0">
+                  <div className="flex items-end gap-[6px] shrink-0">
                     <EdbcTableToolbarRightActions
                       onClearFilters={clearPurposeTableFilters}
                       overallSearch={purposeTableSearch}
@@ -2049,11 +2049,17 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                           <EdbcColumnHeader
                             columnId={EDBC_IDS.EDBC8}
                             label="Advance"
-                            sortField={purposeHeaderSortField}
+                            sortField={sortConfig.key === 'pendingAdvance' ? 'amount' : null}
                             sortDirection={sortConfig.direction}
                             onSort={handlePurposeEdbcSort}
                           />
-                          <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Refund" />
+                          <EdbcColumnHeader
+                            columnId={EDBC_IDS.EDBC8}
+                            label="Refund"
+                            sortField={sortConfig.key === 'billAmount' ? 'amount' : null}
+                            sortDirection={sortConfig.direction}
+                            onSort={() => handleSort('billAmount')}
+                          />
                           <EdbcColumnHeader
                             columnId={EDBC_IDS.EDBC13}
                             label="Status"
@@ -2185,7 +2191,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                     styles={summaryOutsideSelectStyles}
                   />
                 </div>
-                <div className="rounded-md px-4 py-[8px] mt-[8px] text-sm shrink-0" style={SUMMARY_BOX_STYLE}>
+                <div className="rounded-md pl-4 pr-[18px] py-[8px] mt-[8px] text-sm shrink-0" style={SUMMARY_BOX_STYLE}>
                   <div className="flex justify-between text-[14px] gap-6 py-0.5">
                     <span className="flex shrink-0 w-[130px] text-black font-semibold">
                       <span className="whitespace-nowrap">Pending Advance</span>
@@ -2207,7 +2213,7 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                 </div>
               </div>
               <div className="border border-gray-200 px-[18px] pt-[18px] flex flex-col flex-1 min-h-0 overflow-hidden">
-                <div className="flex min-w-0 w-[600px] max-w-full flex-nowrap items-end justify-between gap-[6px] mb-[9px] shrink-0">
+                <div className="flex min-w-0 w-full flex-nowrap items-center justify-between gap-[6px] mb-[9px] shrink-0 overflow-hidden">
                   <div className={`flex min-w-0 items-center overflow-hidden gap-[6px]${hasEmpColumnFilters ? ' flex-1 min-w-0' : ' shrink-0'}`}>
                     <EdbcFilterToggleButton onClick={toggleEmpFilters} />
                     {hasEmpColumnFilters && (
@@ -2282,11 +2288,17 @@ const StaffSummary = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                           <EdbcColumnHeader
                             columnId={EDBC_IDS.EDBC8}
                             label="Advance"
-                            sortField={empHeaderSortField}
+                            sortField={purposeSortConfig.key === 'pendingAdvance' ? 'amount' : null}
                             sortDirection={purposeSortConfig.direction}
                             onSort={handleEmpEdbcSort}
                           />
-                          <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Refund" />
+                          <EdbcColumnHeader
+                            columnId={EDBC_IDS.EDBC8}
+                            label="Refund"
+                            sortField={purposeSortConfig.key === 'billAmount' ? 'amount' : null}
+                            sortDirection={purposeSortConfig.direction}
+                            onSort={() => handlePurposeSort('billAmount')}
+                          />
                           <EdbcColumnHeader
                             columnId={EDBC_IDS.EDBC13}
                             label="Status"

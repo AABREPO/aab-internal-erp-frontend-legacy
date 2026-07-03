@@ -193,17 +193,50 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const customStyles = {
     control: (provided, state) => ({
       ...provided,
+      fontFamily: 'Manrope',
       borderWidth: '2px',
-      lineHeight: '20px',
-      fontSize: '14px',
-      height: '45px',
       borderRadius: '8px',
-      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.3)' : 'rgba(191, 152, 83, 0.3)',
-      boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.3)' : 'none',
+      minHeight: '40px',
+      height: '40px',
+      flexWrap: 'nowrap',
+      borderColor: state.isFocused
+        ? 'rgba(191, 152, 83, 1)'
+        : 'rgba(191, 152, 83, 0.2)',
+      boxShadow: state.isFocused
+        ? '0 0 0 1px rgba(101, 102, 53, 0.2)'
+        : 'none',
+      '&:hover': {
+        borderColor: 'rgba(191, 152, 83, 0.2)',
+      },
     }),
-    clearIndicator: (provided) => ({
+    valueContainer: (provided, state) => ({
       ...provided,
-      cursor: 'pointer',
+      flex: '1 1 0%',
+      minWidth: 0,
+      flexWrap: 'nowrap',
+      overflow: 'hidden',
+      paddingLeft: '12px',
+      paddingRight: state.hasValue ? '2px' : provided.paddingRight,
+      paddingTop: 0,
+      paddingBottom: 0,
+      height: '36px',
+      alignItems: 'center',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      maxWidth: '100%',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+      margin: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      color: 'black',
+    }),
+    input: (provided) => ({
+      ...provided,
+      margin: 0,
+      padding: 0,
     }),
     menu: (provided) => ({
       ...provided,
@@ -216,10 +249,22 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     }),
     menuList: (provided) => ({
       ...provided,
+      paddingTop: 0,
+      paddingBottom: 0,
       maxHeight: '250px',
       overflowY: 'auto',
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none',
+      '&::-webkit-scrollbar': {
+        display: 'none',
+      },
     }),
     indicatorSeparator: () => ({ display: 'none' }),
+    indicatorsContainer: (provided) => ({
+      ...provided,
+      flex: '0 0 auto',
+      paddingLeft: '0',
+    }),
     dropdownIndicator: (provided, state) => ({
       ...provided,
       display: state.hasValue ? 'none' : 'flex',
@@ -228,34 +273,53 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       paddingTop: 0,
       paddingBottom: 0,
     }),
-    singleValue: (provided) => ({
+    clearIndicator: (provided) => ({
       ...provided,
-      fontWeight: '500',
-      color: 'black',
-      textAlign: 'left',
-    }),
-    option: (provided, state) => ({
-      ...provided,
-      fontWeight: '500',
-      backgroundColor: state.isSelected
-        ? 'rgba(191, 152, 83, 0.3)'
-        : state.isFocused
-          ? 'rgba(191, 152, 83, 0.1)'
-          : 'white',
-      color: 'black',
-      textAlign: 'left',
-    }),
-    input: (provided) => ({
-      ...provided,
-      fontWeight: '500',
-      color: 'black',
-      textAlign: 'left',
+      cursor: 'pointer',
+      color: '#000000',
+      flexShrink: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      paddingLeft: '4px',
+      paddingRight: '4px',
     }),
     placeholder: (provided) => ({
       ...provided,
-      fontWeight: '500',
-      color: '#999',
+      color: '#A6A5A6',
       textAlign: 'left',
+      fontWeight: 'normal',
+      fontSize: '14px',
+      paddingLeft: '0px',
+      paddingTop: '0px',
+      paddingBottom: '0px',
+      margin: 0,
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      maxWidth: '100%',
+      position: 'absolute',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      minHeight: 36,
+      height: 'auto',
+      paddingTop: 6,
+      paddingBottom: 6,
+      whiteSpace: 'normal',
+      display: 'flex',
+      alignItems: 'center',
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+      WebkitTapHighlightColor: '#FAF6ED',
+      backgroundColor: state.isSelected
+        ? '#BF9853'
+        : state.isFocused
+          ? '#FAF6ED'
+          : provided.backgroundColor,
+      color: state.isSelected ? '#FFFFFF' : provided.color,
+      ':active': {
+        backgroundColor: state.isSelected ? '#BF9853' : '#FAF6ED',
+      },
     }),
   };
 

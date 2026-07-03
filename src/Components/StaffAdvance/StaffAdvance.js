@@ -1638,6 +1638,9 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
       } else if (sideTableSortField === 'paymentMode') {
         aValue = (a.staff_payment_mode || '').toLowerCase();
         bValue = (b.staff_payment_mode || '').toLowerCase();
+      } else if (sideTableSortField === 'siteName') {
+        aValue = getStaffSideEntryRowDisplay(a, purposeOptions).transferOrRefund.toLowerCase();
+        bValue = getStaffSideEntryRowDisplay(b, purposeOptions).transferOrRefund.toLowerCase();
       } else if (sideTableSortField === 'date') {
         aValue = new Date(a.date).getTime();
         bValue = new Date(b.date).getTime();
@@ -1649,7 +1652,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
       if (aValue > bValue) return sideTableSortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [sideTableEntriesForFilter, sideTableSortField, sideTableSortDirection]);
+  }, [sideTableEntriesForFilter, sideTableSortField, sideTableSortDirection, purposeOptions]);
   const sideTableHasActiveColumnFilters =
     sideTableFilterDateStart ||
     sideTableFilterDateEnd ||
@@ -2037,13 +2040,13 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
               <div className="grid grid-cols-2 gap-3 text-left">
                 <div className="text-left max-w-[300px]">
                   <label className={ADVANCE_PORTAL_LABEL_CLASS}>
-                    Select Type{isRequired('selectedType') && <span className="text-[#E4572E]">*</span>}
+                    Account Type{isRequired('selectedType') && <span className="text-[#E4572E]">*</span>}
                   </label>
                   <Select
                     value={selectTypeOptions.find(option => option.value === formData.selectedType) || null}
                     onChange={(selected) => handleInputChange('selectedType', selected ? selected.value : '')}
                     options={selectTypeOptions}
-                    placeholder="Select Type"
+                    placeholder="Account Type"
                     isClearable
                     isSearchable
                     menuPortalTarget={document.body}
@@ -2076,7 +2079,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                 <div className="text-left">
                   <div className="flex justify-between mb-[8px]">
                     <label className="text-md font-semibold block">
-                      EMP Name{isRequired('empName') && <span className="text-[#E4572E]">*</span>}
+                      Employee Name{isRequired('empName') && <span className="text-[#E4572E]">*</span>}
                     </label>
                     {formData.empName?.type && (
                       <span className="text-[14px] text-[#E4572E] font-semibold block mt-0.5">{formData.empName.type}</span>
@@ -2089,7 +2092,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                     className={ADVANCE_PORTAL_SELECT_CLASS}
                     isClearable
                     styles={customStyles}
-                    placeholder="EMP Name"
+                    placeholder="Employee Name"
                     isSearchable={true}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -2225,7 +2228,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                     disabled={isSubmitting}
                     className={`bg-[#c7934c] text-white w-full sm:w-[120px] h-[33px] rounded flex items-center justify-center text-sm xl:mb-0 mb-2 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
                   >
-                    {isSubmitting ? 'Processing...' : formData.selectedType === 'Refund' ? 'Pay Refund' : formData.selectedType === 'Transfer' ? 'Pay Transfer' : 'Pay Advance'}
+                    {isSubmitting ? 'Processing...' : formData.selectedType === 'Refund' ? 'Refund' : formData.selectedType === 'Transfer' ? 'Transfer' : 'Advance'}
                   </button>
                 </div>
               </div>
@@ -2366,6 +2369,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
                                 <EdbcColumnHeader
                                   columnId={EDBC_IDS.EDBC3}
                                   label="Transfer/Refund"
+                                  {...sideTableEdbcSortProps}
                                 />
                                 <EdbcColumnHeader
                                   columnId={EDBC_IDS.EDBC13}

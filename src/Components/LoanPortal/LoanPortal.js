@@ -1789,7 +1789,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
       .filter(entry => matchesAssociate(entry) && matchesPurpose(entry))
       .sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [loanData, selectedOption, purpose]);
-  const { sortField: sideTableSortField, sortDirection: sideTableSortDirection, handleSort: handleSideTableSort, clearSort: clearSideTableSort } = useEdbcTableSort();
+  const { sortField: sideTableSortField, sortDirection: sideTableSortDirection, handleSort: handleSideTableSort, setSortField: setSideTableSortField, setSortDirection: setSideTableSortDirection } = useEdbcTableSort();
   const { expandedCells: sideTableExpandedCells, toggleExpandedCell: toggleSideTableExpandedCell } = useEdbcExpandedCells();
   const edbc8Config = getEdbcColumnConfig(EDBC_IDS.EDBC8);
   const edbc3Config = getEdbcColumnConfig(EDBC_IDS.EDBC3);
@@ -1934,6 +1934,9 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
       } else if (sideTableSortField === 'paymentMode') {
         aValue = (a.loan_payment_mode || '').toLowerCase();
         bValue = (b.loan_payment_mode || '').toLowerCase();
+      } else if (sideTableSortField === 'siteName') {
+        aValue = getLoanSideEntryRowDisplay(a, getTransferDestination).transferOrRefund.toLowerCase();
+        bValue = getLoanSideEntryRowDisplay(b, getTransferDestination).transferOrRefund.toLowerCase();
       } else if (sideTableSortField === 'date') {
         aValue = new Date(a.date).getTime();
         bValue = new Date(b.date).getTime();
@@ -1948,7 +1951,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
       if (aValue > bValue) return sideTableSortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [sideTableEntriesForFilter, sideTableSortField, sideTableSortDirection]);
+  }, [sideTableEntriesForFilter, sideTableSortField, sideTableSortDirection, getTransferDestination]);
   const sideTableHasActiveColumnFilters =
     sideTableFilterDateStart ||
     sideTableFilterDateEnd ||
@@ -1965,8 +1968,9 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
     setSideTableFilterMode('');
     setSideTableFilterLoanAmount('');
     setSideTableOverallSearch('');
-    clearSideTableSort();
-  }, [clearSideTableSort]);
+    setSideTableSortField('');
+    setSideTableSortDirection('asc');
+  }, [setSideTableSortField, setSideTableSortDirection]);
   const handleSideTableFilterChipsMouseDown = (e) => {
     if (!sideTableFilterChipsScrollRef.current || e.target.closest('button')) return;
     sideTableIsFilterChipsDragging.current = true;
@@ -2604,7 +2608,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
               <div className="shrink-0 w-fit" ref={leftFormColRef}>
                 <div className='grid grid-cols-2 gap-3 text-left'>
                   <div className='text-left max-w-[300px]'>
-                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Select Type</label>
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Account Type<span className="text-[#E4572E]">*</span></label>
                     <Select
                       options={[
                         { value: 'Loan', label: 'Loan' },
@@ -2613,7 +2617,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
                       ]}
                       value={selectedLoanType ? { value: selectedLoanType, label: selectedLoanType } : null}
                       onChange={(selected) => setSelectedLoanType(selected ? selected.value : '')}
-                      placeholder="Select Type..."
+                      placeholder="Account Type"
                       isSearchable
                       isClearable
                       styles={customStyles}
@@ -2621,7 +2625,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
                     />
                   </div>
                   <div className='text-left'>
-                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Date</label>
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Date<span className="text-[#E4572E]">*</span></label>
                     <div className="expense-entry-form-date w-[300px]">
                       <CustomDateField
                         value={dateValue}
@@ -2635,7 +2639,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
                     </div>
                   </div>
                   <div className='text-left'>
-                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Associate</label>
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Associate<span className="text-[#E4572E]">*</span></label>
                     <Select
                       options={combinedOptions}
                       value={selectedOption}
@@ -2644,6 +2648,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
                       isClearable
                       isSearchable
                       styles={customStyles}
+                      placeholder="Con/Ven/Emp/Lab"
                     />
                   </div>
                   <div className='text-left'>
@@ -2651,12 +2656,12 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
                     <AdvancePortalAmountOutput value={overallLoan} />
                   </div>
                   <div className='text-left'>
-                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Purpose</label>
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>Purpose<span className="text-[#E4572E]">*</span></label>
                     <Select
                       options={purposeOptions}
                       value={purpose ? purposeOptions.find(opt => opt.id === parseInt(purpose)) : null}
                       onChange={(selected) => setPurpose(selected ? selected.id : '')}
-                      placeholder="Select a purpose..."
+                      placeholder="Purpose"
                       isSearchable
                       isClearable
                       styles={customStyles}
@@ -2683,7 +2688,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
                             isClearable
                             isSearchable
                             styles={customStyles}
-                            placeholder="Select purpose to..."
+                            placeholder="Transfer To"
                           />
                         ) : (
                           <AdvancePortalAmountInput
@@ -2762,7 +2767,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
                       className={`bg-[#c7934c] text-white w-full sm:w-[120px] h-[33px] rounded flex items-center justify-center text-sm xl:mb-0 mb-2 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
                       onClick={handleSubmit}
                     >
-                      {isSubmitting ? 'Processing...' : selectedLoanType === 'Loan' ? 'Pay Loan' : selectedLoanType}
+                      {isSubmitting ? 'Processing...' : selectedLoanType === 'Refund' ? 'Refund' : selectedLoanType === 'Transfer' ? 'Transfer' : 'Loan'}
                     </button>
                   </div>
                 </div>
@@ -2906,6 +2911,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
                                   <EdbcColumnHeader
                                     columnId={EDBC_IDS.EDBC3}
                                     label="Transfer/Refund"
+                                    {...sideTableEdbcSortProps}
                                   />
                                   <EdbcColumnHeader
                                     columnId={EDBC_IDS.EDBC17}
@@ -3119,7 +3125,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
                       options={finalPaymentModeOptions}
                       value={editFormData.mode ? { value: editFormData.mode, label: editFormData.mode } : null}
                       onChange={(selected) => setEditFormData({ ...editFormData, mode: selected ? selected.value : '' })}
-                      placeholder="Select"
+                      placeholder="Payment Mode"
                       isSearchable
                       isClearable
                       styles={customStyles}
@@ -3132,7 +3138,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
                       options={purposeOptions}
                       value={editFormData.purpose ? purposeOptions.find(opt => opt.id === parseInt(editFormData.purpose) || opt.value === editFormData.purpose) : null}
                       onChange={(selected) => setEditFormData({ ...editFormData, purpose: selected ? selected.id : '' })}
-                      placeholder="Select Purpose"
+                      placeholder="Purpose"
                       isSearchable
                       isClearable
                       styles={customStyles}
@@ -3245,7 +3251,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
                                 }))}
                                 value={paymentPopupData.accountNumber ? { value: paymentPopupData.accountNumber, label: paymentPopupData.accountNumber } : null}
                                 onChange={(selected) => setPaymentPopupData(prev => ({ ...prev, accountNumber: selected ? selected.value : '' }))}
-                                placeholder="Select Account"
+                                placeholder="Account Number"
                                 isSearchable
                                 isClearable
                                 menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
@@ -3321,7 +3327,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
                             ]}
                             value={selectedLoanType ? { value: selectedLoanType, label: selectedLoanType } : null}
                             onChange={(selected) => setSelectedLoanType(selected ? selected.value : '')}
-                            placeholder="Select Type..."
+                            placeholder="Type"
                             isSearchable
                             isClearable
                             styles={customStyles}
@@ -3346,6 +3352,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
                             styles={customStyles}
                             isClearable
                             isSearchable
+                            placeholder="Con/Ven/Emp/Lab"
                             className="custom-select rounded-lg"
                           />
                         </div>
@@ -3355,7 +3362,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
                             options={purposeOptions}
                             value={purpose ? purposeOptions.find(opt => opt.id === parseInt(purpose)) : null}
                             onChange={(selected) => setPurpose(selected ? selected.id : '')}
-                            placeholder="Select Purpose"
+                            placeholder="Purpose"
                             isSearchable
                             isClearable
                             styles={customStyles}
@@ -3390,7 +3397,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
                                     });
                                   }
                                 }}
-                                placeholder="Select"
+                                placeholder="Payment Mode"
                                 isSearchable
                                 isClearable
                                 styles={customStyles}
@@ -3419,7 +3426,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
                                 onChange={(selected) => setTransferSelection(selected || null)}
                                 styles={customStyles}
                                 isClearable
-                                placeholder="Select Transfer To"
+                                placeholder="Transfer To"
                                 className="custom-select rounded-lg"
                               />
                             </div>

@@ -7,10 +7,180 @@ import "jspdf-autotable";
 import RentForm from './Form';
 import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
 import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
+import Pdf from '../Images/pdf.png';
+import FileRemover from '../Images/FileRemover.svg';
+import {
+    EDBC_IDS,
+    EdbcColumnHeader,
+    EdbcEmptyFilterCell,
+    EdbcFilterToggleButton,
+    EdbcTableBodyRow,
+    EdbcTableFilterRow,
+    EdbcTableHeaderRow,
+    EdbcTableToolbarRightActions,
+    EdbcSelectFilter,
+    EdbcTotalAmountFilter,
+    getEdbcColumnConfig
+} from '../ExpensesEntry/databaseExpensesSharedColumns';
 
 const DASHBOARD_REFRESH_MS = 60_000;
 
 const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const rentDashboardColumnIds = {
+    serialNo: EDBC_IDS.EDBC21,
+    shopNo: EDBC_IDS.EDBC13,
+    shopName: EDBC_IDS.EDBC4,
+    doorNo: EDBC_IDS.EDBC22,
+    advance: EDBC_IDS.EDBC8,
+    month: EDBC_IDS.EDBC22,
+    unpaid: EDBC_IDS.EDBC22,
+    activity: EDBC_IDS.EDBC19,
+};
+const RENT_DASHBOARD_EDBC_WIDTH_LOCK_TABLE_CLASS =
+    '[&_th#EDBC-21]:!w-[70px] [&_td#EDBC-21]:!w-[70px] [&_th#EDBC-21]:!min-w-[70px] [&_td#EDBC-21]:!min-w-[70px] [&_th#EDBC-21]:!max-w-[70px] [&_td#EDBC-21]:!max-w-[70px] [&_th#EDBC-13]:!w-[130px] [&_td#EDBC-13]:!w-[130px] [&_th#EDBC-13]:!min-w-[130px] [&_td#EDBC-13]:!min-w-[130px] [&_th#EDBC-13]:!max-w-[130px] [&_td#EDBC-13]:!max-w-[130px] [&_th#EDBC-4]:!w-[218px] [&_td#EDBC-4]:!w-[218px] [&_th#EDBC-4]:!min-w-[218px] [&_td#EDBC-4]:!min-w-[218px] [&_th#EDBC-4]:!max-w-[218px] [&_td#EDBC-4]:!max-w-[218px] [&_th#EDBC-22]:!w-[80px] [&_td#EDBC-22]:!w-[80px] [&_th#EDBC-22]:!min-w-[80px] [&_td#EDBC-22]:!min-w-[80px] [&_th#EDBC-22]:!max-w-[80px] [&_td#EDBC-22]:!max-w-[80px] [&_th#EDBC-8]:!w-[120px] [&_td#EDBC-8]:!w-[120px] [&_th#EDBC-8]:!min-w-[120px] [&_td#EDBC-8]:!min-w-[120px] [&_th#EDBC-8]:!max-w-[120px] [&_td#EDBC-8]:!max-w-[120px] [&_th#EDBC-19]:!w-[70px] [&_td#EDBC-19]:!w-[70px] [&_th#EDBC-19]:!min-w-[70px] [&_td#EDBC-19]:!min-w-[70px] [&_th#EDBC-19]:!max-w-[70px] [&_td#EDBC-19]:!max-w-[70px]';
+const getRentDashboardCellClass = (columnId, extraClassName = '') =>
+    [getEdbcColumnConfig(columnId)?.tdClass || '', extraClassName].filter(Boolean).join(' ');
+const dashboardTopFieldClass = 'border-2 border-[#BF9853] rounded-lg px-[8px] h-[40px] focus:outline-none border-opacity-[0.20] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const dashboardTopDropdownStyles = {
+    control: (provided, state) => ({
+        ...provided,
+        fontFamily: 'Manrope',
+        borderWidth: '2px',
+        borderRadius: '8px',
+        minHeight: '40px',
+        height: '40px',
+        flexWrap: 'nowrap',
+        borderColor: state.isFocused
+            ? 'rgba(191, 152, 83, 1)'
+            : 'rgba(191, 152, 83, 0.2)',
+        boxShadow: state.isFocused
+            ? '0 0 0 1px rgba(101, 102, 53, 0.2)'
+            : 'none',
+        '&:hover': {
+            borderColor: 'rgba(191, 152, 83, 0.2)',
+        },
+    }),
+    valueContainer: (provided, state) => ({
+        ...provided,
+        flex: '1 1 0%',
+        minWidth: 0,
+        flexWrap: 'nowrap',
+        overflow: 'hidden',
+        paddingLeft: '12px',
+        paddingRight: state.hasValue ? '2px' : provided.paddingRight,
+        paddingTop: 0,
+        paddingBottom: 0,
+        height: '36px',
+        alignItems: 'center',
+    }),
+    indicatorSeparator: () => ({ display: 'none' }),
+    singleValue: (provided) => ({
+        ...provided,
+        maxWidth: '100%',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        margin: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+        color: 'black',
+    }),
+    input: (provided) => ({
+        ...provided,
+        margin: 0,
+        padding: 0,
+    }),
+    menu: (provided) => ({
+        ...provided,
+        zIndex: 9999,
+        maxHeight: '300px',
+    }),
+    menuPortal: (provided) => ({
+        ...provided,
+        zIndex: 9999,
+    }),
+    menuList: (provided) => ({
+        ...provided,
+        paddingTop: 0,
+        paddingBottom: 0,
+        maxHeight: '250px',
+        overflowY: 'auto',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+        '&::-webkit-scrollbar': {
+            display: 'none',
+        },
+    }),
+    indicatorsContainer: (provided) => ({
+        ...provided,
+        flex: '0 0 auto',
+        paddingLeft: '0',
+    }),
+    dropdownIndicator: (provided, state) => ({
+        ...provided,
+        display: state.hasValue ? 'none' : 'flex',
+        color: '#000000',
+        flexShrink: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+    }),
+    clearIndicator: (provided) => ({
+        ...provided,
+        cursor: 'pointer',
+        color: '#000000',
+        flexShrink: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+        paddingLeft: '4px',
+        paddingRight: '4px',
+    }),
+    placeholder: (provided) => ({
+        ...provided,
+        fontWeight: 'normal',
+        fontSize: '14px',
+        color: '#6b7280',
+        margin: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+        textAlign: 'left',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        maxWidth: '100%',
+        position: 'absolute',
+    }),
+    option: (provided, state) => ({
+        ...provided,
+        minHeight: 36,
+        height: 'auto',
+        paddingTop: 6,
+        paddingBottom: 6,
+        whiteSpace: 'normal',
+        display: 'flex',
+        alignItems: 'center',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTapHighlightColor: '#FAF6ED',
+        backgroundColor: state.isSelected
+            ? '#BF9853'
+            : state.isFocused
+                ? '#FAF6ED'
+                : provided.backgroundColor,
+        color: state.isSelected ? '#FFFFFF' : provided.color,
+        ':active': {
+            backgroundColor: state.isSelected ? '#BF9853' : '#FAF6ED',
+        },
+    }),
+};
+const paymentStatusOptions = [
+    { value: 'paid', label: 'Paid' },
+    { value: 'unpaid', label: 'Unpaid' },
+];
+const occupancyStatusOptions = [
+    { value: 'occupied', label: 'Occupied Shop' },
+    { value: 'vacant', label: 'Vacant Shop' },
+    { value: 'vacated', label: 'Vacated Shop' },
+];
 const Dashboard = ({ refreshSignal, isActive = true }) => {
     const getCurrentMonth = () => {
         const now = new Date();
@@ -41,8 +211,16 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
     const [selectedOccupancyStatus, setSelectedOccupancyStatus] = useState('');
     const [selectedMonthYear, setSelectedMonthYear] = useState(getCurrentMonth());
     const [showRentFormPopup, setShowRentFormPopup] = useState(false);
+    const [overallSearch, setOverallSearch] = useState('');
+    const [showFilters, setShowFilters] = useState(false);
+    const [shopNoFilter, setShopNoFilter] = useState('');
+    const [shopNameFilter, setShopNameFilter] = useState('');
+    const [doorNoFilter, setDoorNoFilter] = useState('');
+    const [advanceFilter, setAdvanceFilter] = useState('');
     const [tableHeight, setTableHeight] = useState(400); // Default height in pixels
     const scrollRef = useRef(null);
+    const tableRef = useRef(null);
+    const [tableToolbarWidth, setTableToolbarWidth] = useState(null);
     const isDragging = useRef(false);
     const start = useRef({ x: 0, y: 0 });
     const scroll = useRef({ left: 0, top: 0 });
@@ -55,13 +233,11 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
         const savedPaymentStatus = sessionStorage.getItem('paymentStatus');
         const savedShopNo = sessionStorage.getItem('selectedShopNo')
         const savedSelectedDoorNo = sessionStorage.getItem('selectedDoorNo');
-        const savedTenantName = sessionStorage.getItem('selectedTenantName');
         const savedSelectedProperty = sessionStorage.getItem('selectedProperty');
         const savedOccupancyStatus = sessionStorage.getItem('selectedOccupancyStatus');
         try {
             if (savedPaymentStatus) setPaymentStatus(JSON.parse(savedPaymentStatus));
             if (savedShopNo) setSelectedShopNo(JSON.parse(savedShopNo));
-            if (savedTenantName) setSelectedTenantName(JSON.parse(savedTenantName));
             if (savedSelectedDoorNo) setSelectedDoorNo(JSON.parse(savedSelectedDoorNo));
             if (savedSelectedProperty) setSelectedProperty(JSON.parse(savedSelectedProperty));
             if (savedOccupancyStatus) setSelectedOccupancyStatus(JSON.parse(savedOccupancyStatus));
@@ -730,6 +906,19 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
             const matchesShopNo = selectedShopNo ? shop.shopNo === selectedShopNo : true;
             const matchesTenantName = selectedTenantName ? shop.tenantName === selectedTenantName : true;
             const matchesDoorNo = selectedDoorNo ? shop.doorNo === selectedDoorNo : true;
+            const matchesShopNoFilter = shopNoFilter
+                ? shop.shopNo === shopNoFilter
+                : true;
+            const matchesShopNameFilter = shopNameFilter
+                ? shop.tenantName === shopNameFilter
+                : true;
+            const matchesDoorNoFilter = doorNoFilter
+                ? shop.doorNo === doorNoFilter
+                : true;
+            const advanceFilterText = advanceFilter.replace(/[₹,\s]/g, '').trim();
+            const matchesAdvanceFilter = advanceFilterText
+                ? String(shop.advance ?? '').replace(/[₹,\s]/g, '').includes(advanceFilterText)
+                : true;
             const matchesProperty = selectedProperty ? shop.propertyName === selectedProperty.value : true;
             const isVacant = shop.tenantName === 'Vacant';
             const isVacated = shop.vacated;
@@ -764,7 +953,21 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                     matchesMonthStatus = totalAmount === 0 && hasStarted;
                 }
             }
-            return matchesShopNo && matchesTenantName && matchesDoorNo && matchesProperty && matchesOccupancyStatus && (!isVacant || paymentStatus === '') && matchesMonthStatus;
+            const searchText = overallSearch.trim().toLowerCase();
+            const monthTotals = Array.isArray(shop.months)
+                ? shop.months.map((amounts) => Array.isArray(amounts) ? amounts.reduce((a, b) => a + b, 0) : '').join(' ')
+                : '';
+            const matchesOverallSearch = searchText
+                ? [
+                    shop.shopNo,
+                    shop.tenantName,
+                    shop.doorNo,
+                    shop.propertyName,
+                    shop.advance,
+                    monthTotals,
+                ].join(' ').toLowerCase().includes(searchText)
+                : true;
+            return matchesShopNo && matchesTenantName && matchesDoorNo && matchesShopNoFilter && matchesShopNameFilter && matchesDoorNoFilter && matchesAdvanceFilter && matchesProperty && matchesOccupancyStatus && (!isVacant || paymentStatus === '') && matchesMonthStatus && matchesOverallSearch;
         });
     }, [
         tableData,
@@ -776,6 +979,11 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
         paymentStatus,
         selectedProperty,
         selectedOccupancyStatus,
+        overallSearch,
+        shopNoFilter,
+        shopNameFilter,
+        doorNoFilter,
+        advanceFilter,
     ]);
     const sortedTableData = useMemo(() => {
         return [...filteredTableData].sort((a, b) => {
@@ -805,12 +1013,38 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                 if (parsedA.number > parsedB.number) return sortOrder === 'asc' ? 1 : -1;                
                 return 0;
             }
+            if (sortField === 'advance') {
+                const amountA = Number(a.advance) || 0;
+                const amountB = Number(b.advance) || 0;
+                if (amountA < amountB) return sortOrder === 'asc' ? -1 : 1;
+                if (amountA > amountB) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
+            }
             // Default sorting for other fields
             if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
             if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
             return 0;
         });
     }, [filteredTableData, sortField, sortOrder]);
+    useEffect(() => {
+        const updateToolbarWidth = () => {
+            if (tableRef.current) {
+                setTableToolbarWidth(tableRef.current.offsetWidth);
+            }
+        };
+        updateToolbarWidth();
+        const resizeObserver = tableRef.current && typeof ResizeObserver !== 'undefined'
+            ? new ResizeObserver(updateToolbarWidth)
+            : null;
+        if (resizeObserver && tableRef.current) {
+            resizeObserver.observe(tableRef.current);
+        }
+        window.addEventListener('resize', updateToolbarWidth);
+        return () => {
+            if (resizeObserver) resizeObserver.disconnect();
+            window.removeEventListener('resize', updateToolbarWidth);
+        };
+    }, [showFilters, sortedTableData.length]);
     const options = projects
         .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
         .map((project) => ({
@@ -821,11 +1055,10 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
     const filteredByShop = selectedShopNo
         ? tableData.filter(shop => shop.shopNo === selectedShopNo)
         : tableData;
-    const tenantOptions = [...new Set(filteredByShop.map(shop => shop.tenantName))].map(name => ({ value: name, label: name }));
-    const filteredByTenant = selectedTenantName
-        ? filteredByShop.filter(shop => shop.tenantName === selectedTenantName)
-        : filteredByShop;
-    const doorOptions = [...new Set(filteredByTenant.map(shop => shop.doorNo))].map(door => ({ value: door, label: door }));
+    const doorOptions = [...new Set(filteredByShop.map(shop => shop.doorNo).filter(Boolean))].map(door => ({ value: door, label: door }));
+    const tableShopNoFilterOptions = [...new Set(filteredTableData.map(shop => shop.shopNo).filter(Boolean))].map(no => ({ value: no, label: no }));
+    const tableShopNameFilterOptions = [...new Set(filteredTableData.map(shop => shop.tenantName).filter(Boolean))].map(name => ({ value: name, label: name }));
+    const tableDoorNoFilterOptions = [...new Set(filteredTableData.map(shop => shop.doorNo).filter(Boolean))].map(door => ({ value: door, label: door }));
     const handleExportPDF = () => {
         const doc = new jsPDF('landscape');
         const monthYearSuffix = `${monthNames[selectedMonth]} ${selectedYear}`;
@@ -1054,166 +1287,48 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
             return sum + totalAmount;
         }, 0);
     }, [filteredTableData, selectedMonth, selectedYear]);
+    const clearFilters = () => {
+        setOverallSearch('');
+        setShopNoFilter('');
+        setShopNameFilter('');
+        setDoorNoFilter('');
+        setAdvanceFilter('');
+        setSortField('');
+        setSortOrder('asc');
+    };
+    const activeTableFilterChips = [
+        shopNoFilter ? { label: 'Shop No', value: shopNoFilter, onClear: () => setShopNoFilter('') } : null,
+        shopNameFilter ? { label: 'Shop Name', value: shopNameFilter, onClear: () => setShopNameFilter('') } : null,
+        doorNoFilter ? { label: 'D.No', value: doorNoFilter, onClear: () => setDoorNoFilter('') } : null,
+        advanceFilter ? { label: 'Advance', value: advanceFilter, onClear: () => setAdvanceFilter('') } : null,
+    ].filter(Boolean);
     return (
-        <div className="">
-            <div className='mx-auto lg:w-[1750px] p-4 lg:pl-4 bg-white lg:ml-12 lg:mr-6 rounded-md text-left'>
-                <div className="flex flex-col lg:flex-row lg:items-end gap-4 lg:gap-3 p-4">
-                    <div className="flex-shrink-0 mr-3">
+        <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]">
+            <div className="px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
+            <div className='w-full rounded-[6px] bg-white text-left mb-[18px] shrink-0'>
+                <div className="flex flex-wrap items-center justify-between text-left max-md:flex-col max-md:items-stretch">
+                    <div className="flex flex-wrap items-center space-x-3 text-left p-[18px]">
+                    <div className="w-[180px] max-w-full">
                         <h1 className='font-semibold mb-2'>Select Year</h1>
                         <input
                             type="month"
                             value={selectedMonthYear}
                             onChange={(e) => setSelectedMonthYear(e.target.value)}
-                            className="border-2 border-[#BF9853] rounded-lg p-2 w-full lg:w-[180px] h-[45px] focus:outline-none"
+                            className={`${dashboardTopFieldClass} w-[180px] max-w-full`}
                         />
                     </div>
-                    <div className="flex  sm:flex-row w-full flex-wrap">
-                        <div className="w-full sm:w-auto sm:min-w-[200px]">
-                            <label className="block font-semibold mb-2 text-sm sm:text-base">Shop No</label>
-                            <Select
-                                options={shopOptions}
-                                isClearable
-                                placeholder="Select"
-                                className="w-full lg:w-[180px]"
-                                value={shopOptions.find(o => o.value === selectedShopNo) || null}
-                                onChange={(option) => {
-                                    const value = option?.value || '';
-                                    setSelectedShopNo(value);
-                                    setSelectedTenantName('');
-                                    setSelectedDoorNo('');
-                                    if (value) {
-                                        sessionStorage.setItem('selectedShopNo', JSON.stringify(value));
-                                    } else {
-                                        sessionStorage.removeItem('selectedShopNo');
-                                    }
-                                    sessionStorage.removeItem('selectedTenantName');
-                                    sessionStorage.removeItem('selectedDoorNo');
-                                }}
-                                styles={{
-                                    control: (provided, state) => ({
-                                        ...provided,
-                                        height: '45px',
-                                        minHeight: '45px',
-                                        backgroundColor: 'transparent',
-                                        borderWidth: '2px',
-                                        borderColor: state.isFocused
-                                            ? 'rgba(191, 152, 83, 1)'
-                                            : 'rgba(191, 152, 83, 1)',
-                                        borderRadius: '8px',
-                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
-                                        '&:hover': {
-                                            borderColor: 'rgba(191, 152, 83, 1)',
-                                        },
-                                    }),
-                                    placeholder: (provided) => ({
-                                        ...provided,
-                                        color: '#999',
-                                    }),
-                                    singleValue: (provided) => ({
-                                        ...provided,
-                                        color: 'black',
-                                    }),
-                                }}
-                            />
-                        </div>
-                        <div className="w-full sm:w-auto sm:min-w-[200px] mr-5">
-                            <label className="block font-semibold mb-2 text-sm sm:text-base">Tenant Name</label>
-                            <Select
-                                options={tenantOptions}
-                                isClearable
-                                placeholder="Select"
-                                value={tenantOptions.find(o => o.value === selectedTenantName) || null}
-                                onChange={(option) => {
-                                    const value = option?.value || '';
-                                    setSelectedTenantName(value);
-                                    if (value) {
-                                        sessionStorage.setItem('selectedTenantName', JSON.stringify(value));
-                                    } else {
-                                        sessionStorage.removeItem('selectedTenantName');
-                                    }
-                                    setSelectedDoorNo('');
-                                    sessionStorage.removeItem('selectedDoorNo');
-                                }}
-                                isDisabled={!filteredByShop.length}
-                                styles={{
-                                    control: (provided, state) => ({
-                                        ...provided,
-                                        height: '45px',
-                                        minHeight: '45px',
-                                        backgroundColor: 'transparent',
-                                        borderWidth: '2px',
-                                        borderColor: state.isFocused
-                                            ? 'rgba(191, 152, 83, 1)'
-                                            : 'rgba(191, 152, 83, 1)',
-                                        borderRadius: '8px',
-                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
-                                        '&:hover': {
-                                            borderColor: 'rgba(191, 152, 83, 1)',
-                                        },
-                                    }),
-                                    placeholder: (provided) => ({
-                                        ...provided,
-                                        color: '#999',
-                                    }),
-                                    singleValue: (provided) => ({
-                                        ...provided,
-                                        color: 'black',
-                                    }),
-                                }}
-                            />
-                        </div>
-                        <div className="w-full sm:w-auto sm:min-w-[200px]">
-                            <label className="block font-semibold mb-2 text-sm sm:text-base">Door No</label>
-                            <Select
-                                options={doorOptions}
-                                placeholder="Select"
-                                isClearable
-                                className="w-full lg:w-[180px]"
-                                value={doorOptions.find(o => o.value === selectedDoorNo) || null}
-                                onChange={(option) => {
-                                    const value = option?.value || '';
-                                    setSelectedDoorNo(value);
-                                    if (value) {
-                                        sessionStorage.setItem('selectedDoorNo', JSON.stringify(value));
-                                    } else {
-                                        sessionStorage.removeItem('selectedDoorNo');
-                                    }
-                                }}
-                                isDisabled={!filteredByTenant.length}
-                                styles={{
-                                    control: (provided, state) => ({
-                                        ...provided,
-                                        height: '45px',
-                                        minHeight: '45px',
-                                        backgroundColor: 'transparent',
-                                        borderWidth: '2px',
-                                        borderColor: state.isFocused
-                                            ? 'rgba(191, 152, 83, 1)'
-                                            : 'rgba(191, 152, 83, 1)',
-                                        borderRadius: '8px',
-                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
-                                        '&:hover': {
-                                            borderColor: 'rgba(191, 152, 83, 1)',
-                                        },
-                                    }),
-                                    placeholder: (provided) => ({
-                                        ...provided,
-                                        color: '#999',
-                                    }),
-                                    singleValue: (provided) => ({
-                                        ...provided,
-                                        color: 'black',
-                                    }),
-                                }}
-                            />
-                        </div>
-                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                        <div className="w-[180px] max-w-full">
                             <label className="block font-semibold mb-2 text-sm sm:text-base">Payment Status</label>
-                            <select
-                                className='w-full lg:w-[180px] h-[45px] border-2 border-[#BF9853] rounded-lg pl-3 focus:outline-none'
-                                value={paymentStatus}
-                                onChange={(e) => {
-                                    const value = e.target.value;
+                            <Select
+                                options={paymentStatusOptions}
+                                isSearchable
+                                isClearable
+                                placeholder="Payment Status"
+                                className="custom-select rounded-lg w-[180px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                                classNamePrefix="select"
+                                value={paymentStatusOptions.find(option => option.value === paymentStatus) || null}
+                                onChange={(selectedOption) => {
+                                    const value = selectedOption?.value || '';
                                     setPaymentStatus(value);
                                     if (value) {
                                         sessionStorage.setItem('paymentStatus', JSON.stringify(value));
@@ -1221,13 +1336,10 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                                         sessionStorage.removeItem('paymentStatus');
                                     }
                                 }}
-                            >
-                                <option value="">Select</option>
-                                <option value="paid">Paid</option>
-                                <option value="unpaid">Unpaid</option>
-                            </select>
+                                styles={dashboardTopDropdownStyles}
+                            />
                         </div>
-                        <div className="w-full sm:w-auto sm:min-w-[200px] mr-5">
+                        <div className="w-[220px] max-w-full">
                             <label className="block font-semibold mb-2 text-sm sm:text-base">Project Reference Name</label>
                             <Select
                                 options={options}
@@ -1241,42 +1353,25 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                                         sessionStorage.removeItem('selectedProperty');
                                     }
                                 }}
-                                placeholder="Select"
+                                placeholder="Project Reference Name"
                                 isSearchable
-                                styles={{
-                                    control: (provided, state) => ({
-                                        ...provided,
-                                        height: '45px',
-                                        minHeight: '45px',
-                                        backgroundColor: 'transparent',
-                                        borderWidth: '2px',
-                                        borderColor: state.isFocused
-                                            ? 'rgba(191, 152, 83, 1)'
-                                            : 'rgba(191, 152, 83, 1)',
-                                        borderRadius: '8px',
-                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
-                                        '&:hover': {
-                                            borderColor: 'rgba(191, 152, 83, 1)',
-                                        },
-                                    }),
-                                    placeholder: (provided) => ({
-                                        ...provided,
-                                        color: '#999',
-                                    }),
-                                    singleValue: (provided) => ({
-                                        ...provided,
-                                        color: 'black',
-                                    }),
-                                }}
+                                className="custom-select rounded-lg w-[220px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                                classNamePrefix="select"
+                                styles={dashboardTopDropdownStyles}
                             />
                         </div>
-                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                        <div className="w-[180px] max-w-full">
                             <label className="block font-semibold mb-2 text-sm sm:text-base">Occupancy Status</label>
-                            <select
-                                className='w-full lg:w-[180px] h-[45px] border-2 border-[#BF9853] rounded-lg pl-3 focus:outline-none'
-                                value={selectedOccupancyStatus}
-                                onChange={(e) => {
-                                    const value = e.target.value;
+                            <Select
+                                options={occupancyStatusOptions}
+                                isSearchable
+                                isClearable
+                                placeholder="Occupancy Status"
+                                className="custom-select rounded-lg w-[180px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                                classNamePrefix="select"
+                                value={occupancyStatusOptions.find(option => option.value === selectedOccupancyStatus) || null}
+                                onChange={(selectedOption) => {
+                                    const value = selectedOption?.value || '';
                                     setSelectedOccupancyStatus(value);
                                     if (value) {
                                         sessionStorage.setItem('selectedOccupancyStatus', JSON.stringify(value));
@@ -1284,91 +1379,202 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                                         sessionStorage.removeItem('selectedOccupancyStatus');
                                     }
                                 }}
+                                styles={dashboardTopDropdownStyles}
+                            />
+                        </div>
+                        <div className="w-[180px] max-w-full">
+                            <label className="block font-semibold mb-2 text-sm sm:text-base">Total Occupied Shops</label>
+                            <div className={`${dashboardTopFieldClass} w-[180px] max-w-full flex items-center justify-end text-[#E4572E]`}>
+                                {portfolioOccupiedCount}
+                            </div>
+                        </div>
+                        <div className="w-[180px] max-w-full">
+                            <label className="block font-semibold mb-2 text-sm sm:text-base">Total Shop Vacancy</label>
+                            <div
+                                className={`${dashboardTopFieldClass} w-[180px] max-w-full flex items-center justify-end text-[#E4572E] cursor-pointer`}
+                                onClick={() => setShowVacantPopup(true)}
                             >
-                                <option value="">Select</option>
-                                <option value="occupied">Occupied Shop</option>
-                                <option value="vacant">Vacant Shop</option>
-                                <option value="vacated">Vacated Shop</option>
-                            </select>
+                                {portfolioVacantShopsList.length}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center flex-wrap justify-end pr-[18px] max-xl:basis-full max-xl:pl-[18px] max-xl:justify-start max-xl:pb-[18px] max-md:justify-start max-md:px-[18px] max-md:pb-[18px] max-md:w-full">
+                        <div
+                            className="rounded-md px-4 py-[8px] text-sm shrink-0"
+                            style={{
+                                backgroundColor: '#FFFDF9',
+                                backgroundImage: [
+                                    'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                    'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                    'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                    'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                ].join(', '),
+                                backgroundSize: '100% 1px, 100% 1px, 1px 100%, 1px 100%',
+                                backgroundPosition: '0 0, 0 100%, 0 0, 100% 0',
+                                backgroundRepeat: 'repeat-x, repeat-x, repeat-y, repeat-y',
+                            }}
+                        >
+                            <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                <span className="flex shrink-0 w-[250px] text-black font-semibold">
+                                    <span className="whitespace-nowrap">Total Monthly Rent</span>
+                                    <span className="ml-auto">:</span>
+                                </span>
+                                <span className='font-semibold text-[#E4572E]'>₹{totalMonthlyRents.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
+                            </div>
+                            <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                <span className="flex shrink-0 w-[250px] text-black font-semibold">
+                                    <span className="whitespace-nowrap">Collected for {monthNames[selectedMonth]} {selectedYear}</span>
+                                    <span className="ml-auto">:</span>
+                                </span>
+                                <span className="font-semibold text-[#E4572E]">
+                                    ₹{totalForSelectedMonth.toLocaleString("en-IN")}
+                                </span>
+                            </div>
+                            <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                <span className="flex shrink-0 w-[250px] text-black font-semibold">
+                                    <span className="whitespace-nowrap">Balance {monthNames[selectedMonth]} {selectedYear}</span>
+                                    <span className="ml-auto">:</span>
+                                </span>
+                                <span className="font-semibold text-[#E4572E]">
+                                    ₹{(totalMonthlyRents - totalForSelectedMonth).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
             {/* Rent Table */}
-            <div className='mx-auto lg:w-[1750px] p-4 lg:pl-8 mt-5 bg-white lg:ml-12 mr-6 rounded-md'>
-                <div className='flex flex-col lg:flex-row lg:justify-end gap-4 lg:gap-10 items-start lg:items-center mb-3'>
-                    <div className="font-semibold flex flex-col sm:flex-row gap-1 sm:gap-2">
-                        <span>Total Monthly Rent:</span>
-                        <span className='font-bold cursor-pointer text-[#E4572E]'>₹{totalMonthlyRents.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
+            <div className='w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden'>
+                <div
+                    className="flex min-w-0 flex-nowrap items-center justify-between gap-[6px] mb-[12px] shrink-0 overflow-hidden"
+                    style={{ width: tableToolbarWidth ? `${tableToolbarWidth}px` : '100%' }}
+                >
+                    <div className={`flex min-w-0 items-center overflow-hidden gap-[6px]${activeTableFilterChips.length ? ' flex-1 min-w-0' : ' shrink-0'}`}>
+                        <EdbcFilterToggleButton onClick={() => setShowFilters((prev) => !prev)} />
+                        {activeTableFilterChips.length > 0 && (
+                            <div className="flex min-w-0 flex-1 overflow-x-auto flex-nowrap gap-2 no-scrollbar scrollbar-none">
+                                {activeTableFilterChips.map((chip) => (
+                                    <span
+                                        key={chip.label}
+                                        className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden"
+                                    >
+                                        <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">{chip.label}: </span>
+                                        <span className="font-semibold text-[14px] truncate min-w-0">{chip.value}</span>
+                                        <button type="button" onClick={chip.onClear} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
-                    <div className="font-semibold text-sm sm:text-base">
-                        <span className="block sm:inline">Total Collected for {monthNames[selectedMonth]} {selectedYear}:</span>
-                        <span className="text-green-600 ml-0 sm:ml-1">
-                            ₹{totalForSelectedMonth.toLocaleString("en-IN")}
-                        </span>
+                    <div className="flex min-w-0 items-center justify-end gap-[6px] shrink-0">
+                        <EdbcTableToolbarRightActions
+                            onClearFilters={clearFilters}
+                            overallSearch={overallSearch}
+                            onOverallSearchChange={setOverallSearch}
+                            showExportIcons={false}
+                            clearButtonType="button"
+                            wrapperClassName={null}
+                            searchWrapperClassName="h-[34px] min-w-0 flex-1 max-w-[286px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1 sm:w-[286px] sm:min-w-[286px] sm:flex-none sm:shrink-0"
+                        />
+                        <div className="flex shrink-0 items-end gap-2">
+                            <span className="text-[#E4572E] flex items-center gap-1 font-semibold hover:underline cursor-pointer" onClick={handleExportPDF}>PDF<img src={Pdf} alt="Pdf" className="w-4 h-4" /></span>
+                        </div>
                     </div>
-                    <div className="font-semibold text-sm sm:text-base">
-                        <span className="block sm:inline">Balance Rent to Collect for {monthNames[selectedMonth]} {selectedYear}:</span>
-                        <span className="text-red-600 ml-0 sm:ml-1">
-                            ₹{(totalMonthlyRents - totalForSelectedMonth).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                        </span>
-                    </div>
-                    <div className="font-semibold flex gap-2">
-                        <span>Total Occupied Shops:</span>
-                        <span className='font-bold cursor-pointer text-[#E4572E]'>
-                            {portfolioOccupiedCount}
-                        </span>
-                    </div>
-                    <div className="font-semibold flex gap-2">
-                        <span>Total Shop Vacancy:</span>
-                        <span className='font-bold cursor-pointer text-[#E4572E]' onClick={() => setShowVacantPopup(true)}>
-                            {portfolioVacantShopsList.length}
-                        </span>
-                    </div>
-                    <button className='font-bold text-sm text-[#E4572E] cursor-pointer hover:underline text-left lg:text-right' onClick={handleExportPDF}>
-                        Export PDF
-                    </button>
                 </div>
-                <div ref={scrollRef} className="rounded-lg border-l-8 border-[#BF9853] overflow-scroll select-none" style={{ height: `${550}px` }}
+                <div ref={scrollRef} className="rounded-lg border-l-8 border-[#BF9853] overflow-auto no-scrollbar scrollbar-none select-none" style={{ height: `${550}px` }}
                     onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
                 >
-                    <table className="border-collapse w-full text-left min-w-[1165px]">
+                    <table ref={tableRef} className={`border-collapse w-max min-w-max text-left ${RENT_DASHBOARD_EDBC_WIDTH_LOCK_TABLE_CLASS}`}>
                         <thead className="sticky top-0">
-                            <tr className="bg-[#FAF6ED]">
-                                <th className="px-2 py-2 font-semibold cursor-pointer">S.No</th>
-                                <th className="px-4 py-2 font-semibold cursor-pointer" onClick={() => handleSort('shopNo')} >
-                                    Sh.No {sortField === 'shopNo' && (sortOrder === 'asc' ? '↑' : '↓')}
-                                </th>
-                                <th className="px-4 py-2 font-semibold cursor-pointer" onClick={() => handleSort('tenantName')} >
-                                    Shop Name {sortField === 'tenantName' && (sortOrder === 'asc' ? '↑' : '↓')}
-                                </th>
-                                <th className="px-4 py-2 font-semibold">D.No</th>
-                                <th className="px-4 py-2 font-semibold">Advance</th>
+                            <EdbcTableHeaderRow>
+                                <EdbcColumnHeader columnId={rentDashboardColumnIds.serialNo} label="S.No" headerClassName="!text-left" />
+                                <EdbcColumnHeader
+                                    columnId={rentDashboardColumnIds.shopNo}
+                                    label="Shop No"
+                                    sortField={sortField === 'shopNo' ? getEdbcColumnConfig(rentDashboardColumnIds.shopNo)?.sortField : ''}
+                                    sortDirection={sortOrder}
+                                    onSort={() => handleSort('shopNo')}
+                                    headerClassName="!text-left"
+                                />
+                                <EdbcColumnHeader
+                                    columnId={rentDashboardColumnIds.shopName}
+                                    label="Shop Name"
+                                    sortField={sortField === 'tenantName' ? getEdbcColumnConfig(rentDashboardColumnIds.shopName)?.sortField : ''}
+                                    sortDirection={sortOrder}
+                                    onSort={() => handleSort('tenantName')}
+                                />
+                                <EdbcColumnHeader columnId={rentDashboardColumnIds.doorNo} label="D.No" headerClassName="!text-left" />
+                                <EdbcColumnHeader
+                                    columnId={rentDashboardColumnIds.advance}
+                                    label="Advance"
+                                    sortField={sortField === 'advance' ? getEdbcColumnConfig(rentDashboardColumnIds.advance)?.sortField : ''}
+                                    sortDirection={sortOrder}
+                                    onSort={() => handleSort('advance')}
+                                />
                                 {monthNames.map((month, i) => (
-                                    <th key={i} className="px-4 py-2 font-semibold">{month}</th>
+                                    <EdbcColumnHeader key={i} columnId={rentDashboardColumnIds.month} label={month} />
                                 ))}
-                                <th className="px-4 py-2 font-semibold">Unpaid</th>
-                                <th className="px-4 py-2 font-semibold">Edit</th>
-                            </tr>
+                                <EdbcColumnHeader columnId={rentDashboardColumnIds.unpaid} label="Unpaid" />
+                                <EdbcColumnHeader columnId={rentDashboardColumnIds.activity} label="Activity" />
+                            </EdbcTableHeaderRow>
+                            {showFilters && (
+                                <EdbcTableFilterRow>
+                                    <EdbcEmptyFilterCell columnId={rentDashboardColumnIds.serialNo} />
+                                    <EdbcSelectFilter
+                                        columnId={rentDashboardColumnIds.shopNo}
+                                        placeholder="Shop No"
+                                        options={tableShopNoFilterOptions}
+                                        value={shopNoFilter}
+                                        onChange={setShopNoFilter}
+                                        textAlign="right"
+                                    />
+                                    <EdbcSelectFilter
+                                        columnId={rentDashboardColumnIds.shopName}
+                                        placeholder="Shop Name"
+                                        options={tableShopNameFilterOptions}
+                                        value={shopNameFilter}
+                                        onChange={setShopNameFilter}
+                                    />
+                                    <EdbcSelectFilter
+                                        columnId={rentDashboardColumnIds.doorNo}
+                                        placeholder="D.No"
+                                        options={tableDoorNoFilterOptions}
+                                        value={doorNoFilter}
+                                        onChange={setDoorNoFilter}
+                                        textAlign="right"
+                                    />
+                                    <EdbcTotalAmountFilter
+                                        columnId={rentDashboardColumnIds.advance}
+                                        placeholder="Advance"
+                                        value={advanceFilter}
+                                        onChange={(e) => setAdvanceFilter(e.target.value)}
+                                    />
+                                    {monthNames.map((month, i) => (
+                                        <EdbcEmptyFilterCell key={i} columnId={rentDashboardColumnIds.month} />
+                                    ))}
+                                    <EdbcEmptyFilterCell columnId={rentDashboardColumnIds.unpaid} />
+                                    <EdbcEmptyFilterCell columnId={rentDashboardColumnIds.activity} />
+                                </EdbcTableFilterRow>
+                            )}
                         </thead>
                         <tbody>
                             {sortedTableData.map((shop, index) => {
                                 const isVacant = shop.tenantName === 'Vacant';
                                 return (
-                                    <tr
+                                    <EdbcTableBodyRow
                                         key={`${shop.shopNo}-${shop.tenantName || 'Vacant'}-${shop.shNo}`}
-                                        className={`font-semibold text-sm ${isVacant
+                                        className={`${isVacant
                                             ? 'bg-[#FFE5C5] text-[#E4572E] italic'
                                             : shop.vacated
                                                 ? 'bg-[#FDE2E4] text-gray-600 line-through'
                                                 : 'odd:bg-white even:bg-[#FAF6ED]'
                                             }`}
                                     >
-                                        <td className="pr-2 pl-4 py-2 ">{index + 1}</td>
-                                        <td className="pr-6 pl-4 py-2 " title={`${shop.doorNo || ''} - ${shop.propertyName || ''}`}>
+                                        <td id={rentDashboardColumnIds.serialNo} className={getRentDashboardCellClass(rentDashboardColumnIds.serialNo, '!text-left')}>{index + 1}</td>
+                                        <td id={rentDashboardColumnIds.shopNo} className={getRentDashboardCellClass(rentDashboardColumnIds.shopNo, '!text-left')} title={`${shop.doorNo || ''} - ${shop.propertyName || ''}`}>
                                             {shop.shopNo}
                                         </td>
-                                        <td className="px-4 py-2">
+                                        <td id={rentDashboardColumnIds.shopName} className={getRentDashboardCellClass(rentDashboardColumnIds.shopName)}>
                                             {isVacant ? (
                                                 <em></em>
                                             ) : (
@@ -1380,10 +1586,10 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="pr-2 pl-4 py-2">
+                                        <td id={rentDashboardColumnIds.doorNo} className={getRentDashboardCellClass(rentDashboardColumnIds.doorNo, '!text-left')}>
                                             {shop.doorNo || '-'}
                                         </td>
-                                        <td className="px-4 py-2" title={(() => {
+                                        <td id={rentDashboardColumnIds.advance} className={getRentDashboardCellClass(rentDashboardColumnIds.advance)} title={(() => {
                                             const advanceDetails = shop.advanceDetails || [];
                                             const adjustmentDetails = shop.advanceAdjustmentDetails || [];
                                             const shopClosureDetails = shop.shopClosureDetails || [];
@@ -1441,7 +1647,7 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                                                     (selectedYear === shopClosureDate.getFullYear() && i > shopClosureDate.getMonth()))
                                                 : false;
                                             return (
-                                                <td key={i} className="px-4 py-2 text-center" title={hoverText}>
+                                                <td key={i} id={rentDashboardColumnIds.month} className={getRentDashboardCellClass(rentDashboardColumnIds.month)} title={hoverText}>
                                                     {isVacant || isBeforeStart || isAfterClosure ? (
                                                         <span className="text-gray-400 font-medium">-</span>
                                                     ) : totalAmount > 0 ? (
@@ -1462,7 +1668,7 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                                                 </td>
                                             );
                                         })}
-                                        <td className="px-4 py-2 text-center font-bold">
+                                        <td id={rentDashboardColumnIds.unpaid} className={`${getRentDashboardCellClass(rentDashboardColumnIds.unpaid)} font-bold`}>
                                             {isVacant
                                                 ? '-'
                                                 : shop.months.filter((arr, i) => {
@@ -1478,7 +1684,7 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                                                     return isPastMonth && total === 0 && hasKnownStart && !isBeforeStart;
                                                 }).length.toString().padStart(2, '0')}
                                         </td>
-                                        <td className="px-4 py-2 items-center text-center ">
+                                        <td id={rentDashboardColumnIds.activity} className={getRentDashboardCellClass(rentDashboardColumnIds.activity, '!justify-center')}>
                                             {!isVacant && (
                                                 <button
                                                     onClick={() => {
@@ -1489,7 +1695,7 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                                                 </button>
                                             )}
                                         </td>
-                                    </tr>
+                                    </EdbcTableBodyRow>
                                 );
                             })}
                             {tableData.length === 0 && (
@@ -1504,7 +1710,7 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                 </div>
             </div>
             {showConfirm && selectedShop && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-40 p-4">
                     <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md">
                         <p className="text-lg sm:text-xl font-semibold mb-2 text-center">
                             Are you sure you want to edit
@@ -1538,7 +1744,7 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                 </div>
             )}
             {showEditPopup && selectedShop && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-40 p-4">
                     <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md relative max-h-[90vh] overflow-y-auto">
                         <div className="text-left text-base sm:text-lg text-[#E4572E] font-bold mb-4">
                             {selectedShop.tenantName} - {shopInfoMap[selectedShop.shopNo]?.doorNo || ''}
@@ -1589,44 +1795,50 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                 </div>
             )}
             {showVacantPopup && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-auto p-4">
-                    <div className="bg-white rounded-xl p-4 sm:p-6 w-full max-w-4xl max-h-[90vh] shadow-xl">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
-                            <div>
-                                <h2 className="text-lg sm:text-xl font-semibold">Vacant Shop Details</h2>
-                            </div>
-                            <div className="flex items-center gap-4 sm:gap-7">
-                                <button className="text-[#E4572E] font-semibold text-sm cursor-pointer hover:underline" onClick={handleExportVacantPDF}>
-                                    Export PDF
-                                </button>
-                                <button onClick={() => setShowVacantPopup(false)} className="text-gray-500 hover:text-black text-lg sm:text-xl">
-                                    ✕
-                                </button>
-                            </div>
+                <div
+                    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
+                    onClick={() => setShowVacantPopup(false)}
+                >
+                    <div
+                        className="relative bg-white rounded-lg shadow-xl p-[18px] w-fit text-left max-h-[80vh] overflow-hidden no-scrollbar scrollbar-none"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            type="button"
+                            onClick={() => setShowVacantPopup(false)}
+                            className="absolute top-[18px] right-[18px] z-10 flex h-[20px] w-[20px] items-center justify-center"
+                        >
+                            <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
+                        </button>
+                        <div className="mb-2 pr-6">
+                            <p className="text-[16px] font-bold text-[#E4572E]">Vacant Shop Details</p>
                         </div>
-                        <div className="border-l-8 border-[#BF9853] rounded-lg max-h-[60vh] overflow-y-auto">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-xs sm:text-sm min-w-[400px]">
-                                    <thead className="bg-[#FAF6ED] sticky top-0">
-                                        <tr>
-                                            <th className="px-2 py-2 text-left">S.No</th>
-                                            <th className="px-2 py-2 text-left">Shop No</th>
-                                            <th className="px-2 py-2 text-left">Door No</th>
-                                            <th className="px-2 py-2 text-left">Project Reference Name</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {portfolioVacantShopsList.map((shop, index) => (
-                                            <tr key={shop.shopNo} className="border-b border-gray-200">
-                                                <td className="px-2 py-2">{index + 1}</td>
-                                                <td className="px-2 py-2 font-medium">{shop.shopNo}</td>
-                                                <td className="px-2 py-2">{shop.doorNo || 'N/A'}</td>
-                                                <td className="px-2 py-2">{shop.propertyName || 'N/A'}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                        <div className="flex w-[498px] max-w-full justify-end mb-3">
+                            <button className="text-[#E4572E] flex items-center gap-1 font-semibold text-sm cursor-pointer hover:underline" onClick={handleExportVacantPDF}>
+                                PDF<img src={Pdf} alt="Pdf" className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="mt-4 border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
+                            <table className={`table-fixed w-[498px] max-w-full border-collapse ${RENT_DASHBOARD_EDBC_WIDTH_LOCK_TABLE_CLASS}`}>
+                                <thead className="sticky top-0 z-20 bg-[#FAF6ED]">
+                                    <EdbcTableHeaderRow>
+                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC21} label="S.No" headerClassName="!text-left" />
+                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC13} label="Shop No" headerClassName="!text-left" />
+                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC22} label="D.No" headerClassName="!text-left" />
+                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label="Project Reference Name" />
+                                    </EdbcTableHeaderRow>
+                                </thead>
+                                <tbody>
+                                    {portfolioVacantShopsList.map((shop, index) => (
+                                        <EdbcTableBodyRow key={shop.shopNo}>
+                                            <td id={EDBC_IDS.EDBC21} className={getRentDashboardCellClass(EDBC_IDS.EDBC21, '!text-left')}>{index + 1}</td>
+                                            <td id={EDBC_IDS.EDBC13} className={getRentDashboardCellClass(EDBC_IDS.EDBC13, '!text-left')}>{shop.shopNo}</td>
+                                            <td id={EDBC_IDS.EDBC22} className={getRentDashboardCellClass(EDBC_IDS.EDBC22, '!text-left')}>{shop.doorNo || 'N/A'}</td>
+                                            <td id={EDBC_IDS.EDBC4} className={getRentDashboardCellClass(EDBC_IDS.EDBC4)}>{shop.propertyName || 'N/A'}</td>
+                                        </EdbcTableBodyRow>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -1656,6 +1868,7 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                     </div>
                 </div>
             ) : null}
+            </div>
         </div>
     );
 };

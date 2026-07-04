@@ -14,6 +14,7 @@ import {
 } from '../../utils/paymentModeArrangement';
 import { usePaymentModesForModule } from '../../utils/usePaymentModeArrangement';
 import CustomMonthField from "../ExpensesEntry/CustomMonthField";
+import CustomDateField from "../ExpensesEntry/CustomDateField";
 const Form = ({ embedded = false, onSuccess } = {}) => {
     const resolveActiveBranchId = () => {
         try {
@@ -1549,28 +1550,314 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             }
         }
     }, [formTenantName, tenantShopData, shopNoOptions, selectedRentType, shopInfoMap, shopNoIdToShopNoMap]);
+    const rentTypeOptions = [
+        { value: "Rent", label: "Rent" },
+        { value: "Advance", label: "Advance" },
+        { value: "Shop Closure", label: "Shop Closure" },
+        { value: "Refund", label: "Refund" },
+        { value: "Pending Rent", label: "Pending Rent" },
+    ];
+    const formDropdownStyles = {
+        control: (provided, state) => ({
+            ...provided,
+            fontFamily: 'Manrope',
+            borderWidth: '2px',
+            borderRadius: '8px',
+            minHeight: '40px',
+            height: '40px',
+            flexWrap: 'nowrap',
+            borderColor: state.isFocused
+                ? 'rgba(191, 152, 83, 1)'
+                : 'rgba(191, 152, 83, 0.2)',
+            boxShadow: state.isFocused
+                ? '0 0 0 1px rgba(101, 102, 53, 0.2)'
+                : 'none',
+            '&:hover': {
+                borderColor: 'rgba(191, 152, 83, 0.2)',
+            },
+        }),
+        valueContainer: (provided, state) => ({
+            ...provided,
+            flex: '1 1 0%',
+            minWidth: 0,
+            flexWrap: 'nowrap',
+            overflow: 'hidden',
+            paddingLeft: '12px',
+            paddingRight: state.hasValue ? '2px' : provided.paddingRight,
+            paddingTop: 0,
+            paddingBottom: 0,
+            height: '36px',
+            alignItems: 'center',
+        }),
+        indicatorSeparator: () => ({ display: 'none' }),
+        singleValue: (provided) => ({
+            ...provided,
+            maxWidth: '100%',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            margin: 0,
+            paddingTop: 0,
+            paddingBottom: 0,
+            color: 'black',
+        }),
+        input: (provided) => ({
+            ...provided,
+            margin: 0,
+            padding: 0,
+        }),
+        menu: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+            maxHeight: '300px',
+        }),
+        menuPortal: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+        }),
+        menuList: (provided) => ({
+            ...provided,
+            paddingTop: 0,
+            paddingBottom: 0,
+            maxHeight: '250px',
+            overflowY: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            '&::-webkit-scrollbar': {
+                display: 'none',
+            },
+        }),
+        indicatorsContainer: (provided) => ({
+            ...provided,
+            flex: '0 0 auto',
+            paddingLeft: '0',
+        }),
+        dropdownIndicator: (provided, state) => ({
+            ...provided,
+            display: state.hasValue ? 'none' : 'flex',
+            color: '#000000',
+            flexShrink: 0,
+            paddingTop: 0,
+            paddingBottom: 0,
+        }),
+        clearIndicator: (provided) => ({
+            ...provided,
+            cursor: 'pointer',
+            color: '#000000',
+            flexShrink: 0,
+            paddingTop: 0,
+            paddingBottom: 0,
+            paddingLeft: '4px',
+            paddingRight: '4px',
+        }),
+        placeholder: (provided) => ({
+            ...provided,
+            fontWeight: 'normal',
+            fontSize: '14px',
+            color: '#6b7280',
+            margin: 0,
+            paddingTop: 0,
+            paddingBottom: 0,
+            textAlign: 'left',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '100%',
+            position: 'absolute',
+        }),
+        option: (provided, state) => ({
+            ...provided,
+            minHeight: 36,
+            height: 'auto',
+            paddingTop: 6,
+            paddingBottom: 6,
+            whiteSpace: 'normal',
+            display: 'flex',
+            alignItems: 'center',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            WebkitTapHighlightColor: '#FAF6ED',
+            backgroundColor: state.isSelected
+                ? '#BF9853'
+                : state.isFocused
+                    ? '#FAF6ED'
+                    : provided.backgroundColor,
+            color: state.isSelected ? '#FFFFFF' : provided.color,
+            ':active': {
+                backgroundColor: state.isSelected ? '#BF9853' : '#FAF6ED',
+            },
+        }),
+    };
+    const paymentModeDropdownOptions = paymentModeOptions
+        .filter(mode => {
+            if (selectedRentType === "Advance" &&
+                (mode.modeOfPayment === "Advance Adjustment" ||
+                    mode.modeOfPayment?.toLowerCase().includes("advance adjustment"))) {
+                return false;
+            }
+            return true;
+        })
+        .map((mode) => ({
+            value: mode.modeOfPayment,
+            label: mode.modeOfPayment,
+        }));
     return (
-        <div className="p-3 sm:p-4 md:p-6 bg-[#FFFFFF] w-full max-w-[1830px] min-h-[700px] ml-10 mr-12 text-left">
-            <div className="flex  sm:flex-row sm:items-center gap-6">
-                <div>
-                    <h2 className="text-[#E4572E] font-bold mb-2 text-sm sm:text-base">Select Type</h2>
-                    <select className="border-2 border-opacity-[0.18] focus:outline-none border-[#BF9853] rounded-lg p-2 mt-1 w-full sm:w-[170px] h-[45px]"
-                        value={selectedRentType} onChange={(e) => {
-                            setSelectedRentType(e.target.value);
-                            if (e.target.value !== "Shop Closure") setClosureDateError('');
-                        }} >
-                        <option value="Rent">Rent</option>
-                        <option value="Advance">Advance</option>
-                        <option value="Shop Closure">Shop Closure</option>
-                        <option value="Refund">Refund</option>
-                        <option value="Pending Rent">Pending Rent</option>
-                    </select>
+        <div className="p-[18px] bg-[#FAF6ED] w-full h-[calc(100vh-104px)] overflow-hidden">
+            <div className="p-[18px] bg-[#FFFFFF] w-full h-full overflow-y-auto overflow-x-hidden no-scrollbar scrollbar-none text-left rounded-[6px]">
+            <div className="flex flex-wrap items-center gap-4">
+                <div className="w-[300px] max-w-full">
+                    <div className="flex items-center justify-between mb-[8px]">
+                        <h2 className="text-[#E4572E] font-bold text-sm sm:text-base">Account Type</h2>
+                        <span className="text-right text-[#E4572E] font-semibold text-[14px] sm:text-base">ENO:{eno}</span>
+                    </div>
+                    <Select
+                        value={rentTypeOptions.find(option => option.value === selectedRentType)}
+                        onChange={(selectedOption) => {
+                            const value = selectedOption?.value || "";
+                            setSelectedRentType(value);
+                            if (value !== "Shop Closure") setClosureDateError('');
+                        }}
+                        options={rentTypeOptions}
+                        placeholder="Account Type"
+                        isSearchable
+                        isClearable
+                        className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                        classNamePrefix="select"
+                        styles={formDropdownStyles}
+                    />
                 </div>
-                <span className="text-right text-[#E4572E] text-sm sm:text-base -mt-20 ml-10 ">ENO:{eno}</span>
+                <div className="w-full sm:w-[300px]">
+                    <label className="block font-semibold mb-[8px] text-sm sm:text-base">Paid on</label>
+                    <CustomDateField
+                        value={paidOnDate}
+                        onChange={setPaidOnDate}
+                        placeholder="Paid on"
+                        controlHeightPx={40}
+                        anchor="right"
+                        alwaysOpenBelow
+                    />
+                </div>
+                {((formTenantName && formShopNo) ||
+                    (selectedRentType === "Rent" && selectedMonth && calculatedRent) ||
+                    (selectedRentType === "Pending Rent" && formTenantName && formShopNo && startingDate) ||
+                    (selectedRentType === "Shop Closure" && formTenantName && formShopNo && startingDate)) && (
+                        <div
+                            className="hidden xl:block rounded-md px-4 py-[8px] text-sm shrink-0"
+                            style={{
+                                backgroundColor: '#FFFDF9',
+                                backgroundImage: [
+                                    'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                    'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                    'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                    'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                ].join(', '),
+                                backgroundSize: '100% 1px, 100% 1px, 1px 100%, 1px 100%',
+                                backgroundPosition: '0 0, 0 100%, 0 0, 100% 0',
+                                backgroundRepeat: 'repeat-x, repeat-x, repeat-y, repeat-y',
+                            }}
+                        >
+                            {formTenantName && formShopNo && (
+                                <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                    <span className="flex shrink-0 w-[240px] text-black font-semibold">
+                                        <span className="whitespace-nowrap">Advance Amount</span>
+                                        <span className="ml-auto">:</span>
+                                    </span>
+                                    <span className="font-semibold" style={{ color: '#E4572E' }}>
+                                        ₹{advanceAmount.toLocaleString('en-IN')}
+                                    </span>
+                                </div>
+                            )}
+                            {selectedRentType === "Rent" && selectedMonth && calculatedRent && (
+                                <>
+                                    <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                        <span className="flex shrink-0 w-[240px] text-black font-semibold">
+                                            <span className="whitespace-nowrap">
+                                                Rent To Be Paid For {selectedMonth
+                                                    ? new Date(`${selectedMonth}-01`).toLocaleString('default', {
+                                                        month: 'long',
+                                                        year: 'numeric',
+                                                    })
+                                                    : ''}
+                                            </span>
+                                            <span className="ml-auto">:</span>
+                                        </span>
+                                        <span className="font-semibold" style={{ color: '#E4572E' }}>
+                                            ₹{calculatedRent}
+                                        </span>
+                                    </div>
+                                    {formTenantName && formShopNo && startingDate && (
+                                        <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                            <span className="flex shrink-0 w-[240px] text-black font-semibold">
+                                                <span className="whitespace-nowrap">
+                                                    {closureDate ? `Total Pending Rent (Up to ${new Date(closureDate).toLocaleDateString('en-IN', {
+                                                        day: '2-digit',
+                                                        month: 'short',
+                                                        year: 'numeric'
+                                                    })})` : 'Total Pending Rent (Up to Today)'}
+                                                </span>
+                                                <span className="ml-auto">:</span>
+                                            </span>
+                                            <span className="font-semibold" style={{ color: '#E4572E' }}>
+                                                ₹{(closureDate ? calculatePendingRentUpToDate(closureDate) : calculatePendingRentUpToDate(new Date().toISOString().split('T')[0])).toLocaleString('en-IN')}
+                                            </span>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            {selectedRentType === "Pending Rent" && formTenantName && formShopNo && startingDate && (() => {
+                                let shopClosureDate = null;
+                                const matchingTenant = tenantShopData.find(tenant => tenant.tenantName === formTenantName);
+                                if (matchingTenant) {
+                                    matchingTenant.shopNos?.forEach(shop => {
+                                        const shopNo = shop.shopNoId ? shopNoIdToShopNoMap[shop.shopNoId] : null;
+                                        if (shopNo === formShopNo) {
+                                            shopClosureDate = shop.shopClosureDate;
+                                        }
+                                    });
+                                }
+                                return (
+                                    <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                        <span className="flex shrink-0 w-[240px] text-black font-semibold">
+                                            <span className="whitespace-nowrap">
+                                                {shopClosureDate ? `Total Pending Rent (Up to ${new Date(shopClosureDate).toLocaleDateString('en-IN', {
+                                                    day: '2-digit',
+                                                    month: 'short',
+                                                    year: 'numeric'
+                                                })})` : 'Total Pending Rent (Up to Today)'}
+                                            </span>
+                                            <span className="ml-auto">:</span>
+                                        </span>
+                                        <span className="font-semibold" style={{ color: '#E4572E' }}>
+                                            ₹{calculatePendingRentForPendingType().toLocaleString('en-IN')}
+                                        </span>
+                                    </div>
+                                );
+                            })()}
+                            {selectedRentType === "Shop Closure" && formTenantName && formShopNo && startingDate && (() => {
+                                return (
+                                    <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                        <span className="flex shrink-0 w-[240px] text-black font-semibold">
+                                            <span className="whitespace-nowrap">
+                                                {closureDate ? `Total Pending Rent (Up to ${new Date(closureDate).toLocaleDateString('en-IN', {
+                                                    day: '2-digit',
+                                                    month: 'short',
+                                                    year: 'numeric'
+                                                })})` : 'Total Pending Rent (Up to Today)'}
+                                            </span>
+                                            <span className="ml-auto">:</span>
+                                        </span>
+                                        <span className="font-semibold" style={{ color: '#E4572E' }}>
+                                            ₹{(closureDate ? calculatePendingRentUpToDate(closureDate) : calculatePendingRentUpToDate(new Date().toISOString().split('T')[0])).toLocaleString('en-IN')}
+                                        </span>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    )}
             </div>
-            <div className="mt-4 flex flex-col lg:flex-row gap-4 lg:gap-8">
-                <div className="w-full lg:w-auto">
-                    <label className="block font-semibold mb-2 text-sm sm:text-base">Shop No</label>
+            <div className="mt-4 flex flex-wrap gap-4">
+                <div className="w-full sm:w-[300px]">
+                    <label className="block font-semibold mb-[8px] text-sm sm:text-base">Shop No</label>
                     <Select
                         name="shopNo"
                         value={filteredShopNoOptions.find(option => option.value === formShopNo)}
@@ -1655,117 +1942,16 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                             }
                         }}
                         options={filteredShopNoOptions}
-                        placeholder="Choose No"
+                        placeholder="Shop No"
                         isSearchable
                         isClearable
-                        className="w-full sm:w-[170px]"
+                        className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                         classNamePrefix="select"
-                        styles={{
-                            control: (provided, state) => ({
-                                ...provided,
-                                height: '45px',
-                                minHeight: '45px',
-                                backgroundColor: 'transparent',
-                                borderWidth: '2px',
-                                borderColor: state.isFocused
-                                    ? 'rgba(191, 152, 83, 0.5)'
-                                    : 'rgba(191, 152, 83, 0.18)',
-                                borderRadius: '8px',
-                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                '&:hover': {
-                                    borderColor: 'rgba(191, 152, 83, 0.4)',
-                                },
-                            }),
-                            placeholder: (provided) => ({
-                                ...provided,
-                                color: '#999',
-                            }),
-                            singleValue: (provided) => ({
-                                ...provided,
-                                color: 'black',
-                            }),
-                        }}
+                        styles={formDropdownStyles}
                     />
                 </div>
-                <div className="w-full lg:w-auto">
-                    <div className="space-y-2">
-                        {formTenantName && formShopNo && (
-                            <div className={`text-sm text-gray-700 mb-3 flex items-center gap-2 ${selectedRentType === "Rent"
-                                ? "lg:-mt-[76px]"
-                                : selectedRentType === "Pending Rent" || selectedRentType === "Shop Closure"
-                                    ? "lg:-mt-[53px]"
-                                    : "lg:-mt-[34px]"
-                                }`}>
-                                <span>Advance Amount: ₹ {advanceAmount.toLocaleString('en-IN')}</span>
-                            </div>
-                        )}
-                        {selectedRentType === "Rent" && selectedMonth && calculatedRent && (
-                            <>
-                                <div className="text-sm text-gray-700 ">
-                                    Rent To Be Paid For {selectedMonth
-                                        ? new Date(`${selectedMonth}-01`).toLocaleString('default', {
-                                            month: 'long',
-                                            year: 'numeric',
-                                        })
-                                        : ''}: ₹ {calculatedRent}
-                                </div>
-                                {formTenantName && formShopNo && startingDate && (
-                                    <div className="text-sm text-gray-700 ">
-                                        {closureDate ? (
-                                            <>Total Pending Rent (Up to {new Date(closureDate).toLocaleDateString('en-IN', {
-                                                day: '2-digit',
-                                                month: 'short',
-                                                year: 'numeric'
-                                            })}): ₹ {calculatePendingRentUpToDate(closureDate).toLocaleString('en-IN')}</>
-                                        ) : (
-                                            <>Total Pending Rent (Up to Today): ₹ {calculatePendingRentUpToDate(new Date().toISOString().split('T')[0]).toLocaleString('en-IN')}</>
-                                        )}
-                                    </div>
-                                )}
-                            </>
-                        )}
-                        {selectedRentType === "Pending Rent" && formTenantName && formShopNo && startingDate && (() => {
-                            let shopClosureDate = null;
-                            const matchingTenant = tenantShopData.find(tenant => tenant.tenantName === formTenantName);
-                            if (matchingTenant) {
-                                matchingTenant.shopNos?.forEach(shop => {
-                                    const shopNo = shop.shopNoId ? shopNoIdToShopNoMap[shop.shopNoId] : null;
-                                    if (shopNo === formShopNo) {
-                                        shopClosureDate = shop.shopClosureDate;
-                                    }
-                                });
-                            }
-                            return (
-                                <div className="text-sm text-gray-700 ">
-                                    {shopClosureDate ? (
-                                        <>Total Pending Rent (Up to {new Date(shopClosureDate).toLocaleDateString('en-IN', {
-                                            day: '2-digit',
-                                            month: 'short',
-                                            year: 'numeric'
-                                        })}): ₹ {calculatePendingRentForPendingType().toLocaleString('en-IN')}</>
-                                    ) : (
-                                        <>Total Pending Rent (Up to Today): ₹ {calculatePendingRentForPendingType().toLocaleString('en-IN')}</>
-                                    )}
-                                </div>
-                            );
-                        })()}
-                        {selectedRentType === "Shop Closure" && formTenantName && formShopNo && startingDate && (() => {
-                            return (
-                                <div className="text-sm text-gray-700 ">
-                                    {closureDate ? (
-                                        <>Total Pending Rent (Up to {new Date(closureDate).toLocaleDateString('en-IN', {
-                                            day: '2-digit',
-                                            month: 'short',
-                                            year: 'numeric'
-                                        })}): ₹ {calculatePendingRentUpToDate(closureDate).toLocaleString('en-IN')}</>
-                                    ) : (
-                                        <>Total Pending Rent (Up to Today): ₹ {calculatePendingRentUpToDate(new Date().toISOString().split('T')[0]).toLocaleString('en-IN')}</>
-                                    )}
-                                </div>
-                            );
-                        })()}
-                    </div>
-                    <label className="block font-semibold mb-2 text-sm sm:text-base">Tenant Name</label>
+                <div className="w-full sm:w-[300px]">
+                    <label className="block font-semibold mb-[8px] text-sm sm:text-base">Tenant Name</label>
                     <Select
                         name="tenantName"
                         value={tenantOptions.find(option => option.value === formTenantName)}
@@ -1883,144 +2069,209 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                             }
                         }}
                         options={tenantOptions}
-                        placeholder="Choose Tenant"
+                        placeholder="Tenant Name"
                         isSearchable
                         isClearable
-                        className="w-full sm:w-[290px]"
+                        className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                         classNamePrefix="select"
-                        styles={{
-                            control: (provided, state) => ({
-                                ...provided,
-                                height: '45px',
-                                minHeight: '45px',
-                                backgroundColor: 'transparent',
-                                borderWidth: '2px',
-                                borderColor: state.isFocused
-                                    ? 'rgba(191, 152, 83, 0.5)'
-                                    : 'rgba(191, 152, 83, 0.18)',
-                                borderRadius: '8px',
-                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                '&:hover': {
-                                    borderColor: 'rgba(191, 152, 83, 0.4)',
-                                },
-                            }),
-                            placeholder: (provided) => ({
-                                ...provided,
-                                color: '#999',
-                            }),
-                            singleValue: (provided) => ({
-                                ...provided,
-                                color: 'black',
-                            }),
-                        }}
+                        styles={formDropdownStyles}
                     />
                 </div>
             </div>
-            <div className="mt-4 flex flex-col lg:flex-row gap-4 lg:gap-8">
-                <div className="w-full lg:w-auto">
-                    <label className="block font-semibold mb-2 text-sm sm:text-base">
+            <div className="mt-4 flex flex-wrap gap-4">
+                <div className="w-full sm:w-[300px]">
+                    <label className="block font-semibold mb-[8px] text-sm sm:text-base">
                         {(selectedRentType === "Shop Closure" || selectedRentType === "Refund") ? "Refund Amount" : "Amount"}
                     </label>
-                    <input
-                        className={`border-2 border-opacity-[0.18] focus:outline-none rounded-lg p-2 w-full sm:w-[170px] h-[45px] ${amountError ? 'border-red-500' : 'border-[#BF9853]'
-                            }`}
-                        type="text"
-                        value={formatINR(amount)}
-                        onChange={(e) => {
-                            setAmount(e.target.value);
-                            validateAmount(e.target.value);
-                        }}
-                    />
+                    <div className="relative w-[300px] h-[40px]">
+                        <span className="absolute top-1/2 left-[8px] transform -translate-y-1/2 text-gray-600 text-lg">₹</span>
+                        <input
+                            className={`pl-[20px] pr-4 border-2 rounded-lg w-full h-full focus:outline-none border-opacity-[0.20] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500 ${amountError ? 'border-red-500' : 'border-[#BF9853]'
+                                }`}
+                            type="text"
+                            value={formatINR(amount).replace(/^₹\s?/, '')}
+                            onChange={(e) => {
+                                setAmount(e.target.value);
+                                validateAmount(e.target.value);
+                            }}
+                        />
+                    </div>
 
                 </div>
-                <div className="w-full lg:w-auto">
-                    <label className="block font-semibold mb-2 text-sm sm:text-base">Payment Mode</label>
-                    <select
-                        value={formPaymentMode}
-                        onChange={handlePaymentModeChange}
-                        className="border-2 border-opacity-[0.18] focus:outline-none border-[#BF9853] rounded-lg p-2 w-full sm:w-[290px] h-[45px]"
-                    >
-                        <option value="">Choose Method</option>
-                        {paymentModeOptions
-                            .filter(mode => {
-                                if (selectedRentType === "Advance" &&
-                                    (mode.modeOfPayment === "Advance Adjustment" ||
-                                        mode.modeOfPayment?.toLowerCase().includes("advance adjustment"))) {
-                                    return false;
-                                }
-                                return true;
-                            })
-                            .map((mode) => (
-                                <option key={mode.id} value={mode.modeOfPayment}>
-                                    {mode.modeOfPayment}
-                                </option>
-                            ))}
-                    </select>
+                <div className="w-full sm:w-[300px]">
+                    <label className="block font-semibold mb-[8px] text-sm sm:text-base">Payment Mode</label>
+                    <Select
+                        value={paymentModeDropdownOptions.find(option => option.value === formPaymentMode) || null}
+                        onChange={(selectedOption) => handlePaymentModeChange({ target: { value: selectedOption?.value || "" } })}
+                        options={paymentModeDropdownOptions}
+                        placeholder="Payment Mode"
+                        isSearchable
+                        isClearable
+                        className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                        classNamePrefix="select"
+                        styles={formDropdownStyles}
+                    />
                 </div>
             </div>
-            <div className="h-5 mt-1">
+            <div>
                 {amountError && (
                     <p className="text-red-500 text-xs mt-1">{amountError}</p>
                 )}
             </div>
-            <div className="mt-4 flex flex-col lg:flex-row gap-4 lg:gap-8">
-                <div className="w-full lg:w-auto">
-                    <label className="block font-semibold mb-2 text-sm sm:text-base">Paid on</label>
-                    <input
-                        type="date"
-                        value={paidOnDate}
-                        onChange={(e) => setPaidOnDate(e.target.value)}
-                        className="border-2 border-opacity-[0.18] focus:outline-none border-[#BF9853] rounded-lg p-2 w-full sm:w-[170px] h-[45px]"
-                    />
-                </div>
+            <div className="mt-4 flex flex-wrap gap-4">
                 {selectedRentType === "Shop Closure" && (
-                    <div className="w-full lg:w-auto">
-                        <label className="block font-semibold mb-2 text-sm sm:text-base">
+                    <div className="w-full sm:w-[300px]">
+                        <label className="block font-semibold mb-[8px] text-sm sm:text-base">
                             Closure Date <span className="text-[#E4572E]">*</span>
                         </label>
-                        <input
-                            type="date"
-                            required
+                        <CustomDateField
                             value={closureDate}
-                            onChange={(e) => {
-                                setClosureDate(e.target.value);
-                                if (e.target.value) setClosureDateError('');
+                            onChange={(value) => {
+                                setClosureDate(value);
+                                if (value) setClosureDateError('');
                             }}
-                            className={`border-2 border-opacity-[0.18] focus:outline-none rounded-lg p-2 w-full sm:w-[170px] h-[45px] ${closureDateError ? 'border-[#E4572E]' : 'border-[#BF9853]'}`}
+                            placeholder="Closure Date"
+                            controlHeightPx={40}
+                            anchor="right"
+                            alwaysOpenBelow
                         />
                         {closureDateError && (
                             <p className="mt-1 text-xs text-[#E4572E]">{closureDateError}</p>
                         )}
                     </div>
                 )}
-                {selectedRentType === "Shop Closure" && (
-                    <div className="mt-8 flex items-center gap-4">
-                        <button
-                            type="button"
-                            onClick={() => setShopClosureToggle(!shopClosureToggle)}
-                            className={`px-4 py-2 rounded-lg font-semibold text-sm sm:text-base transition-colors duration-200 border-2 ${shopClosureToggle
-                                ? 'border-green-500 text-green-500 hover:border-green-600 hover:text-green-600'
-                                : 'border-red-500 text-red-500 hover:border-red-600 hover:text-red-600'
-                                }`}
-                        >
-                            Source From CR
-                        </button>
-                    </div>
-                )}
                 {(selectedRentType === "Rent" || selectedRentType === "Pending Rent") && (
-                    <div className="w-full lg:w-auto">
-                        <label className="block font-semibold mb-2 text-sm sm:text-base">For The Month of</label>
+                    <div className="w-[300px] lg:w-[616px] max-w-full">
+                        <label className="block font-semibold mb-[8px] text-sm sm:text-base">For The Month of</label>
                         <CustomMonthField
                             value={selectedMonth}
                             onChange={(v) => setSelectedMonth(v)}
                             placeholder="Select month"
-                            className="w-full sm:w-[170px]"
+                            className="w-full"
+                            anchor="right"
                             alwaysOpenBelow
                         />
                     </div>
                 )}
+                {((formTenantName && formShopNo) ||
+                    (selectedRentType === "Rent" && selectedMonth && calculatedRent) ||
+                    (selectedRentType === "Pending Rent" && formTenantName && formShopNo && startingDate) ||
+                    (selectedRentType === "Shop Closure" && formTenantName && formShopNo && startingDate)) && (
+                        <div
+                            className="xl:hidden basis-full rounded-md px-4 py-[8px] text-sm shrink-0"
+                            style={{
+                                backgroundColor: '#FFFDF9',
+                                backgroundImage: [
+                                    'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                    'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                    'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                    'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                ].join(', '),
+                                backgroundSize: '100% 1px, 100% 1px, 1px 100%, 1px 100%',
+                                backgroundPosition: '0 0, 0 100%, 0 0, 100% 0',
+                                backgroundRepeat: 'repeat-x, repeat-x, repeat-y, repeat-y',
+                            }}
+                        >
+                            {formTenantName && formShopNo && (
+                                <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                    <span className="flex shrink-0 w-[240px] text-black font-semibold">
+                                        <span className="whitespace-nowrap">Advance Amount</span>
+                                        <span className="ml-auto">:</span>
+                                    </span>
+                                    <span className="font-semibold" style={{ color: '#E4572E' }}>
+                                        ₹{advanceAmount.toLocaleString('en-IN')}
+                                    </span>
+                                </div>
+                            )}
+                            {selectedRentType === "Rent" && selectedMonth && calculatedRent && (
+                                <>
+                                    <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                        <span className="flex shrink-0 w-[240px] text-black font-semibold">
+                                            <span className="whitespace-nowrap">
+                                                Rent To Be Paid For {selectedMonth
+                                                    ? new Date(`${selectedMonth}-01`).toLocaleString('default', {
+                                                        month: 'long',
+                                                        year: 'numeric',
+                                                    })
+                                                    : ''}
+                                            </span>
+                                            <span className="ml-auto">:</span>
+                                        </span>
+                                        <span className="font-semibold" style={{ color: '#E4572E' }}>
+                                            ₹{calculatedRent}
+                                        </span>
+                                    </div>
+                                    {formTenantName && formShopNo && startingDate && (
+                                        <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                            <span className="flex shrink-0 w-[240px] text-black font-semibold">
+                                                <span className="whitespace-nowrap">
+                                                    {closureDate ? `Total Pending Rent (Up to ${new Date(closureDate).toLocaleDateString('en-IN', {
+                                                        day: '2-digit',
+                                                        month: 'short',
+                                                        year: 'numeric'
+                                                    })})` : 'Total Pending Rent (Up to Today)'}
+                                                </span>
+                                                <span className="ml-auto">:</span>
+                                            </span>
+                                            <span className="font-semibold" style={{ color: '#E4572E' }}>
+                                                ₹{(closureDate ? calculatePendingRentUpToDate(closureDate) : calculatePendingRentUpToDate(new Date().toISOString().split('T')[0])).toLocaleString('en-IN')}
+                                            </span>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            {selectedRentType === "Pending Rent" && formTenantName && formShopNo && startingDate && (() => {
+                                let shopClosureDate = null;
+                                const matchingTenant = tenantShopData.find(tenant => tenant.tenantName === formTenantName);
+                                if (matchingTenant) {
+                                    matchingTenant.shopNos?.forEach(shop => {
+                                        const shopNo = shop.shopNoId ? shopNoIdToShopNoMap[shop.shopNoId] : null;
+                                        if (shopNo === formShopNo) {
+                                            shopClosureDate = shop.shopClosureDate;
+                                        }
+                                    });
+                                }
+                                return (
+                                    <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                        <span className="flex shrink-0 w-[240px] text-black font-semibold">
+                                            <span className="whitespace-nowrap">
+                                                {shopClosureDate ? `Total Pending Rent (Up to ${new Date(shopClosureDate).toLocaleDateString('en-IN', {
+                                                    day: '2-digit',
+                                                    month: 'short',
+                                                    year: 'numeric'
+                                                })})` : 'Total Pending Rent (Up to Today)'}
+                                            </span>
+                                            <span className="ml-auto">:</span>
+                                        </span>
+                                        <span className="font-semibold" style={{ color: '#E4572E' }}>
+                                            ₹{calculatePendingRentForPendingType().toLocaleString('en-IN')}
+                                        </span>
+                                    </div>
+                                );
+                            })()}
+                            {selectedRentType === "Shop Closure" && formTenantName && formShopNo && startingDate && (() => {
+                                return (
+                                    <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                        <span className="flex shrink-0 w-[240px] text-black font-semibold">
+                                            <span className="whitespace-nowrap">
+                                                {closureDate ? `Total Pending Rent (Up to ${new Date(closureDate).toLocaleDateString('en-IN', {
+                                                    day: '2-digit',
+                                                    month: 'short',
+                                                    year: 'numeric'
+                                                })})` : 'Total Pending Rent (Up to Today)'}
+                                            </span>
+                                            <span className="ml-auto">:</span>
+                                        </span>
+                                        <span className="font-semibold" style={{ color: '#E4572E' }}>
+                                            ₹{(closureDate ? calculatePendingRentUpToDate(closureDate) : calculatePendingRentUpToDate(new Date().toISOString().split('T')[0])).toLocaleString('en-IN')}
+                                        </span>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    )}
             </div>
-            <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:gap-4">
+            <div className="mt-[6px] flex flex-col sm:flex-row gap-2 sm:gap-4">
                 <div className='flex items-center'>
                     <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600 text-sm sm:text-base">
                         <img className='w-4 h-3 sm:w-5 sm:h-4 mr-1' alt='' src={Attach}></img>
@@ -2030,11 +2281,25 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                 </div>
                 {selectedRentFile && <span className="text-gray-600 text-sm sm:text-base break-all">{selectedRentFile.name}</span>}
             </div>
-            <button type='submit' disabled={isSubmitting} onClick={handleSubmit}
-                className={`bg-yellow-700 text-white px-4 sm:px-6 mt-6 sm:mt-8 py-2 rounded-md hover:bg-yellow-600 transition duration-200 text-sm sm:text-base w-full sm:w-auto ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-                {isSubmitting ? 'Submitting...' : 'Submit'}
-            </button>
+            <div className="mt-[16px] flex items-center gap-4 flex-nowrap">
+                <button type='submit' disabled={isSubmitting} onClick={handleSubmit}
+                    className={`bg-yellow-700 text-white px-4 sm:px-6 h-[33px] rounded hover:bg-yellow-600 transition duration-200 text-sm sm:text-base w-auto ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                    {isSubmitting ? 'Submitting...' : 'Submit'}
+                </button>
+                {selectedRentType === "Shop Closure" && (
+                    <button
+                        type="button"
+                        onClick={() => setShopClosureToggle(!shopClosureToggle)}
+                        className={`px-4 h-[33px] rounded font-semibold text-sm sm:text-base transition-colors duration-200 border-2 whitespace-nowrap shrink-0 ${shopClosureToggle
+                            ? 'border-green-500 text-green-500 hover:border-green-600 hover:text-green-600'
+                            : 'border-[#BF9853] text-[#BF9853]'
+                            }`}
+                    >
+                        Source From CR
+                    </button>
+                )}
+            </div>
             {showWeeklyPaymentPopup && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
                     <div className="bg-white text-left rounded-xl p-6 w-[800px] h-[600px] overflow-y-auto flex flex-col">
@@ -2113,18 +2378,19 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                                                     </div>
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 mb-2">Account Number<span className="text-red-500">*</span></label>
-                                                        <select
-                                                            value={weeklyPaymentData.accountNumber}
-                                                            onChange={(e) => setWeeklyPaymentData(prev => ({ ...prev, accountNumber: e.target.value }))}
-                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                        >
-                                                            <option value="">Select Account</option>
-                                                            {accountDetails.map((account) => (
-                                                                <option key={account.id} value={account.account_number}>
-                                                                    {account.account_number}
-                                                                </option>
-                                                            ))}
-                                                        </select>
+                                                        <Select
+                                                            value={accountDetails
+                                                                .map((account) => ({ value: account.account_number, label: account.account_number }))
+                                                                .find(option => option.value === weeklyPaymentData.accountNumber) || null}
+                                                            onChange={(selectedOption) => setWeeklyPaymentData(prev => ({ ...prev, accountNumber: selectedOption?.value || "" }))}
+                                                            options={accountDetails.map((account) => ({ value: account.account_number, label: account.account_number }))}
+                                                            placeholder="Account Number"
+                                                            isSearchable
+                                                            isClearable
+                                                            className="w-full"
+                                                            classNamePrefix="select"
+                                                            styles={formDropdownStyles}
+                                                        />
                                                     </div>
                                                 </div>
                                             </div>
@@ -2178,6 +2444,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                     </div>
                 </div>
             )}
+            </div>
         </div>
     );
 };

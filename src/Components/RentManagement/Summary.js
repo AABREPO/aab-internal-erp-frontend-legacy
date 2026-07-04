@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
+import Select from 'react-select';
 import axios from 'axios';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import Pdf from '../Images/pdf.png';
+import CustomDateField from "../ExpensesEntry/CustomDateField";
 import {
   RENT_MANAGEMENT_MODULE_NAME,
 } from '../../utils/paymentModeArrangement';
@@ -29,6 +32,150 @@ const Summary = ({ username, userRoles = [] }) => {
   const [shopNoIdToShopNoMap, setShopNoIdToShopNoMap] = useState({});
   const [tenantNameIdToTenantNameMap, setTenantNameIdToTenantNameMap] = useState({});
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const summaryDropdownStyles = {
+    control: (provided, state) => ({
+      ...provided,
+      fontFamily: 'Manrope',
+      borderWidth: '2px',
+      borderRadius: '8px',
+      minHeight: '40px',
+      height: '40px',
+      flexWrap: 'nowrap',
+      borderColor: state.isFocused
+        ? 'rgba(191, 152, 83, 1)'
+        : 'rgba(191, 152, 83, 0.2)',
+      boxShadow: state.isFocused
+        ? '0 0 0 1px rgba(101, 102, 53, 0.2)'
+        : 'none',
+      '&:hover': {
+        borderColor: 'rgba(191, 152, 83, 0.2)',
+      },
+    }),
+    valueContainer: (provided, state) => ({
+      ...provided,
+      flex: '1 1 0%',
+      minWidth: 0,
+      flexWrap: 'nowrap',
+      overflow: 'hidden',
+      paddingLeft: '12px',
+      paddingRight: state.hasValue ? '2px' : provided.paddingRight,
+      paddingTop: 0,
+      paddingBottom: 0,
+      height: '36px',
+      alignItems: 'center',
+    }),
+    indicatorSeparator: () => ({ display: 'none' }),
+    singleValue: (provided) => ({
+      ...provided,
+      maxWidth: '100%',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+      margin: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      color: 'black',
+    }),
+    input: (provided) => ({
+      ...provided,
+      margin: 0,
+      padding: 0,
+    }),
+    menu: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+      maxHeight: '300px',
+    }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      paddingTop: 0,
+      paddingBottom: 0,
+      maxHeight: '250px',
+      overflowY: 'auto',
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none',
+      '&::-webkit-scrollbar': {
+        display: 'none',
+      },
+    }),
+    indicatorsContainer: (provided) => ({
+      ...provided,
+      flex: '0 0 auto',
+      paddingLeft: '0',
+    }),
+    dropdownIndicator: (provided, state) => ({
+      ...provided,
+      display: state.hasValue ? 'none' : 'flex',
+      color: '#000000',
+      flexShrink: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      paddingLeft: '0',
+      paddingRight: '3px',
+    }),
+    clearIndicator: (provided) => ({
+      ...provided,
+      cursor: 'pointer',
+      color: '#000000',
+      flexShrink: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      paddingLeft: '4px',
+      paddingRight: '4px',
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      fontWeight: 'normal',
+      fontSize: '14px',
+      color: '#6b7280',
+      margin: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      textAlign: 'left',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      maxWidth: '100%',
+      position: 'absolute',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      minHeight: 36,
+      height: 'auto',
+      paddingTop: 6,
+      paddingBottom: 6,
+      whiteSpace: 'normal',
+      display: 'flex',
+      alignItems: 'center',
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+      WebkitTapHighlightColor: '#FAF6ED',
+      backgroundColor: state.isSelected
+        ? '#BF9853'
+        : state.isFocused
+          ? '#FAF6ED'
+          : provided.backgroundColor,
+      color: state.isSelected ? '#FFFFFF' : provided.color,
+      ':active': {
+        backgroundColor: state.isSelected ? '#BF9853' : '#FAF6ED',
+      },
+    }),
+  };
+  const accountTypeOptions = [
+    { value: "Rent", label: "Rent" },
+    { value: "Advance", label: "Advance" },
+    { value: "Shop Closure", label: "Shop Closure" },
+    { value: "Refund", label: "Refund" },
+    { value: "Pending Rent", label: "Pending Rent" },
+  ];
+  const summaryPaymentModeOptions = paymentModeOptions.map((mode) => ({
+    value: mode.modeOfPayment,
+    label: mode.modeOfPayment,
+  }));
   useEffect(() => {
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -754,190 +901,202 @@ const Summary = ({ username, userRoles = [] }) => {
     }
   };
   return (
-    <div className="flex justify-start p-10 ml-10 mr-10 h-[750px] bg-[#FFFFFF]">
-      <div className="lg:flex gap-10 ml-3">
-        <div>
-          <div className="flex justify-between items-center mb-2.5">
-            <h2 className="text-lg font-bold">Date to Date Transaction</h2>
-            <div className="flex gap-3">
-              <button className="text-[#007233] text-sm font-semibold hover:underline cursor-pointer flex items-center" onClick={exportExportExcel}>
-                Export XL
-              </button>
-              <button className="text-red-500 text-sm font-semibold hover:underline cursor-pointer flex items-center" onClick={exportDateRangePDF}>
-                Export PDF
-              </button>
-            </div>
+    <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]">
+      <div className="px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
+      <div className="w-full bg-white rounded-[6px] p-[18px] flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-wrap gap-[18px] items-start">
+        <div className="min-w-[546px] rounded-[6px] bg-white p-[24px] shadow-[0_2px_14px_rgba(0,0,0,0.12)] border border-[#EFEFEF]">
+          <div className="flex justify-between items-center mb-[12px]">
+            <h2 className="text-[18px] font-semibold text-[#202020]">Date to Date Transactions</h2>
+            <button className="text-[#202020] text-[14px] font-semibold hover:underline cursor-pointer flex items-center gap-1" onClick={exportDateRangePDF}>
+              PDF <img src={Pdf} alt="Pdf" className="w-4 h-4" />
+            </button>
           </div>
-          <div className="bg-[#FAF6ED] p-6 rounded shadow-md lg:w-[478px] h-[325px]">
-            <div className="grid grid-cols-2 gap-4">
-              <div className='text-left'>
-                <label className="text-base font-bold">From Date</label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="border-2 border-opacity-[0.22] focus:outline-none border-[#BF9853] p-2 rounded-lg lg:w-[168px] w-[120px] mt-3 h-[45px]"
-                  />
-                </div>
+          <div className="border border-[#E5E5E5] rounded-[3px] p-[14px]">
+            <div className="flex gap-[16px]">
+              <div className='text-left w-[233px]'>
+                <label className="text-[16px] font-semibold block mb-[8px]">From Date</label>
+                <CustomDateField
+                  value={fromDate}
+                  onChange={setFromDate}
+                  placeholder="From Date"
+                  controlHeightPx={40}
+                  anchor="right"
+                  alwaysOpenBelow
+                  className="[&>div:first-child]:!w-[233px]"
+                />
               </div>
-              <div className='text-left'>
-                <label className="text-base font-bold">To Date</label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="border-2 border-opacity-[0.22] focus:outline-none border-[#BF9853] p-2 rounded-lg lg:w-[168px] w-[120px] mt-3 h-[45px]"
-                  />
-                </div>
+              <div className='text-left w-[233px]'>
+                <label className="text-[16px] font-semibold block mb-[8px]">To Date</label>
+                <CustomDateField
+                  value={toDate}
+                  onChange={setToDate}
+                  placeholder="To Date"
+                  controlHeightPx={40}
+                  anchor="right"
+                  alwaysOpenBelow
+                  className="[&>div:first-child]:!w-[233px]"
+                />
               </div>
             </div>
-            <div className="mt-4 text-left">
-              <label className="text-base font-bold">Amount</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={
+            <div className="flex gap-[16px] mt-[13px]">
+              <div className="text-left w-[150px]">
+                <label className="text-[16px] font-semibold block mb-[8px]">Amount</label>
+                <output
+                  className="border border-[#00000029] bg-[#EDEDED] focus:outline-none rounded-md px-[8px] w-[150px] h-[40px] text-[14px] font-semibold flex items-center"
+                >
+                  {
                     (selectedTypes || selectedPaymentMode)
                       ? new Intl.NumberFormat('en-IN', {
                         style: 'currency',
                         currency: 'INR',
                         maximumFractionDigits: 2,
                       }).format(filteredByPaymentModeTotal)
-                      : ""
+                      : "₹0.00"
                   }
-                  className="border-2 border-opacity-[0.22] focus:outline-none border-[#BF9853] p-2 rounded-lg w-[150px] mt-3 h-[45px]"
+                </output>
+              </div>
+              <div className="text-left w-[150px]">
+                <label className="text-[16px] font-semibold block mb-[8px]">Payment Mode</label>
+                <Select
+                  value={summaryPaymentModeOptions.find((option) => option.value === selectedPaymentMode) || null}
+                  onChange={(option) => setSelectedPaymentMode(option?.value || "")}
+                  options={summaryPaymentModeOptions}
+                  placeholder="Payment Mode"
+                  isSearchable
+                  isClearable
+                  className="custom-select rounded-lg w-[150px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                  classNamePrefix="select"
+                  styles={summaryDropdownStyles}
                 />
-                <select
-                  value={selectedPaymentMode}
-                  onChange={(e) => setSelectedPaymentMode(e.target.value)}
-                  className="border-2 border-opacity-[0.22] text-sm font-semibold focus:outline-none border-[#BF9853] p-2 rounded-lg w-[136px] mt-3 h-[45px]">
-                  <option value="">Select Mode</option>
-                  {paymentModeOptions.map((mode, index) => (
-                    <option key={index}>{mode.modeOfPayment}</option>
-                  ))}
-                </select>
-                <select
-                  className="border-2 border-opacity-[0.18] focus:outline-none border-[#BF9853] rounded-lg p-2 mt-3 w-[170px] h-[45px]"
-                  value={selectedTypes}
-                  onChange={(e) => setSelectedTypes(e.target.value)}
-                >
-                  <option value="">Select...</option>
-                  <option value="Rent">Rent</option>
-                  <option value="Advance">Advance</option>
-                  <option value="Shop Closure">Shop Closure</option>
-                  <option value="Refund">Refund</option>
-                  <option value="Pending Rent">Pending Rent</option>
-                </select>
+              </div>
+              <div className="text-left w-[150px]">
+                <label className="text-[16px] font-semibold block mb-[8px]">Account Type</label>
+                <Select
+                  value={accountTypeOptions.find((option) => option.value === selectedTypes) || null}
+                  onChange={(option) => setSelectedTypes(option?.value || "")}
+                  options={accountTypeOptions}
+                  placeholder="Account Type"
+                  isSearchable
+                  isClearable
+                  className="custom-select rounded-lg w-[150px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                  classNamePrefix="select"
+                  styles={summaryDropdownStyles}
+                />
               </div>
             </div>
-            <div className="mt-4 text-left">
-              <label className="text-base font-bold block">Total Amount</label>
-              <input
-                type="text"
-                readOnly
-                value={
+            <div className="mt-[13px] text-left">
+              <label className="text-[16px] font-semibold block mb-[8px]">Total Amount</label>
+              <output
+                className="border border-[#00000029] bg-[#EDEDED] rounded-md px-[8px] w-[482px] h-[40px] focus:outline-none text-[14px] font-semibold flex items-center"
+              >
+                {
                   dateRangeTotal
                     ? new Intl.NumberFormat('en-IN', {
                       style: 'currency',
                       currency: 'INR',
                       maximumFractionDigits: 2,
                     }).format(dateRangeTotal)
-                    : ''
+                    : '₹0.00'
                 }
-                className="border-2 border-opacity-[0.22] border-[#BF9853] p-2 rounded-lg mt-3 w-[201px] h-[45px] focus:outline-none"
-              />
+              </output>
             </div>
           </div>
         </div>
-        <div>
-          <div className="flex justify-between items-center mb-2.5">
-            <h2 className="text-lg ml-6 font-bold text-left">Rent Month Transaction</h2>
-            <div className="flex gap-3">
+        <div className="min-w-[546px] rounded-[6px] bg-white p-[24px] shadow-[0_2px_14px_rgba(0,0,0,0.12)] border border-[#EFEFEF]">
+          <div className="flex justify-between items-center mb-[12px]">
+            <h2 className="text-[18px] font-semibold text-[#202020]">Rent Month Transactions</h2>
+            <div className="flex items-center gap-3">
               {username === "Mahalingam M" && (
                 <button 
-                  className="text-blue-600 text-sm font-semibold hover:underline cursor-pointer flex items-center disabled:opacity-50 disabled:cursor-not-allowed" 
+                  className="text-blue-600 text-[14px] font-semibold hover:underline cursor-pointer flex items-center disabled:opacity-50 disabled:cursor-not-allowed" 
                   onClick={generateMissedReport}
                   disabled={isGeneratingReport}
                 >
                   {isGeneratingReport ? 'Generating...' : 'Generate Report'}
                 </button>
               )}
-              <button className="text-[#007233] text-sm font-semibold hover:underline cursor-pointer flex items-center" onClick={exportExportMonthlyExcel} >
-                Export XL
-              </button>
-              <button className="text-red-500 text-sm font-semibold hover:underline cursor-pointer flex items-center" onClick={exportMonthlyPDF} >
-                Export PDF
+              <button className="text-[#202020] text-[14px] font-semibold hover:underline cursor-pointer flex items-center gap-1" onClick={exportMonthlyPDF} >
+                PDF <img src={Pdf} alt="Pdf" className="w-4 h-4" />
               </button>
             </div>
           </div>
-          <div className="bg-[#FAF6ED] p-6 ml-6 rounded shadow-md w-[478px] h-[325px]">
-            <div className="flex flex-col gap-4 text-left">
-              <label className="text-base font-bold">Rent for</label>
+          <div className="border border-[#E5E5E5] rounded-[3px] p-[18px]">
+            <div className="text-left">
+              <label className="text-[16px] font-semibold block mb-[8px]">Rent for</label>
               <input
                 type="month"
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="border-2 border-opacity-[0.18] focus:outline-none border-[#BF9853] rounded-lg p-2 w-[170px] h-[45px]"
+                className="border-[2px] border-[#F4EEE2] bg-white focus:outline-none rounded-md px-[8px] w-[482px] h-[40px] text-[14px] font-semibold"
               />
-              <label className="text-base font-bold">Amount</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={
+            </div>
+            <div className="flex gap-[16px] mt-[13px]">
+              <div className="text-left w-[150px]">
+                <label className="text-[16px] font-semibold block mb-[8px]">Amount</label>
+                <output
+                  className="border border-[#00000029] bg-[#EDEDED] rounded-md px-[8px] w-[150px] h-[40px] focus:outline-none text-[14px] font-semibold flex items-center"
+                >
+                  {
                     (selectedPaymentModeMonth || selectedType)
                       ? new Intl.NumberFormat('en-IN', {
                         style: 'currency',
                         currency: 'INR',
                         maximumFractionDigits: 2,
                       }).format(filteredMonthTotal)
-                      : ''
+                      : '₹0.00'
                   }
-                  className="border-2 border-opacity-[0.22] border-[#BF9853] p-2 rounded-lg w-[150px] h-[45px] focus:outline-none"
-                />
-                <select value={selectedPaymentModeMonth} onChange={(e) => setSelectedPaymentModeMonth(e.target.value)}
-                  className="border-2 border-opacity-[0.22] font-semibold border-[#BF9853] p-2 rounded-lg text-sm w-[136px] h-[45px] focus:outline-none"
-                >
-                  <option value="">Select Mode</option>
-                  {paymentModeOptions.map((mode, index) => (
-                    <option key={index} value={mode.modeOfPayment}>
-                      {mode.modeOfPayment}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="border-2 border-opacity-[0.18] focus:outline-none border-[#BF9853] rounded-lg p-2 w-[170px] h-[45px]"
-                  value={selectedType}
-                  onChange={(e) => setSelectedType(e.target.value)}>
-                  <option value="">Select...</option>
-                  <option value="Rent">Rent</option>
-                  <option value="Advance">Advance</option>
-                  <option value="Shop Closure">Shop Closure</option>
-                  <option value="Refund">Refund</option>
-                  <option value="Pending Rent">Pending Rent</option>
-                </select>
+                </output>
               </div>
-              <label className="text-base mt-[-4px] font-bold">Total Amount</label>
-              <input
-                type="text"
-                readOnly
-                value={
+              <div className="text-left w-[150px]">
+                <label className="text-[16px] font-semibold block mb-[8px]">Payment Mode</label>
+                <Select
+                  value={summaryPaymentModeOptions.find((option) => option.value === selectedPaymentModeMonth) || null}
+                  onChange={(option) => setSelectedPaymentModeMonth(option?.value || "")}
+                  options={summaryPaymentModeOptions}
+                  placeholder="Payment Mode"
+                  isSearchable
+                  isClearable
+                  className="custom-select rounded-lg w-[150px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                  classNamePrefix="select"
+                  styles={summaryDropdownStyles}
+                />
+              </div>
+              <div className="text-left w-[150px]">
+                <label className="text-[16px] font-semibold block mb-[8px]">Account Type</label>
+                <Select
+                  value={accountTypeOptions.find((option) => option.value === selectedType) || null}
+                  onChange={(option) => setSelectedType(option?.value || "")}
+                  options={accountTypeOptions}
+                  placeholder="Account Type"
+                  isSearchable
+                  isClearable
+                  className="custom-select rounded-lg w-[150px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                  classNamePrefix="select"
+                  styles={summaryDropdownStyles}
+                />
+              </div>
+            </div>
+            <div className="mt-[13px] text-left">
+              <label className="text-[16px] font-semibold block mb-[8px]">Total Amount</label>
+              <output
+                className="border border-[#00000029] bg-[#EDEDED] rounded-md px-[8px] w-[482px] h-[40px] focus:outline-none text-[14px] font-semibold flex items-center"
+              >
+                {
                   monthTotal
                     ? new Intl.NumberFormat('en-IN', {
                       style: 'currency',
                       currency: 'INR',
                       maximumFractionDigits: 2,
                     }).format(monthTotal)
-                    : ''
+                    : '₹0.00'
                 }
-                className="border-2 border-opacity-[0.22] mt-[-5px] focus:outline-none border-[#BF9853] p-2 rounded-lg w-[201px] h-[45px]"
-              />
+              </output>
             </div>
           </div>
         </div>
+      </div>
+      </div>
       </div>
     </div>
   );

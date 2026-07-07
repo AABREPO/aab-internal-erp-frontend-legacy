@@ -21,6 +21,10 @@ import {
   EdbcTimestampFilter,
   EdbcProjectNameFilter,
   EdbcSelectFilter,
+  EdbcPaymentModeFilter,
+  EdbcPaymentModeFilterChip,
+  hasEdbcPaymentModeFilter,
+  matchesEdbcPaymentModeFilter,
   EdbcTextInputFilter,
   EdbcEmptyFilterCell,
   EdbcTotalAmountFilter,
@@ -64,7 +68,7 @@ const AdvancePortalFilterAmountOutput = ({ value, className = '' }) => {
   const formatted = formatAmountDisplay(value);
   const displayValue = formatted ? `₹${formatted}` : '';
   return (
-    <div className={`relative lg:w-[150px] w-full h-[40px] ${className}`.trim()}>
+    <div className={`relative w-[150px] h-[40px] ${className}`.trim()}>
       <input
         type="text"
         readOnly
@@ -250,7 +254,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
   const [selectTransfer, setSelectTransfer] = useState('');
   const [selectType, setSelectType] = useState('');
   const [selectDescription, setSelectDescription] = useState('');
-  const [selectMode, setSelectMode] = useState('');
+  const [selectedPaymentModes, setSelectedPaymentModes] = useState([]);
   const [selectEntryNo, setSelectEntryNo] = useState('');
   const [selectSourceFrom, setSelectSourceFrom] = useState('');
   const [selectBranch, setSelectBranch] = useState('');
@@ -287,7 +291,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
   const [accountDetails, setAccountDetails] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
-  const adminUsernames = ['Mahalingam M', 'Admin'];
+  const adminUsernames = ['Mahalingam M', 'Admin', 'Marimuthu A'];
   const normalizedUsername = (username || '').trim().toLowerCase();
   const isAdminUser = adminUsernames.some(name => name.toLowerCase() === normalizedUsername);
   const isAdmin = isAdminUser;
@@ -374,7 +378,8 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
           if (filters.selectTransfer) setSelectTransfer(filters.selectTransfer);
           if (filters.selectType) setSelectType(filters.selectType);
           if (filters.selectDescription) setSelectDescription(filters.selectDescription);
-          if (filters.selectMode) setSelectMode(filters.selectMode);
+          if (filters.selectedPaymentModes) setSelectedPaymentModes(filters.selectedPaymentModes);
+          else if (filters.selectMode) setSelectedPaymentModes([filters.selectMode]);
           if (filters.selectEntryNo) setSelectEntryNo(filters.selectEntryNo);
           if (filters.selectSourceFrom) setSelectSourceFrom(filters.selectSourceFrom);
           if (filters.selectBranch) setSelectBranch(filters.selectBranch);
@@ -419,7 +424,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
       selectTransfer,
       selectType,
       selectDescription,
-      selectMode,
+      selectedPaymentModes,
       selectEntryNo,
       selectSourceFrom,
       selectBranch,
@@ -433,7 +438,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
       showFilters
     };
     sessionStorage.setItem('advanceTableViewFilters', JSON.stringify(filters));
-  }, [selectDateStart, selectDateEnd, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectDescription, selectMode, selectEntryNo, selectSourceFrom, selectBranch, selectEnteredBy, selectAmount, selectBillAmount, selectRefundAmount, startDate, endDate, overallSearch, showFilters]);
+  }, [selectDateStart, selectDateEnd, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectDescription, selectedPaymentModes, selectEntryNo, selectSourceFrom, selectBranch, selectEnteredBy, selectAmount, selectBillAmount, selectRefundAmount, startDate, endDate, overallSearch, showFilters]);
   useEffect(() => {
     const syncBranch = () => {
       const nextBranchId = resolveActiveBranchId();
@@ -1027,13 +1032,10 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
     if (selectDescription.trim()) {
       if (!String(entry.description ?? '').toLowerCase().includes(selectDescription.toLowerCase().trim())) return false;
     }
-    if (selectMode) {
-      if (selectMode === BLANK_VALUE) {
-        if (!isBlankish(entry.payment_mode)) return false;
-      } else {
-        if (entry.payment_mode?.toLowerCase() !== selectMode.toLowerCase()) return false;
-      }
-    }
+    if (!matchesEdbcPaymentModeFilter(entry.payment_mode, selectedPaymentModes, {
+      blankValue: BLANK_VALUE,
+      isBlankish,
+    })) return false;
     if (selectEntryNo) {
       if (selectEntryNo === BLANK_VALUE) {
         if (!isBlankish(entry.entry_no)) return false;
@@ -1269,7 +1271,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
   const currentData = sortedData.slice(startIndex, endIndex);
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectDateStart, selectDateEnd, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectDescription, selectMode, selectEntryNo, selectSourceFrom, selectBranch, selectEnteredBy, selectAmount, selectBillAmount, selectRefundAmount, startDate, endDate, overallSearch]);
+  }, [selectDateStart, selectDateEnd, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectDescription, selectedPaymentModes, selectEntryNo, selectSourceFrom, selectBranch, selectEnteredBy, selectAmount, selectBillAmount, selectRefundAmount, startDate, endDate, overallSearch]);
   useEffect(() => {
     if (filterScrollResetSkipRef.current) {
       filterScrollResetSkipRef.current = false;
@@ -1290,7 +1292,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
     selectTransfer,
     selectType,
     selectDescription,
-    selectMode,
+    selectedPaymentModes,
     selectEntryNo,
     selectSourceFrom,
     selectBranch,
@@ -1309,7 +1311,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
     setSelectTransfer('');
     setSelectType('');
     setSelectDescription('');
-    setSelectMode('');
+    setSelectedPaymentModes([]);
     setSelectEntryNo('');
     setSelectSourceFrom('');
     setSelectBranch('');
@@ -1326,7 +1328,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
   const hasActiveColumnFilters = Boolean(
     selectDateStart || selectDateEnd || selectContractororVendorName || selectProjectName
     || selectTransfer || selectAmount.trim() || selectBillAmount.trim() || selectRefundAmount.trim()
-    || selectType || selectDescription.trim() || selectMode || selectEntryNo
+    || selectType || selectDescription.trim() || hasEdbcPaymentModeFilter(selectedPaymentModes) || selectEntryNo
     || selectSourceFrom || selectBranch || selectEnteredBy || startDate || endDate
   );
   const toggleFilters = useCallback(() => {
@@ -2063,13 +2065,13 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                       <button onClick={() => setSelectDescription('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                     </span>
                   )}
-                  {selectMode && (
-                    <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
-                      <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Mode: </span>
-                      <span className="font-semibold text-[14px] truncate min-w-0">{selectMode === BLANK_VALUE ? BLANK_LABEL : selectMode}</span>
-                      <button onClick={() => setSelectMode('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                    </span>
-                  )}
+                  <EdbcPaymentModeFilterChip
+                    fieldLabel="Mode"
+                    selectedModes={selectedPaymentModes}
+                    blankValue={BLANK_VALUE}
+                    blankLabel={BLANK_LABEL}
+                    onClear={() => setSelectedPaymentModes([])}
+                  />
                   {selectEntryNo && (
                     <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                       <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Entry No: </span>
@@ -2285,16 +2287,14 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                         blankValue={BLANK_VALUE}
                         selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                       />
-                      <EdbcSelectFilter
+                      <EdbcPaymentModeFilter
                         columnId={EDBC_IDS.EDBC13}
                         placeholder="Mode"
                         options={filterOptionsFromData.modeOptions.map((m) =>
                           m === BLANK_VALUE ? blankOption : { value: m, label: m }
                         )}
-                        value={selectMode}
-                        onChange={setSelectMode}
-                        blankOption={blankOption}
-                        blankValue={BLANK_VALUE}
+                        value={selectedPaymentModes}
+                        onChange={setSelectedPaymentModes}
                         selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                       />
                       <EdbcSelectFilter
@@ -2591,9 +2591,9 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
           )}
           {isEditModalOpen && (
             <div className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]">
-              <div className="bg-white text-left p-6 rounded-lg shadow-lg w-full max-w-2xl">
+              <div className="bg-white text-left p-6 rounded-lg shadow-lg">
                 <div className="flex justify-between items-center mb-[14px]">
-                  <h2 className="text-[18px] font-semibold text-black">Edit Advance Portal</h2>
+                  <h2 className="text-[18px] font-semibold text-black">Edit Advance</h2>
                   <span className="text-[16px] font-semibold text-[#E4572E]">{editFormData.entry_no}</span>
                 </div>
                 <div className="max-h-[75vh] overflow-y-auto">

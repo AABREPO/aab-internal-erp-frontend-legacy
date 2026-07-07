@@ -5,6 +5,7 @@ import Select from 'react-select';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import RentForm from './Form';
+import CustomMonthField from '../ExpensesEntry/CustomMonthField';
 import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
 import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 import Pdf from '../Images/pdf.png';
@@ -218,6 +219,8 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
     const [doorNoFilter, setDoorNoFilter] = useState('');
     const [advanceFilter, setAdvanceFilter] = useState('');
     const [tableHeight, setTableHeight] = useState(400); // Default height in pixels
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(50);
     const scrollRef = useRef(null);
     const tableRef = useRef(null);
     const [tableToolbarWidth, setTableToolbarWidth] = useState(null);
@@ -1026,10 +1029,18 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
             return 0;
         });
     }, [filteredTableData, sortField, sortOrder]);
+    const totalPages = Math.ceil(sortedTableData.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedTableData = sortedTableData.slice(startIndex, endIndex);
+    useEffect(() => {
+        const nextTotalPages = Math.max(1, Math.ceil(sortedTableData.length / itemsPerPage));
+        setCurrentPage((page) => (page > nextTotalPages ? nextTotalPages : page));
+    }, [sortedTableData.length, itemsPerPage]);
     useEffect(() => {
         const updateToolbarWidth = () => {
             if (tableRef.current) {
-                setTableToolbarWidth(tableRef.current.offsetWidth);
+                setTableToolbarWidth(tableRef.current.offsetWidth + 8);
             }
         };
         updateToolbarWidth();
@@ -1307,15 +1318,17 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
             <div className="px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
             <div className='w-full rounded-[6px] bg-white text-left mb-[18px] shrink-0'>
                 <div className="flex flex-wrap items-center justify-between text-left max-md:flex-col max-md:items-stretch">
-                    <div className="flex flex-wrap items-center space-x-3 text-left p-[18px]">
+                    <div className="flex flex-wrap items-center gap-y-4 gap-x-3 text-left p-[18px]">
                     <div className="w-[180px] max-w-full">
                         <h1 className='font-semibold mb-2'>Select Year</h1>
-                        <input
-                            type="month"
-                            value={selectedMonthYear}
-                            onChange={(e) => setSelectedMonthYear(e.target.value)}
-                            className={`${dashboardTopFieldClass} w-[180px] max-w-full`}
-                        />
+                        <div className="expense-entry-form-date w-[180px] max-w-full">
+                            <CustomMonthField
+                                value={selectedMonthYear}
+                                onChange={(v) => setSelectedMonthYear(v)}
+                                placeholder="Select Year"
+                                className="w-full text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                            />
+                        </div>
                     </div>
                         <div className="w-[180px] max-w-full">
                             <label className="block font-semibold mb-2 text-sm sm:text-base">Payment Status</label>
@@ -1398,7 +1411,7 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                             </div>
                         </div>
                     </div>
-                    <div className="flex items-center flex-wrap justify-end pr-[18px] max-xl:basis-full max-xl:pl-[18px] max-xl:justify-start max-xl:pb-[18px] max-md:justify-start max-md:px-[18px] max-md:pb-[18px] max-md:w-full">
+                    <div className="flex items-center flex-wrap justify-end pt-[8px] pb-[8px] pl-[8px] pr-[18px] max-xl:basis-full max-xl:pl-[18px] max-xl:pt-[18px] max-xl:justify-start max-xl:pb-[18px] max-md:justify-start max-md:px-[18px] max-md:pt-[18px] max-md:pb-[18px] max-md:w-full">
                         <div
                             className="rounded-md px-4 py-[8px] text-sm shrink-0"
                             style={{
@@ -1558,7 +1571,7 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                             )}
                         </thead>
                         <tbody>
-                            {sortedTableData.map((shop, index) => {
+                            {paginatedTableData.map((shop, index) => {
                                 const isVacant = shop.tenantName === 'Vacant';
                                 return (
                                     <EdbcTableBodyRow
@@ -1570,7 +1583,7 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                                                 : 'odd:bg-white even:bg-[#FAF6ED]'
                                             }`}
                                     >
-                                        <td id={rentDashboardColumnIds.serialNo} className={getRentDashboardCellClass(rentDashboardColumnIds.serialNo, '!text-left')}>{index + 1}</td>
+                                        <td id={rentDashboardColumnIds.serialNo} className={getRentDashboardCellClass(rentDashboardColumnIds.serialNo, '!text-left')}>{startIndex + index + 1}</td>
                                         <td id={rentDashboardColumnIds.shopNo} className={getRentDashboardCellClass(rentDashboardColumnIds.shopNo, '!text-left')} title={`${shop.doorNo || ''} - ${shop.propertyName || ''}`}>
                                             {shop.shopNo}
                                         </td>
@@ -1708,6 +1721,71 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                         </tbody>
                     </table>
                 </div>
+                <div className="flex shrink-0 items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
+                    <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-700">Items per page:</span>
+                        <select
+                            value={itemsPerPage}
+                            onChange={(e) => {
+                                setItemsPerPage(Number(e.target.value));
+                                setCurrentPage(1);
+                            }}
+                            className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                        >
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                            <option value={200}>200</option>
+                            <option value={300}>300</option>
+                            <option value={400}>400</option>
+                            <option value={500}>500</option>
+                            <option value={600}>600</option>
+                            <option value={700}>700</option>
+                            <option value={800}>800</option>
+                            <option value={900}>900</option>
+                            <option value={1000}>1000</option>
+                        </select>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-700">
+                            Showing {startIndex + 1} to {Math.min(endIndex, sortedTableData.length)} of {sortedTableData.length} entries
+                        </span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                        <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}
+                            className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                        >
+                            Previous
+                        </button>
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            let pageNum;
+                            if (totalPages <= 5) {
+                                pageNum = i + 1;
+                            } else if (currentPage <= 3) {
+                                pageNum = i + 1;
+                            } else if (currentPage >= totalPages - 2) {
+                                pageNum = totalPages - 4 + i;
+                            } else {
+                                pageNum = currentPage - 2 + i;
+                            }
+                            return (
+                                <button key={pageNum} onClick={() => setCurrentPage(pageNum)}
+                                    className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${currentPage === pageNum
+                                        ? 'bg-[#BF9853] text-white border-[#BF9853]'
+                                        : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
+                                        }`}
+                                >
+                                    {pageNum}
+                                </button>
+                            );
+                        })}
+                        <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages}
+                            className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                        >
+                            Next
+                        </button>
+                    </div>
+                </div>
             </div>
             {showConfirm && selectedShop && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-40 p-4">
@@ -1844,19 +1922,19 @@ const Dashboard = ({ refreshSignal, isActive = true }) => {
                 </div>
             )}
             {showRentFormPopup ? (
-                <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg w-full max-w-[1824px] max-h-[92vh] overflow-y-auto shadow-lg relative">
-                        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-                            <p className="text-sm font-semibold text-[#202020]">Rent Entry</p>
+                <div className="fixed inset-0 z-[99999] bg-black/40 flex items-center justify-center p-[18px]">
+                    <div className="bg-white rounded-lg w-fit max-w-full max-h-[calc(100vh-36px)] overflow-y-auto shadow-lg relative">
+                        <div className="sticky top-0 bg-white px-4 py-[8px] flex items-center justify-between">
+                            <p className="text-[18px] font-semibold text-[#000000]">Rent Entry</p>
                             <button
                                 type="button"
                                 onClick={() => setShowRentFormPopup(false)}
-                                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
+                                className="w-8 h-8 flex items-center justify-center rounded-full text-xl"
                             >
-                                ×
+                                <img src={FileRemover} alt="Close" className="w-3 h-3" />
                             </button>
                         </div>
-                        <div className="p-3">
+                        <div className="[&>div]:!h-auto [&>div]:!p-0 [&>div>div]:!p-[18px]">
                             <RentForm
                                 embedded
                                 onSuccess={async () => {

@@ -1360,6 +1360,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
     editFormData.type === 'Refund'
       ? (editFormData.staff_refund_amount ?? '')
       : (editFormData.amount ?? '');
+  const [editAmountGivenFocused, setEditAmountGivenFocused] = useState(false);
 
   useEffect(() => {
     return () => cancelMomentum();
@@ -2057,6 +2058,8 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
                         setEditFormData((prev) => ({ ...prev, from_purpose_id: selected?.id || '' }))
                       }
                       options={purposes}
+                      getOptionValue={(option) => option.id}
+                      getOptionLabel={(option) => option.label}
                       placeholder="Select a purpose..."
                       isSearchable
                       isClearable
@@ -2093,6 +2096,8 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
                           setEditFormData((prev) => ({ ...prev, to_purpose_id: selected?.id || '' }))
                         }
                         options={purposes}
+                        getOptionValue={(option) => option.id}
+                        getOptionLabel={(option) => option.label}
                         placeholder="Select purpose to..."
                         isClearable
                         isSearchable
@@ -2103,13 +2108,38 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
                       />
                     ) : (
                       <input
-                        value={editAmountGivenValue}
+                        value={(() => {
+                          const v = editAmountGivenValue;
+                          if (v === '' || v == null) return '';
+                          const clean = String(v).replace(/,/g, '');
+                          if (!editAmountGivenFocused) {
+                            const n = Number(clean);
+                            return isNaN(n)
+                              ? v
+                              : n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                          }
+                          const [intPart, decPart] = clean.split('.');
+                          const formattedInt = intPart ? Number(intPart).toLocaleString('en-IN') : '';
+                          return decPart !== undefined ? `${formattedInt}.${decPart}` : formattedInt;
+                        })()}
+                        onFocus={() => setEditAmountGivenFocused(true)}
                         onChange={(e) => {
-                          const rawValue = e.target.value;
+                          const rawValue = e.target.value.replace(/,/g, '').replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
                           if (editFormData.type === 'Refund') {
                             setEditFormData((prev) => ({ ...prev, staff_refund_amount: rawValue, amount: '' }));
                           } else {
                             setEditFormData((prev) => ({ ...prev, amount: rawValue, staff_refund_amount: '' }));
+                          }
+                        }}
+                        onBlur={(e) => {
+                          setEditAmountGivenFocused(false);
+                          const val = e.target.value.replace(/,/g, '');
+                          if (val === '' || isNaN(Number(val))) return;
+                          const formatted = Number(val).toFixed(2);
+                          if (editFormData.type === 'Refund') {
+                            setEditFormData((prev) => ({ ...prev, staff_refund_amount: formatted, amount: '' }));
+                          } else {
+                            setEditFormData((prev) => ({ ...prev, amount: formatted, staff_refund_amount: '' }));
                           }
                         }}
                         className={`${ADVANCE_PORTAL_INPUT_CLASS} no-spinner hover:!border-[rgba(191,152,83,0.2)] focus:!border-[rgba(191,152,83,1)]`}

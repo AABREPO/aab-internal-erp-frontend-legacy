@@ -1707,7 +1707,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             <div className="flex flex-wrap items-center gap-4">
                 <div className="w-[300px] max-w-full">
                     <div className="flex items-center justify-between mb-[8px]">
-                        <h2 className="text-[#E4572E] font-bold text-sm sm:text-base">Account Type</h2>
+                        <h2 className="text-[#000000] font-bold text-sm sm:text-base">Account Type</h2>
                         <span className="text-right text-[#E4572E] font-semibold text-[14px] sm:text-base">ENO:{eno}</span>
                     </div>
                     <Select

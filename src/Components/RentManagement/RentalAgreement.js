@@ -3,6 +3,7 @@ import jsPDF from "jspdf";
 import CreatableSelect from 'react-select/creatable';
 import Select from 'react-select';
 import loadingScreen from '../Images/AAlogoBlackSVG.svg';
+import CustomDateField from '../ExpensesEntry/CustomDateField';
 import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
 const RentalAgreement = () => {
     const [projects, setProjects] = useState([]);
@@ -1347,11 +1348,142 @@ WITNESSES:
         { label: 'Light', value: 'Light' },
         { label: 'Ac', value: 'Ac' },
     ];
+    const formDropdownStyles = {
+        control: (provided, state) => ({
+            ...provided,
+            fontFamily: 'Manrope',
+            borderWidth: '2px',
+            borderRadius: '8px',
+            minHeight: '40px',
+            height: '40px',
+            flexWrap: 'nowrap',
+            borderColor: state.isFocused
+                ? 'rgba(191, 152, 83, 1)'
+                : 'rgba(191, 152, 83, 0.2)',
+            boxShadow: state.isFocused
+                ? '0 0 0 1px rgba(101, 102, 53, 0.2)'
+                : 'none',
+            '&:hover': {
+                borderColor: 'rgba(191, 152, 83, 0.2)',
+            },
+        }),
+        valueContainer: (provided, state) => ({
+            ...provided,
+            flex: '1 1 0%',
+            minWidth: 0,
+            flexWrap: 'nowrap',
+            overflow: 'hidden',
+            paddingLeft: '12px',
+            paddingRight: state.hasValue ? '2px' : provided.paddingRight,
+            paddingTop: 0,
+            paddingBottom: 0,
+            height: '36px',
+            alignItems: 'center',
+        }),
+        indicatorSeparator: () => ({ display: 'none' }),
+        singleValue: (provided) => ({
+            ...provided,
+            maxWidth: '100%',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            margin: 0,
+            paddingTop: 0,
+            paddingBottom: 0,
+            color: 'black',
+        }),
+        input: (provided) => ({
+            ...provided,
+            margin: 0,
+            padding: 0,
+        }),
+        menu: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+            maxHeight: '300px',
+        }),
+        menuPortal: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+        }),
+        menuList: (provided) => ({
+            ...provided,
+            paddingTop: 0,
+            paddingBottom: 0,
+            maxHeight: '250px',
+            overflowY: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            '&::-webkit-scrollbar': {
+                display: 'none',
+            },
+        }),
+        indicatorsContainer: (provided) => ({
+            ...provided,
+            flex: '0 0 auto',
+            paddingLeft: '0',
+        }),
+        dropdownIndicator: (provided, state) => ({
+            ...provided,
+            display: state.hasValue ? 'none' : 'flex',
+            color: '#000000',
+            flexShrink: 0,
+            paddingTop: 0,
+            paddingBottom: 0,
+        }),
+        clearIndicator: (provided) => ({
+            ...provided,
+            cursor: 'pointer',
+            color: '#000000',
+            flexShrink: 0,
+            paddingTop: 0,
+            paddingBottom: 0,
+            paddingLeft: '4px',
+            paddingRight: '4px',
+        }),
+        placeholder: (provided) => ({
+            ...provided,
+            fontWeight: 'normal',
+            fontSize: '14px',
+            color: '#6b7280',
+            margin: 0,
+            paddingTop: 0,
+            paddingBottom: 0,
+            textAlign: 'left',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '100%',
+            position: 'absolute',
+        }),
+        option: (provided, state) => ({
+            ...provided,
+            minHeight: 36,
+            height: 'auto',
+            paddingTop: 6,
+            paddingBottom: 6,
+            whiteSpace: 'normal',
+            display: 'flex',
+            alignItems: 'center',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            WebkitTapHighlightColor: '#FAF6ED',
+            backgroundColor: state.isSelected
+                ? '#BF9853'
+                : state.isFocused
+                    ? '#FAF6ED'
+                    : provided.backgroundColor,
+            color: state.isSelected ? '#FFFFFF' : provided.color,
+            ':active': {
+                backgroundColor: state.isSelected ? '#BF9853' : '#FAF6ED',
+            },
+        }),
+    };
     return (
-        <body>
-            <div className="flex lg:ml-12 lg:h-[743px] lg:w-[1724px] bg-white">
-                <div>
-                    <div className="flex  bg-white rounded-lg mt-4 p-5 ml-5 lg:w-[1100px] ">
+        <div className='flex flex-col h-[calc(100vh-104px)] px-[18px] pt-[18px] pb-[18px] overflow-hidden bg-[#FAF6ED]'>
+            <div className="flex flex-col flex-1 min-h-0 px-[18px] pt-[18px] pb-[18px] overflow-hidden bg-white">
+                <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
                         <div>
                             <div className="mb-6 lg:flex gap-5 items-baseline text-left">
                                 <div>
@@ -1385,79 +1517,24 @@ WITNESSES:
                                                 setAgreementFilteredFileOptions(filteredFileOption);
                                             }
                                         }}
-                                        placeholder="Select Project Reference Name"
-                                        className="w-[300px]"
+                                        placeholder="Property Name"
+                                        className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                                        classNamePrefix="select"
                                         isClearable
-                                        menuPortalTarget={document.body}
-                                        styles={{
-                                            control: (provided, state) => ({
-                                                ...provided,
-                                                backgroundColor: 'transparent',
-                                                borderWidth: '2.5px',
-                                                borderColor: state.isFocused
-                                                    ? 'rgba(191, 152, 83, 0.2)'
-                                                    : 'rgba(191, 152, 83, 0.2)',
-                                                borderRadius: '6px',
-                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                                '&:hover': {
-                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                },
-                                            }),
-                                            menuPortal: (base) => ({
-                                                ...base,
-                                                zIndex: 9999,
-                                            }),
-                                            placeholder: (provided) => ({
-                                                ...provided,
-                                                color: '#999',
-                                                textAlign: 'left',
-                                            }),
-                                            menu: (provided) => ({
-                                                ...provided,
-                                                zIndex: 9999,
-                                            }),
-                                            option: (provided, state) => ({
-                                                ...provided,
-                                                textAlign: 'left',
-                                                fontWeight: 'normal',
-                                                fontSize: '15px',
-                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                color: 'black',
-                                            }),
-                                            singleValue: (provided) => ({
-                                                ...provided,
-                                                textAlign: 'left',
-                                                fontWeight: 'normal',
-                                                color: 'black',
-                                            }),
-                                        }}
+                                        styles={formDropdownStyles}
                                     />
                                 </div>
                                 <div>
                                     <label className="block font-semibold text-base mb-2 lg:mt-0 mt-3">Retrive</label>
                                     <Select
-                                        className="w-[340px] text-sm"
-                                        classNamePrefix="react-select"
+                                        className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                                        classNamePrefix="select"
                                         options={reversedAgreementFileOptions}
-                                        placeholder="Select"
+                                        placeholder="Retrive"
                                         isSearchable
                                         onChange={handleAgreementSelection}
                                         isDisabled={!selectedProperty || !selectedProperty.value}
-                                        styles={{
-                                            control: (base) => ({
-                                                ...base,
-                                                minHeight: 43,
-                                                borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                borderWidth: 2,
-                                                borderRadius: 8,
-                                                fontSize: '0.875rem',
-                                                paddingLeft: 4,
-                                                boxShadow: 'none',
-                                                '&:hover': {
-                                                    borderColor: 'rgba(191, 152, 83, 0.3)',
-                                                },
-                                            }),
-                                        }}
+                                        styles={formDropdownStyles}
                                     />
                                 </div>
                             </div>
@@ -1532,52 +1609,11 @@ WITNESSES:
                                                                                 handleOwnerChange(index, 'ownerName', selected.value || '');
                                                                             }
                                                                         }}
-                                                                        placeholder="Select Owner"
-                                                                        className="w-[210px]"
+                                                                        placeholder="Owner"
+                                                                        className="custom-select rounded-lg w-[210px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                                                                        classNamePrefix="select"
                                                                         isClearable
-                                                                        menuPortalTarget={document.body}
-                                                                        styles={{
-                                                                            control: (provided, state) => ({
-                                                                                ...provided,
-                                                                                backgroundColor: 'transparent',
-                                                                                borderWidth: '2px',
-                                                                                borderColor: state.isFocused
-                                                                                    ? 'rgba(191, 152, 83, 0.2)'
-                                                                                    : 'rgba(191, 152, 83, 0.2)',
-                                                                                borderRadius: '6px',
-                                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                                                                '&:hover': {
-                                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                                },
-                                                                            }),
-                                                                            menuPortal: (base) => ({
-                                                                                ...base,
-                                                                                zIndex: 9999,
-                                                                            }),
-                                                                            placeholder: (provided) => ({
-                                                                                ...provided,
-                                                                                color: '#999',
-                                                                                textAlign: 'left',
-                                                                            }),
-                                                                            menu: (provided) => ({
-                                                                                ...provided,
-                                                                                zIndex: 9999,
-                                                                            }),
-                                                                            option: (provided, state) => ({
-                                                                                ...provided,
-                                                                                textAlign: 'left',
-                                                                                fontWeight: 'normal',
-                                                                                fontSize: '15px',
-                                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                                                color: 'black',
-                                                                            }),
-                                                                            singleValue: (provided) => ({
-                                                                                ...provided,
-                                                                                textAlign: 'left',
-                                                                                fontWeight: 'normal',
-                                                                                color: 'black',
-                                                                            }),
-                                                                        }}
+                                                                        styles={formDropdownStyles}
                                                                     />
                                                                 </div>
                                                                 <div className="ml-1">
@@ -1711,31 +1747,10 @@ WITNESSES:
                                                                 onChange={(newValue) =>
                                                                     handleTenantChange(tenant.id, 'tenantName', newValue?.value || '')
                                                                 }
-                                                                placeholder="Select or create..."
-                                                                styles={{
-                                                                    container: (base) => ({
-                                                                        ...base,
-                                                                        marginTop: 0,
-                                                                    }),
-                                                                    control: (base) => ({
-                                                                        ...base,
-                                                                        height: 43,
-                                                                        minHeight: 43,
-                                                                        borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                        borderWidth: 2,
-                                                                        borderRadius: 8,
-                                                                        paddingLeft: 8,
-                                                                        fontSize: '0.875rem',
-                                                                        boxShadow: 'none',
-                                                                        '&:hover': {
-                                                                            borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                        },
-                                                                    }),
-                                                                    indicatorsContainer: (base) => ({
-                                                                        ...base,
-                                                                        padding: 4,
-                                                                    }),
-                                                                }}
+                                                                placeholder="Tenant Name"
+                                                                className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                                                                classNamePrefix="select"
+                                                                styles={formDropdownStyles}
                                                             />
                                                         </div>
                                                         {tenant.tenantsList.map((partner, partnerIndex) => (
@@ -1764,30 +1779,15 @@ WITNESSES:
                                                                                     handlePartnerChange(tenant.id, partnerIndex, 'tenantAddress', matchedTenant.tenantAddress || '');
                                                                                 }
                                                                             }}
-                                                                            placeholder="Select..."
+                                                                            placeholder="Full Name"
+                                                                            className="custom-select rounded-lg w-[310px] h-[43px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500 mb-4"
+                                                                            classNamePrefix="select"
                                                                             styles={{
-                                                                                container: (base) => ({
-                                                                                    ...base,
-                                                                                    width: 310,
-                                                                                    marginBottom: 16,
-                                                                                }),
-                                                                                control: (base) => ({
-                                                                                    ...base,
-                                                                                    height: 43,
-                                                                                    minHeight: 43,
-                                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                                    borderWidth: 2,
-                                                                                    borderRadius: 8,
-                                                                                    paddingLeft: 8,
-                                                                                    fontSize: '0.875rem',
-                                                                                    boxShadow: 'none',
-                                                                                    '&:hover': {
-                                                                                        borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                                    },
-                                                                                }),
-                                                                                indicatorsContainer: (base) => ({
-                                                                                    ...base,
-                                                                                    padding: 4,
+                                                                                ...formDropdownStyles,
+                                                                                control: (provided, state) => ({
+                                                                                    ...formDropdownStyles.control(provided, state),
+                                                                                    minHeight: '43px',
+                                                                                    height: '43px',
                                                                                 }),
                                                                             }}
                                                                         />
@@ -1890,7 +1890,8 @@ WITNESSES:
                                                             <div >
                                                                 <label className="block font-semibold mb-2">Property Type</label>
                                                                 <Select
-                                                                    className="w-[150px] mb-4"
+                                                                    className="custom-select rounded-lg w-[150px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500 mb-4"
+                                                                    classNamePrefix="select"
                                                                     value={propertyTypeOptions.find(option => option.value === owner.propertyType) || null}
                                                                     onChange={(selected) => {
                                                                         const selectedType = selected?.value || '';
@@ -1920,21 +1921,10 @@ WITNESSES:
                                                                         });
                                                                     }}
                                                                     options={propertyTypeOptions}
-                                                                    placeholder="---Select---"
+                                                                    placeholder="Property Type"
                                                                     isSearchable
                                                                     isClearable
-                                                                    styles={{
-                                                                        control: (provided) => ({
-                                                                            ...provided,
-                                                                            borderWidth: '2px',
-                                                                            borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                            borderRadius: '0.375rem',
-                                                                            boxShadow: 'none',
-                                                                            '&:hover': {
-                                                                                borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                            },
-                                                                        }),
-                                                                    }}
+                                                                    styles={formDropdownStyles}
                                                                 />
                                                             </div>
                                                             <div>
@@ -1946,30 +1936,20 @@ WITNESSES:
                                                                         updated[index].selectFloor = value || [];
                                                                         setOwnersProperty(updated);
                                                                     }}
-                                                                    className="w-[230px] h-[39px] mb-4 focus:outline-none placeholder:text-sm"
+                                                                    className="custom-select rounded-lg w-[230px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500 mb-4"
+                                                                    classNamePrefix="select"
                                                                     options={owner.floorOptions || []}
-                                                                    placeholder="Select floor..."
+                                                                    placeholder="Floor"
                                                                     isClearable
                                                                     isMulti
-                                                                    styles={{
-                                                                        ...customStyles,
-                                                                        control: (provided) => ({
-                                                                            ...provided,
-                                                                            borderWidth: '2px',
-                                                                            borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                            borderRadius: '0.375rem',
-                                                                            boxShadow: 'none',
-                                                                            '&:hover': {
-                                                                                borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                            },
-                                                                        }),
-                                                                    }}
+                                                                    styles={formDropdownStyles}
                                                                 />
                                                             </div>
                                                             <div>
                                                                 <label className="block font-semibold mb-2">Shop No</label>
                                                                 <Select
-                                                                    className="w-[180px] mb-4"
+                                                                    className="custom-select rounded-lg w-[180px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500 mb-4"
+                                                                    classNamePrefix="select"
                                                                     options={
                                                                         (owner.shopNoOptions && owner.shopNoOptions.length > 0)
                                                                             ? owner.shopNoOptions
@@ -1982,20 +1962,9 @@ WITNESSES:
                                                                         )?.find(option => option.value === owner.shopNos) || null
                                                                     }
                                                                     onChange={(selected) => handleShopSelection(index, selected)}
-                                                                    placeholder="Select Shop No"
+                                                                    placeholder="Shop No"
                                                                     isClearable
-                                                                    styles={{
-                                                                        control: (provided) => ({
-                                                                            ...provided,
-                                                                            borderWidth: '2px',
-                                                                            borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                            borderRadius: '0.375rem',
-                                                                            boxShadow: 'none',
-                                                                            '&:hover': {
-                                                                                borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                            },
-                                                                        }),
-                                                                    }}
+                                                                    styles={formDropdownStyles}
                                                                 />
                                                             </div>
                                                             <div>
@@ -2186,7 +2155,7 @@ WITNESSES:
                                                             <label className="block font-semibold mb-1">Lock-in period</label>
                                                             <input
                                                                 type="number"
-                                                                className="w-[152px] h-[43px] border-2 border-[#BF9853] rounded-lg border-opacity-20 focus:outline-none appearance-none placeholder:text-sm pl-4"
+                                                                className="w-[152px] h-[43px] border-2 border-[#BF9853] rounded-lg border-opacity-20 focus:outline-none appearance-none placeholder:text-sm pl-4 no-spinner"
                                                                 placeholder="(No.of months)"
                                                                 value={Lockinperiod}
                                                                 onChange={handlelockinperiod}
@@ -2197,7 +2166,7 @@ WITNESSES:
                                                             <label className="block font-semibold mb-1">Notice period</label>
                                                             <input
                                                                 type="number"
-                                                                className="w-[152px] h-[43px] border-2 border-[#BF9853] rounded-lg border-opacity-20 focus:outline-none appearance-none placeholder:text-sm pl-4"
+                                                                className="w-[152px] h-[43px] border-2 border-[#BF9853] rounded-lg border-opacity-20 focus:outline-none appearance-none placeholder:text-sm pl-4 no-spinner"
                                                                 placeholder="(No.of months)"
                                                                 value={Noticeperiod}
                                                                 onChange={handlenoticeperiod}
@@ -2206,14 +2175,20 @@ WITNESSES:
                                                         </div>
                                                         <div>
                                                             <label className="block font-semibold mb-1">Created By</label>
-                                                            <select
-                                                                className="w-[152px] h-[43px] border-2 border-[#BF9853] rounded-lg border-opacity-20 focus:outline-none"
-                                                                value={Createdby}
-                                                                onChange={handlecreateby}
-                                                            >
-                                                                <option>Owner</option>
-                                                                <option>Tenant</option>
-                                                            </select>
+                                                            <Select
+                                                                value={Createdby ? { value: Createdby, label: Createdby } : null}
+                                                                onChange={(selected) => handlecreateby({ target: { value: selected?.value || '' } })}
+                                                                options={[
+                                                                    { value: 'Owner', label: 'Owner' },
+                                                                    { value: 'Tenant', label: 'Tenant' },
+                                                                ]}
+                                                                placeholder="Created By"
+                                                                isSearchable
+                                                                isClearable
+                                                                className="custom-select rounded-lg w-[152px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                                                                classNamePrefix="select"
+                                                                styles={formDropdownStyles}
+                                                            />
                                                         </div>
                                                     </div>
                                                     <div className="flex flex-row mt-5 gap-10 text-left">
@@ -2221,7 +2196,7 @@ WITNESSES:
                                                             <label className="block font-semibold mb-1">Agreement validity</label>
                                                             <input
                                                                 type="number"
-                                                                className="w-[152px] h-[43px] border-2 border-[#BF9853] rounded-lg border-opacity-20 focus:outline-none placeholder:text-sm pl-4"
+                                                                className="w-[152px] h-[43px] border-2 border-[#BF9853] rounded-lg border-opacity-20 focus:outline-none placeholder:text-sm pl-4 no-spinner"
                                                                 placeholder="(No.of months)"
                                                                 value={Agreementvalidity}
                                                                 onChange={handleAgreementValidity}
@@ -2230,32 +2205,41 @@ WITNESSES:
                                                         </div>
                                                         <div>
                                                             <label className="block font-semibold mb-1">Agreement CD</label>
-                                                            <input
-                                                                type="date"
-                                                                className="w-[152px] h-[43px] border-2 border-[#BF9853] rounded-lg border-opacity-20 focus:outline-none placeholder:text-sm pl-4"
-                                                                placeholder="Created date"
+                                                            <CustomDateField
                                                                 value={Agreementcreatedate}
-                                                                onChange={handleagreementcreatedate}
+                                                                onChange={(value) => handleagreementcreatedate({ target: { value } })}
+                                                                placeholder="Created date"
+                                                                className="w-[152px] [&>div]:!w-[152px] text-sm"
+                                                                controlHeightPx={43}
+                                                                alwaysOpenBelow
+                                                                anchor="right"
+                                                                calendarPortal
                                                             />
                                                         </div>
                                                         <div>
                                                             <label className="block font-semibold mb-1">Agreement SD</label>
-                                                            <input
-                                                                type="date"
-                                                                className="w-[152px] h-[43px] border-2 border-[#BF9853] rounded-lg border-opacity-20 focus:outline-none placeholder:text-sm pl-4"
-                                                                placeholder="Start date"
+                                                            <CustomDateField
                                                                 value={Agreementstartdate}
-                                                                onChange={handleAgreementStartDate}
+                                                                onChange={(value) => handleAgreementStartDate({ target: { value } })}
+                                                                placeholder="Start date"
+                                                                className="w-[152px] [&>div]:!w-[152px] text-sm"
+                                                                controlHeightPx={43}
+                                                                alwaysOpenBelow
+                                                                anchor="right"
+                                                                calendarPortal
                                                             />
                                                         </div>
                                                         <div>
                                                             <label className="block font-semibold mb-1">Agreement ED</label>
-                                                            <input
-                                                                type="date"
-                                                                className="w-[152px] h-[43px] border-2 border-[#BF9853] rounded-lg border-opacity-20 focus:outline-none placeholder:text-sm pl-4"
-                                                                placeholder="End date"
+                                                            <CustomDateField
                                                                 value={Agreementenddate}
-                                                                onChange={handleAgreementEndDate}
+                                                                onChange={(value) => handleAgreementEndDate({ target: { value } })}
+                                                                placeholder="End date"
+                                                                className="w-[152px] [&>div]:!w-[152px] text-sm"
+                                                                controlHeightPx={43}
+                                                                alwaysOpenBelow
+                                                                anchor="right"
+                                                                calendarPortal
                                                             />
                                                         </div>
                                                     </div>
@@ -2282,18 +2266,20 @@ WITNESSES:
                                                         </div>
                                                         <div>
                                                             <label className="block font-semibold mb-1">Enhance Rent</label>
-                                                            <select
-                                                                value={selectedPercent}
-                                                                onChange={(e) => setSelectedPercent(e.target.value)}
-                                                                className="w-[152px] h-[43px] border-2 border-[#BF9853] rounded-lg pl-4 border-opacity-20 focus:outline-none appearance-none"
-                                                            >
-                                                                <option value="">Select %</option>
-                                                                {percentageOptions.map((percent) => (
-                                                                    <option key={percent} value={percent}>
-                                                                        {percent}%
-                                                                    </option>
-                                                                ))}
-                                                            </select>
+                                                            <Select
+                                                                value={selectedPercent ? { value: String(selectedPercent), label: `${selectedPercent}%` } : null}
+                                                                onChange={(selected) => setSelectedPercent(selected?.value || '')}
+                                                                options={percentageOptions.map((percent) => ({
+                                                                    value: String(percent),
+                                                                    label: `${percent}%`,
+                                                                }))}
+                                                                placeholder="Enhance Rent"
+                                                                isSearchable
+                                                                isClearable
+                                                                className="custom-select rounded-lg w-[152px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                                                                classNamePrefix="select"
+                                                                styles={formDropdownStyles}
+                                                            />
                                                         </div>
                                                     </div>
                                                     <div className="flex lg:justify-end mt-48">
@@ -2320,7 +2306,8 @@ WITNESSES:
                                                         {items.map((item, index) => (
                                                             <div key={index} className="flex gap-5 mb-4 items-center">
                                                                 <CreatableSelect
-                                                                    className="w-[216px]"
+                                                                    className="custom-select rounded-lg w-[216px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                                                                    classNamePrefix="select"
                                                                     isClearable
                                                                     isSearchable
                                                                     options={nameOptions}
@@ -2332,19 +2319,8 @@ WITNESSES:
                                                                     onChange={(selectedOption) =>
                                                                         handleInputChange(index, "name", selectedOption ? selectedOption.value : "")
                                                                     }
-                                                                    placeholder="Select or type "
-                                                                    styles={{
-                                                                        control: (provided) => ({
-                                                                            ...provided,
-                                                                            borderWidth: '2px',
-                                                                            borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                            borderRadius: '0.375rem',
-                                                                            boxShadow: 'none',
-                                                                            '&:hover': {
-                                                                                borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                            },
-                                                                        }),
-                                                                    }}
+                                                                    placeholder="Item Name"
+                                                                    styles={formDropdownStyles}
                                                                 />
                                                                 <div className="flex items-center border-2 border-[#BF9853] rounded-lg pl-4 border-opacity-20 focus:outline-none w-[216px] h-[43px] justify-between px-2">
                                                                     <button
@@ -2443,7 +2419,7 @@ WITNESSES:
                     </div>
                 </div>
             </div>
-        </body>
+        </div>
     );
 }
 export default RentalAgreement

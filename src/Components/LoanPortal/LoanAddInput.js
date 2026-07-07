@@ -215,7 +215,7 @@ const LoanAddInput = ({ username, userRoles = [] }) => {
         <div className='flex flex-col h-[calc(100vh-104px)] px-[18px] pt-[18px] pb-[18px] overflow-hidden bg-[#FAF6ED]'>
             <div className=" flex flex-col flex-1 min-h-0 px-[18px] pt-[18px] pb-[18px] overflow-hidden bg-white">
                 <div
-                    className="flex-1 min-h-0 lg:flex space-x-[18px] lg:w-full md:w-[32rem] w-[20rem] overflow-x-auto overflow-y-hidden no-scrollbar scrollbar-none select-none"
+                    className="flex-1 min-h-0 flex space-x-[18px] w-full overflow-x-auto overflow-y-hidden no-scrollbar scrollbar-none select-none"
                     style={{ cursor: isDragging ? 'grabbing' : 'default' }}
                     onMouseDown={handleMouseDown}
                     onMouseLeave={handleMouseLeave}
@@ -226,7 +226,7 @@ const LoanAddInput = ({ username, userRoles = [] }) => {
                     onTouchEnd={handleTouchEnd}
                 >
                     <div>
-                        <div className="flex items-center mb-[6px] lg:mt-0 mt-3">
+                        <div className="flex items-center mb-[6px]">
                             <input
                                 type="text"
                                 className=" border-[#BF9853] border-2 border-opacity-25 rounded-full text-[14px] pl-[16px] flex-1 w-44 h-[40px] focus:outline-none"
@@ -245,11 +245,11 @@ const LoanAddInput = ({ username, userRoles = [] }) => {
                         <button className="text-[#E4572E] flex mb-[8px]"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' /><h1 className='mt-1.5 text-[14px] font-semibold'>Import file</h1></button>
                         <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
                             <div className="bg-[#FAF6ED]">
-                                <table className="table-auto lg:w-[320px] ">
+                                <table className="table-auto w-[320px] ">
                                     <thead className='bg-[#FAF6ED]'>
                                         <tr className="border-b h-[40px]">
-                                            <th className="pl-[12px] pr-[12px] text-left lg:w-16 text-[16px] font-bold">S.No</th>
-                                            <th className="pl-0 pr-[8px] text-left lg:w-72 text-[16px] font-bold">
+                                            <th className="pl-[12px] pr-[12px] text-left w-16 text-[16px] font-bold">S.No</th>
+                                            <th className="pl-0 pr-[8px] text-left w-72 text-[16px] font-bold">
                                                 <div className="flex items-center justify-between gap-[12px]">
                                                     <span>Purpose</span>
                                                     <button type="button" onClick={handleDeleteAllLoanTypes} className="inline-flex shrink-0 items-center justify-center">
@@ -262,7 +262,7 @@ const LoanAddInput = ({ username, userRoles = [] }) => {
                                 </table>
                             </div>
                             <div className="overflow-y-auto max-h-[calc(100vh-300px)] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                                <table className="table-fixed lg:w-[320px] w-full">
+                                <table className="table-fixed w-[320px]">
                                     <tbody>
                                         {filteredLoanTypes.map((item) => (
                                             <tr key={item.id} className="border-b odd:bg-white text-[14px] even:bg-[#FAF6ED] h-[40px]">

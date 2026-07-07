@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import search from '../Images/search.png';
 import imports from '../Images/Import.svg';
+import Add from '../Images/+Add.svg';
+import FileRemover from '../Images/FileRemover.svg';
 import cross from '../Images/cross.png';
 import download from '../Images/Download.svg';
 import edit from '../Images/Edit.svg';
@@ -9,7 +11,68 @@ import Select from 'react-select';
 import attach from '../Images/Attachfile.svg';
 import CreatableSelect from 'react-select/creatable';
 import axios from 'axios';
+import CustomDateField from '../ExpensesEntry/CustomDateField';
 import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
+const PROJECT_CATEGORY_OPTIONS = [
+  { value: 'Client Project', label: 'Client Project' },
+  { value: 'Own Project', label: 'Own Project' },
+];
+const PROJECT_TYPE_OPTIONS = [
+  { value: 'Shop', label: 'Shop' },
+  { value: 'House', label: 'House' },
+  { value: 'Land', label: 'Land' },
+  { value: 'Office', label: 'Office' },
+  { value: 'Construction', label: 'Construction' },
+];
+const FLOOR_NAME_OPTIONS = [
+  { value: 'Ground Floor', label: 'Ground Floor' },
+  { value: 'First Floor', label: 'First Floor' },
+  { value: 'Second Floor', label: 'Second Floor' },
+];
+const PROJECT_POPUP_LABEL_CLASS = 'block font-semibold mb-[8px]';
+const PROJECT_POPUP_INPUT_CLASS = 'border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg h-[40px] box-border focus:outline-none';
+const projectPopupSelectStyles = {
+  control: (provided, state) => ({
+    ...provided,
+    minHeight: '40px',
+    height: '40px',
+    backgroundColor: 'transparent',
+    borderWidth: '2px',
+    borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.5)' : 'rgba(191, 152, 83, 0.25)',
+    borderRadius: '8px',
+    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+    '&:hover': {
+      borderColor: 'rgba(191, 152, 83, 0.4)',
+    },
+  }),
+  indicatorSeparator: () => ({ display: 'none' }),
+  menuPortal: (base) => ({
+    ...base,
+    zIndex: 9999,
+  }),
+  menu: (provided) => ({
+    ...provided,
+    zIndex: 9999,
+  }),
+  option: (provided, state) => ({
+    ...provided,
+    backgroundColor: state.isSelected
+      ? 'rgba(191, 152, 83, 0.3)'
+      : state.isFocused
+        ? 'rgba(191, 152, 83, 0.1)'
+        : 'white',
+    color: 'black',
+    fontWeight: state.isSelected ? 'bold' : 'normal',
+  }),
+  singleValue: (provided) => ({
+    ...provided,
+    color: 'black',
+  }),
+  placeholder: (provided) => ({
+    ...provided,
+    color: '#999',
+  }),
+};
 const InputData = ({ username, userRoles = [] }) => {
   const [tenantNameSearch, setTenantNameSearch] = useState("");
   const [paymentModeSearch, setPaymentModeSearch] = useState("");
@@ -1666,40 +1729,7 @@ const InputData = ({ username, userRoles = [] }) => {
     }
   };
   const openProjectManagement = () => {
-    // Generate next project ID
-    const generateNextProjectId = () => {
-      if (projects.length === 0) {
-        return '1'; // Start with 1 if no projects exist
-      }
-
-      // Extract numbers from existing project IDs and find the highest
-      const projectIds = projects
-        .map(project => project.projectId)
-        .filter(projectId => projectId && projectId.toString().trim() !== '')
-        .map(projectId => {
-          // Try to extract numeric value from various formats
-          const numericMatch = projectId.toString().match(/\d+/);
-          return numericMatch ? parseInt(numericMatch[0]) : null;
-        })
-        .filter(num => num !== null && !isNaN(num));
-
-      if (projectIds.length === 0) {
-        return '1'; // Default to 1 if no valid numbers found
-      }
-
-      const maxNumber = Math.max(...projectIds);
-      const nextNumber = maxNumber + 1;
-      return nextNumber.toString();
-    };
-
-    // Set the auto-generated project ID
-    const nextProjectId = generateNextProjectId();
-    setNewProject(prev => ({
-      ...prev,
-      projectId: nextProjectId
-    }));
-
-    setIsProjectManagementOpen(true);
+    alert('For Add Project Name add in the MasterData page');
   };
   const closeProjectManagement = () => {
     setIsProjectManagementOpen(false);
@@ -1848,51 +1878,131 @@ const InputData = ({ username, userRoles = [] }) => {
     }
     e.target.value = '';
   };
+
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [expandedCells, setExpandedCells] = useState({});
+
+  const toggleExpandedCell = (cellKey) => {
+    setExpandedCells((prev) => ({
+      ...prev,
+      [cellKey]: !prev[cellKey],
+    }));
+  };
+
+  const interactiveDragSelectors =
+    'input, textarea, button, select, a, label, [role="button"], [contenteditable="true"], .prevent-drag-scroll';
+
+  const shouldSkipDragScroll = (target) => {
+    if (!target || typeof target.closest !== 'function') return false;
+    return Boolean(target.closest(interactiveDragSelectors));
+  };
+
+  const handleMouseDown = (e) => {
+    if (shouldSkipDragScroll(e.target)) {
+      setIsDragging(false);
+      return;
+    }
+    setIsDragging(true);
+    setStartX(e.pageX - e.currentTarget.offsetLeft);
+    setScrollLeft(e.currentTarget.scrollLeft);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const x = e.pageX - e.currentTarget.offsetLeft;
+    const walk = (x - startX) * 2;
+    e.currentTarget.scrollLeft = scrollLeft - walk;
+  };
+
+  const handleTouchStart = (e) => {
+    if (shouldSkipDragScroll(e.target)) {
+      setIsDragging(false);
+      return;
+    }
+    setIsDragging(true);
+    setStartX(e.touches[0].pageX - e.currentTarget.offsetLeft);
+    setScrollLeft(e.currentTarget.scrollLeft);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const x = e.touches[0].pageX - e.currentTarget.offsetLeft;
+    const walk = (x - startX) * 2;
+    e.currentTarget.scrollLeft = scrollLeft - walk;
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
   return (
-    <div className="p-4 bg-white ml-12 mr-8">
-      <div className=" lg:flex space-x-[2%] w-full overflow-x-auto">
+    <div className='flex flex-col h-[calc(100vh-104px)] px-[18px] pt-[18px] pb-[18px] overflow-hidden bg-[#FAF6ED]'>
+      <div className=" flex flex-col flex-1 min-h-0 px-[18px] pt-[18px] pb-[18px] overflow-hidden bg-white">
+        <div
+          className="flex-1 min-h-0 flex space-x-[18px] w-full overflow-x-auto overflow-y-hidden no-scrollbar scrollbar-none select-none"
+          style={{ cursor: isDragging ? 'grabbing' : 'default' }}
+          onMouseDown={handleMouseDown}
+          onMouseLeave={handleMouseLeave}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
         <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
+          <div className="flex items-center mb-[6px]">
             <input
               type="text"
-              className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
-              placeholder="Search Tenant Link.."
+              className=" border-[#BF9853] border-2 border-opacity-25 rounded-full text-[14px] pl-[16px] flex-1 w-44 h-[40px] focus:outline-none"
+              placeholder="Tenant Name"
               value={tenantLinkSearch}
               onChange={(e) => setTenantLinkSearch(e.target.value)}
             />
-            <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
+            <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
               <img src={search} alt='search' className=' w-5 h-5' />
             </button>
-            <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
+            <button className="text-black font-bold px-1 ml-4"
               onClick={openTenantLinkPopup}>
-              + Add
+              <img src={Add} alt='add' className='w-[30px] h-[30px]' />
             </button>
           </div>
-          <button className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
-          <div className={`${userPermissions.includes("Delete") ? '' : 'mt-5'}`}>
-            {userPermissions.includes("Delete") && (
-              <button onClick={handleAllTenantLinkDelete}>
-                <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[15rem]' />
-              </button>
-            )}
-          </div>
+          <button className="text-[#E4572E] flex mb-[8px]"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' /><h1 className='mt-1.5 text-[14px] font-semibold'>Import file</h1></button>
           <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
             <div className="bg-[#FAF6ED]">
-              <table className="table-auto w-96">
+              <table className="table-auto w-[320px] ">
                 <thead className='bg-[#FAF6ED]'>
-                  <tr className="border-b">
-                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left text-xl font-bold">Tenant Name</th>
+                  <tr className="border-b h-[40px]">
+                    <th className="pl-[12px] pr-[12px] text-left w-16 text-[16px] font-bold">S.No</th>
+                    <th className="pl-0 pr-[8px] text-left w-72 text-[16px] font-bold">
+                      <div className="flex items-center justify-between gap-[12px]">
+                        <span>Tenant Name</span>
+                        {userPermissions.includes("Delete") && (
+                          <button type="button" onClick={handleAllTenantLinkDelete} className="inline-flex shrink-0 items-center justify-center">
+                            <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                          </button>
+                        )}
+                      </div>
+                    </th>
                   </tr>
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[600px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto w-96">
+            <div className="overflow-y-auto max-h-[calc(100vh-300px)] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              <table className="table-fixed w-[320px]">
                 <tbody>
-                  {filteredTenantLink.map((item, index) => {
-                    // Check if tenant has any vacated shops (similar to Dashboard.js logic)
-                    // A shop is vacated if it has a shopClosureDate (active = !shopClosureDate in Dashboard.js)
+                  {filteredTenantLink.map((item) => {
                     const hasVacatedShops = item.shopNos?.some(shop => 
                       shop.shopClosureDate && shop.shopClosureDate.trim() !== ''
                     ) || false;
@@ -1901,21 +2011,27 @@ const InputData = ({ username, userRoles = [] }) => {
                       : (item.tenantName || 'N/A');
                     
                     return (
-                      <tr key={item.id} className="border-b bg-white hover:bg-gray-50 cursor-pointer">
-                        <td className="p-2 align-top">{index + 1}</td>
-                        <td className="py-2 pl-9 font-semibold group flex text-left ">
-                          <div className="flex flex-grow">
-                            {displayTenantName}
-                          </div>
-                          <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                            <button type="button" onClick={() => openEditTenantLink(item)}>
-                              <img src={edit} alt="add" className="w-4 h-4" type="button" />
-                            </button>
-                            {userPermissions.includes("Delete") && (
-                              <button >
-                                <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleTenantLinkDelete(item.id)} />
+                      <tr key={item.id} className="border-b odd:bg-white text-[14px] even:bg-[#FAF6ED] h-[40px]">
+                        <td className="pl-[12px] pr-[12px] text-left font-semibold w-[64px]">{(tenantLinkList.findIndex(t => t.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                        <td className="pl-0 pr-[8px] text-left group font-semibold max-w-0">
+                          <div className="flex items-center min-w-0">
+                            <span
+                              onClick={() => toggleExpandedCell(`${item.id}-tenant`)}
+                              className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-tenant`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                              title={displayTenantName}
+                            >
+                              {displayTenantName}
+                            </span>
+                            <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
+                              <button type="button" onClick={() => openEditTenantLink(item)}>
+                                <img src={edit} alt="add" className="w-4 h-4" type="button" />
                               </button>
-                            )}
+                              {userPermissions.includes("Delete") && (
+                                <button >
+                                  <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleTenantLinkDelete(item.id)} />
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -1927,68 +2043,68 @@ const InputData = ({ username, userRoles = [] }) => {
           </div>
         </div>
         <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
+          <div className="flex items-center mb-[6px]">
             <input
               type="text"
-              className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
-              placeholder="Search Mode..."
+              className=" border-[#BF9853] border-2 border-opacity-25 rounded-full text-[14px] pl-[16px] flex-1 w-44 h-[40px] focus:outline-none"
+              placeholder="Payment Mode"
               value={paymentModeSearch}
               onChange={(e) => setPaymentModeSearch(e.target.value)}
             />
-            <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
+            <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
               <img src={search} alt='search' className=' w-5 h-5' />
             </button>
-            <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
+            <button className="text-black font-bold px-1 ml-4"
               onClick={openPaymentModePopup}>
-              + Add
+              <img src={Add} alt='add' className='w-[30px] h-[30px]' />
             </button>
           </div>
-          <button className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
-            <h1 className='mt-1.5 text-sm'>Import file</h1>
-          </button>
-          <div className={`${userPermissions.includes("Delete") ? '' : 'mt-5'}`}>
-            {userPermissions.includes("Delete") && (
-              <button onClick={handleAllPaymentModes}>
-                <img
-                  src={deleteIcon}
-                  alt='del'
-                  className='-mb-14 ml-[15rem] mt-5 lg:ml-[17rem] md:ml-[30rem]'
-                />
-              </button>
-            )}
-          </div>
+          <button className="text-[#E4572E] flex mb-[8px]"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' /><h1 className='mt-1.5 text-[14px] font-semibold'>Import file</h1></button>
           <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
             <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-72 ">
+              <table className="table-auto w-[320px] ">
                 <thead className='bg-[#FAF6ED]'>
-                  <tr className="border-b">
-                    <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left lg:w-72 text-xl font-bold">Payment Mode</th>
+                  <tr className="border-b h-[40px]">
+                    <th className="pl-[12px] pr-[12px] text-left w-16 text-[16px] font-bold">S.No</th>
+                    <th className="pl-0 pr-[8px] text-left w-72 text-[16px] font-bold">
+                      <div className="flex items-center justify-between gap-[12px]">
+                        <span>Payment Mode</span>
+                        {userPermissions.includes("Delete") && (
+                          <button type="button" onClick={handleAllPaymentModes} className="inline-flex shrink-0 items-center justify-center">
+                            <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                          </button>
+                        )}
+                      </div>
+                    </th>
                   </tr>
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-72 w-full">
+            <div className="overflow-y-auto max-h-[calc(100vh-300px)] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              <table className="table-fixed w-[320px]">
                 <tbody>
-                  {filteredPaymentMode.map((item, index) => (
-                    <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">
-                        {(paymentMode.findIndex(v => v.id === item.id) + 1).toString().padStart(2, '0')}
-                      </td>
-                      <td className="p-2 text-left group flex font-semibold">
-                        <div className="flex flex-grow">
-                          {item.modeOfPayment}
-                        </div>
-                        <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                          <button type="button" >
-                            <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditPaymentMode(item)} />
-                          </button>
-                          {userPermissions.includes("Delete") && (
-                            <button >
-                              <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handlePaymentModeDelete(item.id)} />
+                  {filteredPaymentMode.map((item) => (
+                    <tr key={item.id} className="border-b odd:bg-white text-[14px] even:bg-[#FAF6ED] h-[40px]">
+                      <td className="pl-[12px] pr-[12px] text-left font-semibold w-[64px]">{(paymentMode.findIndex(v => v.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                      <td className="pl-0 pr-[8px] text-left group font-semibold max-w-0">
+                        <div className="flex items-center min-w-0">
+                          <span
+                            onClick={() => toggleExpandedCell(`${item.id}-payment`)}
+                            className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-payment`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                            title={item.modeOfPayment}
+                          >
+                            {item.modeOfPayment}
+                          </span>
+                          <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
+                            <button type="button" >
+                              <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditPaymentMode(item)} />
                             </button>
-                          )}
+                            {userPermissions.includes("Delete") && (
+                              <button >
+                                <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handlePaymentModeDelete(item.id)} />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -1999,26 +2115,26 @@ const InputData = ({ username, userRoles = [] }) => {
           </div>
         </div>
         <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
+          <div className="flex items-center mb-[6px]">
             <input
               type="text"
-              className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
-              placeholder="Search Project.."
+              className=" border-[#BF9853] border-2 border-opacity-25 rounded-full text-[14px] pl-[16px] flex-1 w-44 h-[40px] focus:outline-none"
+              placeholder="Property Name"
               value={projectManagementSearch}
               onChange={(e) => setProjectManagementSearch(e.target.value)}
             />
-            <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
+            <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
               <img src={search} alt='search' className=' w-5 h-5' />
             </button>
-            <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
+            <button className="text-black font-bold px-1 ml-4"
               onClick={openProjectManagement}>
-              + Add
+              <img src={Add} alt='add' className='w-[30px] h-[30px]' />
             </button>
           </div>
-          <button className="flex items-center text-[#E4572E] font-bold px-1 ml-4 mt-2 mb-2"
+          <button className="text-[#E4572E] flex mb-[8px]"
             onClick={() => document.getElementById('projectManagementFileInput').click()}>
-            <img src={imports} alt='import' className='w-4 h-4 mr-1' />
-            Import File
+            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' />
+            <h1 className='mt-1.5 text-[14px] font-semibold'>Import file</h1>
           </button>
           <input
             type="file"
@@ -2029,17 +2145,17 @@ const InputData = ({ username, userRoles = [] }) => {
           />
           <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
             <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-60">
+              <table className="table-auto w-[320px] ">
                 <thead className='bg-[#FAF6ED]'>
-                  <tr className="border-b">
-                    <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left lg:w-52 text-xl font-bold">Property Name</th>
+                  <tr className="border-b h-[40px]">
+                    <th className="pl-[12px] pr-[12px] text-left w-16 text-[16px] font-bold">S.No</th>
+                    <th className="pl-0 pr-[8px] text-left w-72 text-[16px] font-bold">Property Name</th>
                   </tr>
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[550px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-full w-full">
+            <div className="overflow-y-auto max-h-[calc(100vh-300px)] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              <table className="table-fixed w-[320px]">
                 <tbody>
                   {projects.filter(project =>
                     (project.projectCategory || '').toLowerCase() === 'own project' &&
@@ -2047,22 +2163,26 @@ const InputData = ({ username, userRoles = [] }) => {
                     (project.projectName?.toLowerCase().includes(projectManagementSearch.toLowerCase()) ||
                       project.projectAddress?.toLowerCase().includes(projectManagementSearch.toLowerCase()) ||
                       project.projectId?.toLowerCase().includes(projectManagementSearch.toLowerCase()))
-                  ).map((item, index) => (
-                    <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">
-                        {(projects.findIndex(p => p.id === item.id) + 1).toString().padStart(2, '0')}
-                      </td>
-                      <td className="p-2 text-left group flex font-semibold">
-                        <div className="flex flex-grow">
-                          {item.projectReferenceName || ''}
-                        </div>
-                        <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                          <button onClick={() => handleEditProject(item)} className="text-blue-600 hover:text-blue-800" title="Edit" >
-                            <img src={edit} alt="Edit" className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleDeleteProject(item.id)} className="text-red-600 hover:text-red-800" title="Delete" >
-                            <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                          </button>
+                  ).map((item) => (
+                    <tr key={item.id} className="border-b odd:bg-white text-[14px] even:bg-[#FAF6ED] h-[40px]">
+                      <td className="pl-[12px] pr-[12px] text-left font-semibold w-[64px]">{(projects.findIndex(p => p.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                      <td className="pl-0 pr-[8px] text-left group font-semibold max-w-0">
+                        <div className="flex items-center min-w-0">
+                          <span
+                            onClick={() => toggleExpandedCell(`${item.id}-project`)}
+                            className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-project`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                            title={item.projectReferenceName || ''}
+                          >
+                            {item.projectReferenceName || ''}
+                          </span>
+                          <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <button onClick={() => handleEditProject(item)} title="Edit" >
+                              <img src={edit} alt="Edit" className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleDeleteProject(item.id)} title="Delete" >
+                              <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -2071,6 +2191,7 @@ const InputData = ({ username, userRoles = [] }) => {
               </table>
             </div>
           </div>
+        </div>
         </div>
       </div>
       {isPropertyEditOpen && (
@@ -2276,25 +2397,25 @@ const InputData = ({ username, userRoles = [] }) => {
         </div>
       )}
       {isPaymentModeOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-          <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closePaymentModePopup}>
-                <img src={cross} alt='cross' className='w-5 h-5' />
+        <div className="fixed inset-0 z-[9999] bg-black bg-opacity-50 flex justify-center items-center p-[18px] box-border">
+          <div className="bg-white rounded-md p-[16px]">
+            <div className="flex justify-end">
+              <button className="" onClick={closePaymentModePopup}>
+                <img src={FileRemover} alt='close' className='w-3 h-3' />
               </button>
             </div>
             <form onSubmit={handleSubmitPaymentMode}>
-              <div className="mb-4">
-                <label className="block text-lg font-medium mb-2 -ml-60">Payment Mode</label>
+              <div className="mb-[8px] text-left">
+                <label className="block text-lg font-medium mb-[8px]">Payment Mode</label>
                 <input
                   type="text"
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                  placeholder="Enter Payment Mode"
+                  className="w-[300px] border-2 border-[#BF9853] border-opacity-35 rounded-md pl-[8px] h-[40px] focus:outline-none"
+                  placeholder="Payment Mode"
                   onChange={(e) => setModeOfPayment(e.target.value)}
                   required
                 />
               </div>
-              <div className="flex space-x-2 mt-4 ml-12">
+              <div className="flex space-x-2 mt-[16px] justify-end">
                 <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
                   Submit
                 </button>
@@ -2484,7 +2605,7 @@ const InputData = ({ username, userRoles = [] }) => {
                       type='text'
                       value={detail.ebNo}
                       onChange={(e) => handleNewDetailChange(index, 'ebNo', e.target.value)}
-                      placeholder='EB NO'
+                      placeholder="EB.NO"
                       className='w-56 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
                     />
                   </div>
@@ -2528,26 +2649,26 @@ const InputData = ({ username, userRoles = [] }) => {
         </div>
       )}
       {editPaymentModeOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
-          <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeEditPaymentMode}>
-                <img src={cross} alt='close' className='w-5 h-5' />
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999]" >
+          <div className="bg-white rounded-md p-[16px]">
+            <div className="flex justify-end">
+              <button className="" onClick={closeEditPaymentMode}>
+                <img src={FileRemover} alt='close' className='w-3 h-3' />
               </button>
             </div>
             <form onSubmit={handleSubmitEditPaymentMode}>
-              <div className="mb-4">
-                <label className="block text-lg font-medium mb-2 -ml-[15.5rem]">Payment Mode</label>
+              <div className="mb-[8px] text-left">
+                <label className="block text-lg font-medium mb-[8px]">Payment Mode</label>
                 <input
                   type="text"
                   value={editModeOfPayment}
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                  placeholder="Enter Payment Mode"
+                  className="w-[300px] border-2 border-[#BF9853] border-opacity-35 rounded pl-[8px] h-[40px] focus:outline-none"
+                  placeholder="Payment Mode"
                   onChange={(e) => setEditModeOfPayment(e.target.value)}
                   required
                 />
               </div>
-              <div className="flex space-x-2 mt-8 ml-12">
+              <div className="flex space-x-2 mt-[16px] justify-end">
                 <button
                   type="submit"
                   className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
@@ -2582,17 +2703,17 @@ const InputData = ({ username, userRoles = [] }) => {
         </div>
       )}
       {isProjectManagementOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white rounded-md w-[95rem] h-[40rem] text-left overflow-y-auto pl-20">
-            <div className='flex justify-end mr-16 mt-4'>
+        <div className="fixed inset-0 z-[9999] bg-black bg-opacity-50 flex items-center justify-center p-[18px] box-border">
+          <div className="bg-white rounded-md w-max max-w-full text-left max-h-[calc(100vh-36px)] flex flex-col items-start overflow-hidden p-[18px]">
+            <div className='flex justify-end shrink-0 w-full'>
               <div>
                 <button className="text-red-500 " onClick={closeProjectManagement}>
                   <img src={cross} alt="close" className="w-5 h-5" />
                 </button>
               </div>
             </div>
-            <form onSubmit={handleSubmitProject}>
-              <div className='overflow-y-auto h-[500px]'>
+            <form onSubmit={handleSubmitProject} className="flex flex-col flex-1 min-h-0 overflow-hidden w-max max-w-full">
+              <div className='flex-1 min-h-0 overflow-y-auto no-scrollbar scrollbar-none w-max max-w-full'>
                 <div className="flex gap-4">
                   <div className="mb-4 pl-5">
                     <label className="block text-lg font-medium mb-2">Project Name</label>
@@ -2602,15 +2723,15 @@ const InputData = ({ username, userRoles = [] }) => {
                       onChange={(e) =>
                         setNewProject((prev) => ({ ...prev, projectName: e.target.value }))
                       }
-                      className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                      placeholder="Enter Project Name"
+                      className="w-[35rem] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg h-[40px] box-border focus:outline-none"
+                      placeholder="Project Name"
                       required
                     />
                   </div>
                   <div className="mb-4 pl-5">
                     <label className="block text-lg font-medium mb-2">Project ID</label>
-                    <input className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                      placeholder="Enter Project ID"
+                    <input className="w-[25rem] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg h-[40px] box-border focus:outline-none"
+                      placeholder="Project ID"
                       type="text"
                       value={newProject.projectId}
                       onChange={(e) =>
@@ -2621,8 +2742,8 @@ const InputData = ({ username, userRoles = [] }) => {
                 <div className="flex gap-4">
                   <div className="mb-4 pl-5">
                     <label className="block text-lg font-medium mb-2">Project Reference Name</label>
-                    <input className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                      placeholder="Enter Project Reference Name"
+                    <input className="w-[35rem] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg h-[40px] box-border focus:outline-none"
+                      placeholder="Project Reference Name"
                       type="text"
                       value={newProject.projectReferenceName}
                       onChange={(e) =>
@@ -2631,21 +2752,26 @@ const InputData = ({ username, userRoles = [] }) => {
                   </div>
                   <div className="mb-4 pl-5">
                     <label className="block text-lg font-medium mb-2">Project Category</label>
-                    <select className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                      value={newProject.projectCategory}
-                      onChange={(e) =>
-                        setNewProject((prev) => ({ ...prev, projectCategory: e.target.value }))
-                      }>
-                      <option value="">Select Project Category</option>
-                      <option value="Client Project">Client Project</option>
-                      <option value="Own Project">Own Project</option>
-                    </select>
+                    <Select
+                      options={PROJECT_CATEGORY_OPTIONS}
+                      value={PROJECT_CATEGORY_OPTIONS.find((opt) => opt.value === newProject.projectCategory) || null}
+                      onChange={(selectedOption) =>
+                        setNewProject((prev) => ({ ...prev, projectCategory: selectedOption?.value || '' }))
+                      }
+                      placeholder="Project Category"
+                      isSearchable
+                      isClearable
+                      className="w-[25rem]"
+                      classNamePrefix="select"
+                      menuPortalTarget={document.body}
+                      styles={projectPopupSelectStyles}
+                    />
                   </div>
                 </div>
                 <div className="mb-4 pl-5">
                   <label className="block text-lg font-medium mb-2">Project Address</label>
-                  <input className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Project Address"
+                  <input className="w-[62rem] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg h-[40px] box-border focus:outline-none"
+                    placeholder="Project Address"
                     type="text"
                     value={newProject.projectAddress}
                     onChange={(e) =>
@@ -2666,7 +2792,7 @@ const InputData = ({ username, userRoles = [] }) => {
                             value={owner.clientName}
                             onChange={(e) => handleNewOwnerChange(index, 'clientName', e.target.value)}
                             placeholder="Client Name"
-                            className="w-80 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                            className="w-80 border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg h-[40px] box-border"
                           />
                         </div>
                         <div className="flex flex-col">
@@ -2676,7 +2802,7 @@ const InputData = ({ username, userRoles = [] }) => {
                             value={owner.fatherName}
                             onChange={(e) => handleNewOwnerChange(index, 'fatherName', e.target.value)}
                             placeholder="Father Name"
-                            className="w-72 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                            className="w-72 border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg h-[40px] box-border"
                           />
                         </div>
                         <div className="flex flex-col">
@@ -2686,7 +2812,7 @@ const InputData = ({ username, userRoles = [] }) => {
                             value={owner.mobile}
                             onChange={(e) => handleNewOwnerChange(index, 'mobile', e.target.value)}
                             placeholder="Mobile"
-                            className="w-60 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                            className="w-60 border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg h-[40px] box-border"
                           />
                         </div>
                         <div className="flex flex-col">
@@ -2696,7 +2822,7 @@ const InputData = ({ username, userRoles = [] }) => {
                             value={owner.age}
                             onChange={(e) => handleNewOwnerChange(index, 'age', e.target.value)}
                             placeholder="Age"
-                            className="w-20 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                            className="w-20 border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg h-[40px] box-border"
                           />
                         </div>
                       </div>
@@ -2708,7 +2834,7 @@ const InputData = ({ username, userRoles = [] }) => {
                         value={owner.clientAddress}
                         onChange={(e) => handleNewOwnerChange(index, 'clientAddress', e.target.value)}
                         placeholder="Client Address"
-                        className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                        className="w-[62rem] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg h-[40px] box-border"
                       />
                       <button
                         type="button"
@@ -2736,31 +2862,33 @@ const InputData = ({ username, userRoles = [] }) => {
                     </div>
                     <div className="">
                       <label className="block mb-1 text-lg font-medium">Project Type</label>
-                      <select
-                        value={detail.projectType}
-                        onChange={(e) => handleNewDetailChange(index, 'projectType', e.target.value)}
-                        className="w-40  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                      >
-                        <option value="">Select Type</option>
-                        <option value="Shop">Shop</option>
-                        <option value="House">House</option>
-                        <option value="Land">Land</option>
-                        <option value="Office">Office</option>
-                        <option value="Construction">Construction</option>
-                      </select>
+                      <Select
+                        options={PROJECT_TYPE_OPTIONS}
+                        value={PROJECT_TYPE_OPTIONS.find((opt) => opt.value === detail.projectType) || null}
+                        onChange={(selectedOption) => handleNewDetailChange(index, 'projectType', selectedOption?.value || '')}
+                        placeholder="Project Type"
+                        isSearchable
+                        isClearable
+                        className="w-40"
+                        classNamePrefix="select"
+                        menuPortalTarget={document.body}
+                        styles={projectPopupSelectStyles}
+                      />
                     </div>
                     <div>
                       <label className="block mb-1 text-lg font-medium">Floor Name</label>
-                      <select
-                        value={detail.floorName}
-                        onChange={(e) => handleNewDetailChange(index, 'floorName', e.target.value)}
-                        className="w-36  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                      >
-                        <option value="">Select Floor</option>
-                        <option value="Ground Floor">Ground Floor</option>
-                        <option value="First Floor">First Floor</option>
-                        <option value="Second Floor">Second Floor</option>
-                      </select>
+                      <Select
+                        options={FLOOR_NAME_OPTIONS}
+                        value={FLOOR_NAME_OPTIONS.find((opt) => opt.value === detail.floorName) || null}
+                        onChange={(selectedOption) => handleNewDetailChange(index, 'floorName', selectedOption?.value || '')}
+                        placeholder="Floor Name"
+                        isSearchable
+                        isClearable
+                        className="w-36"
+                        classNamePrefix="select"
+                        menuPortalTarget={document.body}
+                        styles={projectPopupSelectStyles}
+                      />
                     </div>
                     <div>
                       <label className="block mb-1 text-lg font-medium">Shop No</label>
@@ -2769,7 +2897,7 @@ const InputData = ({ username, userRoles = [] }) => {
                         value={detail.shopNo}
                         onChange={(e) => handleNewDetailChange(index, 'shopNo', e.target.value)}
                         placeholder="Shop No"
-                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                        className="w-28  border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg h-[40px] box-border"
                       />
                     </div>
                     <div>
@@ -2779,7 +2907,7 @@ const InputData = ({ username, userRoles = [] }) => {
                         value={detail.doorNo}
                         onChange={(e) => handleNewDetailChange(index, 'doorNo', e.target.value)}
                         placeholder="Door No"
-                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                        className="w-28  border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg h-[40px] box-border"
                       />
                     </div>
                     <div>
@@ -2789,7 +2917,7 @@ const InputData = ({ username, userRoles = [] }) => {
                         value={detail.area}
                         onChange={(e) => handleNewDetailChange(index, 'area', e.target.value)}
                         placeholder="Area"
-                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                        className="w-28  border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg h-[40px] box-border"
                       />
                     </div>
                     <div className="relative">
@@ -2823,8 +2951,8 @@ const InputData = ({ username, userRoles = [] }) => {
                           type='text'
                           value={detail.ebNo}
                           onChange={(e) => handleNewDetailChange(index, 'ebNo', e.target.value)}
-                          placeholder='EB NO'
-                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                          placeholder="EB.NO"
+                          className='w-40 border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg h-[40px] box-border focus:outline-none'
                         />
                       </div>
                     </div>
@@ -2836,7 +2964,7 @@ const InputData = ({ username, userRoles = [] }) => {
                           value={detail.propertyTaxNo}
                           onChange={(e) => handleNewDetailChange(index, 'propertyTaxNo', e.target.value)}
                           placeholder='Property Tax No'
-                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                          className='w-40 border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg h-[40px] box-border focus:outline-none'
                         />
                       </div>
                     </div>
@@ -2848,7 +2976,7 @@ const InputData = ({ username, userRoles = [] }) => {
                           value={detail.waterTaxNo}
                           onChange={(e) => handleNewDetailChange(index, 'waterTaxNo', e.target.value)}
                           placeholder='Water Tax No'
-                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                          className='w-40 border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg h-[40px] box-border focus:outline-none'
                         />
                       </div>
                     </div>
@@ -2873,7 +3001,7 @@ const InputData = ({ username, userRoles = [] }) => {
                 ))}
                 <button type="button" className="text-[#E4572E] font-bold px-1 ml-3 border-dashed border-b-2 border-[#BF9853] " onClick={addNewPropertyDetail}>+ Add on</button>
               </div>
-              <div className="flex justify-end space-x-2 mt-6 mb-4 mr-5">
+              <div className="flex justify-end space-x-2 shrink-0 mt-6 mb-4 mr-5">
                 <button
                   type="submit"
                   className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
@@ -2893,33 +3021,34 @@ const InputData = ({ username, userRoles = [] }) => {
         </div>
       )}
       {isProjectEditOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white rounded-md w-[95rem] h-[40rem] text-left overflow-y-auto pl-20">
-            <div className='flex justify-end mr-16 mt-4'>
+        <div className="fixed inset-0 z-[9999] bg-black bg-opacity-50 flex items-center justify-center p-[18px] box-border">
+          <div className="bg-white rounded-md w-max max-w-full text-left max-h-[calc(100vh-36px)] flex flex-col items-start overflow-hidden p-[18px]">
+            <div className='flex justify-end shrink-0 w-full'>
               <button className="text-red-500" onClick={() => setIsProjectEditOpen(false)}>
                 <img src={cross} alt="close" className="w-5 h-5" />
               </button>
             </div>
-            <form>
-              <div className="overflow-y-auto h-[500px]">
+            <form className="flex flex-col flex-1 min-h-0 overflow-hidden w-max max-w-full">
+              <div className="flex flex-col flex-1 min-h-0 overflow-hidden w-max max-w-full">
+                <div className="shrink-0 w-max max-w-full">
                 <div className="flex gap-4">
-                  <div className="mb-4 pl-5">
-                    <label className="block text-lg font-medium mb-2">Project Name</label>
+                  <div className="mb-4">
+                    <label className={PROJECT_POPUP_LABEL_CLASS}>Project Name</label>
                     <input
                       type="text"
                       value={editProject.projectName}
                       onChange={(e) =>
                         setEditProject((prev) => ({ ...prev, projectName: e.target.value }))
                       }
-                      className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                      placeholder="Enter Project Name"
+                      className={`w-[35rem] ${PROJECT_POPUP_INPUT_CLASS}`}
+                      placeholder="Project Name"
                       required
                     />
                   </div>
-                  <div className="mb-4 pl-5">
-                    <label className="block text-lg font-medium mb-2">Project ID</label>
-                    <input className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                      placeholder="Enter Project ID"
+                  <div className="mb-4">
+                    <label className={PROJECT_POPUP_LABEL_CLASS}>Project ID</label>
+                    <input className={`w-[25rem] ${PROJECT_POPUP_INPUT_CLASS}`}
+                      placeholder="Project ID"
                       type="text"
                       value={editProject.projectId}
                       onChange={(e) =>
@@ -2928,33 +3057,38 @@ const InputData = ({ username, userRoles = [] }) => {
                   </div>
                 </div>
                 <div className="flex gap-4">
-                  <div className="mb-4 pl-5">
-                    <label className="block text-lg font-medium mb-2">Project Reference Name</label>
-                    <input className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                      placeholder="Enter Project Reference Name"
+                  <div className="mb-4">
+                    <label className={PROJECT_POPUP_LABEL_CLASS}>Project Reference Name</label>
+                    <input className={`w-[35rem] ${PROJECT_POPUP_INPUT_CLASS}`}
+                      placeholder="Project Reference Name"
                       type="text"
                       value={editProject.projectReferenceName}
                       onChange={(e) =>
                         setEditProject((prev) => ({ ...prev, projectReferenceName: e.target.value }))
                       }></input>
                   </div>
-                  <div className="mb-4 pl-5">
-                    <label className="block text-lg font-medium mb-2">Project Category</label>
-                    <select className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                      value={editProject.projectCategory}
-                      onChange={(e) =>
-                        setEditProject((prev) => ({ ...prev, projectCategory: e.target.value }))
-                      }>
-                      <option value="">Select Project Category</option>
-                      <option value="Client Project">Client Project</option>
-                      <option value="Own Project">Own Project</option>
-                    </select>
+                  <div className="mb-4">
+                    <label className={PROJECT_POPUP_LABEL_CLASS}>Project Category</label>
+                    <Select
+                      options={PROJECT_CATEGORY_OPTIONS}
+                      value={PROJECT_CATEGORY_OPTIONS.find((opt) => opt.value === editProject.projectCategory) || null}
+                      onChange={(selectedOption) =>
+                        setEditProject((prev) => ({ ...prev, projectCategory: selectedOption?.value || '' }))
+                      }
+                      placeholder="Project Category"
+                      isSearchable
+                      isClearable
+                      className="w-[25rem]"
+                      classNamePrefix="select"
+                      menuPortalTarget={document.body}
+                      styles={projectPopupSelectStyles}
+                    />
                   </div>
                 </div>
-                <div className="mb-4 pl-5">
-                  <label className="block text-lg font-medium mb-2">Project Address</label>
-                  <input className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Project Address"
+                <div className="mb-4">
+                  <label className={PROJECT_POPUP_LABEL_CLASS}>Project Address</label>
+                  <input className={`w-[62rem] ${PROJECT_POPUP_INPUT_CLASS}`}
+                    placeholder="Project Address"
                     type="text"
                     value={editProject.projectAddress}
                     onChange={(e) =>
@@ -2969,55 +3103,55 @@ const InputData = ({ username, userRoles = [] }) => {
                       </div>
                       <div className='flex mb-2 gap-5'>
                         <div className="flex flex-col">
-                          <label className="mb-1 text-lg font-medium">Client Name</label>
+                          <label className={PROJECT_POPUP_LABEL_CLASS}>Client Name</label>
                           <input
                             type="text"
                             value={owner.clientName}
                             onChange={(e) => handleEditOwnerChange(index, 'clientName', e.target.value)}
                             placeholder="Client Name"
-                            className="w-80 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                            className={`w-80 ${PROJECT_POPUP_INPUT_CLASS}`}
                           />
                         </div>
                         <div className="flex flex-col">
-                          <label className="mb-1 text-lg font-medium">Father Name</label>
+                          <label className={PROJECT_POPUP_LABEL_CLASS}>Father Name</label>
                           <input
                             type="text"
                             value={owner.fatherName}
                             onChange={(e) => handleEditOwnerChange(index, 'fatherName', e.target.value)}
                             placeholder="Father Name"
-                            className="w-72 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                            className={`w-72 ${PROJECT_POPUP_INPUT_CLASS}`}
                           />
                         </div>
                         <div className="flex flex-col">
-                          <label className="mb-1 text-lg font-medium">Mobile</label>
+                          <label className={PROJECT_POPUP_LABEL_CLASS}>Mobile</label>
                           <input
                             type="text"
                             value={owner.mobile}
                             onChange={(e) => handleEditOwnerChange(index, 'mobile', e.target.value)}
                             placeholder="Mobile"
-                            className="w-60 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                            className={`w-60 ${PROJECT_POPUP_INPUT_CLASS}`}
                           />
                         </div>
                         <div className="flex flex-col">
-                          <label className="mb-1 text-lg font-medium">Age</label>
+                          <label className={PROJECT_POPUP_LABEL_CLASS}>Age</label>
                           <input
                             type="text"
                             value={owner.age}
                             onChange={(e) => handleEditOwnerChange(index, 'age', e.target.value)}
                             placeholder="Age"
-                            className="w-20 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                            className={`w-20 ${PROJECT_POPUP_INPUT_CLASS}`}
                           />
                         </div>
                       </div>
                     </div>
                     <div className=" relative pl-4">
-                      <label className="block text-lg font-medium ">Client Address</label>
+                      <label className={PROJECT_POPUP_LABEL_CLASS}>Client Address</label>
                       <input
                         type="text"
                         value={owner.clientAddress}
                         onChange={(e) => handleEditOwnerChange(index, 'clientAddress', e.target.value)}
                         placeholder="Client Address"
-                        className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                        className={`w-[62rem] ${PROJECT_POPUP_INPUT_CLASS}`}
                       />
                       <button
                         type="button"
@@ -3038,72 +3172,76 @@ const InputData = ({ username, userRoles = [] }) => {
                   </div>
                 ))}
                 <button type="button" className="text-[#E4572E] font-bold ml-4 px-1 border-dashed border-b-2 border-[#BF9853]" onClick={addEditOwner}>+ Add Another Owner</button>
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar scrollbar-none w-max max-w-full">
                 {editProject.propertyDetailsList.map((detail, index) => (
                   <div className="flex mb-2 gap-5" key={index}>
                     <div className="mt-12">
                       {index + 1}.
                     </div>
                     <div className="">
-                      <label className="block mb-1 text-lg font-medium">Project Type</label>
-                      <select
-                        value={detail.projectType}
-                        onChange={(e) => handleEditDetailChange(index, 'projectType', e.target.value)}
-                        className="w-40  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                      >
-                        <option value="">Select Type</option>
-                        <option value="Shop">Shop</option>
-                        <option value="House">House</option>
-                        <option value="Land">Land</option>
-                        <option value="Office">Office</option>
-                        <option value="Construction">Construction</option>
-                      </select>
+                      <label className={PROJECT_POPUP_LABEL_CLASS}>Project Type</label>
+                      <Select
+                        options={PROJECT_TYPE_OPTIONS}
+                        value={PROJECT_TYPE_OPTIONS.find((opt) => opt.value === detail.projectType) || null}
+                        onChange={(selectedOption) => handleEditDetailChange(index, 'projectType', selectedOption?.value || '')}
+                        placeholder="Project Type"
+                        isSearchable
+                        isClearable
+                        className="w-40"
+                        classNamePrefix="select"
+                        menuPortalTarget={document.body}
+                        styles={projectPopupSelectStyles}
+                      />
                     </div>
                     <div>
-                      <label className="block mb-1 text-lg font-medium">Floor Name</label>
-                      <select
-                        value={detail.floorName}
-                        onChange={(e) => handleEditDetailChange(index, 'floorName', e.target.value)}
-                        className="w-36  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                      >
-                        <option value="">Select Floor</option>
-                        <option value="Ground Floor">Ground Floor</option>
-                        <option value="First Floor">First Floor</option>
-                        <option value="Second Floor">Second Floor</option>
-                      </select>
+                      <label className={PROJECT_POPUP_LABEL_CLASS}>Floor Name</label>
+                      <Select
+                        options={FLOOR_NAME_OPTIONS}
+                        value={FLOOR_NAME_OPTIONS.find((opt) => opt.value === detail.floorName) || null}
+                        onChange={(selectedOption) => handleEditDetailChange(index, 'floorName', selectedOption?.value || '')}
+                        placeholder="Floor Name"
+                        isSearchable
+                        isClearable
+                        className="w-36"
+                        classNamePrefix="select"
+                        menuPortalTarget={document.body}
+                        styles={projectPopupSelectStyles}
+                      />
                     </div>
                     <div>
-                      <label className="block mb-1 text-lg font-medium">Shop No</label>
+                      <label className={PROJECT_POPUP_LABEL_CLASS}>Shop No</label>
                       <input
                         type="text"
                         value={detail.shopNo}
                         onChange={(e) => handleEditDetailChange(index, 'shopNo', e.target.value)}
                         placeholder="Shop No"
-                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                        className={`w-28 ${PROJECT_POPUP_INPUT_CLASS}`}
                       />
                     </div>
                     <div>
-                      <label className="block mb-1 text-lg font-medium">Door No</label>
+                      <label className={PROJECT_POPUP_LABEL_CLASS}>Door No</label>
                       <input
                         type="text"
                         value={detail.doorNo}
                         onChange={(e) => handleEditDetailChange(index, 'doorNo', e.target.value)}
                         placeholder="Door No"
-                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                        className={`w-28 ${PROJECT_POPUP_INPUT_CLASS}`}
                       />
                     </div>
                     <div>
-                      <label className="block mb-1 text-lg font-medium">Area</label>
+                      <label className={PROJECT_POPUP_LABEL_CLASS}>Area</label>
                       <input
                         type="text"
                         value={detail.area}
                         onChange={(e) => handleEditDetailChange(index, 'area', e.target.value)}
                         placeholder="Area"
-                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                        className={`w-28 ${PROJECT_POPUP_INPUT_CLASS}`}
                       />
                     </div>
                     <div className="relative">
                       <div className="flex items-center gap-2 mb-1">
-                        <label className='text-lg font-medium '>EB.NO</label>
+                        <label className={PROJECT_POPUP_LABEL_CLASS}>EB.NO</label>
                         <div className="relative inline-flex bg-gray-200 rounded-lg p-0.5">
                           <button
                             type="button"
@@ -3132,32 +3270,32 @@ const InputData = ({ username, userRoles = [] }) => {
                           type='text'
                           value={detail.ebNo}
                           onChange={(e) => handleEditDetailChange(index, 'ebNo', e.target.value)}
-                          placeholder='EB NO'
-                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                          placeholder="EB.NO"
+                          className={`w-40 ${PROJECT_POPUP_INPUT_CLASS}`}
                         />
                       </div>
                     </div>
                     <div className="relative">
-                      <label className='block mb-1 text-lg font-medium '>Property Tax No</label>
+                      <label className={PROJECT_POPUP_LABEL_CLASS}>Property Tax No</label>
                       <div className="flex">
                         <input
                           type='text'
                           value={detail.propertyTaxNo}
                           onChange={(e) => handleEditDetailChange(index, 'propertyTaxNo', e.target.value)}
                           placeholder='Property Tax No'
-                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                          className={`w-40 ${PROJECT_POPUP_INPUT_CLASS}`}
                         />
                       </div>
                     </div>
                     <div className="relative">
-                      <label className='block mb-1 text-lg font-medium '>Water Tax No</label>
+                      <label className={PROJECT_POPUP_LABEL_CLASS}>Water Tax No</label>
                       <div className="flex">
                         <input
                           type='text'
                           value={detail.waterTaxNo}
                           onChange={(e) => handleEditDetailChange(index, 'waterTaxNo', e.target.value)}
                           placeholder='Water Tax No'
-                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                          className={`w-40 ${PROJECT_POPUP_INPUT_CLASS}`}
                         />
                       </div>
                     </div>
@@ -3181,8 +3319,9 @@ const InputData = ({ username, userRoles = [] }) => {
                   </div>
                 ))}
                 <button type="button" className="text-[#E4572E] font-bold px-1 ml-3 border-dashed border-b-2 border-[#BF9853] " onClick={addEditPropertyDetail}>+ Add on</button>
+                </div>
               </div>
-              <div className="flex justify-end space-x-2 mt-6 mb-4 mr-5">
+              <div className="flex justify-end space-x-2 shrink-0 mt-6 mb-4 mr-5">
                 <button
                   type="submit"
                   onClick={handleSubmitEditProject}
@@ -3203,20 +3342,20 @@ const InputData = ({ username, userRoles = [] }) => {
         </div>
       )}
       {isTenantLinkOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-          <div className="bg-white rounded-md w-[83rem] h-[44rem] px-6 py-4 pl-24">
-            <div className='overflow-y-auto h-[38rem]'>
-              <div className="flex justify-end mr-4">
+        <div className="fixed inset-0 z-[9999] bg-black bg-opacity-50 flex items-center justify-center p-[18px] box-border">
+          <div className="bg-white rounded-md w-fit max-w-full text-left max-h-[calc(100vh-86px)] flex flex-col overflow-hidden p-[18px]">
+            <div className='flex-1 min-h-0 overflow-hidden flex flex-col'>
+              <div className="flex justify-end shrink-0">
                 <button className="text-red-500" onClick={closeTenantLinkPopup}>
                   <img src={cross} alt='cross' className='w-5 h-5' />
                 </button>
               </div>
-              <form onSubmit={handleTenantLinkSubmit} className=" space-y-2">
-                <h2 className="text-2xl font-bold">Tenant Details</h2>
+              <form onSubmit={handleTenantLinkSubmit} className="space-y-2 flex flex-col flex-1 min-h-0 overflow-hidden">
+                <h2 className="text-[18px] font-bold">Tenant Details</h2>
                 <div className='text-left mb-2'>
-                  <div className='flex gap-10'>
+                  <div className='flex gap-[18px]'>
                     <div className='mt-3'>
-                      <label className='block font-semibold'>Tenant Name</label>
+                      <label className='block font-semibold mb-[8px]'>Tenant Name</label>
                       <input
                         type="text"
                         name="tenantName"
@@ -3227,7 +3366,7 @@ const InputData = ({ username, userRoles = [] }) => {
                       />
                     </div>
                     <div className='mt-3'>
-                      <label className='block font-semibold'>Tenant FullName</label>
+                      <label className='block font-semibold mb-[8px]'>Tenant FullName</label>
                       <input
                         type="text"
                         name="fullName"
@@ -3238,9 +3377,9 @@ const InputData = ({ username, userRoles = [] }) => {
                       />
                     </div>
                   </div>
-                  <div className='flex gap-10'>
+                  <div className='flex gap-[18px]'>
                     <div className='mt-3'>
-                      <label className='block font-semibold'>Tenant FatherName</label>
+                      <label className='block font-semibold mb-[8px]'>Tenant FatherName</label>
                       <input
                         type="text"
                         name="tenantFatherName"
@@ -3251,20 +3390,25 @@ const InputData = ({ username, userRoles = [] }) => {
                       />
                     </div>
                     <div className='mt-3'>
-                      <label className='block font-semibold'>Tenant Age</label>
+                      <label className='block font-semibold mb-[8px]'>Tenant Age</label>
                       <input
                         type="text"
                         name="age"
                         value={tenantLinkFormData.age}
-                        onChange={handleTenantLinkChange}
+                        onChange={(e) => {
+                          const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                          handleTenantLinkChange({
+                            target: { name: 'age', value: rawValue },
+                          });
+                        }}
                         className="block w-[550px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
                         placeholder="Age"
                       />
                     </div>
                   </div>
-                  <div className='flex gap-10'>
+                  <div className='flex gap-[18px]'>
                     <div className='mt-3'>
-                      <label className='block font-semibold'>Mobile Number</label>
+                      <label className='block font-semibold mb-[8px]'>Mobile Number</label>
                       <input
                         type="text"
                         name="mobileNumber"
@@ -3275,7 +3419,7 @@ const InputData = ({ username, userRoles = [] }) => {
                       />
                     </div>
                     <div className='mt-3'>
-                      <label className='block font-semibold'>Tenant Address</label>
+                      <label className='block font-semibold mb-[8px]'>Tenant Address</label>
                       <input
                         type="text"
                         name="tenantAddress"
@@ -3287,7 +3431,8 @@ const InputData = ({ username, userRoles = [] }) => {
                     </div>
                   </div>
                 </div>
-                <h2 className="text-2xl font-bold">Shop Details</h2>
+                <h2 className="text-[18px] font-bold shrink-0">Shop Details</h2>
+                <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none">
                 {/* Sticky column headers for Shop Details rows */}
                 <div className="sticky top-0 z-20 bg-white pt-2 pb-2">
                   <div className="w-[1150px]">
@@ -3372,6 +3517,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                       borderColor: 'rgba(191, 152, 83, 0.4)',
                                     },
                                   }),
+                                  indicatorSeparator: () => ({ display: 'none' }),
                                   menuPortal: (base) => ({
                                     ...base,
                                     zIndex: 9999,
@@ -3458,6 +3604,9 @@ const InputData = ({ username, userRoles = [] }) => {
                                 className="w-44 text-sm"
                                 classNamePrefix="select"
                                 menuPortalTarget={document.body}
+                                classNames={{
+                                  menuList: () => 'no-scrollbar scrollbar-none',
+                                }}
                                 styles={{
                                   control: (provided, state) => ({
                                     ...provided,
@@ -3474,6 +3623,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                       borderColor: 'rgba(191, 152, 83, 0.4)',
                                     },
                                   }),
+                                  indicatorSeparator: () => ({ display: 'none' }),
                                   menuPortal: (base) => ({
                                     ...base,
                                     zIndex: 9999,
@@ -3484,6 +3634,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                   }),
                                   option: (provided, state) => ({
                                     ...provided,
+                                    textAlign: 'left',
                                     backgroundColor: state.isSelected
                                       ? 'rgba(191, 152, 83, 0.3)'
                                       : state.isFocused
@@ -3568,21 +3719,22 @@ const InputData = ({ username, userRoles = [] }) => {
                                 placeholder="Advance"
                               />
                               <div className="relative flex">
-                                <input
-                                  type="date"
-                                  name="startingDate"
-                                  value={shop.startingDate}
-                                  onChange={(e) => {
-                                    const rawValue = e.target.value;
+                                <CustomDateField
+                                  value={shop.startingDate || ''}
+                                  onChange={(value) => {
                                     handleTenantLinkShopChange(sIndex, {
                                       target: {
                                         name: 'startingDate',
-                                        value: rawValue,
+                                        value,
                                       },
                                     });
                                   }}
-                                  className="border-2 text-sm border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
-                                  placeholder="Advance"
+                                  placeholder="Start Date"
+                                  className="w-28 [&>div]:!w-28 text-sm"
+                                  controlHeightPx={44}
+                                  alwaysOpenBelow
+                                  anchor="right"
+                                  calendarPortal
                                 />
                                 {tenantLinkFormData.shopNos.length > 1 && (
                                   <button
@@ -3610,9 +3762,10 @@ const InputData = ({ username, userRoles = [] }) => {
                     + Add On
                   </button>
                 </div>
+                </div>
               </form>
             </div>
-            <div className="flex justify-end space-x-2">
+            <div className="flex justify-end space-x-2 shrink-0">
               <button
                 type="submit"
                 onClick={handleTenantLinkSubmit}
@@ -3642,7 +3795,7 @@ const InputData = ({ username, userRoles = [] }) => {
               <form className="space-y-2" >
                 <h2 className="text-2xl font-bold">Tenant Details</h2>
                 <div className='text-left'>
-                  <div className='flex gap-10'>
+                  <div className='flex gap-[18px]'>
                     <div className='mt-3'>
                       <label className='block font-semibold'>Tenant Name</label>
                       <input
@@ -3666,7 +3819,7 @@ const InputData = ({ username, userRoles = [] }) => {
                       />
                     </div>
                   </div>
-                  <div className='flex gap-10'>
+                  <div className='flex gap-[18px]'>
                     <div className='mt-3'>
                       <label className='block font-semibold'>Tenant FatherName</label>
                       <input
@@ -3684,13 +3837,18 @@ const InputData = ({ username, userRoles = [] }) => {
                         type="text"
                         name="age"
                         value={editTenantLinkFormData.age}
-                        onChange={handleEditTenantLinkChange}
+                        onChange={(e) => {
+                          const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                          handleEditTenantLinkChange({
+                            target: { name: 'age', value: rawValue },
+                          });
+                        }}
                         className="block w-[600px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
                         placeholder="Age"
                       />
                     </div>
                   </div>
-                  <div className='flex gap-10'>
+                  <div className='flex gap-[18px]'>
                     <div className='mt-3'>
                       <label className='block font-semibold'>Mobile Number</label>
                       <input
@@ -3838,6 +3996,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                     },
                                     cursor: isVacated ? 'not-allowed' : 'pointer',
                                   }),
+                                  indicatorSeparator: () => ({ display: 'none' }),
                                   menuPortal: (base) => ({
                                     ...base,
                                     zIndex: 9999,
@@ -3923,6 +4082,9 @@ const InputData = ({ username, userRoles = [] }) => {
                                 className="w-44 text-sm"
                                 classNamePrefix="select"
                                 menuPortalTarget={document.body}
+                                classNames={{
+                                  menuList: () => 'no-scrollbar scrollbar-none',
+                                }}
                                 styles={{
                                   control: (provided, state) => ({
                                     ...provided,
@@ -3940,6 +4102,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                     },
                                     cursor: isVacated ? 'not-allowed' : 'pointer',
                                   }),
+                                  indicatorSeparator: () => ({ display: 'none' }),
                                   menuPortal: (base) => ({
                                     ...base,
                                     zIndex: 9999,
@@ -3950,6 +4113,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                   }),
                                   option: (provided, state) => ({
                                     ...provided,
+                                    textAlign: 'left',
                                     backgroundColor: state.isSelected
                                       ? 'rgba(191, 152, 83, 0.3)'
                                       : state.isFocused

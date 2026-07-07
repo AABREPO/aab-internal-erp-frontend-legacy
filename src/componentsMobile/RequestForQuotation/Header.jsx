@@ -55,7 +55,11 @@ const Header = ({ title = "Request For Quotation", showBack = true, showNotifica
                 >
                   {user?.userImage ? (
                     <img 
-                      src={`data:image/jpeg;base64,${user.userImage}`} 
+                      src={
+                        user.userImage.startsWith('http') || user.userImage.startsWith('data:')
+                          ? user.userImage
+                          : `data:image/jpeg;base64,${user.userImage}`
+                      } 
                       alt={user.username || 'Profile'} 
                       className="w-full h-full object-cover"
                     />

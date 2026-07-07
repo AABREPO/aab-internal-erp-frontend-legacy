@@ -1597,6 +1597,20 @@ const PendingBill = ({ username, userRoles = [], paymentModeOptions: paymentMode
                 throw new Error(`Failed to save bills: ${response.statusText}`)
             }
             const savedBills = await response.json()
+            // Optimistically merge the just-saved verifications into local state so the
+            // table (and the popup, if reopened) reflect the new data instantly, without
+            // waiting for the background refetch below.
+            const optimisticVerifications = (Array.isArray(savedBills) && savedBills.length > 0)
+                ? savedBills
+                : billsData
+            const applyOptimisticVerifications = (rows) =>
+                (Array.isArray(rows) ? rows : []).map((row) =>
+                    String(row?.id) === String(trackerId)
+                        ? { ...row, billVerifications: optimisticVerifications }
+                        : row
+                )
+            setApiData(applyOptimisticVerifications)
+            setAllTrackerDataForChecks(applyOptimisticVerifications)
             const verifiedBills = billsData.filter(bill => bill.is_verified && bill.bill_number !== 'NO_PO')
             const verifiedBillNumbers = verifiedBills.map(bill => bill.bill_number)
             const verifiedCount = verifiedBills.length
@@ -1614,16 +1628,42 @@ const PendingBill = ({ username, userRoles = [], paymentModeOptions: paymentMode
                 verifiedBills: { ...verifiedBills },
                 extraVerifiedBills: extraBills > 0 ? { ...extraVerifiedBills } : {}
             })
-            await fetchTrackerData()
-            await fetchExpensesData()
-            await fetchAllBillEntries()
+            // Close the popup and reset the form immediately so the UI feels instant.
             setShowModal(false)
             setSelectedBill(null)
             setPoNumbers([])
             setExtraPoNumbers([])
             setRangeStart('')
             setRangeEnd('')
-            await fetchAllTrackerDataForChecks()
+            // Invalidate every cached dataset so the just-saved verification data is
+            // reflected on the next verification / duplicate / last-PO check.
+            vendorTrackersCacheRef.current.clear()
+            vendorTrackersPromiseRef.current.clear()
+            allTrackerChecksPromiseRef.current = null
+            expensesCacheRef.current = null
+            billEntriesCacheRef.current = null
+            // Refresh data in the background (do not block closing the popup).
+            Promise.all([
+                fetchTrackerData({ silent: true }),
+                fetchExpensesData(),
+                fetchAllBillEntries()
+            ]).then(([, freshExpenses, freshBillEntries]) => {
+                // Keep the on-demand caches in sync with the freshly fetched data.
+                expensesCacheRef.current = freshExpenses
+                billEntriesCacheRef.current = freshBillEntries
+            }).catch((refreshError) => {
+                console.error("Error refreshing data after verification:", refreshError)
+            })
+            fetchAllTrackerDataForChecks().then(() => {
+                // Warm the vendor tracker cache with fresh verifications for this vendor so
+                // the next duplicate check is both instant and accurate.
+                if (vendorId != null && String(vendorId).trim() !== '') {
+                    return ensureVendorTrackersLoaded(vendorId)
+                }
+                return undefined
+            }).catch((warmError) => {
+                console.error("Error warming vendor tracker cache:", warmError)
+            })
         } catch (error) {
             alert(`Error saving bills: ${error.message}`)
         }
@@ -1861,10 +1901,39 @@ const PendingBill = ({ username, userRoles = [], paymentModeOptions: paymentMode
             if (response.ok) {
                 const message = await response.text();
                 alert(message);
-                // Remove from apiData
-                setApiData(prev => prev.filter(item => item.id !== id));
-                // Also remove from billData if present
-                setBillData(prev => prev.filter(bill => bill.id !== id));
+                // Normalize the id so removal works even if row ids come back as
+                // numbers in one place and strings in another (or under alternate keys).
+                const deletedKey = String(id);
+                const matchesDeleted = (row) => {
+                    const rowKey = row?.id ?? row?.bill_id ?? row?.tracker_id;
+                    return String(rowKey) === deletedKey;
+                };
+                // Capture the deleted row's vendor so we can refresh that vendor's
+                // verification data (used for duplicate / verification checks).
+                const deletedRow = (Array.isArray(apiData) ? apiData : []).find(matchesDeleted);
+                const deletedVendorId = deletedRow?.vendor_id ?? deletedRow?.vendorId ?? null;
+                // Remove from every local dataset immediately so the row disappears
+                // without waiting for a refetch.
+                setApiData(prev => (Array.isArray(prev) ? prev : []).filter(item => !matchesDeleted(item)));
+                setBillData(prev => (Array.isArray(prev) ? prev : []).filter(bill => !matchesDeleted(bill)));
+                setAllTrackerDataForChecks(prev => (Array.isArray(prev) ? prev : []).filter(item => !matchesDeleted(item)));
+                // Invalidate cached vendor verifications and the combined checks promise
+                // so the next duplicate / verification check reflects this deletion.
+                if (deletedVendorId != null && String(deletedVendorId).trim() !== '') {
+                    vendorTrackersCacheRef.current.delete(String(deletedVendorId).trim());
+                    vendorTrackersPromiseRef.current.delete(String(deletedVendorId).trim());
+                }
+                allTrackerChecksPromiseRef.current = null;
+                // Reconcile with the server in the background (non-blocking): refresh the
+                // pending list and re-warm the current vendor's verification data.
+                fetchTrackerData({ silent: true }).catch((refreshError) => {
+                    console.error("Error refreshing tracker data after delete:", refreshError);
+                });
+                if (deletedVendorId != null && String(deletedVendorId).trim() !== '') {
+                    ensureVendorTrackersLoaded(deletedVendorId).catch((warmError) => {
+                        console.error("Error refreshing vendor verification data after delete:", warmError);
+                    });
+                }
             } else {
                 const errorText = await response.text();
                 throw new Error(errorText || 'Failed to delete tracker');
@@ -4997,8 +5066,22 @@ const PendingBill = ({ username, userRoles = [], paymentModeOptions: paymentMode
             };
             const response = await axios.post(withBranchUrl("https://backendaab.in/aabuildersDash/api/vendor-payments/tracker"), payload);
             alert(`Tracker created with ID: ${response.data.id}`);
-            await fetchTrackerData();
-            await fetchAllTrackerDataForChecks();
+            // Optimistically add the new tracker to the table so it appears instantly,
+            // then reconcile with the server in the background.
+            const createdTracker = response.data || {};
+            const optimisticRow = {
+                ...createdTracker,
+                id: createdTracker.id,
+                bill_arrival_date: createdTracker.bill_arrival_date ?? payload.bill_arrival_date,
+                vendor_id: createdTracker.vendor_id ?? payload.vendor_id,
+                no_of_bills: createdTracker.no_of_bills ?? payload.no_of_bills,
+                total_amount: createdTracker.total_amount ?? payload.total_amount,
+                branch_id: createdTracker.branch_id ?? payload.branch_id,
+                billVerifications: createdTracker.billVerifications ?? []
+            };
+            setApiData((prev) => [optimisticRow, ...(Array.isArray(prev) ? prev : [])]);
+            // Clear the input row immediately so the UI feels instant; refresh the
+            // table in the background instead of blocking on the fetches.
             setFormData({
                 billArrivalDate: '',
                 vendorName: null,
@@ -5007,6 +5090,12 @@ const PendingBill = ({ username, userRoles = [], paymentModeOptions: paymentMode
                 totalAmount: ''
             });
             setVendorId(null);
+            Promise.all([
+                fetchTrackerData({ silent: true }),
+                fetchAllTrackerDataForChecks()
+            ]).catch((refreshError) => {
+                console.error("Error refreshing tracker data:", refreshError);
+            });
         } catch (error) {
             console.error("Error creating tracker:", error);
         }

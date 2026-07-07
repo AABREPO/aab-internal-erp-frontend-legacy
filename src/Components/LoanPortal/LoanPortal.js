@@ -38,6 +38,9 @@ import {
   EdbcTableToolbarRightActions,
   matchesEdbcAmountFilter,
   formatEdbcFilterDateDMY,
+  matchesEdbcPaymentModeFilter,
+  equalsEdbcFilterValue,
+  TABLE_FILTER_OPTION_HEIGHT_PX,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
 import {
   LOAN_PORTAL_MODULE_NAME,
@@ -65,6 +68,43 @@ const formatNumber = (num) => {
 const LOAN_SIDE_TABLE_BLANK_VALUE = 'BLANK';
 const LOAN_SIDE_TABLE_BLANK_LABEL = 'Blank';
 const loanSideTableBlankOption = { value: LOAN_SIDE_TABLE_BLANK_VALUE, label: LOAN_SIDE_TABLE_BLANK_LABEL };
+
+const LOAN_TOP_PAYMENT_MODE_MULTI_SELECT_STYLES = {
+  ...DATABASE_TABLE_FILTER_SELECT_STYLES,
+  multiValue: () => ({ display: 'none' }),
+  multiValueLabel: () => ({ display: 'none' }),
+  multiValueRemove: () => ({ display: 'none' }),
+};
+
+const LoanTopPaymentModeCheckboxOption = ({ innerProps, label, isSelected, isFocused }) => (
+  <div
+    {...innerProps}
+    className="flex items-center gap-2 cursor-pointer select-none"
+    style={{
+      backgroundColor: isFocused ? '#FAF6ED' : 'white',
+      minHeight: `${TABLE_FILTER_OPTION_HEIGHT_PX}px`,
+      padding: '0 12px',
+    }}
+  >
+    <span
+      className="pointer-events-none shrink-0 inline-flex items-center justify-center box-border rounded-[2px]"
+      style={{
+        width: 14,
+        height: 14,
+        border: isSelected ? '2px solid #BF9853' : '2px solid #D1D5DB',
+        backgroundColor: isSelected ? '#BF9853' : '#FFFFFF',
+      }}
+      aria-hidden
+    >
+      {isSelected ? (
+        <svg width="9" height="7" viewBox="0 0 10 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M1 4L3.5 6.5L9 1" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ) : null}
+    </span>
+    <span className="text-[14px] font-normal text-black truncate">{label}</span>
+  </div>
+);
 const LOAN_SIDE_TABLE_FORM_PATH_CSS = `
 .expense-form-side-table-host .side-table-form-path .form-side-table-toolbar-row {
   width: 100% !important;
@@ -88,7 +128,7 @@ const LOAN_SIDE_TABLE_FORM_PATH_CSS = `
   padding: 0 !important;
 }
 .expense-form-side-table-host .side-table-form-path .form-side-table-search-column {
-  flex: 1 1 auto !important;
+  flex: 0 0 auto !important;
   margin-left: auto !important;
   align-items: flex-end !important;
   justify-content: flex-end !important;
@@ -106,9 +146,8 @@ const LOAN_SIDE_TABLE_FORM_PATH_CSS = `
   white-space: nowrap !important;
 }
 .expense-form-side-table-host .side-table-form-path .form-side-table-search-row {
-  flex: 1 1 auto !important;
+  flex: 0 0 auto !important;
   justify-content: flex-end !important;
-  width: 100% !important;
   display: flex !important;
   flex-wrap: nowrap !important;
   gap: 6px !important;
@@ -284,7 +323,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
   const [toDate, setToDate] = useState('');
   const [todayAmount, setTodayAmount] = useState(0);
   const [totalOutstanding, setTotalOutstanding] = useState(0);
-  const [filteredPaymentMode, setFilteredPaymentMode] = useState('');
+  const [filteredPaymentMode, setFilteredPaymentMode] = useState([]);
   const [filteredAmount, setFilteredAmount] = useState(0);
   const [description, setDescription] = useState('');
   const [amountGiven, setAmountGiven] = useState('');
@@ -2057,8 +2096,14 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
     const filtered = loanData.filter(entry => {
       const entryDate = new Date(entry.date);
       const isInDateRange = entryDate >= from && entryDate <= to;
-      const isMatchingPayment =
-        !filteredPaymentMode || entry.loan_payment_mode === filteredPaymentMode;
+      const isMatchingPayment = matchesEdbcPaymentModeFilter(
+        entry.loan_payment_mode,
+        filteredPaymentMode,
+        {
+          blankValue: 'Blank',
+          isBlankish: (value) => !value || String(value).trim() === '',
+        },
+      );
       return isInDateRange && isMatchingPayment;
     });
     const total = filtered.reduce((sum, entry) => {
@@ -2566,21 +2611,29 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
             <div>
               <label className="block mb-[8px] font-semibold text-sm sm:text-base">Payment Mode</label>
               <Select
-                value={finalPaymentModeOptions.find(option => option.value === filteredPaymentMode) || null}
-                onChange={(selected) => setFilteredPaymentMode(selected ? selected.value : '')}
+                isMulti
+                isClearable={false}
+                closeMenuOnSelect={false}
+                hideSelectedOptions={false}
+                controlShouldRenderValue={false}
+                filterOption={() => true}
                 options={finalPaymentModeOptions}
+                value={finalPaymentModeOptions.filter((option) =>
+                  filteredPaymentMode.some((selectedValue) => equalsEdbcFilterValue(option.value, selectedValue)),
+                )}
+                onChange={(selected) => setFilteredPaymentMode((selected || []).map((option) => option.value))}
                 placeholder="Payment Mode"
-                isClearable
-                isSearchable
                 menuPortalTarget={document.body}
+                noOptionsMessage={() => null}
+                components={{ Option: LoanTopPaymentModeCheckboxOption }}
                 styles={{
-                  ...customStyles,
+                  ...LOAN_TOP_PAYMENT_MODE_MULTI_SELECT_STYLES,
                   placeholder: (provided) => ({
-                    ...customStyles.placeholder(provided),
+                    ...LOAN_TOP_PAYMENT_MODE_MULTI_SELECT_STYLES.placeholder(provided),
                     color: '#A6A5A6',
                   }),
                   dropdownIndicator: (provided, state) => ({
-                    ...customStyles.dropdownIndicator(provided, state),
+                    ...LOAN_TOP_PAYMENT_MODE_MULTI_SELECT_STYLES.dropdownIndicator(provided, state),
                     paddingLeft: 0,
                     paddingRight: 4,
                   }),
@@ -2794,7 +2847,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
                       </div>
                       <div className="flex min-w-0 w-full flex-nowrap items-center justify-between gap-[6px]">
                         <div
-                          className={`form-side-table-filter-left flex min-w-0 items-center overflow-hidden flex-nowrap${sideTableHasActiveColumnFilters ? ' w-full gap-[8px]' : ' shrink-0 gap-[6px]'}`}
+                          className={`form-side-table-filter-left flex min-w-0 items-center overflow-hidden flex-nowrap${sideTableHasActiveColumnFilters ? ' flex-1 gap-[8px]' : ' shrink-0 gap-[6px]'}`}
                         >
                           <EdbcFilterToggleButton onClick={toggleSideTableFilters} />
                           {sideTableHasActiveColumnFilters && (

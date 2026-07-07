@@ -1442,60 +1442,6 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                   classNamePrefix="select"
                 />
               </div>
-              <div>
-                <label className="block font-semibold mb-[8px]">Payment Mode</label>
-                <Select
-                  value={paymentModeFilter ? { value: paymentModeFilter, label: paymentModeFilter } : null}
-                  onChange={(selectedOption) => setPaymentModeFilter(selectedOption ? selectedOption.value : "")}
-                  options={finalPaymentModeOptions}
-                  placeholder="Payment Mode"
-                  isSearchable
-                  isClearable
-                  styles={{
-                    ...customStyles,
-                    placeholder: (provided) => ({
-                      ...customStyles.placeholder(provided),
-                      color: '#A6A5A6',
-                    }),
-                    dropdownIndicator: (provided, state) => ({
-                      ...customStyles.dropdownIndicator(provided, state),
-                      paddingLeft: 0,
-                      paddingRight: 4,
-                    }),
-                  }}
-                  className="w-[150px] h-[40px]"
-                  classNamePrefix="select"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold mb-[8px]">Type</label>
-                <Select
-                  value={typeFilter ? { value: typeFilter, label: typeFilter } : null}
-                  onChange={(selectedOption) => setTypeFilter(selectedOption ? selectedOption.value : "")}
-                  options={[
-                    { value: "Loan", label: "Loan" },
-                    { value: "Refund", label: "Refund" },
-                    { value: "Transfer", label: "Transfer" },
-                  ]}
-                  placeholder="Type"
-                  isSearchable
-                  isClearable
-                  styles={{
-                    ...customStyles,
-                    placeholder: (provided) => ({
-                      ...customStyles.placeholder(provided),
-                      color: '#A6A5A6',
-                    }),
-                    dropdownIndicator: (provided, state) => ({
-                      ...customStyles.dropdownIndicator(provided, state),
-                      paddingLeft: 0,
-                      paddingRight: 4,
-                    }),
-                  }}
-                  className="w-[150px] h-[40px]"
-                  classNamePrefix="select"
-                />
-              </div>
             </div>
             <div className="flex items-center flex-wrap justify-end pr-[18px] max-xl:basis-full max-xl:pl-[18px] max-xl:justify-start max-xl:pb-[18px] max-md:justify-start max-md:px-[18px] max-md:pb-[18px] max-md:w-full">
               <div

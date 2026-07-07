@@ -25,7 +25,7 @@ const ADVANCE_MODULE_TABS = ['advanceportal', 'advacetablview', 'advancedatabase
 const ADVANCE_DEFAULT_TAB = 'advanceportal';
 
 const getInitialAdvanceTab = (username) => {
-    const isAdmin = username === 'Mahalingam M' || username === 'Admin';
+    const isAdmin = username === 'Mahalingam M' || username === 'Admin' || username === 'Marimuthu A';
     const allowedTabs = isAdmin
         ? ADVANCE_MODULE_TABS
         : ADVANCE_MODULE_TABS.filter((tab) => tab !== 'advancedatabase');
@@ -37,7 +37,7 @@ const getInitialAdvanceTab = (username) => {
 };
 
 const AdvanceHeading = ({ username, userRoles = [] }) => {
-    const isAdminAdvance = username === 'Mahalingam M' || username === 'Admin';
+    const isAdminAdvance = username === 'Mahalingam M' || username === 'Admin' || username === 'Marimuthu A';
     const allowedTabs = isAdminAdvance
         ? ADVANCE_MODULE_TABS
         : ADVANCE_MODULE_TABS.filter((tab) => tab !== 'advancedatabase');

@@ -26,7 +26,7 @@ const RENT_MODULE_TABS = [
 const RENT_DEFAULT_TAB = 'form';
 
 const getInitialRentTab = (username) => {
-  const isAdmin = username === 'Mahalingam M' || username === 'Admin';
+  const isAdmin = username === 'Mahalingam M' || username === 'Admin' || username === 'Marimuthu A';
   const allowedTabs = isAdmin
     ? RENT_MODULE_TABS
     : RENT_MODULE_TABS.filter((tab) => tab !== 'database');
@@ -38,7 +38,7 @@ const getInitialRentTab = (username) => {
 };
 
 const RHeading = ({ username, userRoles = [] }) => {
-  const isAdminRent = username === 'Mahalingam M' || username === 'Admin';
+  const isAdminRent = username === 'Mahalingam M' || username === 'Admin' || username === 'Marimuthu A';
 
   const allowedTabs = isAdminRent
     ? RENT_MODULE_TABS

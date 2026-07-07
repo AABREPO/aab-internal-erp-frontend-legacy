@@ -1303,9 +1303,9 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true, utilityEn
                 if (!searchable.includes(q)) return false;
             }
             return (
-                matchesEdbcSelectFilter(expense.siteName, selectedSiteName, { blankValue: BLANK_VALUE, isBlankish }) &&
-                matchesEdbcSelectFilter(expense.vendor, selectedVendor, { blankValue: BLANK_VALUE, isBlankish }) &&
-                matchesEdbcSelectFilter(expense.contractor, selectedContractor, { blankValue: BLANK_VALUE, isBlankish }) &&
+                matchesEdbcSelectFilter(getDisplaySiteName(expense), selectedSiteName, { blankValue: BLANK_VALUE, isBlankish }) &&
+                matchesEdbcSelectFilter(getDisplayVendorName(expense), selectedVendor, { blankValue: BLANK_VALUE, isBlankish }) &&
+                matchesEdbcSelectFilter(getDisplayContractorName(expense), selectedContractor, { blankValue: BLANK_VALUE, isBlankish }) &&
                 matchesEdbcSelectFilter(expense.category, selectedCategory, { blankValue: BLANK_VALUE, isBlankish }) &&
                 matchesEdbcSelectFilter(expense.machineTools, selectedMachineTools, { blankValue: BLANK_VALUE, isBlankish }) &&
                 matchesEdbcSelectFilter(expense.source, selectedSource, { blankValue: BLANK_VALUE, isBlankish }) &&
@@ -1340,9 +1340,18 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true, utilityEn
                 blankOption: includeBlank ? blankOption : null,
                 isBlankish,
             });
-        setSiteOptions(getOptions(filtered, "siteName"));
-        setVendorOptions(getOptions(filtered, "vendor"));
-        setContractorOptions(getOptions(filtered, "contractor"));
+        setSiteOptions(getOptions(
+            filtered.map((item) => ({ ...item, __siteDisplayName: getDisplaySiteName(item) })),
+            "__siteDisplayName"
+        ));
+        setVendorOptions(getOptions(
+            filtered.map((item) => ({ ...item, __vendorDisplayName: getDisplayVendorName(item) })),
+            "__vendorDisplayName"
+        ));
+        setContractorOptions(getOptions(
+            filtered.map((item) => ({ ...item, __contractorDisplayName: getDisplayContractorName(item) })),
+            "__contractorDisplayName"
+        ));
         setCategoryOptions(getOptions(filtered, "category"));
         setSourceOptions(getOptions(filtered, "source"));
         setPaymentModeFilterOptions(
@@ -1993,20 +2002,23 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true, utilityEn
     }, [employeeOptions]);
     // Helper functions to get display names
     const getDisplaySiteName = (expense) => {
-        if (expense.projectId && projectIdToName[expense.projectId]) {
-            return projectIdToName[expense.projectId];
+        const projectId = expense.projectId ?? expense.project_id;
+        if (projectId != null && projectId !== '' && projectIdToName[projectId]) {
+            return projectIdToName[projectId];
         }
         return expense.siteName || '';
     };
     const getDisplayVendorName = (expense) => {
-        if (expense.vendorId && vendorIdToName[expense.vendorId]) {
-            return vendorIdToName[expense.vendorId];
+        const vendorId = expense.vendorId ?? expense.vendor_id;
+        if (vendorId != null && vendorId !== '' && vendorIdToName[vendorId]) {
+            return vendorIdToName[vendorId];
         }
         return expense.vendor || '';
     };
     const getDisplayContractorName = (expense) => {
-        if (expense.contractorId && contractorIdToName[expense.contractorId]) {
-            return contractorIdToName[expense.contractorId];
+        const contractorId = expense.contractorId ?? expense.contractor_id;
+        if (contractorId != null && contractorId !== '' && contractorIdToName[contractorId]) {
+            return contractorIdToName[contractorId];
         }
         return expense.contractor || '';
     };
@@ -2700,11 +2712,11 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true, utilityEn
                                 </div>
                             </div>
                             <Modal isOpen={modalIsOpen} onRequestClose={handleCancel}
-                                contentLabel={getEditPopupHeading(formData.source, 'Edit Expense Entry')} className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]"
+                                contentLabel={getEditPopupHeading(formData.source, 'Edit Expense')} className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]"
                                 overlayClassName="fixed inset-0 z-[9999]">
-                                <div className="bg-white text-left p-6 rounded-lg shadow-lg w-full max-w-2xl">
+                                <div className="bg-white text-left p-6 rounded-lg shadow-lg">
                                     <div className="flex justify-between items-center mb-[12px]">
-                                        <h2 className="text-xl font-bold">{getEditPopupHeading(formData.source, 'Edit Expense Entry')}</h2>
+                                        <h2 className="text-xl font-bold">{getEditPopupHeading(formData.source, 'Edit Expense')}</h2>
                                         <span className="text-[16px] font-semibold text-[#E4572E]">{formData.eno}</span>
                                     </div>
                                     <form className="flex flex-col gap-[12px]">
@@ -3920,7 +3932,7 @@ const AuditModal = ({ show, onClose, audits, resolveMachineToolsDisplay, vendorO
                                                 {formatTimestamp(editedDate)}
                                             </td>
                                             {auditDataFields.slice(0, 2).map((field) => renderFieldCell(audit, field, 'old'))}
-                                            <td id={EDBC_IDS.EDBC4} className={`border text-sm ${edbc4TdClass}`}>
+                                            <td id={EDBC_IDS.EDBC4} className={`border text-sm h-[38px] ${edbc4TdClass}`}>
                                                 {oldAssociate.name}
                                             </td>
                                             <td id={EDBC_IDS.EDBC12} className={`border text-sm ${edbc12TdClass}`}>

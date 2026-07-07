@@ -1269,7 +1269,7 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           </div>
         </div>
 
-        <div className="w-full max-w-[1850px] mx-auto pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
+        <div className="w-full max-w-[1850px] mx-auto pt-[18px] px-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
           <div className="w-fit max-w-full flex flex-col flex-1 min-h-0 overflow-hidden">
             <div
               className={`text-left flex ${hasActiveColumnFilters

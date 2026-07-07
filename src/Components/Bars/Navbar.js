@@ -23,6 +23,14 @@ const formatLiveDateTime = (date) => {
   };
 };
 
+const resolveProfileImageSrc = (imageValue) => {
+  if (!imageValue) return '';
+  if (imageValue.startsWith('http') || imageValue.startsWith('data:')) {
+    return imageValue;
+  }
+  return `data:image/jpeg;base64,${imageValue}`;
+};
+
 const Navbar = ({ username, userImage, position, email, onLogout, userRoles = [], branchId, brachId }) => {
   const location = useLocation();
   const hideMainNavForOrbitChrome = isOrbitAppChromeRoute(location.pathname);
@@ -43,6 +51,7 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
   const [editRequests, setEditRequests] = useState([]);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [branchOptions, setBranchOptions] = useState([]);
+  const profileImageSrc = resolveProfileImageSrc(userImage);
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const sidebarRef = useRef(null);
   const profileRef = useRef(null);
@@ -739,9 +748,9 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
                 aria-haspopup="true"
               >
                 <span className="avatar-mark">
-                  {userImage ? (
+                  {profileImageSrc ? (
                     <img
-                      src={`data:image/jpeg;base64,${userImage}`}
+                      src={profileImageSrc}
                       alt=""
                       width={18}
                       height={18}
@@ -765,9 +774,9 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
             {isProfileDropdownVisible && (
               <div className="absolute right-0 top-full z-20 mt-1 w-72 rounded-md bg-white p-4 shadow-lg">
                 <div className="items-center">
-                  {userImage ? (
+                  {profileImageSrc ? (
                     <img
-                      src={`data:image/jpeg;base64,${userImage}`}
+                      src={profileImageSrc}
                       alt="Profile"
                       className="w-64 h-64 rounded-full object-cover"
                     />

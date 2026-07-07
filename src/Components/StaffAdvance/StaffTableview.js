@@ -277,6 +277,7 @@ const EditModal = memo(({
     editFormData.type === 'Refund'
       ? (editFormData.staff_refund_amount ?? '')
       : (editFormData.amount ?? '');
+  const [amountGivenFocused, setAmountGivenFocused] = useState(false);
 
   if (!isOpen) return null;
 
@@ -364,6 +365,8 @@ const EditModal = memo(({
                   setEditFormData((prev) => ({ ...prev, from_purpose_id: selected?.id || '' }))
                 }
                 options={purposes}
+                getOptionValue={(option) => option.id}
+                getOptionLabel={(option) => option.label}
                 placeholder="Select a purpose..."
                 isSearchable
                 isClearable
@@ -400,6 +403,8 @@ const EditModal = memo(({
                     setEditFormData((prev) => ({ ...prev, to_purpose_id: selected?.id || '' }))
                   }
                   options={purposes}
+                  getOptionValue={(option) => option.id}
+                  getOptionLabel={(option) => option.label}
                   placeholder="Select purpose to..."
                   isClearable
                   isSearchable
@@ -410,13 +415,38 @@ const EditModal = memo(({
                 />
               ) : (
                 <input
-                  value={amountGivenValue}
+                  value={(() => {
+                    const v = amountGivenValue;
+                    if (v === '' || v == null) return '';
+                    const clean = String(v).replace(/,/g, '');
+                    if (!amountGivenFocused) {
+                      const n = Number(clean);
+                      return isNaN(n)
+                        ? v
+                        : n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    }
+                    const [intPart, decPart] = clean.split('.');
+                    const formattedInt = intPart ? Number(intPart).toLocaleString('en-IN') : '';
+                    return decPart !== undefined ? `${formattedInt}.${decPart}` : formattedInt;
+                  })()}
+                  onFocus={() => setAmountGivenFocused(true)}
                   onChange={(e) => {
-                    const rawValue = e.target.value;
+                    const rawValue = e.target.value.replace(/,/g, '').replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
                     if (editFormData.type === 'Refund') {
                       setEditFormData((prev) => ({ ...prev, staff_refund_amount: rawValue, amount: '' }));
                     } else {
                       setEditFormData((prev) => ({ ...prev, amount: rawValue, staff_refund_amount: '' }));
+                    }
+                  }}
+                  onBlur={(e) => {
+                    setAmountGivenFocused(false);
+                    const val = e.target.value.replace(/,/g, '');
+                    if (val === '' || isNaN(Number(val))) return;
+                    const formatted = Number(val).toFixed(2);
+                    if (editFormData.type === 'Refund') {
+                      setEditFormData((prev) => ({ ...prev, staff_refund_amount: formatted, amount: '' }));
+                    } else {
+                      setEditFormData((prev) => ({ ...prev, amount: formatted, staff_refund_amount: '' }));
                     }
                   }}
                   className={`${ADVANCE_PORTAL_INPUT_CLASS} no-spinner hover:!border-[rgba(191,152,83,0.2)] focus:!border-[rgba(191,152,83,1)]`}
@@ -583,7 +613,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   const isFilterChipsDragging = useRef(false);
   const filterChipsDragStart = useRef({ x: 0, scrollLeft: 0 });
   const [staffAdvanceCombinedOptions, setStaffAdvanceCombinedOptions] = useState([]);
-  const adminUsernames = ['Mahalingam M', 'Admin'];
+  const adminUsernames = ['Mahalingam M', 'Admin', 'Marimuthu A'];
   const normalizedUsername = (username || '').trim().toLowerCase();
   const isAdminUser = adminUsernames.some(name => name.toLowerCase() === normalizedUsername);
   const isAdmin = isAdminUser;
@@ -1719,7 +1749,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
             <p className="text-sm">{error}</p>
           </div>
         )}
-        <div className="w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
+        <div className="w-full pt-[18px] px-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
           <div
             className={`text-left flex ${hasActiveColumnFilters ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'} mb-[12px] gap-[6px]`}>
             <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">

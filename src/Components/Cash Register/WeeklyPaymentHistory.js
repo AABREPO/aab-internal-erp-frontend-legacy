@@ -4981,8 +4981,8 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                 </div>
                                                             </td>
                                                             <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
-                                                                <div className="flex w-full items-center justify-center">
-                                                                    <span className="inline-flex items-center gap-[4px]">
+                                                                <div className="relative flex w-full items-center justify-center">
+                                                                    <span className="inline-flex items-center">
                                                                         {row.bill_copy_url ? (
                                                                             <>
                                                                                 <a
@@ -4998,7 +4998,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                     <button
                                                                                         type="button"
                                                                                         onClick={() => handleRemoveBillCopyUrl(row)}
-                                                                                        className="flex h-[12px] w-[12px] shrink-0 items-center justify-center rounded-full hover:bg-[#fff1ee]"
+                                                                                        className="absolute left-1/2 ml-[12px] top-1/2 -translate-y-1/2 flex h-[12px] w-[12px] shrink-0 items-center justify-center rounded-full hover:bg-[#fff1ee]"
                                                                                         title="Remove File"
                                                                                     >
                                                                                         <img src={FileRemover} className="" alt="Remove File" />
@@ -5006,7 +5006,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                 ) : null}
                                                                             </>
                                                                         ) : (
-                                                                            <span className="inline-flex items-center gap-2">
+                                                                            <span className="inline-flex items-center">
                                                                                 {isWeeklyExpenseTypeMatched(row.type) ? (
                                                                                     <button
                                                                                         type="button"
@@ -5030,7 +5030,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                     <button
                                                                                         type="button"
                                                                                         onClick={() => handleRestoreBillCopyUrl(row)}
-                                                                                        className="inline-flex shrink-0"
+                                                                                        className="absolute left-1/2 ml-[12px] top-1/2 -translate-y-1/2 inline-flex shrink-0"
                                                                                         title="Restore Removed File"
                                                                                     >
                                                                                         <img src={restore} alt="" className="w-4 h-4" />
@@ -5043,9 +5043,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                             </td>
                                                             <td id={EDBC_IDS.EDBC19} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
                                                                 <div className="flex gap-1 justify-center">
-                                                                    {canEditSelectedWeek && (
-                                                                        <>
-                                                                            {editingRowId === row.id ? (
+                                                                    {canEditSelectedWeek && editingRowId === row.id ? (
                                                                                 <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
                                                                                     <button type="button" onClick={() => saveEditedExpense(row)} className="text-green-600 font-bold text-lg p-0 leading-none">
                                                                                         ✓
@@ -5053,7 +5051,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                 </span>
                                                                             ) : (
                                                                                 <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
-                                                                                    {row.type === "Daily" || !isWeeklyExpenseTypeMatched(row.type) || !hasEditPermission ? (
+                                                                                    {!canEditSelectedWeek || row.type === "Daily" || !isWeeklyExpenseTypeMatched(row.type) || !hasEditPermission ? (
                                                                                         <img className="w-5 h-4 opacity-40 cursor-not-allowed" src={Edit} alt="Edit Disabled" />
                                                                                     ) : (
                                                                                         <button type="button" onClick={() => {
@@ -5066,7 +5064,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                 </span>
                                                                             )}
                                                                             <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
-                                                                                {row.type === "Daily" || !isWeeklyExpenseTypeMatched(row.type) || !hasDeletePermission ? (
+                                                                                {!canEditSelectedWeek || row.type === "Daily" || !isWeeklyExpenseTypeMatched(row.type) || !hasDeletePermission ? (
                                                                                     <img className="w-5 h-4 opacity-40 cursor-not-allowed" src={Delete} alt="Delete Disabled" />
                                                                                 ) : (
                                                                                     <button type="button" onClick={() => handleWeeklyExpensesDelete(row.id)}>
@@ -5083,8 +5081,6 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                     </button>
                                                                                 )}
                                                                             </span>
-                                                                        </>
-                                                                    )}
                                                                 </div>
                                                             </td>
                                                             <td className="w-[12px] min-w-[12px] max-w-[12px] p-0"></td>
@@ -5443,9 +5439,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                     )}
                                                                     <td id={EDBC_IDS.EDBC19} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
                                                                         <div className="flex gap-1 justify-center">
-                                                                            {canEditSelectedWeek && (
-                                                                                <>
-                                                                                    {editingPaymentId === row.id ? (
+                                                                                    {canEditSelectedWeek && editingPaymentId === row.id ? (
                                                                                         <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
                                                                                             <button
                                                                                                 className="text-green-600 font-bold text-lg"
@@ -5457,7 +5451,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                         </span>
                                                                                     ) : (
                                                                                         <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
-                                                                                            {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
+                                                                                            {canEditSelectedWeek && weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
                                                                                                 hasEditPermission ? (
                                                                                                     <button onClick={() => {
                                                                                                         setEditingPaymentId(row.id);
@@ -5481,7 +5475,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                             )}
                                                                                         </span>
                                                                                     )}
-                                                                                    {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
+                                                                                    {canEditSelectedWeek && weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
                                                                                         <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
                                                                                             {hasDeletePermission ? (
                                                                                                 <button
@@ -5520,8 +5514,6 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                             />
                                                                                         )}
                                                                                     </span>
-                                                                                </>
-                                                                            )}
                                                                         </div>
                                                                     </td>
                                                                     <td className="w-[12px] min-w-[12px] max-w-[12px] p-0"></td>

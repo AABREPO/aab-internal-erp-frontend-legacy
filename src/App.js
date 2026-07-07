@@ -16,6 +16,14 @@ import RHeading from './Components/RentManagement/RHeading';
 import MHeading from './Components/MasonaryCalculater/MHeading';
 import CHeading from './Components/CarpentryCalculation/CHeading';
 import LoginPage from './LoginPages/Login';
+import {
+  clearAuthSession,
+  registerLogoutHandler,
+  setupAxiosAuthInterceptor,
+  startSessionExpiryWatch,
+  stopSessionExpiryWatch,
+  validateStoredSession,
+} from './utils/authSession';
 import BillHeading from './Components/BillChecklist/BillHeading';
 import PurchaseHeading from './Components/Purchase/PurchaseHeading';
 import TestPurchaseOrder from './Components/Purchase/TestPurchaseOrder';
@@ -197,34 +205,70 @@ function AppContent({ user, handleLogout }) {
   );
 }
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      const normalizedUser = {
-        ...parsedUser,
-        branchId: parsedUser?.branchId ?? parsedUser?.branch_id ?? parsedUser?.brachId ?? ''
-      };
-      setUser(normalizedUser);
-      setIsLoggedIn(true);
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const sessionInitIdRef = React.useRef(0);
+
+  const handleLogout = React.useCallback((message) => {
+    stopSessionExpiryWatch();
+    setUser(null);
+    clearAuthSession();
+    if (message) {
+      alert(message);
     }
   }, []);
+
+  useEffect(() => {
+    registerLogoutHandler(handleLogout);
+    setupAxiosAuthInterceptor();
+  }, [handleLogout]);
+
+  useEffect(() => {
+    const initId = sessionInitIdRef.current;
+
+    const restoreSession = async () => {
+      const isCancelled = () => initId !== sessionInitIdRef.current;
+      const result = await validateStoredSession(isCancelled);
+      if (isCancelled()) {
+        return;
+      }
+
+      if (result.valid && result.user) {
+        const normalizedUser = {
+          ...result.user,
+          branchId: result.user?.branchId ?? result.user?.branch_id ?? result.user?.brachId ?? '',
+        };
+        setUser(normalizedUser);
+        startSessionExpiryWatch();
+      } else if (result.message) {
+        alert(result.message);
+      }
+      setSessionChecked(true);
+    };
+
+    restoreSession();
+
+    return () => {
+      stopSessionExpiryWatch();
+    };
+  }, []);
+
   const handleLogin = (userData) => {
+    sessionInitIdRef.current += 1;
     const normalizedUser = {
       ...userData,
-      branchId: userData?.branchId ?? userData?.branch_id ?? userData?.brachId ?? ''
+      branchId: userData?.branchId ?? userData?.branch_id ?? userData?.brachId ?? '',
     };
     setUser(normalizedUser);
-    setIsLoggedIn(true);
+    setSessionChecked(true);
     localStorage.setItem('user', JSON.stringify(normalizedUser));
+    startSessionExpiryWatch();
   };
-  const handleLogout = () => {
-    setUser(null);
-    setIsLoggedIn(false);
-    localStorage.removeItem('user');
+
+  if (!sessionChecked) {
+    return null;
   }
+
   return (
     <Router>
       {!user ? (

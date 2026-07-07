@@ -56,7 +56,11 @@ const Header = ({ title = "Purchase Order", showBack = true, showNotification = 
                 >
                   {user?.userImage ? (
                     <img
-                      src={`data:image/jpeg;base64,${user.userImage}`}
+                      src={
+                        user.userImage.startsWith('http') || user.userImage.startsWith('data:')
+                          ? user.userImage
+                          : `data:image/jpeg;base64,${user.userImage}`
+                      }
                       alt={user.username || 'Profile'}
                       className="w-full h-full object-cover"
                     />

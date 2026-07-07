@@ -23,6 +23,10 @@ import {
   EdbcTimestampFilter,
   EdbcProjectNameFilter,
   EdbcSelectFilter,
+  EdbcPaymentModeFilter,
+  EdbcPaymentModeFilterChip,
+  hasEdbcPaymentModeFilter,
+  matchesEdbcPaymentModeFilter,
   EdbcTextInputFilter,
   EdbcTotalAmountFilter,
   matchesEdbcAmountFilter,
@@ -69,7 +73,7 @@ const AdvancePortalFilterAmountOutput = ({ value, className = '' }) => {
   const formatted = formatAmountDisplay(value);
   const displayValue = formatted ? `₹${formatted}` : '';
   return (
-    <div className={`relative lg:w-[150px] w-full h-[40px] ${className}`.trim()}>
+    <div className={`relative w-[150px] h-[40px] ${className}`.trim()}>
       <input
         type="text"
         readOnly
@@ -257,7 +261,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   const [selectDatabaseTransfer, setSelectDatabaseTransfer] = useState('');
   const [selectDatabaseType, setSelectDatabaseType] = useState('');
   const [selectDatabaseDescription, setSelectDatabaseDescription] = useState('');
-  const [selectDatabaseMode, setSelectDatabaseMode] = useState('');
+  const [selectedDatabasePaymentModes, setSelectedDatabasePaymentModes] = useState([]);
   const [selectDatabaseEntryNo, setSelectDatabaseEntryNo] = useState('');
   const [selectDatabaseSourceFrom, setSelectDatabaseSourceFrom] = useState('');
   const [selectDatabaseBranch, setSelectDatabaseBranch] = useState('');
@@ -298,7 +302,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     accountNumber: '',
   });
   const [accountDetails, setAccountDetails] = useState([]);
-  const adminUsernames = ['Mahalingam M', 'Admin'];
+  const adminUsernames = ['Mahalingam M', 'Admin', 'Marimuthu A'];
   const normalizedUsername = (username || '').trim().toLowerCase();
   const isAdminUser = adminUsernames.some(name => name.toLowerCase() === normalizedUsername);
   const isAdmin = isAdminUser ;
@@ -394,7 +398,8 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           if (filters.selectDatabaseTransfer) setSelectDatabaseTransfer(filters.selectDatabaseTransfer);
           if (filters.selectDatabaseType) setSelectDatabaseType(filters.selectDatabaseType);
           if (filters.selectDatabaseDescription) setSelectDatabaseDescription(filters.selectDatabaseDescription);
-          if (filters.selectDatabaseMode) setSelectDatabaseMode(filters.selectDatabaseMode);
+          if (filters.selectedDatabasePaymentModes) setSelectedDatabasePaymentModes(filters.selectedDatabasePaymentModes);
+          else if (filters.selectDatabaseMode) setSelectedDatabasePaymentModes([filters.selectDatabaseMode]);
           if (filters.selectDatabaseEntryNo) setSelectDatabaseEntryNo(filters.selectDatabaseEntryNo);
           if (filters.selectDatabaseSourceFrom) setSelectDatabaseSourceFrom(filters.selectDatabaseSourceFrom);
           if (filters.selectDatabaseBranch) setSelectDatabaseBranch(filters.selectDatabaseBranch);
@@ -442,7 +447,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       selectDatabaseTransfer,
       selectDatabaseType,
       selectDatabaseDescription,
-      selectDatabaseMode,
+      selectedDatabasePaymentModes,
       selectDatabaseEntryNo,
       selectDatabaseSourceFrom,
       selectDatabaseBranch,
@@ -456,7 +461,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       showFilters
     };
     sessionStorage.setItem('advanceDatabaseFilters', JSON.stringify(filters));
-  }, [timestampStartDate, timestampEndDate, selectDatabaseDateStart, selectDatabaseDateEnd, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, selectDatabaseAmount, selectDatabaseBillAmount, selectDatabaseRefundAmount, startDate, endDate, overallSearch, showFilters]);
+  }, [timestampStartDate, timestampEndDate, selectDatabaseDateStart, selectDatabaseDateEnd, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectedDatabasePaymentModes, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, selectDatabaseAmount, selectDatabaseBillAmount, selectDatabaseRefundAmount, startDate, endDate, overallSearch, showFilters]);
   const scrollRef = useRef(null);
   const filterRowRef = useRef(null);
   const filterNudgeUsedRef = useRef(false);
@@ -1116,13 +1121,10 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     if (selectDatabaseDescription.trim()) {
       if (!String(entry.description ?? '').toLowerCase().includes(selectDatabaseDescription.toLowerCase().trim())) return false;
     }
-    if (selectDatabaseMode) {
-      if (selectDatabaseMode === BLANK_VALUE) {
-        if (!isBlankish(entry.payment_mode)) return false;
-      } else {
-        if (entry.payment_mode?.toLowerCase() !== selectDatabaseMode.toLowerCase()) return false;
-      }
-    }
+    if (!matchesEdbcPaymentModeFilter(entry.payment_mode, selectedDatabasePaymentModes, {
+      blankValue: BLANK_VALUE,
+      isBlankish,
+    })) return false;
     if (selectDatabaseEntryNo) {
       if (selectDatabaseEntryNo === BLANK_VALUE) {
         if (!isBlankish(entry.entry_no)) return false;
@@ -1453,7 +1455,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   const advCol17Label = 'Activity';
   useEffect(() => {
     setCurrentPage(1);
-  }, [timestampStartDate, timestampEndDate, selectDatabaseDateStart, selectDatabaseDateEnd, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, selectDatabaseAmount, selectDatabaseBillAmount, selectDatabaseRefundAmount, startDate, endDate, overallSearch]);
+  }, [timestampStartDate, timestampEndDate, selectDatabaseDateStart, selectDatabaseDateEnd, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectedDatabasePaymentModes, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, selectDatabaseAmount, selectDatabaseBillAmount, selectDatabaseRefundAmount, startDate, endDate, overallSearch]);
   useEffect(() => {
     if (filterScrollResetSkipRef.current) {
       filterScrollResetSkipRef.current = false;
@@ -1468,7 +1470,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     });
   }, [
     timestampStartDate, timestampEndDate, selectDatabaseDateStart, selectDatabaseDateEnd, selectDatabaseContractororVendorName, selectDatabaseProjectName,
-    selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode,
+    selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectedDatabasePaymentModes,
     selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy,
     selectDatabaseAmount, selectDatabaseBillAmount, selectDatabaseRefundAmount,
     startDate, endDate,
@@ -1483,7 +1485,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     setSelectDatabaseTransfer('');
     setSelectDatabaseType('');
     setSelectDatabaseDescription('');
-    setSelectDatabaseMode('');
+    setSelectedDatabasePaymentModes([]);
     setSelectDatabaseEntryNo('');
     setSelectDatabaseSourceFrom('');
     setSelectDatabaseBranch('');
@@ -1501,7 +1503,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     timestampStartDate || timestampEndDate || selectDatabaseDateStart || selectDatabaseDateEnd
     || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer
     || selectDatabaseAmount.trim() || selectDatabaseBillAmount.trim() || selectDatabaseRefundAmount.trim()
-    || selectDatabaseType || selectDatabaseDescription.trim() || selectDatabaseMode
+    || selectDatabaseType || selectDatabaseDescription.trim() || hasEdbcPaymentModeFilter(selectedDatabasePaymentModes)
     || selectDatabaseEntryNo || selectDatabaseSourceFrom || selectDatabaseBranch
     || selectDatabaseEnteredBy || startDate || endDate
   );
@@ -2340,13 +2342,13 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                     <button onClick={() => setSelectDatabaseDescription('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
-                {selectDatabaseMode && (
-                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
-                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Mode: </span>
-                    <span className="font-semibold text-[14px] truncate min-w-0">{selectDatabaseMode === BLANK_VALUE ? BLANK_LABEL : selectDatabaseMode}</span>
-                    <button onClick={() => setSelectDatabaseMode('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                  </span>
-                )}
+                <EdbcPaymentModeFilterChip
+                  fieldLabel="Mode"
+                  selectedModes={selectedDatabasePaymentModes}
+                  blankValue={BLANK_VALUE}
+                  blankLabel={BLANK_LABEL}
+                  onClear={() => setSelectedDatabasePaymentModes([])}
+                />
                 {selectDatabaseEntryNo && (
                   <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                     <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Entry No: </span>
@@ -2582,16 +2584,14 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                       blankValue={BLANK_VALUE}
                       selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                     />
-                    <EdbcSelectFilter
+                    <EdbcPaymentModeFilter
                       columnId={EDBC_IDS.EDBC13}
                       placeholder={advCol11Label}
                       options={filterOptionsFromData.modeOptions.map((m) =>
                         m === BLANK_VALUE ? blankOption : { value: m, label: m }
                       )}
-                      value={selectDatabaseMode}
-                      onChange={setSelectDatabaseMode}
-                      blankOption={blankOption}
-                      blankValue={BLANK_VALUE}
+                      value={selectedDatabasePaymentModes}
+                      onChange={setSelectedDatabasePaymentModes}
                       selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                     />
                     <EdbcSelectFilter
@@ -2941,9 +2941,9 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
         )}
         {isEditModalOpen && (
           <div className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]">
-            <div className="bg-white text-left p-6 rounded-lg shadow-lg w-full max-w-2xl">
+            <div className="bg-white text-left p-6 rounded-lg shadow-lg">
               <div className="flex justify-between items-center mb-[14px]">
-                <h2 className="text-[18px] font-semibold text-black">Edit Advance Portal</h2>
+                <h2 className="text-[18px] font-semibold text-black">Edit Advance</h2>
                 <span className="text-[16px] font-semibold text-[#E4572E]">{editFormData.entry_no}</span>
               </div>
               <div className="max-h-[75vh] overflow-y-auto">

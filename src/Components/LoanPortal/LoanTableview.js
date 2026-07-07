@@ -19,9 +19,14 @@ import {
   EdbcColumnHeader,
   EdbcTimestampFilter,
   EdbcSelectFilter,
+  EdbcPaymentModeFilter,
+  EdbcPaymentModeFilterChip,
+  hasEdbcPaymentModeFilter,
+  matchesEdbcPaymentModeFilter,
   EdbcTextInputFilter,
   EdbcEmptyFilterCell,
   EdbcTotalAmountFilter,
+  matchesEdbcAmountFilter,
   EdbcDateBodyCell,
   EdbcExpandableBodyCell,
   EDBC_TABLE_EDGE_TABLE_CLASS,
@@ -67,7 +72,7 @@ const AdvancePortalAmountOutput = ({ value, className = '' }) => {
   const formattedValue = formatAmountDisplay(value);
   const displayValue = formattedValue ? `₹${formattedValue}` : '';
   return (
-    <div className={`relative lg:w-[150px] w-full h-[40px] ${className}`.trim()}>
+    <div className={`relative w-[150px] h-[40px] ${className}`.trim()}>
       <input
         type="text"
         readOnly
@@ -234,11 +239,13 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
   const [selectProjectName, setSelectProjectName] = useState('');
   const [selectTransfer, setSelectTransfer] = useState('');
   const [selectType, setSelectType] = useState('');
-  const [selectMode, setSelectMode] = useState('');
+  const [selectedPaymentModes, setSelectedPaymentModes] = useState([]);
   const [selectDescription, setSelectDescription] = useState('');
   const [selectSourceFrom, setSelectSourceFrom] = useState('');
   const [selectBranch, setSelectBranch] = useState('');
   const [selectEntryNo, setSelectEntryNo] = useState('');
+  const [selectLoanAmount, setSelectLoanAmount] = useState('');
+  const [selectRefundAmount, setSelectRefundAmount] = useState('');
   const [overallSearch, setOverallSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -274,7 +281,7 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const [isRequestLoanModalOpen, setIsRequestLoanModalOpen] = useState(false);
-  const adminUsernames = ['Mahalingam M', 'Admin'];
+  const adminUsernames = ['Mahalingam M', 'Admin', 'Marimuthu A'];
   const normalizedUsername = (username || '').trim().toLowerCase();
   const isAdminUser = adminUsernames.some(name => name.toLowerCase() === normalizedUsername);
   const isAdmin = isAdminUser;
@@ -478,6 +485,11 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
     const modes = [...new Set(loanData.map(entry => entry.loan_payment_mode).filter(Boolean))];
     return modes.sort();
   }, [loanData]);
+
+  const modeFilterOptions = useMemo(
+    () => uniquePaymentModes.map((mode) => ({ value: mode, label: mode })),
+    [uniquePaymentModes],
+  );
 
   const uniqueSourceFromOptions = useMemo(() => {
     const sources = [...new Set(loanData.map((entry) => entry.source).filter(Boolean))];
@@ -970,9 +982,12 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
     if (selectType) {
       if (entry.type?.toLowerCase() !== selectType.toLowerCase()) return false;
     }
-    if (selectMode) {
-      if (entry.loan_payment_mode?.toLowerCase() !== selectMode.toLowerCase()) return false;
-    }
+    if (!matchesEdbcPaymentModeFilter(entry.loan_payment_mode, selectedPaymentModes, {
+      blankValue: 'BLANK',
+      isBlankish: (value) => !value || String(value).trim() === '',
+    })) return false;
+    if (selectLoanAmount.trim() && !matchesEdbcAmountFilter(entry.amount, selectLoanAmount)) return false;
+    if (selectRefundAmount.trim() && !matchesEdbcAmountFilter(entry.loan_refund_amount, selectRefundAmount)) return false;
     if (selectDescription.trim()) {
       if (!String(entry.description ?? '').toLowerCase().includes(selectDescription.toLowerCase().trim())) return false;
     }
@@ -1035,8 +1050,8 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
             bValue = b.vendor_id ? getVendorName(b.vendor_id) : getContractorName(b.contractor_id);
             break;
           case 'project':
-            aValue = getSiteName(a.project_id);
-            bValue = getSiteName(b.project_id);
+            aValue = resolveLoanPurposeName(a);
+            bValue = resolveLoanPurposeName(b);
             break;
           case 'type':
             aValue = a.type || '';
@@ -1104,7 +1119,7 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
   const edbc8Config = getEdbcColumnConfig(EDBC_IDS.EDBC8);
   const edbc19TdClass = getEdbcColumnConfig(EDBC_IDS.EDBC19)?.tdClass || '';
   const mapLoanSortKeyToEdbc = (key) => {
-    if (key === 'project') return 'siteName';
+    if (key === 'project') return 'source';
     if (key === 'entryNo') return 'eno';
     if (key === 'mode') return 'paymentMode';
     if (key === 'type') return 'accountType';
@@ -1112,12 +1127,14 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
   };
   const handleEdbcSort = (edbcField) => {
     const fieldToKey = {
-      siteName: 'project',
       eno: 'entryNo',
       paymentMode: 'mode',
       accountType: 'type',
     };
     handleSort(fieldToKey[edbcField] || edbcField);
+  };
+  const handlePurposeEdbcSort = () => {
+    handleSort('project');
   };
   const resolveEdbcSortField = (advanceSortKey) =>
     sortConfig.key === advanceSortKey ? mapLoanSortKeyToEdbc(advanceSortKey) : '';
@@ -1134,11 +1151,14 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
     setSelectTransfer('');
     setSelectType('');
     setSelectDescription('');
-    setSelectMode('');
+    setSelectedPaymentModes([]);
     setSelectSourceFrom('');
     setSelectBranch('');
     setSelectEntryNo('');
+    setSelectLoanAmount('');
+    setSelectRefundAmount('');
     setOverallSearch('');
+    setSortConfig({ key: null, direction: 'asc' });
     setShowFilters(false);
   };
   const handleFilterChipsMouseDown = (e) => {
@@ -1170,14 +1190,16 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
     selectProjectName ||
     selectTransfer ||
     selectType ||
-    selectMode ||
+    hasEdbcPaymentModeFilter(selectedPaymentModes) ||
     selectDescription.trim() ||
     selectSourceFrom ||
     selectBranch ||
-    selectEntryNo;
+    selectEntryNo ||
+    selectLoanAmount.trim() ||
+    selectRefundAmount.trim();
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectDate, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectMode, selectDescription, selectSourceFrom, selectBranch, selectEntryNo, overallSearch]);
+  }, [selectDate, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectedPaymentModes, selectLoanAmount, selectRefundAmount, selectDescription, selectSourceFrom, selectBranch, selectEntryNo, overallSearch]);
   const goToPage = (page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
@@ -1687,11 +1709,23 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
                     <button onClick={() => setSelectType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
-                {selectMode && (
+                <EdbcPaymentModeFilterChip
+                  fieldLabel="Mode"
+                  selectedModes={selectedPaymentModes}
+                  onClear={() => setSelectedPaymentModes([])}
+                />
+                {selectLoanAmount.trim() && (
                   <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
-                    <span className="font-semibold shrink-0 whitespace-nowrap">Mode: </span>
-                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectMode}</span>
-                    <button onClick={() => setSelectMode('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Loan: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectLoanAmount}</span>
+                    <button onClick={() => setSelectLoanAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  </span>
+                )}
+                {selectRefundAmount.trim() && (
+                  <span className="inline-flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-semibold shrink-0 whitespace-nowrap">Refund: </span>
+                    <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectRefundAmount}</span>
+                    <button onClick={() => setSelectRefundAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectDescription.trim() && (
@@ -1764,11 +1798,11 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
                     onSort={handleEdbcSort}
                   />
                   <EdbcColumnHeader
-                    columnId={EDBC_IDS.EDBC4}
+                    columnId={EDBC_IDS.EDBC14}
                     label="Purpose"
                     sortField={resolveEdbcSortField('project')}
                     sortDirection={sortConfig.direction}
-                    onSort={handleEdbcSort}
+                    onSort={handlePurposeEdbcSort}
                   />
                   <EdbcColumnHeader
                     columnId={EDBC_IDS.EDBC3}
@@ -1850,7 +1884,7 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
                       selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                     />
                     <EdbcSelectFilter
-                      columnId={EDBC_IDS.EDBC4}
+                      columnId={EDBC_IDS.EDBC14}
                       placeholder="Purpose"
                       options={uniqueProjectPurposeOptions}
                       value={selectProjectName}
@@ -1865,8 +1899,8 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
                       onChange={setSelectTransfer}
                       selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                     />
-                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.loan} />
-                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.refund} />
+                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.loan} value={selectLoanAmount} onChange={(e) => setSelectLoanAmount(e.target.value)} />
+                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.refund} value={selectRefundAmount} onChange={(e) => setSelectRefundAmount(e.target.value)} />
                     <EdbcTextInputFilter
                       columnId={EDBC_IDS.EDBC9}
                       placeholder="Description"
@@ -1881,12 +1915,12 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
                       onChange={setSelectType}
                       selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                     />
-                    <EdbcSelectFilter
+                    <EdbcPaymentModeFilter
                       columnId={EDBC_IDS.EDBC13}
                       placeholder="Mode"
-                      options={uniquePaymentModes.map((m) => ({ value: m, label: m }))}
-                      value={selectMode}
-                      onChange={setSelectMode}
+                      options={modeFilterOptions}
+                      value={selectedPaymentModes}
+                      onChange={setSelectedPaymentModes}
                       selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                     />
                     <EdbcSelectFilter
@@ -1939,7 +1973,7 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
                         getDisplayValue={getAssociateName}
                       />
                       <EdbcExpandableBodyCell
-                        columnId={EDBC_IDS.EDBC4}
+                        columnId={EDBC_IDS.EDBC14}
                         expense={{ ...entry, id: entry.loanPortalId || entry.id }}
                         rowIndex={index}
                         expandedCells={expandedCells}

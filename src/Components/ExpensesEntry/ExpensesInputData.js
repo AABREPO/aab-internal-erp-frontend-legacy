@@ -4,6 +4,7 @@ import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
 import search from '../Images/search.png';
 import imports from '../Images/Import.svg';
 import cross from '../Images/cross.png';
+import FileRemover from '../Images/FileRemover.svg';
 import edit from '../Images/Edit.svg';
 import Add from '../Images/+Add.svg';
 import deleteIcon from '../Images/Delete.svg';
@@ -1618,25 +1619,25 @@ const DTableView = ({ username, userRoles = [] }) => {
         </div>
         {isVendorEditOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999]" >
-            <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
-              <div>
-                <button className="text-red-500 ml-[95%]" onClick={closeEditVendorPopup}>
-                  <img src={cross} alt='close' className='w-5 h-5' />
+            <div className="bg-white text-left max-w-[600px] rounded-md p-[18px]">
+              <div className='flex justify-end'>
+                <button className="text-red-500" onClick={closeEditVendorPopup}>
+                  <img src={FileRemover} alt='close' className='w-3 h-3' />
                 </button>
               </div>
               <form onSubmit={handleEditVendorName}>
-                <div className="mb-4">
-                  <label className="block text-lg font-medium mb-2 -ml-[15.5rem]">Vendor Name</label>
+                <div className="mb-[8px]">
+                  <label className="block text-[16px] font-medium mb-2">Vendor Name</label>
                   <input
                     type="text"
                     value={editVendorName}
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Vendor Name"
+                    className="h-[40px] w-[300px] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-md focus:outline-none"
+                    placeholder="Vendor Name"
                     onChange={(e) => setEditVendorName(e.target.value)}
                     required
                   />
                 </div>
-                <div className="flex space-x-2 mt-8 ml-12">
+                <div className="flex space-x-2 mt-[16px] justify-end">
                   <button
                     type="submit"
                     className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
@@ -1656,36 +1657,36 @@ const DTableView = ({ username, userRoles = [] }) => {
         )}
         {isEditSiteNameOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999]" >
-            <div className="bg-white rounded-md w-[30rem] px-2 py-2">
-              <div>
-                <button className="text-red-500 ml-[95%]" onClick={closeEditSiteNamePopup}>
-                  <img src={cross} alt='close' className='w-5 h-5' />
+            <div className="bg-white text-left max-w-[600px] rounded-md p-[18px]">
+              <div className='flex justify-end'>
+                <button className="text-red-500" onClick={closeEditSiteNamePopup}>
+                  <img src={FileRemover} alt='close' className='w-3 h-3' />
                 </button>
               </div>
               <form onSubmit={handleEditSiteName}>
-                <div className="mb-4">
-                  <label className="block text-lg font-medium mb-2 -ml-[17.5rem]">Site Name</label>
+                <div className="mb-[8px]">
+                  <label className="block text-[16px] font-medium mb-2">Site Name</label>
                   <input
                     type="text"
                     value={editSiteName}
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Site Name"
+                    className="h-[40px] w-[300px] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-md focus:outline-none"
+                    placeholder="Site Name"
                     onChange={(e) => setEditSiteName(e.target.value)}
                     required
                   />
                 </div>
-                <div className="mb-4 ">
-                  <label className="block text-lg font-medium mb-2 -ml-[19rem]">Site No</label>
+                <div className="mb-[8px] ">
+                  <label className="block text-[16px] font-medium mb-2">Site No</label>
                   <input
                     type="text"
                     value={editSiteNo}
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Site No"
+                    className="h-[40px] w-[300px] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-md focus:outline-none"
+                    placeholder="Site No"
                     onChange={(e) => setEditSiteNo(e.target.value)}
                     required
                   />
                 </div>
-                <div className="flex space-x-2 mt-4 ml-12 mb-3">
+                <div className="flex space-x-2 mt-[16px] justify-end">
                   <button
                     type="submit"
                     className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
@@ -1705,25 +1706,25 @@ const DTableView = ({ username, userRoles = [] }) => {
         )}
         {isContractorEditOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999]" >
-            <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
-              <div>
-                <button className="text-red-500 ml-[95%]" onClick={closeEditContractorPopup}>
-                  <img src={cross} alt='close' className='w-5 h-5' />
+            <div className="bg-white text-left max-w-[600px] rounded-md p-[18px]">
+              <div className='flex justify-end'>
+                <button className="text-red-500" onClick={closeEditContractorPopup}>
+                  <img src={FileRemover} alt='close' className='w-3 h-3' />
                 </button>
               </div>
               <form onSubmit={handleEditContractorName}>
-                <div className="mb-4">
-                  <label className="block text-lg font-medium mb-2 -ml-[13.5rem]">Contractor Name</label>
+                <div className="mb-[8px]">
+                  <label className="block text-[16px] font-medium mb-2">Contractor Name</label>
                   <input
                     type="text"
                     value={editContractorName}
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Contractor Name"
+                    className="h-[40px] w-[300px] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-md focus:outline-none"
+                    placeholder="Contractor Name"
                     onChange={(e) => setEditContractorName(e.target.value)}
                     required
                   />
                 </div>
-                <div className="flex space-x-2 mt-8 ml-12">
+                <div className="flex space-x-2 mt-[16px] justify-end">
                   <button
                     type="submit"
                     className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
@@ -1743,25 +1744,25 @@ const DTableView = ({ username, userRoles = [] }) => {
         )}
         {isCategoriesEditOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999]" >
-            <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
-              <div>
-                <button className="text-red-500 ml-[95%]" onClick={closeEditCategoryPopup}>
-                  <img src={cross} alt='close' className='w-5 h-5' />
+            <div className="bg-white rounded-md text-left max-w-[600px] p-[18px]">
+              <div className='flex justify-end'>
+                <button className="text-red-500" onClick={closeEditCategoryPopup}>
+                  <img src={FileRemover} alt='close' className='w-3 h-3' />
                 </button>
               </div>
               <form onSubmit={handleEditCategoriesName}>
-                <div className="mb-4">
-                  <label className="block text-lg font-medium mb-2 -ml-[17.5rem]">Category</label>
+                <div className="mb-[8px]">
+                  <label className="block text-[16px] font-medium mb-2">Category</label>
                   <input
                     type="text"
                     value={editCategory}
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Category"
+                    className="h-[40px] w-[300px] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-md focus:outline-none"
+                    placeholder="Category"
                     onChange={(e) => setEditCategory(e.target.value)}
                     required
                   />
                 </div>
-                <div className="flex space-x-2 mt-8 ml-12">
+                <div className="flex space-x-2 mt-[16px] justify-end">
                   <button
                     type="submit"
                     className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
@@ -1781,25 +1782,25 @@ const DTableView = ({ username, userRoles = [] }) => {
         )}
         {isAccountTypeEditOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999]" >
-            <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
-              <div>
-                <button className="text-red-500 ml-[95%]" onClick={closeEditAccountTypePopup}>
-                  <img src={cross} alt='close' className='w-5 h-5' />
+            <div className="bg-white text-left max-w-[600px] rounded-md p-[18px]">
+              <div className='flex justify-end'>
+                <button className="text-red-500" onClick={closeEditAccountTypePopup}>
+                  <img src={FileRemover} alt='close' className='w-3 h-3' />
                 </button>
               </div>
               <form onSubmit={handleEditAccountTypes}>
-                <div className="mb-4">
-                  <label className="block text-lg font-medium mb-2 -ml-[15rem]">Account Type</label>
+                <div className="mb-[8px]">
+                  <label className="block text-[16px] font-medium mb-2">Account Type</label>
                   <input
                     type="text"
                     value={editAccountType}
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Account Type"
+                    className="h-[40px] w-[300px] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-md focus:outline-none"
+                    placeholder="Account Type"
                     onChange={(e) => setEditAccountType(e.target.value)}
                     required
                   />
                 </div>
-                <div className="flex space-x-2 mt-8 ml-12">
+                <div className="flex space-x-2 mt-[16px] justify-end">
                   <button
                     type="submit"
                     className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
@@ -1819,25 +1820,25 @@ const DTableView = ({ username, userRoles = [] }) => {
         )}
         {isEditWeeklyTypeOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999]" >
-            <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
-              <div>
-                <button className="text-red-500 ml-[95%]" onClick={closeEditWeeklyTypePopup}>
-                  <img src={cross} alt='close' className='w-5 h-5' />
+            <div className="bg-white text-left max-w-[600px] rounded-md p-[18px]">
+              <div className='flex justify-end'>
+                <button className="text-red-500" onClick={closeEditWeeklyTypePopup}>
+                  <img src={FileRemover} alt='close' className='w-3 h-3' />
                 </button>
               </div>
               <form onSubmit={handleEditWeeklyTypes}>
-                <div className="mb-4">
-                  <label className="block text-lg font-medium mb-2 -ml-[15rem]">Type</label>
+                <div className="mb-[8px]">
+                  <label className="block text-[16px] font-medium mb-2">Type</label>
                   <input
                     type="text"
                     value={editWeeklyType}
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Account Type"
+                    className="h-[40px] w-[300px] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-md focus:outline-none"
+                    placeholder="Type"
                     onChange={(e) => setEditWeeklyType(e.target.value)}
                     required
                   />
                 </div>
-                <div className="flex space-x-2 mt-8 ml-12">
+                <div className="flex space-x-2 mt-[16px] justify-end">
                   <button
                     type="submit"
                     className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
@@ -1857,25 +1858,25 @@ const DTableView = ({ username, userRoles = [] }) => {
         )}
         {isMachineToolsEditOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999]" >
-            <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
-              <div>
-                <button className="text-red-500 ml-[95%]" onClick={closeEditMachineToolsPopup}>
-                  <img src={cross} alt='close' className='w-5 h-5' />
+            <div className="bg-white text-left max-w-[600px] rounded-md p-[18px]">
+              <div className='flex justify-end'>
+                <button className="text-red-500" onClick={closeEditMachineToolsPopup}>
+                  <img src={FileRemover} alt='close' className='w-3 h-3' />
                 </button>
               </div>
               <form onSubmit={handleEditMachineTools}>
-                <div className="mb-4">
-                  <label className="block text-lg font-medium mb-2 -ml-[17rem]">Machine Tools</label>
+                <div className="mb-[8px]">
+                  <label className="block text-[16px] font-medium mb-2">Machine Tools</label>
                   <input
                     type="text"
                     value={editMachineTool}
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Machine Tools"
+                    className="h-[40px] w-[300px] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-md focus:outline-none"
+                    placeholder="Machine Tools"
                     onChange={(e) => setEditMachineTool(e.target.value)}
                     required
                   />
                 </div>
-                <div className="flex space-x-2 mt-8 ml-12">
+                <div className="flex space-x-2 mt-[16px] justify-end">
                   <button
                     type="submit"
                     className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
@@ -1895,35 +1896,35 @@ const DTableView = ({ username, userRoles = [] }) => {
         )}
         {isSiteNamesOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999] ">
-            <div className="bg-white rounded-md w-[30rem] h-80 px-2 py-2">
-              <div>
-                <button className="text-red-500 ml-[95%]" onClick={closeSiteNames}>
-                  <img src={cross} alt='cross' className='w-5 h-5' />
+            <div className="bg-white text-left max-w-[600px] rounded-md p-[18px]">
+              <div className='flex justify-end'>
+                <button className="text-red-500" onClick={closeSiteNames}>
+                  <img src={FileRemover} alt='close' className='w-3 h-3' />
                 </button>
               </div>
               <form onSubmit={handleSubmitSiteNames}>
-                <div className="mb-4">
-                  <label className="block text-lg font-medium mb-2 -ml-[17rem]">Site Name </label>
+                <div className="mb-[8px]">
+                  <label className="block text-[16px] font-medium mb-2">Site Name </label>
                   <input
                     type="text"
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                    placeholder="Enter Site Name"
+                    className="h-[40px] w-[300px] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-md focus:outline-none"
+                    placeholder="Site Name"
                     onChange={(e) => setSiteName(e.target.value)}
                     required
                   />
                 </div>
                 <div className="mb-4">
-                  <label className="block text-lg font-medium mb-2 -ml-[18.5rem]">Site No </label>
+                  <label className="block text-[16px] font-medium mb-2">Site No </label>
                   <input
                     type="text"
                     value={siteNo}
                     onChange={(e) => setSiteNo(e.target.value)}
-                    placeholder="Enter Site No"
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                    placeholder="Site No"
+                    className="h-[40px] w-[300px] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-md focus:outline-none"
                     required
                   />
                 </div>
-                <div className="flex space-x-2 mt-8 ml-12">
+                <div className="flex space-x-2 mt-[16px] justify-end">
                   <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
                     Submit
                   </button>
@@ -1937,24 +1938,24 @@ const DTableView = ({ username, userRoles = [] }) => {
         )}
         {isMachineToolsOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999] ">
-            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
-              <div>
-                <button className="text-red-500 ml-[95%]" onClick={closeMachineTools}>
-                  <img src={cross} alt='cross' className='w-5 h-5' />
+              <div className="bg-white text-left max-w-[600px] rounded-md p-[18px]">
+              <div className='flex justify-end'>
+                <button className="text-red-500" onClick={closeMachineTools}>
+                  <img src={FileRemover} alt='close' className='w-3 h-3' />
                 </button>
               </div>
               <form onSubmit={handleSubmitMachineTools}>
-                <div className="mb-4">
-                  <label className="block text-lg font-medium mb-2 -ml-[15rem]">Machine Tools </label>
+                <div className="mb-[8px]">
+                  <label className="block text-[16px] font-medium mb-2">Machine Tools </label>
                   <input
                     type="text"
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                    placeholder="Enter Tools Name"
+                    className="h-[40px] w-[300px] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-md focus:outline-none"
+                    placeholder="Machine Tools"
                     onChange={(e) => setMachineTool(e.target.value)}
                     required
                   />
                 </div>
-                <div className="flex space-x-2 mt-4 ml-12">
+                <div className="flex space-x-2 mt-[16px] justify-end">
                   <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
                     Submit
                   </button>
@@ -1968,24 +1969,24 @@ const DTableView = ({ username, userRoles = [] }) => {
         )}
         {isAccountTypesOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999] ">
-            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
-              <div>
-                <button className="text-red-500 ml-[95%]" onClick={closeAccountTypes}>
-                  <img src={cross} alt='cross' className='w-5 h-5' />
+            <div className="bg-white text-left max-w-[600px] rounded-md p-[18px]">
+              <div className='flex justify-end'>
+                <button className="text-red-500" onClick={closeAccountTypes}>
+                  <img src={FileRemover} alt='close' className='w-3 h-3' />
                 </button>
               </div>
               <form onSubmit={handleSubmitAccountTypes}>
-                <div className="mb-4">
-                  <label className="block text-lg font-medium mb-2 -ml-60">Account Type</label>
+                <div className="mb-[8px]">
+                  <label className="block text-[16px] font-medium mb-2">Account Type</label>
                   <input
                     type="text"
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                    placeholder="Enter Account Type"
+                    className="h-[40px] w-[300px] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-md focus:outline-none"
+                    placeholder="Account Type"
                     onChange={(e) => setAccountType(e.target.value)}
                     required
                   />
                 </div>
-                <div className="flex space-x-2 mt-4 ml-12">
+                <div className="flex space-x-2 mt-[16px] justify-end">
                   <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
                     Submit
                   </button>
@@ -1999,24 +2000,24 @@ const DTableView = ({ username, userRoles = [] }) => {
         )}
         {isWeeklyTypeOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999] ">
-            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
-              <div>
-                <button className="text-red-500 ml-[95%]" onClick={closeWeeklyTypes}>
-                  <img src={cross} alt='cross' className='w-5 h-5' />
+            <div className="bg-white text-left max-w-[600px] rounded-md p-[18px]">
+              <div className='flex justify-end'>
+                <button className="text-red-500" onClick={closeWeeklyTypes}>
+                  <img src={FileRemover} alt='close' className='w-3 h-3' />
                 </button>
               </div>
               <form onSubmit={handleSubmitWeeklyTypes}>
-                <div className="mb-4">
-                  <label className="block text-lg font-medium mb-2 -ml-60">Type</label>
+                <div className="mb-[8px]">
+                  <label className="block text-[16px] font-medium mb-2">Type</label>
                   <input
                     type="text"
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                    placeholder="Enter Type"
+                    className="h-[40px] w-[300px] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-md focus:outline-none"
+                    placeholder="Type"
                     onChange={(e) => setWeeklyType(e.target.value)}
                     required
                   />
                 </div>
-                <div className="flex space-x-2 mt-4 ml-12">
+                <div className="flex space-x-2 mt-[16px] justify-end">
                   <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
                     Submit
                   </button>
@@ -2030,24 +2031,24 @@ const DTableView = ({ username, userRoles = [] }) => {
         )}
         {isVendorNameOpens && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999] ">
-            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
-              <div>
-                <button className="text-red-500 ml-[95%]" onClick={closevendorNames}>
-                  <img src={cross} alt='cross' className='w-5 h-5' />
+            <div className="bg-white text-left max-w-[600px] rounded-md p-[18px]">
+              <div className='flex justify-end'>
+                <button className="text-red-500" onClick={closevendorNames}>
+                  <img src={FileRemover} alt='close' className='w-3 h-3' />
                 </button>
               </div>
               <form onSubmit={handleSubmitVendorName}>
                 <div className="mb-4">
-                  <label className="block text-lg font-medium mb-2 -ml-[16rem]">Vendor Name</label>
+                  <label className="block text-[16px] font-medium mb-2">Vendor Name</label>
                   <input
                     type="text"
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                    placeholder="Enter Vendor Name"
+                    className="h-[40px] w-[300px] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-md focus:outline-none"
+                    placeholder="Vendor Name"
                     onChange={(e) => setVendorName(e.target.value)}
                     required
                   />
                 </div>
-                <div className="flex space-x-2 mt-4 ml-12">
+                <div className="flex space-x-2 mt-[16px] justify-end">
                   <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
                     Submit
                   </button>
@@ -2061,24 +2062,24 @@ const DTableView = ({ username, userRoles = [] }) => {
         )}
         {isContractorNameOpens && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999] ">
-            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
-              <div>
-                <button className="text-red-500 ml-[95%]" onClick={closeContractorNames}>
-                  <img src={cross} alt='cross' className='w-5 h-5' />
+            <div className="bg-white text-left max-w-[600px] rounded-md p-[18px]">
+              <div className='flex justify-end'>
+                <button className="text-red-500" onClick={closeContractorNames}>
+                  <img src={FileRemover} alt='close' className='w-3 h-3' />
                 </button>
               </div>
               <form onSubmit={handleSubmitContractorName}>
-                <div className="mb-4">
-                  <label className="block text-lg font-medium mb-2 -ml-[13.5rem]">Contractor Name</label>
+                <div className="mb-[8px]">
+                  <label className="block text-[16px] font-medium mb-2">Contractor Name</label>
                   <input
                     type="text"
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                    placeholder="Enter Contractor Name"
+                    className="h-[40px] w-[300px] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-md focus:outline-none"
+                    placeholder="Contractor Name"
                     onChange={(e) => setContractorName(e.target.value)}
                     required
                   />
                 </div>
-                <div className="flex space-x-2 mt-4 ml-12">
+                <div className="flex space-x-2 mt-[16px] justify-end">
                   <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
                     Submit
                   </button>
@@ -2092,24 +2093,24 @@ const DTableView = ({ username, userRoles = [] }) => {
         )}
         {isCategoryOpens && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999] ">
-            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
-              <div>
-                <button className="text-red-500 ml-[95%]" onClick={closeCategory}>
-                  <img src={cross} alt='cross' className='w-5 h-5' />
+            <div className="bg-white text-left max-w-[600px] rounded-md p-[18px]">
+              <div className='flex justify-end'>
+                <button className="text-red-500" onClick={closeCategory}>
+                  <img src={FileRemover} alt='close' className='w-3 h-3' />
                 </button>
               </div>
               <form onSubmit={handleSubmitCategory}>
-                <div className="mb-4">
-                  <label className="block text-lg font-medium mb-2 -ml-72">Category</label>
+                <div className="mb-[8px]">
+                  <label className="block text-[16px] font-medium mb-2">Category</label>
                   <input
                     type="text"
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                    placeholder="Enter Category"
+                    className="h-[40px] w-[300px] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-md focus:outline-none"
+                    placeholder="Category"
                     onChange={(e) => setCategory(e.target.value)}
                     required
                   />
                 </div>
-                <div className="flex space-x-2 mt-4 ml-12">
+                <div className="flex space-x-2 mt-[16px] justify-end">
                   <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
                     Submit
                   </button>

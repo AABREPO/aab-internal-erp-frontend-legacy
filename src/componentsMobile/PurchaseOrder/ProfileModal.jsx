@@ -18,7 +18,11 @@ const ProfileModal = ({ user, isOpen, onClose, onLogout }) => {
           <div className="w-[120px] h-[120px] rounded-full overflow-hidden bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center">
             {user.userImage ? (
               <img 
-                src={`data:image/jpeg;base64,${user.userImage}`} 
+                src={
+                  user.userImage.startsWith('http') || user.userImage.startsWith('data:')
+                    ? user.userImage
+                    : `data:image/jpeg;base64,${user.userImage}`
+                } 
                 alt={user.username || 'Profile'} 
                 className="w-full h-full object-cover"
               />

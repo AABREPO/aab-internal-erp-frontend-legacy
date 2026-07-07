@@ -216,7 +216,7 @@ const StaffAddInput = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         <div className='flex flex-col h-[calc(100vh-104px)] px-[18px] pt-[18px] pb-[18px] overflow-hidden bg-[#FAF6ED]'>
             <div className=" flex flex-col flex-1 min-h-0 px-[18px] pt-[18px] pb-[18px] overflow-hidden bg-white">
                 <div
-                    className="flex-1 min-h-0 lg:flex space-x-[18px] lg:w-full md:w-[32rem] w-[20rem] overflow-x-auto overflow-y-hidden no-scrollbar scrollbar-none select-none"
+                    className="flex-1 min-h-0 flex space-x-[18px] w-full overflow-x-auto overflow-y-hidden no-scrollbar scrollbar-none select-none"
                     style={{ cursor: isDragging ? 'grabbing' : 'default' }}
                     onMouseDown={handleMouseDown}
                     onMouseLeave={handleMouseLeave}
@@ -227,7 +227,7 @@ const StaffAddInput = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                     onTouchEnd={handleTouchEnd}
                 >
                     <div>
-                        <div className="flex items-center mb-[6px] lg:mt-0 mt-3">
+                        <div className="flex items-center mb-[6px]">
                             <input
                                 type="text"
                                 className=" border-[#BF9853] border-2 border-opacity-25 rounded-full text-[14px] pl-[16px] flex-1 w-44 h-[40px] focus:outline-none"
@@ -249,8 +249,8 @@ const StaffAddInput = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                                 <table className="table-auto w-[320px] ">
                                     <thead className='bg-[#FAF6ED]'>
                                         <tr className="border-b h-[40px]">
-                                            <th className="pl-[12px] pr-[12px] text-left lg:w-16 text-[16px] font-bold">S.No</th>
-                                            <th className="pl-0 pr-[8px] text-left lg:w-72 text-[16px] font-bold">
+                                            <th className="pl-[12px] pr-[12px] text-left w-16 text-[16px] font-bold">S.No</th>
+                                            <th className="pl-0 pr-[8px] text-left w-72 text-[16px] font-bold">
                                                 <div className="flex items-center justify-between gap-[12px]">
                                                     <span>Purpose</span>
                                                     <button type="button" onClick={handleDeleteAllStaffTypes} className="inline-flex shrink-0 items-center justify-center">
@@ -311,8 +311,8 @@ const StaffAddInput = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                                 <label className="block text-lg font-medium mb-[8px]">Purpose</label>
                                 <input
                                     type="text"
-                                    className="w-[300px] border-2 border-[#BF9853] border-opacity-35 rounded pl-[8px] h-[40px] focus:outline-none"
-                                    placeholder="Enter Purpose"
+                                    className="w-[300px] border-2 border-[#BF9853] border-opacity-35 rounded-md pl-[8px] h-[40px] focus:outline-none"
+                                    placeholder="Purpose"
                                     onChange={(e) => setStaffType(e.target.value)}
                                     required
                                 />
@@ -344,8 +344,8 @@ const StaffAddInput = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                                 <input
                                     type="text"
                                     value={editStaffType}
-                                    className="w-[300px] border-2 border-[#BF9853] border-opacity-35 rounded pl-[8px] h-[40px] focus:outline-none"
-                                    placeholder="Enter Purpose"
+                                    className="w-[300px] border-2 border-[#BF9853] border-opacity-35 rounded-md pl-[8px] h-[40px] focus:outline-none"
+                                    placeholder="Purpose"
                                     onChange={(e) => setEditStaffType(e.target.value)}
                                     required
                                 />

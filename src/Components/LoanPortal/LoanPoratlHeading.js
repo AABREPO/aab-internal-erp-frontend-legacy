@@ -27,7 +27,7 @@ const LOAN_MODULE_TABS = ['loanportal', 'loantableview', 'loandatabase', 'loanad
 const LOAN_DEFAULT_TAB = 'loanportal';
 
 const getInitialLoanTab = (username) => {
-    const isAdmin = username === 'Mahalingam M' || username === 'Admin';
+    const isAdmin = username === 'Mahalingam M' || username === 'Admin' || username === 'Marimuthu A';
     const allowedTabs = isAdmin
         ? LOAN_MODULE_TABS
         : LOAN_MODULE_TABS.filter((tab) => tab !== 'loandatabase');
@@ -39,7 +39,7 @@ const getInitialLoanTab = (username) => {
 };
 
 const LoanPoratlHeading = ({ username, userRoles = [] }) => {
-    const isAdminLoan = username === 'Mahalingam M' || username === 'Admin';
+    const isAdminLoan = username === 'Mahalingam M' || username === 'Admin' || username === 'Marimuthu A';
     const allowedTabs = isAdminLoan
         ? LOAN_MODULE_TABS
         : LOAN_MODULE_TABS.filter((tab) => tab !== 'loandatabase');

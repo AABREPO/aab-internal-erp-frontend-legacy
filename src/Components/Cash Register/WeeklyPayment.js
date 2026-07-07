@@ -4713,21 +4713,21 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                                                                     </div>
                                                                 </td>
                                                                 <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
-                                                                    <div className="flex w-full items-center justify-center">
-                                                                        <span className="inline-flex items-center gap-[4px]">
+                                                                    <div className="relative flex w-full items-center justify-center">
+                                                                        <span className="inline-flex items-center">
                                                                             {row.bill_copy_url ? (
                                                                                 <>
                                                                                     <a href={cleanUrl(row.bill_copy_url)} target="_blank" rel="noopener noreferrer" className="inline-flex shrink-0 w-[16px] h-[16px] items-center justify-center cursor-pointer" title="View File">
                                                                                         <img src={file} className="" alt="Open File" />
                                                                                     </a>
                                                                                     {canRemoveBillCopyUrl && isWeeklyExpenseTypeMatched(row.type) ? (
-                                                                                        <button type="button" onClick={() => handleRemoveBillCopyUrl(row)} className="flex h-[12px] w-[12px] shrink-0 items-center justify-center rounded-full hover:bg-[#fff1ee]" title="Remove File">
+                                                                                        <button type="button" onClick={() => handleRemoveBillCopyUrl(row)} className="absolute left-1/2 ml-[12px] top-1/2 -translate-y-1/2 flex h-[12px] w-[12px] shrink-0 items-center justify-center rounded-full hover:bg-[#fff1ee]" title="Remove File">
                                                                                             <img src={FileRemover} className="" alt="Remove File" />
                                                                                         </button>
                                                                                     ) : null}
                                                                                 </>
                                                                             ) : (
-                                                                                <span className="inline-flex items-center gap-2">
+                                                                                <span className="inline-flex items-center">
                                                                                     {isWeeklyExpenseTypeMatched(row.type) ? (
                                                                                         <button type="button" onClick={() => handleFileUploadClick(row)} className="inline-flex h-4 w-4 shrink-0 items-center justify-center cursor-pointer" title="Upload File">
                                                                                             <img src={fileUpload} className="w-4 h-4 opacity-70 hover:opacity-100" alt="Upload File" />
@@ -4738,7 +4738,7 @@ const WeeklyPayment = ({ username, userRoles = [], onExportActionsReady, onClosu
                                                                                         </button>
                                                                                     )}
                                                                                     {canRemoveBillCopyUrl && isWeeklyExpenseTypeMatched(row.type) && removedBillCopyRows[row.id] ? (
-                                                                                        <button type="button" onClick={() => handleRestoreBillCopyUrl(row)} className="inline-flex shrink-0" title="Restore Removed File">
+                                                                                        <button type="button" onClick={() => handleRestoreBillCopyUrl(row)} className="absolute left-1/2 ml-[12px] top-1/2 -translate-y-1/2 inline-flex shrink-0" title="Restore Removed File">
                                                                                             <img src={restore} alt="" className="w-4 h-4" />
                                                                                         </button>
                                                                                     ) : null}

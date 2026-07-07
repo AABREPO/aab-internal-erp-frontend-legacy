@@ -1744,7 +1744,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
             <Select
               value={year ? { value: year, label: year } : null}
               onChange={(selectedOption) => setYear(selectedOption ? selectedOption.value : "")}
-              options={years.map((y) => ({
+              options={[...years].reverse().map((y) => ({
                 value: y.toString(),
                 label: y.toString(),
               }))}
@@ -1752,61 +1752,6 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
               isSearchable
               isClearable
               styles={customStyles}
-              className="w-[150px] h-[40px]"
-              classNamePrefix="select"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-[8px]">Payment Mode</label>
-            <Select
-              value={paymentModeFilter ? { value: paymentModeFilter, label: paymentModeFilter } : null}
-              onChange={(selectedOption) => setPaymentModeFilter(selectedOption ? selectedOption.value : "")}
-              options={finalPaymentModeOptions}
-              placeholder="Payment Mode"
-              isSearchable
-              isClearable
-              styles={{
-                ...customStyles,
-                placeholder: (provided) => ({
-                  ...customStyles.placeholder(provided),
-                  color: '#A6A5A6',
-                }),
-                dropdownIndicator: (provided, state) => ({
-                  ...customStyles.dropdownIndicator(provided, state),
-                  paddingLeft: 0,
-                  paddingRight: 4,
-                }),
-              }}
-              className="w-[150px] h-[40px]"
-              classNamePrefix="select"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-[8px]">Type</label>
-            <Select
-              value={typeFilter ? { value: typeFilter, label: typeFilter } : null}
-              onChange={(selectedOption) => setTypeFilter(selectedOption ? selectedOption.value : "")}
-              options={[
-                { value: "Advance", label: "Advance" },
-                { value: "Bill Settlement", label: "Bill Settlement" },
-                { value: "Refund", label: "Refund" },
-                { value: "Transfer", label: "Transfer" },
-              ]}
-              placeholder="Type"
-              isSearchable
-              isClearable
-              styles={{
-                ...customStyles,
-                placeholder: (provided) => ({
-                  ...customStyles.placeholder(provided),
-                  color: '#A6A5A6',
-                }),
-                dropdownIndicator: (provided, state) => ({
-                  ...customStyles.dropdownIndicator(provided, state),
-                  paddingLeft: 0,
-                  paddingRight: 4,
-                }),
-              }}
               className="w-[150px] h-[40px]"
               classNamePrefix="select"
             />
@@ -1863,7 +1808,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
         </div>
         </div>
       </div>
-      <div className="w-full max-w-[1850px] mx-auto pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
+      <div className="w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
         <div className="flex min-w-0 w-full flex-nowrap items-center justify-between gap-[6px] mb-[12px] shrink-0 overflow-hidden">
           <div className={`flex min-w-0 items-center overflow-hidden gap-[6px]${hasActiveColumnFilters ? ' flex-1 min-w-0' : ' shrink-0'}`}>
             <EdbcFilterToggleButton onClick={toggleFilters} />

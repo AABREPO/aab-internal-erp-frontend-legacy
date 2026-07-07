@@ -252,10 +252,30 @@ const buildSecondTablePopupContext = ({
 });
 
 const SummaryPopupContextHeader = ({ context }) => (
-  <h3 className="text-[18px] font-semibold text-[#000000]">
-    {context.line1 && <span className="block">{context.line1}</span>}
-    {context.line2 && <span className="block">{context.line2}</span>}
+  <h3 className="text-[18px] font-semibold text-[#000000] min-w-0 break-words whitespace-normal">
+    {context.line1}
+    {context.line1 && context.line2 && ' - '}
+    {context.line2}
   </h3>
+);
+
+const SummaryPopupExportActions = ({ onExportPdf, onExportCsv }) => (
+  <div className="flex shrink-0 justify-end items-center gap-[8px]">
+    <span
+      className="text-[#E4572E] flex items-center gap-1 font-semibold hover:underline cursor-pointer"
+      onClick={onExportPdf}
+    >
+      PDF
+      <img src={PdfIcon} alt="Pdf" className="w-4 h-4" />
+    </span>
+    <span
+      className="text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer"
+      onClick={onExportCsv}
+    >
+      XL
+      <img src={XlIcon} alt="XL" className="w-4 h-4" />
+    </span>
+  </div>
 );
 
 const getContractorVendorOptionValue = (option) => `${option.type}-${option.id}`;
@@ -2912,17 +2932,17 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
             >
               <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
             </button>
-            <div className="mb-2 pr-6">
+            <div className="mb-2 pr-[46px] w-[468px] max-w-full min-w-0">
               <SummaryPopupContextHeader context={projectPopupContext} />
               <p className="text-sm text-gray-600 mt-1">{projectPopupTitle}</p>
+              <div className="flex w-[468px] max-w-full justify-end mt-[8px]">
+                <SummaryPopupExportActions
+                  onExportPdf={() => exportPopupPDF(sortPopupData(projectPopupData, projectPopupSortConfig), projectPopupTitle, projectPopupContext, true)}
+                  onExportCsv={() => exportPopupCSV(sortPopupData(projectPopupData, projectPopupSortConfig), projectPopupTitle, projectPopupContext, true)}
+                />
+              </div>
             </div>
-            <div className="flex w-[468px] max-w-full justify-end mb-3">
-              <SummaryTableExportActions
-                onExportPdf={() => exportPopupPDF(sortPopupData(projectPopupData, projectPopupSortConfig), projectPopupTitle, projectPopupContext, true)}
-                onExportCsv={() => exportPopupCSV(sortPopupData(projectPopupData, projectPopupSortConfig), projectPopupTitle, projectPopupContext, true)}
-              />
-            </div>
-            <div className="mt-4 border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
+            <div className="mt-[8px] border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
               <table className={` ${SUMMARY_POPUP_TABLE_CLASS}`}>
                 <thead className="sticky top-0 z-20 bg-[#FAF6ED]">
                   <EdbcTableHeaderRow>
@@ -3005,17 +3025,17 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
             >
               <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
             </button>
-            <div className="mb-2 pr-6">
+            <div className="mb-2 pr-[46px] w-[468px] max-w-full min-w-0">
               <SummaryPopupContextHeader context={sitePopupContext} />
               <p className="text-sm text-gray-600 mt-1">{sitePopupTitle}</p>
+              <div className="flex w-[468px] max-w-full justify-end mt-[8px]">
+                <SummaryPopupExportActions
+                  onExportPdf={() => exportPopupPDF(sortPopupData(sitePopupData, sitePopupSortConfig), sitePopupTitle, sitePopupContext, false)}
+                  onExportCsv={() => exportPopupCSV(sortPopupData(sitePopupData, sitePopupSortConfig), sitePopupTitle, sitePopupContext, false)}
+                />
+              </div>
             </div>
-            <div className="flex w-[468px] max-w-full justify-end mb-3">
-              <SummaryTableExportActions
-                onExportPdf={() => exportPopupPDF(sortPopupData(sitePopupData, sitePopupSortConfig), sitePopupTitle, sitePopupContext, false)}
-                onExportCsv={() => exportPopupCSV(sortPopupData(sitePopupData, sitePopupSortConfig), sitePopupTitle, sitePopupContext, false)}
-              />
-            </div>
-            <div className="mt-4 border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
+            <div className="mt-[8px] border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
               <table className={` ${SUMMARY_POPUP_TABLE_CLASS}`}>
                 <thead className="sticky top-0 z-20 bg-[#FAF6ED]">
                   <EdbcTableHeaderRow>
@@ -3098,17 +3118,17 @@ const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
             >
               <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
             </button>
-            <div className="mb-2 pr-6">
+            <div className={`mb-2 pr-[46px] max-w-full min-w-0 ${isBillStatusFromFirstTable ? 'w-[588px]' : 'w-[668px]'}`}>
               <SummaryPopupContextHeader context={billStatusPopupContext} />
               <p className="text-sm text-gray-600 mt-1">Bill Status Details</p>
+              <div className={`flex max-w-full justify-end mt-[8px] ${isBillStatusFromFirstTable ? 'w-[588px]' : 'w-[668px]'}`}>
+                <SummaryPopupExportActions
+                  onExportPdf={exportBillStatusPDF}
+                  onExportCsv={exportBillStatusCSV}
+                />
+              </div>
             </div>
-            <div className={`flex max-w-full justify-end mb-3 ${isBillStatusFromFirstTable ? 'w-[588px]' : 'w-[668px]'}`}>
-              <SummaryTableExportActions
-                onExportPdf={exportBillStatusPDF}
-                onExportCsv={exportBillStatusCSV}
-              />
-            </div>
-            <div className="mt-4 border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
+            <div className="mt-[8px] border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
               <table className={billStatusPopupTableClass}>
                 <thead className="sticky top-0 z-20 bg-[#FAF6ED]">
                   <EdbcTableHeaderRow>

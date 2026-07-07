@@ -26,7 +26,7 @@ const STAFF_MODULE_TABS = ['staffAdvance', 'staffTablview', 'staffDatabase', 'st
 const STAFF_DEFAULT_TAB = 'staffAdvance';
 
 const getInitialStaffTab = (username) => {
-    const isAdmin = username === 'Mahalingam M' || username === 'Admin';
+    const isAdmin = username === 'Mahalingam M' || username === 'Admin' || username === 'Marimuthu A';
     const allowedTabs = isAdmin
         ? STAFF_MODULE_TABS
         : STAFF_MODULE_TABS.filter((tab) => tab !== 'staffDatabase');
@@ -38,7 +38,7 @@ const getInitialStaffTab = (username) => {
 };
 
 const StaffHeading = ({ username, userRoles = [] }) => {
-    const isAdminStaff = username === 'Mahalingam M' || username === 'Admin';
+    const isAdminStaff = username === 'Mahalingam M' || username === 'Admin' || username === 'Marimuthu A';
     const allowedTabs = isAdminStaff
         ? STAFF_MODULE_TABS
         : STAFF_MODULE_TABS.filter((tab) => tab !== 'staffDatabase');

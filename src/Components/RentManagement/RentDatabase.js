@@ -7,8 +7,6 @@ import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
 import Select from 'react-select';
-import Filter from '../Images/filter (3).png'
-import Reload from '../Images/rotate-right.png'
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import {
@@ -26,11 +24,49 @@ import {
 } from '../../utils/paymentModeArrangement';
 import { usePaymentModesForModule } from '../../utils/usePaymentModeArrangement';
 import QRCode from '../Images/AAB_QR_CODE.jpeg';
+import {
+    EDBC_IDS,
+    EDBC_TABLE_EDGE_TABLE_CLASS,
+    EdbcColumnHeader,
+    EdbcDateFilter,
+    EdbcEmptyFilterCell,
+    EdbcTableBodyRow,
+    EdbcTableFilterRow,
+    EdbcTableHeaderRow,
+    EdbcSelectFilter,
+    EdbcTimestampFilter,
+    EdbcTotalAmountFilter,
+    EdbcFilterToggleButton,
+    EdbcTableToolbarRightActions,
+    getEdbcColumnConfig,
+    matchesEdbcAmountFilter,
+    formatEdbcFilterDateDMY,
+} from '../ExpensesEntry/databaseExpensesSharedColumns';
 Modal.setAppElement('#root');
+const rentDatabaseColumnIds = {
+    timestamp: EDBC_IDS.EDBC1,
+    shopNo: EDBC_IDS.EDBC13,
+    tenantName: EDBC_IDS.EDBC3,
+    amount: EDBC_IDS.EDBC8,
+    paidOnDate: EDBC_IDS.EDBC2,
+    eno: EDBC_IDS.EDBC17,
+    forTheMonthOf: EDBC_IDS.EDBC14,
+    paymentMode: EDBC_IDS.EDBC14,
+    formType: EDBC_IDS.EDBC12,
+    branch: EDBC_IDS.EDBC15,
+    enteredBy: EDBC_IDS.EDBC16,
+    activity: EDBC_IDS.EDBC19,
+    print: EDBC_IDS.EDBC20,
+};
+const RENT_DATABASE_EDBC_WIDTH_LOCK_TABLE_CLASS =
+    '[&_th#EDBC-1]:!w-[168px] [&_td#EDBC-1]:!w-[168px] [&_th#EDBC-1]:!min-w-[168px] [&_td#EDBC-1]:!min-w-[168px] [&_th#EDBC-1]:!max-w-[168px] [&_td#EDBC-1]:!max-w-[168px] [&_th#EDBC-13]:!w-[130px] [&_td#EDBC-13]:!w-[130px] [&_th#EDBC-13]:!min-w-[130px] [&_td#EDBC-13]:!min-w-[130px] [&_th#EDBC-13]:!max-w-[130px] [&_td#EDBC-13]:!max-w-[130px] [&_thead_tr>th#EDBC-13]:!overflow-hidden [&_thead_tr:nth-child(2)>th#EDBC-13>div]:!w-[130px] [&_thead_tr:nth-child(2)>th#EDBC-13>div]:!min-w-[130px] [&_thead_tr:nth-child(2)>th#EDBC-13>div]:!max-w-[130px] [&_th#EDBC-3]:!w-[298px] [&_td#EDBC-3]:!w-[298px] [&_th#EDBC-3]:!min-w-[298px] [&_td#EDBC-3]:!min-w-[298px] [&_th#EDBC-3]:!max-w-[298px] [&_td#EDBC-3]:!max-w-[298px] [&_th#EDBC-8]:!w-[120px] [&_td#EDBC-8]:!w-[98px] [&_th#EDBC-8]:!min-w-[120px] [&_td#EDBC-8]:!min-w-[98px] [&_th#EDBC-8]:!max-w-[120px] [&_td#EDBC-8]:!max-w-[98px] [&_th#EDBC-2]:!w-[120px] [&_td#EDBC-2]:!w-[120px] [&_th#EDBC-2]:!min-w-[120px] [&_td#EDBC-2]:!min-w-[120px] [&_th#EDBC-2]:!max-w-[120px] [&_td#EDBC-2]:!max-w-[120px] [&_thead_tr>th#EDBC-2]:!overflow-hidden [&_thead_tr>th#EDBC-2]:!box-border [&_thead_tr>th#EDBC-2]:!pr-[1px] [&_thead_tr:nth-child(2)>th:nth-child(5)]:!w-[120px] [&_thead_tr:nth-child(2)>th:nth-child(5)]:!min-w-[120px] [&_thead_tr:nth-child(2)>th:nth-child(5)]:!max-w-[120px] [&_thead_tr:nth-child(2)>th:nth-child(5)]:!overflow-hidden [&_thead_tr:nth-child(2)>th:nth-child(5)]:!pr-[1px] [&_thead_tr:nth-child(2)>th:nth-child(5)>div]:!w-[120px] [&_thead_tr:nth-child(2)>th:nth-child(5)>div]:!min-w-[120px] [&_thead_tr:nth-child(2)>th:nth-child(5)>div]:!max-w-[120px] [&_thead_tr:nth-child(2)>th:nth-child(5)>div]:!box-border [&_thead_tr:nth-child(2)>th:nth-child(5) button]:!w-[120px] [&_thead_tr:nth-child(2)>th:nth-child(5) button]:!min-w-[120px] [&_thead_tr:nth-child(2)>th:nth-child(5) button]:!max-w-[120px] [&_th#EDBC-17]:!w-[120px] [&_td#EDBC-17]:!w-[120px] [&_th#EDBC-17]:!min-w-[120px] [&_td#EDBC-17]:!min-w-[120px] [&_th#EDBC-17]:!max-w-[120px] [&_td#EDBC-17]:!max-w-[120px] [&_th#EDBC-14]:!w-[158px] [&_td#EDBC-14]:!w-[158px] [&_th#EDBC-14]:!min-w-[158px] [&_td#EDBC-14]:!min-w-[158px] [&_th#EDBC-14]:!max-w-[158px] [&_td#EDBC-14]:!max-w-[158px] [&_th#EDBC-12]:!w-[158px] [&_td#EDBC-12]:!w-[158px] [&_th#EDBC-12]:!min-w-[158px] [&_td#EDBC-12]:!min-w-[158px] [&_th#EDBC-12]:!max-w-[158px] [&_td#EDBC-12]:!max-w-[158px] [&_th#EDBC-16]:!w-[158px] [&_td#EDBC-16]:!w-[158px] [&_th#EDBC-16]:!min-w-[158px] [&_td#EDBC-16]:!min-w-[158px] [&_th#EDBC-16]:!max-w-[158px] [&_td#EDBC-16]:!max-w-[158px] [&_th#EDBC-15]:!w-[158px] [&_td#EDBC-15]:!w-[158px] [&_th#EDBC-15]:!min-w-[158px] [&_td#EDBC-15]:!min-w-[158px] [&_th#EDBC-15]:!max-w-[158px] [&_td#EDBC-15]:!max-w-[158px] [&_th#EDBC-19]:!w-[70px] [&_td#EDBC-19]:!w-[70px] [&_th#EDBC-19]:!min-w-[70px] [&_td#EDBC-19]:!min-w-[70px] [&_th#EDBC-19]:!max-w-[70px] [&_td#EDBC-19]:!max-w-[70px] [&_th#EDBC-20]:!w-[70px] [&_td#EDBC-20]:!w-[70px] [&_th#EDBC-20]:!min-w-[70px] [&_td#EDBC-20]:!min-w-[70px] [&_th#EDBC-20]:!max-w-[70px] [&_td#EDBC-20]:!max-w-[70px]';
+const getRentDatabaseCellClass = (columnId, extraClassName = '') =>
+    [getEdbcColumnConfig(columnId)?.tdClass || '', extraClassName].filter(Boolean).join(' ');
 
 const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true }) => {
     const [rentForms, setRentForms] = useState([]);
     const [dbShowFilters, setDbShowFilters] = useState(false);
+    const [overallSearch, setOverallSearch] = useState('');
     const [selectedFile, setSelectedFile] = useState(null);
     const [message, setMessage] = useState("");
     const [selectedDbDate, setSelectedDbDate] = useState('');
@@ -49,6 +85,12 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
     const [audits, setAudits] = useState([]);
     const [selectedDbMonth, setSelectedDbMonth] = useState('');
     const [selectedDbENo, setSelectedDbENo] = useState('');
+    const [dbTimestampDate, setDbTimestampDate] = useState('');
+    const [showDbTimestampDatePicker, setShowDbTimestampDatePicker] = useState(false);
+    const [dbAmount, setDbAmount] = useState('');
+    const [dbEnteredBy, setDbEnteredBy] = useState('');
+    const [dbBranch, setDbBranch] = useState('');
+    const [enteredByOption, setEnteredByOption] = useState([]);
     useEffect(() => {
         const savedSelectedDbDate = sessionStorage.getItem('selectedDbDate');
         const savedDbShopNo = sessionStorage.getItem('dbShopNo')
@@ -96,6 +138,9 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
         if (dbShowFilters) sessionStorage.setItem('dbShowFilters', JSON.stringify(dbShowFilters));
     }, [selectedDbDate, dbShopNo, selectedDbMonth, dbTenantName, dbFormType, selectedDbENo, dbPaymentMode, dbShowFilters]);
     const scrollRef = useRef(null);
+    const filterRowRef = useRef(null);
+    const filterNudgeUsedRef = useRef(false);
+    const filterScrollResetSkipRef = useRef(true);
     const isDragging = useRef(false);
     const start = useRef({ x: 0, y: 0 });
     const scroll = useRef({ left: 0, top: 0 });
@@ -136,6 +181,8 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
     const [userPermissions, setUserPermissions] = useState([]);
     const [sortField, setSortField] = useState('');
     const [sortOrder, setSortOrder] = useState('asc');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(50);
     const fileInputRef = useRef(null);
     const currentItems = filteredRentForm;
     const handleSort = (field) => {
@@ -146,30 +193,6 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
             setSortOrder('asc');
         }
     };
-    const sortedItems = sortField
-        ? [...currentItems].sort((a, b) => {
-            const valA = a[sortField];
-            const valB = b[sortField];
-            if (!isNaN(valA) && !isNaN(valB)) {
-                return sortOrder === 'asc' ? valA - valB : valB - valA;
-            }
-            if (sortField === 'forTheMonthOf') {
-                const dateA = new Date(valA + '-01');
-                const dateB = new Date(valB + '-01');
-                return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
-            }
-            if (sortField === 'paidOnDate') {
-                const dateA = new Date(valA);
-                const dateB = new Date(valB);
-                return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
-            }
-            const strA = valA?.toString().toLowerCase() || '';
-            const strB = valB?.toString().toLowerCase() || '';
-            return sortOrder === 'asc'
-                ? strA.localeCompare(strB)
-                : strB.localeCompare(strA);
-        })
-        : currentItems;
     useEffect(() => {
         console.log('Sort field:', sortField);
         console.log('Sort order:', sortOrder);
@@ -194,6 +217,74 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
         }
         return String(rent?.branch ?? rent?.branch_name ?? rent?.branchName ?? '').trim();
     };
+
+    const getBranchName = (branchId) => {
+        const match = branchOptions.find((b) => String(b.id) === String(branchId));
+        return String(match?.branch ?? match?.branchName ?? '').trim();
+    };
+
+    const sortedItems = sortField
+        ? [...currentItems].sort((a, b) => {
+            const valA = a[sortField];
+            const valB = b[sortField];
+            if (sortField === 'amount') {
+                const numA = Number(a.refundAmount || a.amount) || 0;
+                const numB = Number(b.refundAmount || b.amount) || 0;
+                return sortOrder === 'asc' ? numA - numB : numB - numA;
+            }
+            if (sortField === 'branch') {
+                const strA = getRentBranchDisplay(a).toLowerCase();
+                const strB = getRentBranchDisplay(b).toLowerCase();
+                return sortOrder === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
+            }
+            if (sortField === 'enteredBy') {
+                const strA = getRentEnteredBy(a).toLowerCase();
+                const strB = getRentEnteredBy(b).toLowerCase();
+                return sortOrder === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
+            }
+            if (!isNaN(valA) && !isNaN(valB)) {
+                return sortOrder === 'asc' ? valA - valB : valB - valA;
+            }
+            if (sortField === 'forTheMonthOf') {
+                const dateA = new Date(valA + '-01');
+                const dateB = new Date(valB + '-01');
+                return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+            }
+            if (sortField === 'paidOnDate') {
+                const dateA = new Date(valA);
+                const dateB = new Date(valB);
+                return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+            }
+            if (sortField === 'timestamp') {
+                const dateA = new Date(valA);
+                const dateB = new Date(valB);
+                return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+            }
+            const strA = valA?.toString().toLowerCase() || '';
+            const strB = valB?.toString().toLowerCase() || '';
+            return sortOrder === 'asc'
+                ? strA.localeCompare(strB)
+                : strB.localeCompare(strA);
+        })
+        : currentItems;
+    const totalPages = Math.ceil(sortedItems.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedItems = sortedItems.slice(startIndex, endIndex);
+    useEffect(() => {
+        const nextTotalPages = Math.max(1, Math.ceil(sortedItems.length / itemsPerPage));
+        setCurrentPage((page) => (page > nextTotalPages ? nextTotalPages : page));
+    }, [sortedItems.length, itemsPerPage]);
+
+    const dbBranchFilterOptions = useMemo(() => {
+        const ids = [...new Set(rentForms.map((r) => r.branchId ?? r.branch_id).filter((v) => v != null && v !== ''))];
+        return ids.map((id) => ({ value: String(id), label: getBranchName(id) || String(id) }));
+    }, [rentForms, branchOptions]);
+
+    const dbAmountTotal = useMemo(
+        () => rentForms.reduce((sum, rent) => sum + (Number(rent.refundAmount || rent.amount) || 0), 0),
+        [rentForms]
+    );
 
     useEffect(() => {
         const fetchBranches = async () => {
@@ -360,6 +451,7 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
         };
         scrollRef.current.scrollLeft = scroll.current.left - dx;
         scrollRef.current.scrollTop = scroll.current.top - dy;
+        filterNudgeUsedRef.current = false;
         lastMove.current = {
             time: now,
             x: e.clientX,
@@ -573,6 +665,13 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
 
     useEffect(() => {
         const filtered = rentForms.filter(rent => {
+            if (dbTimestampDate) {
+                const selectedDate = new Date(dbTimestampDate);
+                const entryTimestamp = new Date(rent.timestamp);
+                if (selectedDate.toDateString() !== entryTimestamp.toDateString()) {
+                    return false;
+                }
+            }
             const matchesShopNo = dbShopNo ? rent.shopNo === dbShopNo : true;
             const matchesTenantName = dbTenantName ? rent.tenantName === dbTenantName : true;
             const matchesPaymentMode = dbPaymentMode ? rent.paymentMode === dbPaymentMode : true;
@@ -587,6 +686,39 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
                     year: 'numeric',
                 }) === selectedDbMonth
                 : true;
+            if (dbAmount.trim() && !matchesEdbcAmountFilter(rent.refundAmount || rent.amount, dbAmount)) return false;
+            if (dbEnteredBy && getRentEnteredBy(rent).toLowerCase() !== dbEnteredBy.toLowerCase()) return false;
+            if (dbBranch) {
+                const branchId = rent?.branchId ?? rent?.branch_id;
+                if (String(branchId) !== String(dbBranch)) return false;
+            }
+            if (overallSearch.trim()) {
+                const q = overallSearch.toLowerCase().trim();
+                const shopDisplay = rent.shopNoId && shopNoIdToShopNoMap[rent.shopNoId] ? shopNoIdToShopNoMap[rent.shopNoId] : rent.shopNo;
+                const tenantDisplay = rent.tenantNameId && tenantNameIdToTenantNameMap[rent.tenantNameId] ? tenantNameIdToTenantNameMap[rent.tenantNameId] : rent.tenantName;
+                const monthDisplay = rent.forTheMonthOf
+                    ? new Date(`${rent.forTheMonthOf}-01`).toLocaleString('default', {
+                        month: 'long',
+                        year: 'numeric',
+                    })
+                    : '';
+                const searchable = [
+                    formatDate(rent.timestamp),
+                    shopDisplay,
+                    tenantDisplay,
+                    rent.refundAmount || rent.amount,
+                    rent.paidOnDate,
+                    rent.eno,
+                    monthDisplay,
+                    rent.paymentMode,
+                    rent.formType,
+                    getRentEnteredBy(rent),
+                    getRentBranchDisplay(rent),
+                ]
+                    .map((v) => String(v ?? '').toLowerCase())
+                    .join(' ');
+                if (!searchable.includes(q)) return false;
+            }
             return (
                 matchesShopNo &&
                 matchesTenantName &&
@@ -604,6 +736,7 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
         setPaymentModeOption(getUnique('paymentMode'));
         setFormTypeOptions(getUnique('formType'));
         setEnoOption(getUnique('eno'));
+        setEnteredByOption([...new Set(filtered.map((rent) => getRentEnteredBy(rent)).filter(Boolean))]);
         const uniqueMonths = getUnique('forTheMonthOf').sort();
         const formattedMonths = uniqueMonths.map(monthStr => {
             const [year, month] = monthStr.split('-');
@@ -611,7 +744,22 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
             return date.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
         });
         setMonthOptions(formattedMonths);
-    }, [dbShopNo, dbTenantName, dbPaymentMode, dbFormType, selectedDbMonth, selectedDbDate, rentForms, selectedDbENo]);
+    }, [dbShopNo, dbTenantName, dbPaymentMode, dbFormType, selectedDbMonth, selectedDbDate, rentForms, selectedDbENo, overallSearch, shopNoIdToShopNoMap, tenantNameIdToTenantNameMap, branchOptions, dbTimestampDate, dbAmount, dbEnteredBy, dbBranch]);
+
+    useEffect(() => {
+        if (filterScrollResetSkipRef.current) {
+            filterScrollResetSkipRef.current = false;
+            return;
+        }
+        if (!dbShowFilters) return;
+        const scroller = scrollRef.current;
+        if (!scroller) return;
+        filterNudgeUsedRef.current = false;
+        requestAnimationFrame(() => {
+            scroller.scrollTop = 0;
+        });
+    }, [selectedDbDate, dbShopNo, selectedDbMonth, dbTenantName, dbFormType, selectedDbENo, dbPaymentMode, dbTimestampDate, dbAmount, dbEnteredBy, dbBranch]);
+
     const convertDDMMYYYYToYYYYMMDD = (dateString) => {
         if (!dateString) return '';
         if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
@@ -1009,7 +1157,14 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
         setDbFormType('');
         setSelectedDbMonth('');
         setSelectedDbENo('');
+        setDbTimestampDate('');
+        setDbAmount('');
+        setDbEnteredBy('');
+        setDbBranch('');
+        setOverallSearch('');
         setDbShowFilters(false);
+        setSortField('');
+        setSortOrder('asc');
         sessionStorage.removeItem('selectedDbDate');
         sessionStorage.removeItem('dbShopNo');
         sessionStorage.removeItem('selectedDbMonth');
@@ -1169,563 +1324,374 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
     };
     return (
         <body className="bg-[#FAF6ED] ">
-            <div>
-                <div className='md:mt-[-35px] mb-3 text-left max-w-[1850px] md:text-right md:items-center items-start cursor-default flex flex-col sm:flex-row justify-between table-auto  overflow-auto  gap-2 sm:gap-0'>
-                    <div></div>
-                    <div className='flex items-center gap-4'>
-                        <span className='text-[#E4572E] mr-4 font-semibold hover:underline cursor-pointer' onClick={handleExportPDF}>
-                            Export pdf
-                        </span>
-                        <span className='text-[#007233] mr-4 font-semibold hover:underline cursor-pointer' onClick={handleExportExcel}>
-                            Export XL
-                        </span>
-                        <span className=' text-[#BF9853] mr-4 font-semibold hover:underline'>Print</span>
-                    </div>
-                </div>
-                <div className=" ml-10 mr-10 p-4 bg-white">
-                    <div className="flex justify-between  sm:flex-row sm:items-center sm:space-x-3">
+            <div className='flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]'>
+                <div className='px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]'>
+                <div className="w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
+                    <div className="flex flex-col flex-1 min-h-0 overflow-hidden w-max max-w-full">
+                    <div className="flex justify-between sm:flex-row sm:items-center sm:space-x-3 mb-[12px] gap-[6px] w-full">
                         <div className='flex gap-4'>
-                            <button className='pl-2' onClick={() => setDbShowFilters(!dbShowFilters)}>
-                                <img
-                                    src={Filter}
-                                    alt="Toggle Filter"
-                                    className="w-7 h-7 border border-[#BF9853] rounded-md"
-                                />
-                            </button>
-                            {(selectedDbDate || dbShopNo || dbTenantName || dbPaymentMode || dbFormType || selectedDbMonth || selectedDbENo) && (
-                                <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
+                            <EdbcFilterToggleButton
+                                onClick={() => {
+                                    const willOpen = !dbShowFilters;
+                                    const scroller = scrollRef.current;
+                                    if (willOpen) {
+                                        setDbShowFilters(true);
+                                        if (!scroller) return;
+                                        if (scroller.scrollTop <= 0) return;
+                                        if (filterNudgeUsedRef.current) return;
+                                        filterNudgeUsedRef.current = true;
+                                        requestAnimationFrame(() => {
+                                            requestAnimationFrame(() => {
+                                                const h = filterRowRef.current?.offsetHeight || 0;
+                                                if (h > 0) {
+                                                    scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+                                                }
+                                            });
+                                        });
+                                        return;
+                                    }
+                                    const h = filterRowRef.current?.offsetHeight || 0;
+                                    setDbShowFilters(false);
+                                    if (!scroller || h <= 0 || !filterNudgeUsedRef.current) return;
+                                    filterNudgeUsedRef.current = false;
+                                    requestAnimationFrame(() => {
+                                        requestAnimationFrame(() => {
+                                            scroller.scrollTop = scroller.scrollTop + h;
+                                        });
+                                    });
+                                }}
+                            />
+                            {(selectedDbDate || dbShopNo || dbTenantName || dbPaymentMode || dbFormType || selectedDbMonth || selectedDbENo || dbTimestampDate || dbAmount.trim() || dbEnteredBy || dbBranch) && (
+                                <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
+                                    {dbTimestampDate && (
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Timestamp: </span>
+                                            <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(dbTimestampDate)}</span>
+                                            <button type="button" onClick={() => setDbTimestampDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                        </span>
+                                    )}
                                     {selectedDbDate && (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
-                                            <span className="font-normal">Paid On Date: </span>
-                                            <span className="font-bold">{selectedDbDate}</span>
-                                            <button onClick={() => { setSelectedDbDate(''); sessionStorage.removeItem('selectedDbDate'); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Paid on: </span>
+                                            <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(selectedDbDate)}</span>
+                                            <button type="button" onClick={() => { setSelectedDbDate(''); sessionStorage.removeItem('selectedDbDate'); }} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
                                     {dbShopNo && (
-                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                                            <span className="font-normal">Shop N0: </span>
-                                            <span className="font-bold">{dbShopNo}</span>
-                                            <button onClick={() => { setDbShopNo(''); sessionStorage.removeItem('dbShopNo'); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Shop No: </span>
+                                            <span className="font-semibold text-[14px] truncate min-w-0">{dbShopNo}</span>
+                                            <button type="button" onClick={() => { setDbShopNo(''); sessionStorage.removeItem('dbShopNo'); }} className="text-[#E4572E] text-2xl ml-1">×</button>
                                         </span>
                                     )}
                                     {dbTenantName && (
-                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                                            <span className="font-normal">Tenant Name: </span>
-                                            <span className="font-bold">{dbTenantName}</span>
-                                            <button onClick={() => { setDbTenantName(''); sessionStorage.removeItem('dbTenantName'); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Tenant Name: </span>
+                                            <span className="font-semibold text-[14px] truncate min-w-0">{dbTenantName}</span>
+                                            <button type="button" onClick={() => { setDbTenantName(''); sessionStorage.removeItem('dbTenantName'); }} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                        </span>
+                                    )}
+                                    {dbAmount.trim() && (
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Amount: </span>
+                                            <span className="font-semibold text-[14px] truncate min-w-0">{dbAmount}</span>
+                                            <button type="button" onClick={() => setDbAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                         </span>
                                     )}
                                     {dbPaymentMode && (
-                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                                            <span className="font-normal">Payment Mode: </span>
-                                            <span className="font-bold">{dbPaymentMode}</span>
-                                            <button onClick={() => { setDbPaymentMode(''); sessionStorage.removeItem('dbPaymentMode'); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Payment Mode: </span>
+                                            <span className="font-semibold text-[14px] truncate min-w-0">{dbPaymentMode}</span>
+                                            <button type="button" onClick={() => { setDbPaymentMode(''); sessionStorage.removeItem('dbPaymentMode'); }} className="text-[#E4572E] text-2xl ml-1">×</button>
                                         </span>
                                     )}
                                     {dbFormType && (
-                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                                            <span className="font-normal">Type: </span>
-                                            <span className="font-bold">{dbFormType}</span>
-                                            <button onClick={() => { setDbFormType(''); sessionStorage.removeItem('dbFormType'); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Type: </span>
+                                            <span className="font-semibold text-[14px] truncate min-w-0">{dbFormType}</span>
+                                            <button type="button" onClick={() => { setDbFormType(''); sessionStorage.removeItem('dbFormType'); }} className="text-[#E4572E] text-2xl ml-1">×</button>
                                         </span>
                                     )}
                                     {selectedDbMonth && (
-                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                                            <span className="font-normal">For The Month Of: </span>
-                                            <span className="font-bold">{selectedDbMonth}</span>
-                                            <button onClick={() => { setSelectedDbMonth(''); sessionStorage.removeItem('selectedDbMonth'); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">For the month of: </span>
+                                            <span className="font-semibold text-[14px] truncate min-w-0">{selectedDbMonth}</span>
+                                            <button type="button" onClick={() => { setSelectedDbMonth(''); sessionStorage.removeItem('selectedDbMonth'); }} className="text-[#E4572E] text-2xl ml-1">×</button>
                                         </span>
                                     )}
                                     {selectedDbENo && (
-                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                                            <span className="font-normal">E No: </span>
-                                            <span className="font-bold">{selectedDbENo}</span>
-                                            <button onClick={() => { setSelectedDbENo(''); sessionStorage.removeItem('selectedDbENo'); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Entry No: </span>
+                                            <span className="font-semibold text-[14px] truncate min-w-0">{selectedDbENo}</span>
+                                            <button type="button" onClick={() => { setSelectedDbENo(''); sessionStorage.removeItem('selectedDbENo'); }} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                        </span>
+                                    )}
+                                    {dbEnteredBy && (
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Entered By: </span>
+                                            <span className="font-semibold text-[14px] truncate min-w-0">{dbEnteredBy}</span>
+                                            <button type="button" onClick={() => setDbEnteredBy('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                        </span>
+                                    )}
+                                    {dbBranch && (
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Branch: </span>
+                                            <span className="font-semibold text-[14px] truncate min-w-0">{getBranchName(dbBranch) || dbBranch}</span>
+                                            <button type="button" onClick={() => setDbBranch('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                         </span>
                                     )}
                                 </div>
                             )}
                         </div>
-                        <div className='mb-4 flex items-center gap-3'>
-                            <label className='flex items-center gap-2 px-4 py-2 border border-[#BF9853] rounded-lg cursor-pointer hover:bg-[#BF9853]/5 transition-colors'>
-                                <svg className='w-5 h-5 text-[#BF9853]' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth='2' d='M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12'></path>
-                                </svg>
-                                <span className='text-sm font-medium text-gray-700'>Choose CSV File</span>
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept=".csv"
-                                    onChange={handleFileChange}
-                                    className='hidden'
-                                />
-                            </label>
-                            {selectedFile && (
-                                <span className='text-sm text-gray-600 flex items-center gap-2'>
-                                    <svg className='w-4 h-4 text-[#BF9853]' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                                        <path strokeLinecap='round' strokeLinejoin='round' strokeWidth='2' d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'></path>
-                                    </svg>
-                                    <span className='max-w-xs truncate'>{selectedFile.name}</span>
-                                    <button
-                                        onClick={() => {
-                                            setSelectedFile(null);
-                                            if (fileInputRef.current) {
-                                                fileInputRef.current.value = '';
-                                            }
-                                        }}
-                                        className='text-gray-400 hover:text-red-500 ml-1'
-                                        type='button'
-                                    >
-                                        ×
-                                    </button>
-                                </span>
-                            )}
-                            <button onClick={handleUpload} disabled={!selectedFile}
-                                className='bg-[#BF9853] text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-[#BF9853]/90 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors'
-                            >
-                                Upload
-                            </button>
-                            {message && (
-                                <span className={`text-sm font-medium ${
-                                    message.includes('failed') || message.includes('Please select') 
-                                        ? 'text-red-600' 
-                                        : 'text-green-600'
-                                }`}>
-                                    {message}
-                                </span>
-                            )}
-                        </div>
-                        <div>
-                            <button onClick={resetFilters}
-                                className='w-36 h-9 border border-[#BF9853] rounded-md font-semibold text-sm text-[#BF9853] flex items-center justify-center gap-2'
-                            >
-                                <img className='w-4 h-4' src={Reload} alt="Reload" />
-                                Reset Table
-                            </button>
-                        </div>
+                        
+                        <EdbcTableToolbarRightActions
+                            onClearFilters={resetFilters}
+                            overallSearch={overallSearch}
+                            onOverallSearchChange={setOverallSearch}
+                            showExportIcons
+                            onExportPdf={handleExportPDF}
+                            onExportCsv={handleExportExcel}
+                        />
                     </div>
-                    <div className=" w-full  py-5 flex justify-between">
                         <div
                             ref={scrollRef}
-                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[625px] overflow-scroll select-none"
+                            className="w-full rounded-lg border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none no-scrollbar"
+                            onWheel={() => { filterNudgeUsedRef.current = false; }}
                             onMouseDown={handleMouseDown}
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp} >
-                            <table className="table-auto min-w-[1400px] w-screen border-collapse">
-                                <thead>
-                                    <tr className="bg-[#FAF6ED] text-left sticky top-0 z-90">
-                                        <th className="px-4 py-2 font-bold">Timestamp</th>
-                                        <th className="px-4 py-2 font-bold cursor-pointer" onClick={() => handleSort('shopNo')} >
-                                            Shop No {sortField === 'shopNo' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
-                                        </th>
-                                        <th className="px-4 py-2 font-bold" onClick={() => handleSort('tenantName')}>
-                                            Tenant Name {sortField === 'tenantName' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
-                                        </th>
-                                        <th className="px-4 py-2 font-bold">Amount</th>
-                                        <th className="px-4 py-2 font-bold cursor-pointer" onClick={() => handleSort('paidOnDate')} >
-                                            Paid on {sortField === 'paidOnDate' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
-                                        </th>
-                                        <th className="px-4 py-2 font-bold cursor-pointer" onClick={() => handleSort('eno')} >
-                                            E No {sortField === 'eno' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
-                                        </th>
-                                        <th className="px-4 py-2 font-bold cursor-pointer" onClick={() => handleSort('forTheMonthOf')} >
-                                            For the month of {sortField === 'forTheMonthOf' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
-                                        </th>
-                                        <th className="px-4 py-2 font-bold" onClick={() => handleSort('paymentMode')} >
-                                            Payment mode {sortField === 'paymentMode' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
-                                        </th>
-                                        <th className="px-4 py-2 font-bold cursor-pointer" onClick={() => handleSort('formType')} >
-                                            Type {sortField === 'formType' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
-                                        </th>
-                                        <th className="px-4 py-2 font-bold">Entered By</th>
-                                        <th className="px-4 py-2 font-bold">Branch</th>
-                                        <th className="px-4 py-2 font-bold">Activity</th>
-                                        <th className="px-1 py-2 font-bold">Print</th>
-                                    </tr>
+                            <table className={`border-collapse w-max min-w-max text-left ${RENT_DATABASE_EDBC_WIDTH_LOCK_TABLE_CLASS} ${EDBC_TABLE_EDGE_TABLE_CLASS}${dbShowFilters ? ' [&_thead_tr:first-child_th]:!border-b-0' : ''}`}>
+                                <thead className="sticky top-0">
+                                    <EdbcTableHeaderRow>
+                                        <EdbcColumnHeader
+                                            columnId={rentDatabaseColumnIds.timestamp}
+                                            label="Timestamp"
+                                            sortField={sortField === 'timestamp' ? getEdbcColumnConfig(rentDatabaseColumnIds.timestamp)?.sortField : ''}
+                                            sortDirection={sortOrder}
+                                            onSort={() => handleSort('timestamp')}
+                                        />
+                                        <EdbcColumnHeader
+                                            columnId={rentDatabaseColumnIds.shopNo}
+                                            label="Shop No"
+                                            sortField={sortField === 'shopNo' ? getEdbcColumnConfig(rentDatabaseColumnIds.shopNo)?.sortField : ''}
+                                            sortDirection={sortOrder}
+                                            onSort={() => handleSort('shopNo')}
+                                            headerClassName="!text-left"
+                                        />
+                                        <EdbcColumnHeader
+                                            columnId={rentDatabaseColumnIds.tenantName}
+                                            label="Tenant Name"
+                                            sortField={sortField === 'tenantName' ? getEdbcColumnConfig(rentDatabaseColumnIds.tenantName)?.sortField : ''}
+                                            sortDirection={sortOrder}
+                                            onSort={() => handleSort('tenantName')}
+                                        />
+                                        <EdbcColumnHeader
+                                            columnId={rentDatabaseColumnIds.amount}
+                                            label="Amount"
+                                            sortField={sortField === 'amount' ? getEdbcColumnConfig(rentDatabaseColumnIds.amount)?.sortField : ''}
+                                            sortDirection={sortOrder}
+                                            onSort={() => handleSort('amount')}
+                                        />
+                                        <EdbcColumnHeader
+                                            columnId={rentDatabaseColumnIds.paidOnDate}
+                                            label="Paid on"
+                                            sortField={sortField === 'paidOnDate' ? getEdbcColumnConfig(rentDatabaseColumnIds.paidOnDate)?.sortField : ''}
+                                            sortDirection={sortOrder}
+                                            onSort={() => handleSort('paidOnDate')}
+                                        />
+                                        <EdbcColumnHeader
+                                            columnId={rentDatabaseColumnIds.eno}
+                                            label="Entry No"
+                                            sortField={sortField === 'eno' ? getEdbcColumnConfig(rentDatabaseColumnIds.eno)?.sortField : ''}
+                                            sortDirection={sortOrder}
+                                            onSort={() => handleSort('eno')}
+                                        />
+                                        <EdbcColumnHeader
+                                            columnId={rentDatabaseColumnIds.forTheMonthOf}
+                                            label="For the month of"
+                                            sortField={sortField === 'forTheMonthOf' ? getEdbcColumnConfig(rentDatabaseColumnIds.forTheMonthOf)?.sortField : ''}
+                                            sortDirection={sortOrder}
+                                            onSort={() => handleSort('forTheMonthOf')}
+                                        />
+                                        <EdbcColumnHeader
+                                            columnId={rentDatabaseColumnIds.paymentMode}
+                                            label="Payment Mode"
+                                            sortField={sortField === 'paymentMode' ? getEdbcColumnConfig(rentDatabaseColumnIds.paymentMode)?.sortField : ''}
+                                            sortDirection={sortOrder}
+                                            onSort={() => handleSort('paymentMode')}
+                                        />
+                                        <EdbcColumnHeader
+                                            columnId={rentDatabaseColumnIds.formType}
+                                            label="Type"
+                                            sortField={sortField === 'formType' ? getEdbcColumnConfig(rentDatabaseColumnIds.formType)?.sortField : ''}
+                                            sortDirection={sortOrder}
+                                            onSort={() => handleSort('formType')}
+                                        />
+                                        <EdbcColumnHeader
+                                            columnId={rentDatabaseColumnIds.branch}
+                                            label="Branch"
+                                            sortField={sortField === 'branch' ? getEdbcColumnConfig(rentDatabaseColumnIds.branch)?.sortField : ''}
+                                            sortDirection={sortOrder}
+                                            onSort={() => handleSort('branch')}
+                                        />
+                                        <EdbcColumnHeader
+                                            columnId={rentDatabaseColumnIds.enteredBy}
+                                            label="Entered By"
+                                            sortField={sortField === 'enteredBy' ? getEdbcColumnConfig(rentDatabaseColumnIds.enteredBy)?.sortField : ''}
+                                            sortDirection={sortOrder}
+                                            onSort={() => handleSort('enteredBy')}
+                                        />
+                                        <EdbcColumnHeader columnId={rentDatabaseColumnIds.activity} label="Activity" />
+                                        <EdbcColumnHeader columnId={rentDatabaseColumnIds.print} label="Print" />
+                                    </EdbcTableHeaderRow>
                                     {dbShowFilters && (
-                                        <tr>
-                                            <th></th>
-                                            <th className="px-2">
-                                                <Select
-                                                    className="w-40 mt-3 mb-3"
-                                                    options={shopNoOption.map(type => ({ value: type, label: type }))}
-                                                    value={dbShopNo ? { value: dbShopNo, label: dbShopNo } : null}
-                                                    onChange={(selectedOption) => {
-                                                        const value = selectedOption ? selectedOption.value : '';
-                                                        setDbShopNo(value);
-                                                        if (value) {
-                                                            sessionStorage.setItem('dbShopNo', JSON.stringify(value));
-                                                        } else {
-                                                            sessionStorage.removeItem('dbShopNo');
-                                                        }
-                                                    }}
-                                                    placeholder="Shop..."
-                                                    menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'transparent',
-                                                            borderWidth: '3px',
-                                                            borderColor: state.isFocused
-                                                                ? 'rgba(191, 152, 83, 0.2)'
-                                                                : 'rgba(191, 152, 83, 0.2)',
-                                                            borderRadius: '6px',
-                                                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                                            '&:hover': {
-                                                                borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#999',
-                                                            textAlign: 'left',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9,
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            textAlign: 'left',
-                                                            fontWeight: 'normal',
-                                                            fontSize: '15px',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: 'black',
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            textAlign: 'left',
-                                                            fontWeight: 'normal',
-                                                            color: 'black',
-                                                        }),
-                                                    }}
-                                                />
-                                            </th>
-                                            <th className="px-2">
-                                                <Select
-                                                    className="w-48 mt-3 mb-3"
-                                                    options={tenantNameOption.map(type => ({ value: type, label: type }))}
-                                                    value={dbTenantName ? { value: dbTenantName, label: dbTenantName } : null}
-                                                    onChange={(selectedOption) => {
-                                                        const value = selectedOption ? selectedOption.value : '';
-                                                        setDbTenantName(value);
-                                                        if (value) {
-                                                            sessionStorage.setItem('dbTenantName', JSON.stringify(value));
-                                                        } else {
-                                                            sessionStorage.removeItem('dbTenantName');
-                                                        }
-                                                    }}
-                                                    placeholder="Search Tenant"
-                                                    menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'transparent',
-                                                            borderWidth: '3px',
-                                                            borderColor: state.isFocused
-                                                                ? 'rgba(191, 152, 83, 0.2)'
-                                                                : 'rgba(191, 152, 83, 0.2)',
-                                                            borderRadius: '6px',
-                                                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                                            '&:hover': {
-                                                                borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#999',
-                                                            textAlign: 'left',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9,
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            textAlign: 'left',
-                                                            fontWeight: 'normal',
-                                                            fontSize: '15px',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: 'black',
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            textAlign: 'left',
-                                                            fontWeight: 'normal',
-                                                            color: 'black',
-                                                        }),
-                                                    }}
-                                                />
-                                            </th>
-                                            <th></th>
-                                            <th className="px-2">
-                                                <input
-                                                    type="date"
-                                                    value={selectedDbDate}
-                                                    onChange={(e) => setSelectedDbDate(e.target.value)}
-                                                    className="p-1 -ml-3 mt-3 mb-3 rounded-md bg-transparent w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
-                                                    placeholder="Search Date..."
-                                                />
-                                            </th>
-                                            <th>
-                                                <Select
-                                                    className="w-34 h-10 mt-3 mb-3"
-                                                    options={enoOption.map(type => ({ value: type, label: type }))}
-                                                    value={selectedDbENo ? { value: selectedDbENo, label: selectedDbENo } : null}
-                                                    onChange={(selectedOption) => {
-                                                        const value = selectedOption ? selectedOption.value : '';
-                                                        setSelectedDbENo(value);
-                                                        if (value) {
-                                                            sessionStorage.setItem('selectedDbENo', JSON.stringify(value));
-                                                        } else {
-                                                            sessionStorage.removeItem('selectedDbENo');
-                                                        }
-                                                    }}
-                                                    placeholder='Search ...'
-                                                    menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'transparent',
-                                                            borderWidth: '3px',
-                                                            borderColor: state.isFocused
-                                                                ? 'rgba(191, 152, 83, 0.2)'
-                                                                : 'rgba(191, 152, 83, 0.2)',
-                                                            borderRadius: '6px',
-                                                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                                            '&:hover': {
-                                                                borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#999',
-                                                            textAlign: 'left',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9,
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            textAlign: 'left',
-                                                            fontWeight: 'normal',
-                                                            fontSize: '15px',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: 'black',
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            textAlign: 'left',
-                                                            fontWeight: 'normal',
-                                                            color: 'black',
-                                                        }),
-                                                    }}
-                                                />
-                                            </th>
-                                            <th>
-                                                <Select
-                                                    className="w-48 mt-3 mb-3"
-                                                    options={monthOptions.map(type => ({ value: type, label: type }))}
-                                                    value={selectedDbMonth ? { value: selectedDbMonth, label: selectedDbMonth } : null}
-                                                    onChange={(selectedOption) => {
-                                                        const value = selectedOption ? selectedOption.value : '';
-                                                        setSelectedDbMonth(value);
-                                                        if (value) {
-                                                            sessionStorage.setItem('selectedDbMonth', JSON.stringify(value));
-                                                        } else {
-                                                            sessionStorage.removeItem('selectedDbMonth');
-                                                        }
-                                                    }}
-                                                    placeholder="Search Mode..."
-                                                    menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'transparent',
-                                                            borderWidth: '3px',
-                                                            borderColor: state.isFocused
-                                                                ? 'rgba(191, 152, 83, 0.2)'
-                                                                : 'rgba(191, 152, 83, 0.2)',
-                                                            borderRadius: '6px',
-                                                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                                            '&:hover': {
-                                                                borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#999',
-                                                            textAlign: 'left',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9,
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            textAlign: 'left',
-                                                            fontWeight: 'normal',
-                                                            fontSize: '15px',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: 'black',
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            textAlign: 'left',
-                                                            fontWeight: 'normal',
-                                                            color: 'black',
-                                                        }),
-                                                    }}
-                                                />
-                                            </th>
-                                            <th className="px-2">
-                                                <Select
-                                                    className="w-48 mt-3 mb-3"
-                                                    options={paymentModeOption.map(type => ({ value: type, label: type }))}
-                                                    value={dbPaymentMode ? { value: dbPaymentMode, label: dbPaymentMode } : null}
-                                                    onChange={(selectedOption) => {
-                                                        const value = selectedOption ? selectedOption.value : '';
-                                                        setDbPaymentMode(value);
-                                                        if (value) {
-                                                            sessionStorage.setItem('dbPaymentMode', JSON.stringify(value));
-                                                        } else {
-                                                            sessionStorage.removeItem('dbPaymentMode');
-                                                        }
-                                                    }}
-                                                    placeholder="Search Mode..."
-                                                    menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'transparent',
-                                                            borderWidth: '3px',
-                                                            borderColor: state.isFocused
-                                                                ? 'rgba(191, 152, 83, 0.2)'
-                                                                : 'rgba(191, 152, 83, 0.2)',
-                                                            borderRadius: '6px',
-                                                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                                            '&:hover': {
-                                                                borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#999',
-                                                            textAlign: 'left',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9,
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            textAlign: 'left',
-                                                            fontWeight: 'normal',
-                                                            fontSize: '15px',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: 'black',
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            textAlign: 'left',
-                                                            fontWeight: 'normal',
-                                                            color: 'black',
-                                                        }),
-                                                    }}
-                                                />
-                                            </th>
-                                            <th className="px-2">
-                                                <Select
-                                                    className="w-44 mt-3 mb-3"
-                                                    options={formTypeOptions.map(type => ({ value: type, label: type }))}
-                                                    value={dbFormType ? { value: dbFormType, label: dbFormType } : null}
-                                                    onChange={(selectedOption) => {
-                                                        const value = selectedOption ? selectedOption.value : '';
-                                                        setDbFormType(value);
-                                                        if (value) {
-                                                            sessionStorage.setItem('dbFormType', JSON.stringify(value));
-                                                        } else {
-                                                            sessionStorage.removeItem('dbFormType');
-                                                        }
-                                                    }}
-                                                    placeholder="Search Type.."
-                                                    menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'transparent',
-                                                            borderWidth: '3px',
-                                                            borderColor: state.isFocused
-                                                                ? 'rgba(191, 152, 83, 0.2)'
-                                                                : 'rgba(191, 152, 83, 0.2)',
-                                                            borderRadius: '6px',
-                                                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                                            '&:hover': {
-                                                                borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#999',
-                                                            textAlign: 'left',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9,
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            textAlign: 'left',
-                                                            fontWeight: 'normal',
-                                                            fontSize: '15px',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: 'black',
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            textAlign: 'left',
-                                                            fontWeight: 'normal',
-                                                            color: 'black',
-                                                        }),
-                                                    }}
-                                                />
-                                            </th>
-                                            <th></th>
-                                            <th></th>
-                                            <th></th>
-                                            <th></th>
-                                        </tr>
+                                        <EdbcTableFilterRow ref={filterRowRef}>
+                                            <EdbcTimestampFilter
+                                                columnId={rentDatabaseColumnIds.timestamp}
+                                                placeholder="Timestamp"
+                                                timestampStartDate={dbTimestampDate}
+                                                timestampEndDate={dbTimestampDate}
+                                                isOpen={showDbTimestampDatePicker}
+                                                onOpen={() => setShowDbTimestampDatePicker(true)}
+                                                onClose={() => setShowDbTimestampDatePicker(false)}
+                                                onApply={(from) => {
+                                                    setDbTimestampDate(from || '');
+                                                    setShowDbTimestampDatePicker(false);
+                                                }}
+                                            />
+                                            <EdbcSelectFilter
+                                                columnId={rentDatabaseColumnIds.shopNo}
+                                                placeholder="Shop No"
+                                                options={shopNoOption.map((type) => ({ value: type, label: type }))}
+                                                value={dbShopNo}
+                                                onChange={(value) => {
+                                                    setDbShopNo(value);
+                                                    if (value) {
+                                                        sessionStorage.setItem('dbShopNo', JSON.stringify(value));
+                                                    } else {
+                                                        sessionStorage.removeItem('dbShopNo');
+                                                    }
+                                                }}
+                                            />
+                                            <EdbcSelectFilter
+                                                columnId={rentDatabaseColumnIds.tenantName}
+                                                placeholder="Tenant Name"
+                                                options={tenantNameOption.map((type) => ({ value: type, label: type }))}
+                                                value={dbTenantName}
+                                                onChange={(value) => {
+                                                    setDbTenantName(value);
+                                                    if (value) {
+                                                        sessionStorage.setItem('dbTenantName', JSON.stringify(value));
+                                                    } else {
+                                                        sessionStorage.removeItem('dbTenantName');
+                                                    }
+                                                }}
+                                            />
+                                            <EdbcTotalAmountFilter
+                                                columnId={rentDatabaseColumnIds.amount}
+                                                totalAmount={dbAmountTotal}
+                                                value={dbAmount}
+                                                onChange={(e) => setDbAmount(e.target.value)}
+                                            />
+                                            <EdbcDateFilter
+                                                placeholder="Paid on"
+                                                value={selectedDbDate}
+                                                onChange={setSelectedDbDate}
+                                            />
+                                            <EdbcSelectFilter
+                                                columnId={rentDatabaseColumnIds.eno}
+                                                placeholder="Entry No"
+                                                options={enoOption.map((type) => ({ value: type, label: type }))}
+                                                value={selectedDbENo}
+                                                onChange={(value) => {
+                                                    setSelectedDbENo(value);
+                                                    if (value) {
+                                                        sessionStorage.setItem('selectedDbENo', JSON.stringify(value));
+                                                    } else {
+                                                        sessionStorage.removeItem('selectedDbENo');
+                                                    }
+                                                }}
+                                                textAlign="right"
+                                            />
+                                            <EdbcSelectFilter
+                                                columnId={rentDatabaseColumnIds.forTheMonthOf}
+                                                placeholder="For the month of"
+                                                options={monthOptions.map((type) => ({ value: type, label: type }))}
+                                                value={selectedDbMonth}
+                                                onChange={(value) => {
+                                                    setSelectedDbMonth(value);
+                                                    if (value) {
+                                                        sessionStorage.setItem('selectedDbMonth', JSON.stringify(value));
+                                                    } else {
+                                                        sessionStorage.removeItem('selectedDbMonth');
+                                                    }
+                                                }}
+                                            />
+                                            <EdbcSelectFilter
+                                                columnId={rentDatabaseColumnIds.paymentMode}
+                                                placeholder="Payment mode"
+                                                options={paymentModeOption.map((type) => ({ value: type, label: type }))}
+                                                value={dbPaymentMode}
+                                                onChange={(value) => {
+                                                    setDbPaymentMode(value);
+                                                    if (value) {
+                                                        sessionStorage.setItem('dbPaymentMode', JSON.stringify(value));
+                                                    } else {
+                                                        sessionStorage.removeItem('dbPaymentMode');
+                                                    }
+                                                }}
+                                            />
+                                            <EdbcSelectFilter
+                                                columnId={rentDatabaseColumnIds.formType}
+                                                placeholder="Type"
+                                                options={formTypeOptions.map((type) => ({ value: type, label: type }))}
+                                                value={dbFormType}
+                                                onChange={(value) => {
+                                                    setDbFormType(value);
+                                                    if (value) {
+                                                        sessionStorage.setItem('dbFormType', JSON.stringify(value));
+                                                    } else {
+                                                        sessionStorage.removeItem('dbFormType');
+                                                    }
+                                                }}
+                                            />
+                                            <EdbcSelectFilter
+                                                columnId={rentDatabaseColumnIds.branch}
+                                                placeholder="Branch"
+                                                options={dbBranchFilterOptions}
+                                                selectValue={dbBranch ? dbBranchFilterOptions.find((opt) => String(opt.value) === String(dbBranch)) || { value: dbBranch, label: getBranchName(dbBranch) || dbBranch } : null}
+                                                onChange={(value) => setDbBranch(value ? String(value) : '')}
+                                            />
+                                            <EdbcSelectFilter
+                                                columnId={rentDatabaseColumnIds.enteredBy}
+                                                placeholder="Entered By"
+                                                options={enteredByOption.map((type) => ({ value: type, label: type }))}
+                                                value={dbEnteredBy}
+                                                onChange={setDbEnteredBy}
+                                            />
+                                            <EdbcEmptyFilterCell columnId={rentDatabaseColumnIds.activity} />
+                                            <EdbcEmptyFilterCell columnId={rentDatabaseColumnIds.print} />
+                                        </EdbcTableFilterRow>
                                     )}
                                 </thead>
                                 <tbody>
-                                    {sortedItems.map((rent, index) => (
-                                        <tr key={rent.id} className="odd:bg-white even:bg-[#FAF6ED]">
-                                            <td className=" text-sm text-left px-4 font-semibold">{formatDate(rent.timestamp)}</td>
-                                            <td className=" text-sm text-left px-4 py-2 font-semibold">
+                                    {paginatedItems.map((rent) => (
+                                        <EdbcTableBodyRow key={rent.id}>
+                                            <td id={rentDatabaseColumnIds.timestamp} className={getRentDatabaseCellClass(rentDatabaseColumnIds.timestamp)}>
+                                                {formatDate(rent.timestamp)}
+                                            </td>
+                                            <td id={rentDatabaseColumnIds.shopNo} className={getRentDatabaseCellClass(rentDatabaseColumnIds.shopNo, '!text-left')}>
                                                 {rent.shopNoId && shopNoIdToShopNoMap[rent.shopNoId]
                                                     ? shopNoIdToShopNoMap[rent.shopNoId]
                                                     : rent.shopNo}
                                             </td>
-                                            <td className=" text-sm text-left px-4 font-semibold">
+                                            <td id={rentDatabaseColumnIds.tenantName} className={getRentDatabaseCellClass(rentDatabaseColumnIds.tenantName)}>
                                                 {rent.tenantNameId && tenantNameIdToTenantNameMap[rent.tenantNameId]
                                                     ? tenantNameIdToTenantNameMap[rent.tenantNameId]
                                                     : rent.tenantName}
                                             </td>
-                                            <td className={`text-sm text-left px-4 font-semibold ${rent.refundAmount ? 'text-red-500' : 'text-black'}`}>
+                                            <td id={rentDatabaseColumnIds.amount} className={getRentDatabaseCellClass(rentDatabaseColumnIds.amount, rent.refundAmount ? '!text-red-500' : '')}>
                                                 {Number(rent.refundAmount || rent.amount) === 0
                                                     ? 'NIL'
                                                     : `₹${Number(rent.refundAmount || rent.amount).toLocaleString('en-IN', {
@@ -1733,11 +1699,11 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
                                                         maximumFractionDigits: 2,
                                                     })}`}
                                             </td>
-                                            <td className="text-sm text-left px-4 font-semibold">
+                                            <td id={rentDatabaseColumnIds.paidOnDate} className={getRentDatabaseCellClass(rentDatabaseColumnIds.paidOnDate)}>
                                                 {Number(rent.refundAmount || rent.amount) === 0 ? 'NIL' : formatDateOnly(rent.paidOnDate)}
                                             </td>
-                                            <td className=" text-sm text-left px-4 font-semibold">{rent.eno}</td>
-                                            <td className="text-sm text-left px-4 font-semibold">
+                                            <td id={rentDatabaseColumnIds.eno} className={getRentDatabaseCellClass(rentDatabaseColumnIds.eno)}>{rent.eno}</td>
+                                            <td id={rentDatabaseColumnIds.forTheMonthOf} className={getRentDatabaseCellClass(rentDatabaseColumnIds.forTheMonthOf)}>
                                                 {rent.forTheMonthOf
                                                     ? new Date(`${rent.forTheMonthOf}-01`).toLocaleString('default', {
                                                         month: 'long',
@@ -1745,35 +1711,31 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
                                                     })
                                                     : ''}
                                             </td>
-                                            <td className=" text-sm text-left px-4 font-semibold">{rent.paymentMode}</td>
-                                            <td className=" text-sm text-left px-4 font-semibold">{rent.formType}</td>
-                                            <td className="text-sm text-left px-4 font-semibold">
-                                                {getRentEnteredBy(rent) || '-'}
-                                            </td>
-                                            <td className="text-sm text-left px-4 font-semibold">
+                                            <td id={rentDatabaseColumnIds.paymentMode} className={getRentDatabaseCellClass(rentDatabaseColumnIds.paymentMode)}>{rent.paymentMode}</td>
+                                            <td id={rentDatabaseColumnIds.formType} className={getRentDatabaseCellClass(rentDatabaseColumnIds.formType)}>{rent.formType}</td>
+                                            <td id={rentDatabaseColumnIds.branch} className={getRentDatabaseCellClass(rentDatabaseColumnIds.branch)}>
                                                 {getRentBranchDisplay(rent) || '-'}
                                             </td>
-                                            <td className=" flex w-[100px] justify-between py-2">
+                                            <td id={rentDatabaseColumnIds.enteredBy} className={getRentDatabaseCellClass(rentDatabaseColumnIds.enteredBy)}>
+                                                {getRentEnteredBy(rent) || '-'}
+                                            </td>
+                                            <td id={rentDatabaseColumnIds.activity} className={`${getRentDatabaseCellClass(rentDatabaseColumnIds.activity)} flex justify-between`}>
                                                 <button
                                                     onClick={() => handleEditClick(rent)}
                                                     disabled={rent.formType === 'Shop Closure' || rent.formType === 'Refund'}
                                                     className={`rounded-full transition duration-200 ml-2 mr-3 ${
-                                                        rent.formType === 'Shop Closure' || rent.formType === 'Refund' 
-                                                            ? 'cursor-not-allowed' 
+                                                        rent.formType === 'Shop Closure' || rent.formType === 'Refund'
+                                                            ? 'cursor-not-allowed'
                                                             : ''
                                                     }`}
-                                                    title={rent.formType === 'Shop Closure' || rent.formType === 'Refund' 
-                                                        ? 'Cannot edit Shop Closure or Refund forms' 
+                                                    title={rent.formType === 'Shop Closure' || rent.formType === 'Refund'
+                                                        ? 'Cannot edit Shop Closure or Refund forms'
                                                         : ''}
                                                 >
                                                     <img
                                                         src={edit}
                                                         alt="Edit"
-                                                        className={`w-4 h-6 transition duration-200 ${
-                                                            rent.formType === 'Shop Closure' || rent.formType === 'Refund' 
-                                                                ? '' 
-                                                                : ''
-                                                        }`}
+                                                        className="w-4 h-6 transition duration-200"
                                                     />
                                                 </button>
                                                 {userPermissions.includes("Delete") && (
@@ -1782,26 +1744,91 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
                                                             src={remove}
                                                             alt='delete'
                                                             onClick={() => handleDelete(rent.id, username)}
-                                                            className='  w-4 h-4 transition duration-200 ' />
+                                                            className='w-4 h-4 transition duration-200' />
                                                     </button>
                                                 )}
-                                                <button onClick={() => fetchAuditDetails(rent.id)} className="rounded-full transition duration-200 -mr-1" >
+                                                <button onClick={() => fetchAuditDetails(rent.id)} className="rounded-full transition duration-200 -mr-1">
                                                     <img
                                                         src={history}
                                                         alt="history"
-                                                        className=" w-4 h-5 transition duration-200 "
+                                                        className="w-4 h-5 transition duration-200"
                                                     />
                                                 </button>
                                             </td>
-                                            <td className="text-sm text-left px-2 font-semibold">
-                                                <button className="text-blue-600 underline" onClick={() => handlePrint(rent)}>
+                                            <td id={rentDatabaseColumnIds.print} className={getRentDatabaseCellClass(rentDatabaseColumnIds.print)}>
+                                                <button className="text-blue-600 underline text-xs sm:text-sm" onClick={() => handlePrint(rent)}>
                                                     Print
                                                 </button>
                                             </td>
-                                        </tr>
+                                        </EdbcTableBodyRow>
                                     ))}
                                 </tbody>
                             </table>
+                        </div>
+                        <div className="flex shrink-0 items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
+                            <div className="flex items-center space-x-2">
+                                <span className="text-sm text-gray-700">Items per page:</span>
+                                <select
+                                    value={itemsPerPage}
+                                    onChange={(e) => {
+                                        setItemsPerPage(Number(e.target.value));
+                                        setCurrentPage(1);
+                                    }}
+                                    className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                >
+                                    <option value={25}>25</option>
+                                    <option value={50}>50</option>
+                                    <option value={100}>100</option>
+                                    <option value={200}>200</option>
+                                    <option value={300}>300</option>
+                                    <option value={400}>400</option>
+                                    <option value={500}>500</option>
+                                    <option value={600}>600</option>
+                                    <option value={700}>700</option>
+                                    <option value={800}>800</option>
+                                    <option value={900}>900</option>
+                                    <option value={1000}>1000</option>
+                                </select>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <span className="text-sm text-gray-700">
+                                    Showing {startIndex + 1} to {Math.min(endIndex, sortedItems.length)} of {sortedItems.length} entries
+                                </span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                                <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}
+                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                >
+                                    Previous
+                                </button>
+                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                    let pageNum;
+                                    if (totalPages <= 5) {
+                                        pageNum = i + 1;
+                                    } else if (currentPage <= 3) {
+                                        pageNum = i + 1;
+                                    } else if (currentPage >= totalPages - 2) {
+                                        pageNum = totalPages - 4 + i;
+                                    } else {
+                                        pageNum = currentPage - 2 + i;
+                                    }
+                                    return (
+                                        <button key={pageNum} onClick={() => setCurrentPage(pageNum)}
+                                            className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${currentPage === pageNum
+                                                ? 'bg-[#BF9853] text-white border-[#BF9853]'
+                                                : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
+                                                }`}
+                                        >
+                                            {pageNum}
+                                        </button>
+                                    );
+                                })}
+                                <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages}
+                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                >
+                                    Next
+                                </button>
+                            </div>
                         </div>
                         <Modal
                             isOpen={modalIsOpen}
@@ -2119,6 +2146,7 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
                         )}
                         <AuditModal show={showModal} onClose={() => setShowModal(false)} audits={audits} />
                     </div>
+                </div>
                 </div>
             </div>
         </body>

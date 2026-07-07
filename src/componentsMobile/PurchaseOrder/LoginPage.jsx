@@ -20,16 +20,27 @@ const LoginPage = ({
     const handleLogin = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post(`${apiBaseUrl}/login`, { email, password });
-            const { username, userImage, position, email: userEmail, userRoles, id } = response.data;
+            const response = await axios.post(`${apiBaseUrl}/auth/login`, { email, password });
+            const token = response.data?.access_token;
+            const loggedInUser = response.data?.user || {};
+            const { username, userImage, userImageUrl, position, email: userEmail, userRoles, id, branchId, branch_id, brachId } = loggedInUser;
+            const resolvedBranchId = branch_id ?? branchId ?? brachId ?? '';
+            const resolvedUserImage = userImageUrl || userImage || '';
+            if (token) {
+                localStorage.setItem('authToken', token);
+                axios.defaults.headers.common.Authorization = `Bearer ${token}`;
+            }
             setUserId(id);
             const userData = {
                 username: username || '',
-                userImage: userImage || '',
+                userImage: resolvedUserImage,
+                userImageUrl: resolvedUserImage,
                 position: position || '',
                 email: userEmail || '',
                 userRoles: userRoles || [],
                 userId: id,
+                branchId: resolvedBranchId,
+                brachId: resolvedBranchId,
             };
             onLogin(userData);
             if (redirectPath) {
@@ -43,14 +54,22 @@ const LoginPage = ({
     const refreshUserData = async () => {
         if (!userId) return;        
         try {
-            const response = await axios.get(`${apiBaseUrl}/user/id/${userId}`);
-            const { username, userImage, position, email: userEmail, userRoles } = response.data;
+            const token = localStorage.getItem('authToken');
+            const response = await axios.get(`${apiBaseUrl}/user/id/${userId}`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            });
+            const { username, userImage, userImageUrl, position, email: userEmail, userRoles, branchId, branch_id, brachId } = response.data;
+            const resolvedBranchId = branch_id ?? branchId ?? brachId ?? '';
+            const resolvedUserImage = userImageUrl || userImage || '';
             onLogin({
                 username: username || '',
-                userImage: userImage || '',
+                userImage: resolvedUserImage,
+                userImageUrl: resolvedUserImage,
                 position: position || '',
                 email: userEmail || '',
                 userRoles: userRoles || [],
+                branchId: resolvedBranchId,
+                brachId: resolvedBranchId,
             });
         } catch (err) {
             console.error('Failed to refresh user data', err);

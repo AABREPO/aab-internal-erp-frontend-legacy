@@ -49,19 +49,34 @@ const SUMMARY_RIGHT_TABLE_CLASS = `${SUMMARY_TABLE_CLASS} ${SUMMARY_EDBC3_COLUMN
 const LOAN_SUMMARY_LEFT_TABLE_TOOLBAR_WIDTH_CLASS = 'w-[758px]';
 const LOAN_SUMMARY_RIGHT_TABLE_TOOLBAR_WIDTH_CLASS = 'w-[838px]';
 const LOAN_SUMMARY_LEFT_PANEL_HEADER_WIDTH_CLASS = 'w-[794px]';
+const LOAN_SUMMARY_RIGHT_PANEL_HEADER_WIDTH_CLASS = 'w-[874px]';
 
 const SUMMARY_POPUP_TABLE_CLASS = `table-fixed w-[468px] max-w-full border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS} ${EDBC8_COLUMN_LOCK_TABLE_CLASS} [&_th#EDBC-2]:!w-[130px] [&_td#EDBC-2]:!w-[130px] [&_th#EDBC-2]:!min-w-[130px] [&_td#EDBC-2]:!min-w-[130px] [&_th#EDBC-2]:!max-w-[130px] [&_td#EDBC-2]:!max-w-[130px]`;
 
-const SummaryPopupContextHeader = ({ context }) => {
-  const parts = String(context || '').split(' - ').filter(Boolean);
-  return (
-    <h3 className="text-[18px] font-semibold text-[#000000]">
-      {parts.map((line, index) => (
-        <span key={index} className="block">{line}</span>
-      ))}
-    </h3>
-  );
-};
+const SummaryPopupContextHeader = ({ context }) => (
+  <h3 className="text-[18px] font-semibold text-[#000000] min-w-0 break-words whitespace-normal">
+    {context}
+  </h3>
+);
+
+const SummaryPopupExportActions = ({ onExportPdf, onExportCsv }) => (
+  <div className="flex shrink-0 justify-end items-center gap-[8px]">
+    <span
+      className="text-[#E4572E] flex items-center gap-1 font-semibold hover:underline cursor-pointer"
+      onClick={onExportPdf}
+    >
+      PDF
+      <img src={PdfIcon} alt="Pdf" className="w-4 h-4" />
+    </span>
+    <span
+      className="text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer"
+      onClick={onExportCsv}
+    >
+      XL
+      <img src={XlIcon} alt="XL" className="w-4 h-4" />
+    </span>
+  </div>
+);
 
 const SUMMARY_OUTSIDE_SELECT_CLASS = 'custom-select w-[300px] h-[40px] rounded-lg focus:outline-none';
 const summaryOutsideSelectStyles = {
@@ -452,21 +467,21 @@ const LoanSummary = () => {
   const [progress, setProgress] = useState(0);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [purposeSortConfig, setPurposeSortConfig] = useState({ key: null, direction: 'asc' });
-
+  
   // Popup/Modal state for Associate panel (Left Panel)
   const [associatePopupData, setAssociatePopupData] = useState(null);
   const [associatePopupTitle, setAssociatePopupTitle] = useState("");
   const [associatePopupContext, setAssociatePopupContext] = useState("");
   const [showAssociatePopup, setShowAssociatePopup] = useState(false);
   const [associatePopupSortConfig, setAssociatePopupSortConfig] = useState({ key: null, direction: 'asc' });
-
+  
   // Popup/Modal state for Purpose panel (Right Panel)
   const [purposePopupData, setPurposePopupData] = useState(null);
   const [purposePopupTitle, setPurposePopupTitle] = useState("");
   const [purposePopupContext, setPurposePopupContext] = useState("");
   const [showPurposePopup, setShowPurposePopup] = useState(false);
   const [purposePopupSortConfig, setPurposePopupSortConfig] = useState({ key: null, direction: 'asc' });
-
+  
   // Popup/Modal state for Status popup (combined loan + refund)
   const [showStatusPopup, setShowStatusPopup] = useState(false);
   const [statusPopupData, setStatusPopupData] = useState({ loans: [], refunds: [] });
@@ -581,7 +596,7 @@ const LoanSummary = () => {
       };
     });
   };
-
+  
   useEffect(() => {
     setCombinedOptions([...vendorOptions, ...contractorOptions, ...employeeOptions, ...labourOptions]);
   }, [vendorOptions, contractorOptions, employeeOptions, labourOptions]);
@@ -826,11 +841,11 @@ const LoanSummary = () => {
       if (!purposeId) return;
       if (selectedAssociate) {
         if (!assocId) return;
-        if (String(assocId) !== String(selectedAssociate.id)) return;
-        const key = `${assocId}-${purposeId}`;
-        if (!map[key]) map[key] = { associateId: assocId, purposeId, pendingLoan: 0, refund: 0 };
-        if (e.type === "Loan" || e.type === "Transfer") map[key].pendingLoan += Number(e.amount) || 0;
-        else if (e.type === "Refund") map[key].refund += Number(e.loan_refund_amount) || 0;
+      if (String(assocId) !== String(selectedAssociate.id)) return;
+      const key = `${assocId}-${purposeId}`;
+      if (!map[key]) map[key] = { associateId: assocId, purposeId, pendingLoan: 0, refund: 0 };
+      if (e.type === "Loan" || e.type === "Transfer") map[key].pendingLoan += Number(e.amount) || 0;
+      else if (e.type === "Refund") map[key].refund += Number(e.loan_refund_amount) || 0;
       } else {
         const key = String(purposeId);
         if (!map[key]) map[key] = { purposeId, pendingLoan: 0, refund: 0 };
@@ -848,12 +863,12 @@ const LoanSummary = () => {
       const assocId = e.vendor_id || e.contractor_id || e.employee_id || e.labour_id;
       const purposeId = e.loan_purpose_id || e.from_purpose_id;
       if (selectedPurpose) {
-        if (!assocId || !purposeId) return;
-        if (String(purposeId) !== String(selectedPurpose.id)) return;
-        const key = `${purposeId}-${assocId}`;
-        if (!map[key]) map[key] = { purposeId, associateId: assocId, pendingLoan: 0, refund: 0 };
-        if (e.type === "Loan" || e.type === "Transfer") map[key].pendingLoan += Number(e.amount) || 0;
-        else if (e.type === "Refund") map[key].refund += Number(e.loan_refund_amount) || 0;
+      if (!assocId || !purposeId) return;
+      if (String(purposeId) !== String(selectedPurpose.id)) return;
+      const key = `${purposeId}-${assocId}`;
+      if (!map[key]) map[key] = { purposeId, associateId: assocId, pendingLoan: 0, refund: 0 };
+      if (e.type === "Loan" || e.type === "Transfer") map[key].pendingLoan += Number(e.amount) || 0;
+      else if (e.type === "Refund") map[key].refund += Number(e.loan_refund_amount) || 0;
       } else {
         if (!assocId) return;
         const key = String(assocId);
@@ -893,11 +908,11 @@ const LoanSummary = () => {
   };
 
   const buildLoanPopupRow = (item, amount) => ({
-    date: new Date(item.date).toLocaleDateString('en-GB'),
+      date: new Date(item.date).toLocaleDateString('en-GB'),
     amount,
-    type: item.type,
-    mode: item.type === "Transfer" ? "" : (item.loan_payment_mode || ""),
-    description: item.description || "",
+      type: item.type,
+      mode: item.type === "Transfer" ? "" : (item.loan_payment_mode || ""),
+      description: item.description || "",
     transferTo: item.type === "Transfer"
       ? (item.to_purpose_id ? getPurposeName(item.to_purpose_id) : (item.transfer_Project_id ? siteOptions.find(s => String(s.id) === String(item.transfer_Project_id))?.value || "" : ""))
       : "",
@@ -1567,10 +1582,10 @@ const LoanSummary = () => {
     option: (provided, state) => ({
       ...provided,
       fontWeight: '500',
-      backgroundColor: state.isSelected
-        ? 'rgba(191, 152, 83, 0.3)'
-        : state.isFocused
-          ? 'rgba(191, 152, 83, 0.1)'
+      backgroundColor: state.isSelected 
+        ? 'rgba(191, 152, 83, 0.3)' 
+        : state.isFocused 
+          ? 'rgba(191, 152, 83, 0.1)' 
           : 'white',
       color: 'black',
       textAlign: 'left',
@@ -1862,7 +1877,7 @@ const LoanSummary = () => {
       if (!selectedAssociate) return entry.associateName || '-';
       if (entry.isRefund || entry.type === 'Refund') return <div className="text-xs text-gray-500">Refund</div>;
       if (entry.type === 'Transfer' && entry.transferTo) {
-        return (
+  return (
           <div className="text-xs text-gray-500">
             {entry.amount < 0 ? 'Transfer To: ' : 'Transfer From: '}
             {entry.transferTo}
@@ -1892,22 +1907,22 @@ const LoanSummary = () => {
       <div className="p-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
         <div className="flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 max-h-full overflow-visible px-[24px] py-[24px] items-stretch bg-white">
           {/* Left Panel: Associate Summary */}
-          <div className={`flex flex-col w-fit max-w-full min-w-0 min-h-0 max-h-full overflow-hidden bg-white rounded-[6px] ${SUMMARY_PANEL_SHADOW} px-[24px] py-[24px]`}>
+          <div className={`flex flex-col flex-1 w-fit max-w-full min-w-0 min-h-0 max-h-full overflow-hidden bg-white rounded-[6px] ${SUMMARY_PANEL_SHADOW} px-[24px] py-[24px]`}>
             <div className="w-full min-w-0 flex flex-col flex-1 min-h-0 max-h-full">
-              <div className={`flex flex-wrap justify-between items-end gap-[12px] mb-[18px] shrink-0 max-w-full self-start ${LOAN_SUMMARY_LEFT_PANEL_HEADER_WIDTH_CLASS}`}>
+              <div className={`flex flex-nowrap justify-between items-end gap-[12px] mb-[18px] shrink-0 max-w-full self-start ${LOAN_SUMMARY_LEFT_PANEL_HEADER_WIDTH_CLASS}`}>
                 <div className="text-left">
                   <label className="block font-semibold mb-[8px]">Associate</label>
-                  <Select
-                    options={combinedOptions}
-                    value={selectedAssociate}
-                    onChange={setSelectedAssociate}
+              <Select
+                options={combinedOptions}
+                value={selectedAssociate}
+                onChange={setSelectedAssociate}
                     placeholder="Con/Ven/Emp/Lab"
                     className={SUMMARY_OUTSIDE_SELECT_CLASS}
-                    isClearable
-                    menuPortalTarget={document.body}
+                isClearable
+                menuPortalTarget={document.body}
                     styles={summaryOutsideSelectStyles}
-                  />
-                </div>
+              />
+              </div>
                 <div className="rounded-md px-4 py-[8px] text-sm shrink-0" style={SUMMARY_BOX_STYLE}>
                   <div className="flex justify-between text-[14px] gap-6 py-0.5">
                     <span className="flex shrink-0 w-[130px] text-black font-semibold">
@@ -1917,9 +1932,9 @@ const LoanSummary = () => {
                     <span className="font-semibold" style={{ color: '#E4572E' }}>
                       {formatSummaryAmount(pendingAdvanceAssociate)}
                     </span>
-                  </div>
-                </div>
-              </div>
+            </div>
+          </div>
+          </div>
               <div className="border border-gray-200 px-[18px] pt-[18px] flex flex-col flex-1 min-h-0 overflow-hidden self-start w-fit max-w-full">
                 <div className={`flex min-w-0 ${LOAN_SUMMARY_LEFT_TABLE_TOOLBAR_WIDTH_CLASS} max-w-full flex-nowrap items-center justify-between gap-[6px] mb-[9px] shrink-0 overflow-hidden`}>
                   <div className={`flex min-w-0 items-center overflow-hidden gap-[6px]${hasAssociateColumnFilters ? ' flex-1 min-w-0' : ' shrink-0'}`}>
@@ -2033,11 +2048,11 @@ const LoanSummary = () => {
                             <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC14} />
                           </EdbcTableFilterRow>
                         )}
-                      </thead>
-                      <tbody>
-                        {sortedSummaryByAssociate.length === 0 ? (
-                          <tr><td colSpan={5} className="text-center p-6 text-gray-500">No Records Available</td></tr>
-                        ) : sortedSummaryByAssociate.map((item, i) => (
+              </thead>
+              <tbody>
+                {sortedSummaryByAssociate.length === 0 ? (
+                  <tr><td colSpan={5} className="text-center p-6 text-gray-500">No Records Available</td></tr>
+                ) : sortedSummaryByAssociate.map((item, i) => (
                           <EdbcTableBodyRow key={i}>
                             <EdbcExpandableBodyCell
                               columnId={EDBC_IDS.EDBC4}
@@ -2051,7 +2066,7 @@ const LoanSummary = () => {
                               id={EDBC_IDS.EDBC8}
                               className={edbc8Config?.tdClass}
                               onMouseEnter={(e) => handleLoanMouseEnter(e, selectedAssociate?.id, item.purposeId, 'associate')}
-                              onMouseLeave={hideTooltip}
+                      onMouseLeave={hideTooltip}
                             >
                               <span
                                 onClick={() => handleAssociateLoanClick(selectedAssociate?.id, item.purposeId, getPurposeName(item.purposeId))}
@@ -2064,11 +2079,11 @@ const LoanSummary = () => {
                               >
                                 {formatSummaryAmount(item.pendingLoan)}
                               </span>
-                            </td>
-                            <td
+                    </td>
+                    <td 
                               className={edbc8Config?.tdClass}
                               onMouseEnter={(e) => handleBalanceMouseEnter(e, selectedAssociate?.id, item.purposeId, 'associate')}
-                              onMouseLeave={hideTooltip}
+                      onMouseLeave={hideTooltip}
                             >
                               <span
                                 onClick={() => handleAssociateBalanceClick(selectedAssociate?.id, item.purposeId, getPurposeName(item.purposeId))}
@@ -2081,7 +2096,7 @@ const LoanSummary = () => {
                               >
                                 {formatSummaryAmount(item.pendingLoan - item.refund)}
                               </span>
-                            </td>
+                    </td>
                             {renderLoanStatusBodyCell({
                               status: item.status,
                               pendingLoan: item.pendingLoan,
@@ -2093,33 +2108,33 @@ const LoanSummary = () => {
                             })}
                             <td id={EDBC_IDS.EDBC14} className={edbc14Config?.tdClass}></td>
                           </EdbcTableBodyRow>
-                        ))}
-                      </tbody>
-                    </table>
+                ))}
+              </tbody>
+            </table>
                   </div>
                 </div>
               </div>
-            </div>
           </div>
+        </div>
 
           {/* Right Panel: Purpose Summary */}
-          <div className={`flex flex-col flex-1 min-w-0 min-h-0 max-h-full overflow-hidden bg-white rounded-[6px] ${SUMMARY_PANEL_SHADOW} px-[24px] py-[24px]`}>
+          <div className={`flex flex-col flex-1 w-fit max-w-full min-w-0 min-h-0 max-h-full overflow-hidden bg-white rounded-[6px] ${SUMMARY_PANEL_SHADOW} px-[24px] py-[24px]`}>
             <div className="w-full min-w-0 flex flex-col flex-1 min-h-0 max-h-full">
-              <div className="flex flex-wrap justify-between items-end gap-[12px] mb-[18px] shrink-0 w-full">
+              <div className={`flex flex-nowrap justify-between items-end gap-[12px] mb-[18px] shrink-0 max-w-full self-start ${LOAN_SUMMARY_RIGHT_PANEL_HEADER_WIDTH_CLASS}`}>
                 <div className="text-left">
                   <label className="block font-semibold mb-[8px]">Purpose</label>
-                  <Select
-                    options={purposeOptions}
-                    value={selectedPurpose}
-                    onChange={setSelectedPurpose}
+              <Select
+                options={purposeOptions}
+                value={selectedPurpose}
+                onChange={setSelectedPurpose}
                     placeholder="Purpose"
                     isSearchable={true}
                     className={SUMMARY_OUTSIDE_SELECT_CLASS}
-                    isClearable
-                    menuPortalTarget={document.body}
+                isClearable
+                menuPortalTarget={document.body}
                     styles={summaryOutsideSelectStyles}
-                  />
-                </div>
+              />
+              </div>
                 <div className="rounded-md px-4 py-[8px] text-sm shrink-0" style={SUMMARY_BOX_STYLE}>
                   <div className="flex justify-between text-[14px] gap-6 py-0.5">
                     <span className="flex shrink-0 w-[130px] text-black font-semibold">
@@ -2129,9 +2144,9 @@ const LoanSummary = () => {
                     <span className="font-semibold" style={{ color: '#E4572E' }}>
                       {formatSummaryAmount(pendingAdvancePurpose)}
                     </span>
-                  </div>
-                </div>
-              </div>
+            </div>
+          </div>
+          </div>
               <div className="border border-gray-200 px-[18px] pt-[18px] flex flex-col flex-1 min-h-0 overflow-hidden self-start w-fit max-w-full">
                 <div className={`flex min-w-0 ${LOAN_SUMMARY_RIGHT_TABLE_TOOLBAR_WIDTH_CLASS} max-w-full flex-nowrap items-center justify-between gap-[6px] mb-[9px] shrink-0 overflow-hidden`}>
                   <div className={`flex min-w-0 items-center overflow-hidden gap-[6px]${hasPurposeColumnFilters ? ' flex-1 min-w-0' : ' shrink-0'}`}>
@@ -2245,11 +2260,11 @@ const LoanSummary = () => {
                             <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC14} />
                           </EdbcTableFilterRow>
                         )}
-                      </thead>
-                      <tbody>
-                        {sortedSummaryByPurpose.length === 0 ? (
-                          <tr><td colSpan={5} className="text-center p-6 text-gray-500">No Records Available</td></tr>
-                        ) : sortedSummaryByPurpose.map((item, i) => (
+              </thead>
+              <tbody>
+                {sortedSummaryByPurpose.length === 0 ? (
+                  <tr><td colSpan={5} className="text-center p-6 text-gray-500">No Records Available</td></tr>
+                ) : sortedSummaryByPurpose.map((item, i) => (
                           <EdbcTableBodyRow key={i}>
                             <EdbcExpandableBodyCell
                               columnId={EDBC_IDS.EDBC3}
@@ -2263,7 +2278,7 @@ const LoanSummary = () => {
                               id={EDBC_IDS.EDBC8}
                               className={edbc8Config?.tdClass}
                               onMouseEnter={(e) => handleLoanMouseEnter(e, item.associateId, selectedPurpose?.id, 'purpose')}
-                              onMouseLeave={hideTooltip}
+                      onMouseLeave={hideTooltip}
                             >
                               <span
                                 onClick={() => handlePurposeLoanClick(item.associateId, selectedPurpose?.id, getAssociateName(item.associateId))}
@@ -2276,11 +2291,11 @@ const LoanSummary = () => {
                               >
                                 {formatSummaryAmount(item.pendingLoan)}
                               </span>
-                            </td>
-                            <td
+                    </td>
+                    <td 
                               className={edbc8Config?.tdClass}
                               onMouseEnter={(e) => handleBalanceMouseEnter(e, item.associateId, selectedPurpose?.id, 'purpose')}
-                              onMouseLeave={hideTooltip}
+                      onMouseLeave={hideTooltip}
                             >
                               <span
                                 onClick={() => handlePurposeBalanceClick(item.associateId, selectedPurpose?.id, getAssociateName(item.associateId))}
@@ -2293,7 +2308,7 @@ const LoanSummary = () => {
                               >
                                 {formatSummaryAmount(item.pendingLoan - item.refund)}
                               </span>
-                            </td>
+                    </td>
                             {renderLoanStatusBodyCell({
                               status: item.status,
                               pendingLoan: item.pendingLoan,
@@ -2305,17 +2320,17 @@ const LoanSummary = () => {
                             })}
                             <td id={EDBC_IDS.EDBC14} className={edbc14Config?.tdClass}></td>
                           </EdbcTableBodyRow>
-                        ))}
-                      </tbody>
-                    </table>
+                ))}
+              </tbody>
+            </table>
                   </div>
                 </div>
-              </div>
-            </div>
+          </div>
           </div>
         </div>
+      </div>
 
-        {/* Tooltip */}
+      {/* Tooltip */}
         {tooltipData && (
           <div
             className="fixed z-50 bg-white text-black p-3 rounded shadow-lg text-sm max-w-xs"
@@ -2346,12 +2361,12 @@ const LoanSummary = () => {
                   {entry.type === 'Transfer' && tooltipTable === 'associate' && selectedAssociate && entry.transferPurposeName && !entry.isRefund && (
                     <div className="text-xs text-gray-500 ml-2">
                       ({entry.amount < 0 ? 'Transfer To: ' : 'Transfer From: '}{entry.transferPurposeName})
-                    </div>
+                </div>
                   )}
                   {entry.type === 'Transfer' && tooltipTable === 'purpose' && selectedPurpose && entry.transferPurposeName && !entry.isRefund && (
                     <div className="text-xs text-gray-500 ml-2">
                       ({entry.amount < 0 ? 'Transfer To: ' : 'Transfer From: '}{entry.transferPurposeName})
-                    </div>
+              </div>
                   )}
                 </div>
               ))}
@@ -2362,20 +2377,20 @@ const LoanSummary = () => {
                   .reduce((sum, item) => sum + item.amount, 0)
                   .toLocaleString('en-IN')}
               </span>
-            </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Associate Popup */}
-        {showAssociatePopup && associatePopupData && (
+      {/* Associate Popup */}
+      {showAssociatePopup && associatePopupData && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
-            onClick={() => setShowAssociatePopup(false)}
-          >
+          onClick={() => setShowAssociatePopup(false)}
+        >
             <div
               className="relative bg-white rounded-lg shadow-xl p-[18px] w-fit text-left max-h-[80vh] overflow-hidden no-scrollbar scrollbar-none"
-              onClick={(e) => e.stopPropagation()}
-            >
+            onClick={(e) => e.stopPropagation()}
+          >
               <button
                 type="button"
                 onClick={() => setShowAssociatePopup(false)}
@@ -2383,17 +2398,17 @@ const LoanSummary = () => {
               >
                 <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
               </button>
-              <div className="mb-2 pr-6">
+              <div className="mb-2 pr-[46px] w-[468px] max-w-full min-w-0">
                 <SummaryPopupContextHeader context={associatePopupContext} />
                 <p className="text-sm text-gray-600 mt-1">{associatePopupTitle}</p>
-              </div>
-              <div className="flex w-[468px] max-w-full justify-end mb-3">
-                <SummaryTableExportActions
-                  onExportPdf={() => exportPopupPDF(sortPopupData(associatePopupData, associatePopupSortConfig), associatePopupTitle, associatePopupContext)}
-                  onExportCsv={() => exportPopupCSV(sortPopupData(associatePopupData, associatePopupSortConfig), associatePopupTitle, associatePopupContext)}
-                />
-              </div>
-              <div className="mt-4 border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
+                <div className="flex w-[468px] max-w-full justify-end mt-[8px]">
+                  <SummaryPopupExportActions
+                    onExportPdf={() => exportPopupPDF(sortPopupData(associatePopupData, associatePopupSortConfig), associatePopupTitle, associatePopupContext)}
+                    onExportCsv={() => exportPopupCSV(sortPopupData(associatePopupData, associatePopupSortConfig), associatePopupTitle, associatePopupContext)}
+                  />
+                </div>
+            </div>
+              <div className="mt-[8px] border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
                 <table className={SUMMARY_POPUP_TABLE_CLASS}>
                   <thead className="sticky top-0 z-20 bg-[#FAF6ED]">
                     <EdbcTableHeaderRow>
@@ -2420,8 +2435,8 @@ const LoanSummary = () => {
                         onSort={handleAssociatePopupSort}
                       />
                     </EdbcTableHeaderRow>
-                  </thead>
-                  <tbody>
+                </thead>
+                <tbody>
                     {sortPopupData(associatePopupData, associatePopupSortConfig).map((entry, index) => (
                       <EdbcTableBodyRow key={index}>
                         <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass}>{entry.date}</td>
@@ -2433,32 +2448,32 @@ const LoanSummary = () => {
                         </td>
                       </EdbcTableBodyRow>
                     ))}
-                  </tbody>
-                  <tfoot>
+                </tbody>
+                <tfoot>
                     <tr className="bg-[#BF9853] text-white h-[40px] font-bold">
                       <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass}>Total</td>
                       <td id={EDBC_IDS.EDBC4} className={edbc4Config?.tdClass}></td>
                       <td id={EDBC_IDS.EDBC8} className={`${edbc8Config?.tdClass} text-white`}>
                         ₹{associatePopupData.reduce((sum, item) => sum + item.amount, 0).toLocaleString('en-IN')}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Purpose Popup */}
-        {showPurposePopup && purposePopupData && (
+      {/* Purpose Popup */}
+      {showPurposePopup && purposePopupData && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
-            onClick={() => setShowPurposePopup(false)}
-          >
+          onClick={() => setShowPurposePopup(false)}
+        >
             <div
               className="relative bg-white rounded-lg shadow-xl p-[18px] w-fit text-left max-h-[80vh] overflow-hidden no-scrollbar scrollbar-none"
-              onClick={(e) => e.stopPropagation()}
-            >
+            onClick={(e) => e.stopPropagation()}
+          >
               <button
                 type="button"
                 onClick={() => setShowPurposePopup(false)}
@@ -2466,17 +2481,17 @@ const LoanSummary = () => {
               >
                 <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
               </button>
-              <div className="mb-2 pr-6">
+              <div className="mb-2 pr-[46px] w-[468px] max-w-full min-w-0">
                 <SummaryPopupContextHeader context={purposePopupContext} />
                 <p className="text-sm text-gray-600 mt-1">{purposePopupTitle}</p>
-              </div>
-              <div className="flex w-[468px] max-w-full justify-end mb-3">
-                <SummaryTableExportActions
-                  onExportPdf={() => exportPopupPDF(sortPopupData(purposePopupData, purposePopupSortConfig), purposePopupTitle, purposePopupContext)}
-                  onExportCsv={() => exportPopupCSV(sortPopupData(purposePopupData, purposePopupSortConfig), purposePopupTitle, purposePopupContext)}
-                />
-              </div>
-              <div className="mt-4 border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
+                <div className="flex w-[468px] max-w-full justify-end mt-[8px]">
+                  <SummaryPopupExportActions
+                    onExportPdf={() => exportPopupPDF(sortPopupData(purposePopupData, purposePopupSortConfig), purposePopupTitle, purposePopupContext)}
+                    onExportCsv={() => exportPopupCSV(sortPopupData(purposePopupData, purposePopupSortConfig), purposePopupTitle, purposePopupContext)}
+                  />
+                </div>
+            </div>
+              <div className="mt-[8px] border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
                 <table className={SUMMARY_POPUP_TABLE_CLASS}>
                   <thead className="sticky top-0 z-20 bg-[#FAF6ED]">
                     <EdbcTableHeaderRow>
@@ -2503,8 +2518,8 @@ const LoanSummary = () => {
                         onSort={handlePurposePopupSort}
                       />
                     </EdbcTableHeaderRow>
-                  </thead>
-                  <tbody>
+                </thead>
+                <tbody>
                     {sortPopupData(purposePopupData, purposePopupSortConfig).map((entry, index) => (
                       <EdbcTableBodyRow key={index}>
                         <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass}>{entry.date}</td>
@@ -2516,32 +2531,32 @@ const LoanSummary = () => {
                         </td>
                       </EdbcTableBodyRow>
                     ))}
-                  </tbody>
-                  <tfoot>
+                </tbody>
+                <tfoot>
                     <tr className="bg-[#BF9853] text-white h-[40px] font-bold">
                       <td id={EDBC_IDS.EDBC2} className={edbc2Config?.tdClass}>Total</td>
                       <td id={EDBC_IDS.EDBC4} className={edbc4Config?.tdClass}></td>
                       <td id={EDBC_IDS.EDBC8} className={`${edbc8Config?.tdClass} text-white`}>
                         ₹{purposePopupData.reduce((sum, item) => sum + item.amount, 0).toLocaleString('en-IN')}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Status Popup */}
-        {showStatusPopup && statusPopupData && (
+      {/* Status Popup */}
+      {showStatusPopup && statusPopupData && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
-            onClick={() => setShowStatusPopup(false)}
-          >
+          onClick={() => setShowStatusPopup(false)}
+        >
             <div
               className="relative bg-white rounded-lg shadow-xl p-[18px] w-fit text-left max-h-[80vh] overflow-hidden no-scrollbar scrollbar-none"
-              onClick={(e) => e.stopPropagation()}
-            >
+            onClick={(e) => e.stopPropagation()}
+          >
               <button
                 type="button"
                 onClick={() => setShowStatusPopup(false)}
@@ -2549,121 +2564,124 @@ const LoanSummary = () => {
               >
                 <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
               </button>
-              <div className="mb-2 pr-6">
+              <div className="mb-2 pr-[46px] w-[468px] max-w-full min-w-0">
                 <SummaryPopupContextHeader context={statusPopupContext} />
                 <p className="text-sm text-gray-600 mt-1">Status Details</p>
-              </div>
-              <div className="flex w-[468px] max-w-full justify-end mb-3">
-                <SummaryTableExportActions onExportPdf={exportStatusPDF} onExportCsv={exportStatusCSV} />
-              </div>
-              <div className="mt-4 border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-[#f8f1e5]">
-                      <th className="p-3 text-left font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleStatusPopupSort('date')}>
-                        Date
-                        {statusPopupSortConfig.key === 'date' && (
-                          <span className="ml-1">{statusPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
-                      <th className="p-3 text-right font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleStatusPopupSort('loanAmount')}>
-                        Loan Amount
-                        {statusPopupSortConfig.key === 'loanAmount' && (
-                          <span className="ml-1">{statusPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
-                      <th className="p-3 text-right font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleStatusPopupSort('refundAmount')}>
-                        Refund Amount
-                        {statusPopupSortConfig.key === 'refundAmount' && (
-                          <span className="ml-1">{statusPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(() => {
-                      const combinedData = [];
-                      const dateMap = new Map();
-                      statusPopupData.loans.forEach(loan => {
-                        const key = `${loan.date}`;
-                        dateMap.set(key, {
-                          date: loan.date,
-                          loanAmount: loan.amount,
-                          refundAmount: 0,
-                        });
+                <div className="flex w-[468px] max-w-full justify-end mt-[8px]">
+                  <SummaryPopupExportActions
+                    onExportPdf={exportStatusPDF}
+                    onExportCsv={exportStatusCSV}
+                  />
+                </div>
+            </div>
+              <div className="mt-[8px] border-l-8 border-l-[#BF9853] max-h-[55vh] overflow-y-auto no-scrollbar scrollbar-none rounded-lg overflow-hidden">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-[#f8f1e5]">
+                    <th className="p-3 text-left font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleStatusPopupSort('date')}>
+                      Date
+                      {statusPopupSortConfig.key === 'date' && (
+                        <span className="ml-1">{statusPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </th>
+                    <th className="p-3 text-right font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleStatusPopupSort('loanAmount')}>
+                      Loan Amount
+                      {statusPopupSortConfig.key === 'loanAmount' && (
+                        <span className="ml-1">{statusPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </th>
+                    <th className="p-3 text-right font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleStatusPopupSort('refundAmount')}>
+                      Refund Amount
+                      {statusPopupSortConfig.key === 'refundAmount' && (
+                        <span className="ml-1">{statusPopupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const combinedData = [];
+                    const dateMap = new Map();
+                    statusPopupData.loans.forEach(loan => {
+                      const key = `${loan.date}`;
+                      dateMap.set(key, {
+                        date: loan.date,
+                        loanAmount: loan.amount,
+                        refundAmount: 0,
                       });
-                      statusPopupData.refunds.forEach(refund => {
-                        const key = `${refund.date}`;
-                        if (dateMap.has(key)) {
-                          dateMap.get(key).refundAmount = refund.amount;
-                        } else {
-                          dateMap.set(key, {
-                            date: refund.date,
-                            loanAmount: 0,
-                            refundAmount: refund.amount,
-                          });
-                        }
-                      });
-                      combinedData.push(...Array.from(dateMap.values()));
-                      const parseDate = (dateStr) => {
-                        const [day, month, year] = dateStr.split('/');
-                        return new Date(`${year}-${month}-${day}`);
-                      };
-                      if (!statusPopupSortConfig.key) {
-                        combinedData.sort((a, b) => parseDate(b.date) - parseDate(a.date));
+                    });
+                    statusPopupData.refunds.forEach(refund => {
+                      const key = `${refund.date}`;
+                      if (dateMap.has(key)) {
+                        dateMap.get(key).refundAmount = refund.amount;
                       } else {
-                        combinedData.sort((a, b) => {
-                          let aValue = a[statusPopupSortConfig.key];
-                          let bValue = b[statusPopupSortConfig.key];
-                          if (statusPopupSortConfig.key === 'date') {
-                            aValue = parseDate(aValue);
-                            bValue = parseDate(bValue);
-                            return statusPopupSortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
-                          }
-                          if (typeof aValue === 'number' && typeof bValue === 'number') {
-                            return statusPopupSortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
-                          }
-                          return 0;
+                        dateMap.set(key, {
+                          date: refund.date,
+                          loanAmount: 0,
+                          refundAmount: refund.amount,
                         });
                       }
-                      return combinedData.map((entry, index) => (
-                        <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-[#FAF6ED]"}>
-                          <td className="p-3 text-left">{entry.date}</td>
-                          <td className={`p-3 text-right font-semibold ${entry.loanAmount < 0 ? 'text-red-600' : ''}`}>
-                            {entry.loanAmount !== 0 ? `₹${entry.loanAmount.toLocaleString('en-IN')}` : '-'}
-                          </td>
-                          <td className="p-3 text-right font-semibold">
-                            {entry.refundAmount !== 0 ? `₹${entry.refundAmount.toLocaleString('en-IN')}` : '-'}
-                          </td>
-                        </tr>
-                      ));
-                    })()}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-[#f8f1e5] font-bold">
-                      <td className="p-3 text-left">Total</td>
-                      <td className="p-3 text-right">
-                        ₹{statusPopupData.loans.reduce((sum, item) => sum + item.amount, 0).toLocaleString('en-IN')}
-                      </td>
-                      <td className="p-3 text-right">
-                        ₹{statusPopupData.refunds.reduce((sum, item) => sum + item.amount, 0).toLocaleString('en-IN')}
-                      </td>
-                    </tr>
-                    <tr className="bg-[#BF9853] text-white font-bold">
-                      <td className="p-3 text-left">Balance Loan</td>
-                      <td className="p-3 text-right" colSpan="2">
-                        ₹{(
-                          statusPopupData.loans.reduce((sum, item) => sum + item.amount, 0) -
-                          statusPopupData.refunds.reduce((sum, item) => sum + item.amount, 0)
-                        ).toLocaleString('en-IN')}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
+                    });
+                    combinedData.push(...Array.from(dateMap.values()));
+                    const parseDate = (dateStr) => {
+                      const [day, month, year] = dateStr.split('/');
+                      return new Date(`${year}-${month}-${day}`);
+                    };
+                    if (!statusPopupSortConfig.key) {
+                      combinedData.sort((a, b) => parseDate(b.date) - parseDate(a.date));
+                    } else {
+                      combinedData.sort((a, b) => {
+                        let aValue = a[statusPopupSortConfig.key];
+                        let bValue = b[statusPopupSortConfig.key];
+                        if (statusPopupSortConfig.key === 'date') {
+                          aValue = parseDate(aValue);
+                          bValue = parseDate(bValue);
+                          return statusPopupSortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
+                        }
+                        if (typeof aValue === 'number' && typeof bValue === 'number') {
+                          return statusPopupSortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
+                        }
+                        return 0;
+                      });
+                    }
+                    return combinedData.map((entry, index) => (
+                      <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-[#FAF6ED]"}>
+                        <td className="p-3 text-left">{entry.date}</td>
+                        <td className={`p-3 text-right font-semibold ${entry.loanAmount < 0 ? 'text-red-600' : ''}`}>
+                          {entry.loanAmount !== 0 ? `₹${entry.loanAmount.toLocaleString('en-IN')}` : '-'}
+                        </td>
+                        <td className="p-3 text-right font-semibold">
+                          {entry.refundAmount !== 0 ? `₹${entry.refundAmount.toLocaleString('en-IN')}` : '-'}
+                        </td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-[#f8f1e5] font-bold">
+                    <td className="p-3 text-left">Total</td>
+                    <td className="p-3 text-right">
+                      ₹{statusPopupData.loans.reduce((sum, item) => sum + item.amount, 0).toLocaleString('en-IN')}
+                    </td>
+                    <td className="p-3 text-right">
+                      ₹{statusPopupData.refunds.reduce((sum, item) => sum + item.amount, 0).toLocaleString('en-IN')}
+                    </td>
+                  </tr>
+                  <tr className="bg-[#BF9853] text-white font-bold">
+                    <td className="p-3 text-left">Balance Loan</td>
+                    <td className="p-3 text-right" colSpan="2">
+                      ₹{(
+                        statusPopupData.loans.reduce((sum, item) => sum + item.amount, 0) -
+                        statusPopupData.refunds.reduce((sum, item) => sum + item.amount, 0)
+                      ).toLocaleString('en-IN')}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
-        )}
+        </div>
+      )}
       </div>
     </div>
   );

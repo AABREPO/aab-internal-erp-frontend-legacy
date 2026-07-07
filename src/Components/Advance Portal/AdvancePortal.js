@@ -69,7 +69,7 @@ const AdvancePortalAmountOutput = ({
   const isFilter = variant === 'filter';
   const isModalReadonly = variant === 'modal-readonly';
   const wrapperClass = isFilter
-    ? `relative lg:w-[150px] w-full h-[40px] ${className}`.trim()
+    ? `relative w-[150px] h-[40px] ${className}`.trim()
     : isModalReadonly
       ? `relative w-full h-[45px] ${className}`.trim()
       : fullWidth

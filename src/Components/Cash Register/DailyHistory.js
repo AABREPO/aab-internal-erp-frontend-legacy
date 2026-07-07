@@ -4032,7 +4032,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                     ) : (
                                                                         <div className={`${getEdbcColumnConfig(EDBC_IDS.EDBC3)?.filterWidthClass || ''} h-[40px] flex items-center min-w-0`}>
                                                                             <span
-                                                                                className="block w-full truncate whitespace-nowrap overflow-hidden"
+                                                                                className="block w-full truncate whitespace-nowrap overflow-hidden leading-[21px]"
                                                                                 title={siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""}
                                                                             >
                                                                                 {siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""}
@@ -4062,7 +4062,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                     ) : (
                                                                         <div className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass || ''} h-[40px] flex items-center min-w-0`}>
                                                                             <span
-                                                                                className="block w-full truncate whitespace-nowrap overflow-hidden"
+                                                                            className="block w-full truncate whitespace-nowrap overflow-hidden leading-[21px]"
                                                                                 title={row.type || ""}
                                                                             >
                                                                                 {row.type}
@@ -4084,7 +4084,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                         </div>
                                                                     ) : (
                                                                         <div className="flex items-center justify-end">
-                                                                            <div className="relative h-[40px] flex flex-col justify-center leading-tight cursor-default text-right">
+                                                                            <div className="relative h-[40px] flex flex-col justify-center leading-[21px] cursor-default text-right">
                                                                                 <span>
                                                                                     {formatEdbcTotalAmountPlaceholder(Number((row.amount || 0) + (row.extra_amount || 0)))}
                                                                                 </span>
@@ -4145,8 +4145,8 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                     </button>
                                                                 </td>
                                                                 <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
-                                                                    <div className="flex w-full items-center justify-center">
-                                                                        <span className="inline-flex items-center gap-[4px]">
+                                                                    <div className="relative flex w-full items-center justify-center">
+                                                                        <span className="inline-flex items-center">
                                                                             {row.file_url ? (
                                                                                 <>
                                                                                     <a
@@ -4162,7 +4162,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                                         <button
                                                                                             type="button"
                                                                                             onClick={() => handleRemoveFileUrl(row)}
-                                                                                            className="flex h-[12px] w-[12px] shrink-0 items-center justify-center rounded-full hover:bg-[#fff1ee]"
+                                                                                            className="absolute left-1/2 ml-[12px] top-1/2 -translate-y-1/2 flex h-[12px] w-[12px] shrink-0 items-center justify-center rounded-full hover:bg-[#fff1ee]"
                                                                                             title="Remove File"
                                                                                         >
                                                                                             <img src={FileRemover} className="" alt="Remove File" />
@@ -4170,7 +4170,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                                     )}
                                                                                 </>
                                                                             ) : (
-                                                                                <span className="inline-flex items-center gap-2">
+                                                                                <span className="inline-flex items-center">
                                                                                     <button
                                                                                         type="button"
                                                                                         onClick={() => handleFileUploadClick(row)}
@@ -4188,7 +4188,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                                         <button
                                                                                             type="button"
                                                                                             onClick={() => handleRestoreFileUrl(row)}
-                                                                                            className="inline-flex shrink-0"
+                                                                                            className="absolute left-1/2 ml-[12px] top-1/2 -translate-y-1/2 inline-flex shrink-0"
                                                                                             title="Restore Removed File"
                                                                                         >
                                                                                             <img src={restore} alt="" className="w-4 h-4" />
@@ -4200,9 +4200,8 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                     </div>
                                                                 </td>
                                                                 <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
-                                                                    {canEditSelectedWeek && (
-                                                                        <div className="flex gap-1 justify-center">
-                                                                            {editingDailyExpenseRowId === row.id ? (
+                                                                    <div className="flex gap-1 justify-center">
+                                                                            {canEditSelectedWeek && editingDailyExpenseRowId === row.id ? (
                                                                                 <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
                                                                                     <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
                                                                                         ✓
@@ -4210,7 +4209,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                                 </span>
                                                                             ) : (
                                                                                 <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
-                                                                                    {hasEditPermission ? (
+                                                                                    {canEditSelectedWeek && hasEditPermission ? (
                                                                                         <button onClick={() => handleEditClick(row)}>
                                                                                             <img className="w-5 h-4" src={Edit} alt="Edit" />
                                                                                         </button>
@@ -4220,7 +4219,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                                 </span>
                                                                             )}
                                                                             <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
-                                                                                {hasDeletePermission ? (
+                                                                                {canEditSelectedWeek && hasDeletePermission ? (
                                                                                     <button type="button" onClick={() => handleDailyExpensesDelete(row.id)}>
                                                                                         <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                                     </button>
@@ -4233,8 +4232,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                                     <img className="w-5 h-4" src={history} alt="History" />
                                                                                 </button>
                                                                             </span>
-                                                                        </div>
-                                                                    )}
+                                                                    </div>
                                                                 </td>
                                                                 <td className="w-[12px] min-w-[12px] max-w-[12px] p-0"></td>
                                                             </EdbcTableBodyRow>
@@ -4528,9 +4526,8 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                 />
                                                             )}
                                                             <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
-                                                                {canEditSelectedWeek && (
                                                                     <div className="flex gap-1 justify-center">
-                                                                        {editingPaymentId === row.id ? (
+                                                                        {canEditSelectedWeek && editingPaymentId === row.id ? (
                                                                             <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
                                                                                 <button className="text-green-600 font-bold text-lg" onClick={() => saveEditedRefundPayment(row.id)}>
                                                                                     ✓
@@ -4538,7 +4535,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                             </span>
                                                                         ) : (
                                                                             <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
-                                                                                {hasEditPermission ? (
+                                                                                {canEditSelectedWeek && hasEditPermission ? (
                                                                                     <button onClick={() => handleEditRefundClick(row)}>
                                                                                         <img className="w-5 h-4" src={Edit} alt="Edit" />
                                                                                     </button>
@@ -4548,7 +4545,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                             </span>
                                                                         )}
                                                                         <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
-                                                                            {hasDeletePermission ? (
+                                                                            {canEditSelectedWeek && hasDeletePermission ? (
                                                                                 <button type="button" onClick={() => handleRefundPaymentsDelete(row.id)}>
                                                                                     <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                                 </button>
@@ -4562,7 +4559,6 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                             </button>
                                                                         </span>
                                                                     </div>
-                                                                )}
                                                             </td>
                                                             <td className="w-[12px] min-w-[12px] max-w-[12px] p-0"></td>
                                                         </EdbcTableBodyRow>
